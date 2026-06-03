@@ -233,6 +233,7 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_STROKEFX = 'strokefx';
+  const FILTER_ID_SPIKY = 'spiky';
 
   const AGE_GLOSS = {
     under18: { surfaceScale: 12, specularExponent: 80 },
@@ -365,12 +366,12 @@
     let miterlimit = null;
     let spikyScale = 0;
     if (p.gender === 'nonbinary') {
-      spikyScale = 5;
+      spikyScale = 12;
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
-      spikyScale = 12;
+      spikyScale = 25;
     }
 
     return {
@@ -393,12 +394,9 @@
 
   function buildStrokeFilterDef(style) {
     const hasAge = style.ageTexture === 'glossy' || style.ageTexture === 'roughstone';
-    const hasSpiky = style.spikyScale > 0;
-    if (!hasAge && !hasSpiky) return '';
+    if (!hasAge) return '';
 
     let inner = '';
-    let ageResult = 'SourceGraphic';
-
     if (style.ageTexture === 'glossy') {
       inner +=
         '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
@@ -413,24 +411,11 @@
         '<feMergeNode in="SourceGraphic"/>' +
         '<feMergeNode in="spec"/>' +
         '</feMerge>';
-      ageResult = 'ageOut';
     } else if (style.ageTexture === 'roughstone') {
       inner +=
         '<feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="5" seed="2" result="stoneNoise"/>' +
         '<feDisplacementMap in="SourceGraphic" in2="stoneNoise" scale="' +
         style.roughstoneScale +
-        '" xChannelSelector="R" yChannelSelector="G" result="ageOut"/>';
-      ageResult = 'ageOut';
-    }
-
-    if (hasSpiky) {
-      inner +=
-        '<feMorphology in="' +
-        ageResult +
-        '" operator="erode" radius="2" result="eroded"/>' +
-        '<feTurbulence type="turbulence" baseFrequency="0.35" numOctaves="1" result="spikyNoise"/>' +
-        '<feDisplacementMap in="eroded" in2="spikyNoise" scale="' +
-        style.spikyScale +
         '" xChannelSelector="R" yChannelSelector="G"/>';
     }
 
@@ -443,8 +428,23 @@
     );
   }
 
+  function buildSpikyFilterDef(style) {
+    if (style.spikyScale <= 0) return '';
+    return (
+      '<filter id="' +
+      FILTER_ID_SPIKY +
+      '" x="-10%" y="-10%" width="120%" height="120%">' +
+      '<feTurbulence type="turbulence" baseFrequency="0.06" numOctaves="2" seed="4" result="noise"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
+      style.spikyScale +
+      '" xChannelSelector="R" yChannelSelector="G" result="displaced"/>' +
+      '<feComposite in="displaced" in2="SourceGraphic" operator="xor"/>' +
+      '</filter>'
+    );
+  }
+
   function buildSvgDefs(style) {
-    return '<defs>' + buildStrokeFilterDef(style) + '</defs>';
+    return '<defs>' + buildStrokeFilterDef(style) + buildSpikyFilterDef(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -497,13 +497,13 @@
     }
   }
 
-  /** Single pass: domain stroke 45 + roughline displacement. */
-  function pathOnePass(pathMarkup, style) {
-    const clean = sanitizePathsInner(pathMarkup);
+  function strokeAttrs(style, width, filterId) {
     let attrs =
       'fill="none" stroke="' +
       style.strokeColor +
-      '" stroke-width="45" stroke-linecap="' +
+      '" stroke-width="' +
+      width +
+      '" stroke-linecap="' +
       style.linecap +
       '" stroke-linejoin="' +
       style.linejoin +
@@ -511,10 +511,32 @@
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    if (style.ageTexture !== 'none' || style.spikyScale > 0) {
-      attrs += ' filter="url(#' + FILTER_ID_STROKEFX + ')"';
+    if (filterId) {
+      attrs += ' filter="url(#' + filterId + ')"';
     }
-    return '<g class="path-layers"><g ' + attrs + '>' + clean + '</g></g>';
+    return attrs;
+  }
+
+  /** Solid pass 45 (+ age texture) · spiky genders add pass 2 width 55 + xor edge filter. */
+  function pathOnePass(pathMarkup, style) {
+    const clean = sanitizePathsInner(pathMarkup);
+    if (style.spikyScale > 0) {
+      return (
+        '<g class="path-layers">' +
+        '<g ' +
+        strokeAttrs(style, 45, null) +
+        '>' +
+        clean +
+        '</g>' +
+        '<g ' +
+        strokeAttrs(style, 55, FILTER_ID_SPIKY) +
+        '>' +
+        clean +
+        '</g></g>'
+      );
+    }
+    const ageFx = style.ageTexture !== 'none' ? FILTER_ID_STROKEFX : null;
+    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, ageFx) + '>' + clean + '</g></g>';
   }
 
   function pathLayers(pathMarkup, style) {
