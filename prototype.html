@@ -360,6 +360,12 @@
       ageTexture = 'roughstone';
       roughstoneScale = AGE_ROUGHSTONE_SCALE[p.age];
     }
+    const surfaceScale =
+      ageTexture === 'glossy'
+        ? glossSurfaceScale
+        : ageTexture === 'roughstone'
+          ? roughstoneScale
+          : 0;
 
     let linecap = 'round';
     let linejoin = 'round';
@@ -371,7 +377,7 @@
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
-      spikyScale = 25;
+      spikyScale = 35;
     }
 
     return {
@@ -388,20 +394,20 @@
       roughstoneScale,
       glossSurfaceScale,
       glossSpecularExponent,
+      surfaceScale,
       spikyScale
     };
   }
 
   function buildStrokeFilterDef(style) {
-    const hasAge = style.ageTexture === 'glossy' || style.ageTexture === 'roughstone';
-    if (!hasAge) return '';
+    if (style.surfaceScale <= 0) return '';
 
     let inner = '';
     if (style.ageTexture === 'glossy') {
       inner +=
         '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
         '<feSpecularLighting in="blur" surfaceScale="' +
-        style.glossSurfaceScale +
+        style.surfaceScale +
         '" specularConstant="1.5" specularExponent="' +
         style.glossSpecularExponent +
         '" lighting-color="white" result="spec">' +
@@ -415,7 +421,7 @@
       inner +=
         '<feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="5" seed="2" result="stoneNoise"/>' +
         '<feDisplacementMap in="SourceGraphic" in2="stoneNoise" scale="' +
-        style.roughstoneScale +
+        style.surfaceScale +
         '" xChannelSelector="R" yChannelSelector="G"/>';
     }
 
@@ -433,17 +439,17 @@
     return (
       '<filter id="' +
       FILTER_ID_SPIKY +
-      '" x="-10%" y="-10%" width="120%" height="120%">' +
-      '<feTurbulence type="turbulence" baseFrequency="0.06" numOctaves="2" seed="4" result="noise"/>' +
+      '" x="-15%" y="-15%" width="130%" height="130%">' +
+      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="2" result="noise"/>' +
       '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
       style.spikyScale +
-      '" xChannelSelector="R" yChannelSelector="G" result="displaced"/>' +
-      '<feComposite in="displaced" in2="SourceGraphic" operator="xor"/>' +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
 
   function buildSvgDefs(style) {
+    console.log('surfaceScale:', style.surfaceScale);
     return '<defs>' + buildStrokeFilterDef(style) + buildSpikyFilterDef(style) + '</defs>';
   }
 
@@ -517,26 +523,16 @@
     return attrs;
   }
 
-  /** Solid pass 45 (+ age texture) · spiky genders add pass 2 width 55 + xor edge filter. */
+  /** Single pass 45 — age (#strokefx) or spiky (#spiky) on full stroke. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
+    let filterId = null;
     if (style.spikyScale > 0) {
-      return (
-        '<g class="path-layers">' +
-        '<g ' +
-        strokeAttrs(style, 45, null) +
-        '>' +
-        clean +
-        '</g>' +
-        '<g ' +
-        strokeAttrs(style, 55, FILTER_ID_SPIKY) +
-        '>' +
-        clean +
-        '</g></g>'
-      );
+      filterId = FILTER_ID_SPIKY;
+    } else if (style.surfaceScale > 0) {
+      filterId = FILTER_ID_STROKEFX;
     }
-    const ageFx = style.ageTexture !== 'none' ? FILTER_ID_STROKEFX : null;
-    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, ageFx) + '>' + clean + '</g></g>';
+    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
   }
 
   function pathLayers(pathMarkup, style) {
