@@ -223,14 +223,17 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_DOTS3D = 'dots3d';
+  const FILTER_ID_SHADOWBLUR = 'shadowblur';
   const DOTS3D_FILTER_DEF =
     '<filter id="dots3d" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-    '<feTurbulence type="turbulence" baseFrequency="0.20" numOctaves="2" seed="3" result="noise"/>' +
-    '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="4" result="light">' +
-    '<feDistantLight azimuth="225" elevation="50"/>' +
+    '<feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="4" seed="7" result="noise"/>' +
+    '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="6" result="light">' +
+    '<feDistantLight azimuth="135" elevation="40"/>' +
     '</feDiffuseLighting>' +
     '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
     '</filter>';
+  const SHADOWBLUR_FILTER_DEF =
+    '<filter id="shadowblur"><feGaussianBlur stdDeviation="10"/></filter>';
 
   /** תחום: צבעים, רקע, דפוס, intent לחיבורים */
   const DOMAINS = {
@@ -350,7 +353,7 @@
   }
 
   function buildSvgDefs() {
-    return '<defs>' + DOTS3D_FILTER_DEF + '</defs>';
+    return '<defs>' + SHADOWBLUR_FILTER_DEF + DOTS3D_FILTER_DEF + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -414,12 +417,14 @@
     return '<g ' + attrs + '>';
   }
 
-  /** Pass 1 black 74 · Pass 2 white 62 + dots3d only. */
+  /** Shadow blur · Pass 2 white 62 + dots3d only. */
   function pathTwoPasses(pathMarkup) {
     const clean = sanitizePathsInner(pathMarkup);
     return (
       '<g class="path-layers">' +
-      strokePassFixed('#000', 74) +
+      '<g transform="translate(4,6)" fill="none" stroke="#000" stroke-width="80" opacity="0.15" filter="url(#' +
+      FILTER_ID_SHADOWBLUR +
+      ')">' +
       clean +
       '</g>' +
       strokePassFixed('#fff', 62, FILTER_ID_DOTS3D) +
