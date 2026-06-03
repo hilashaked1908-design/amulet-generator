@@ -524,15 +524,17 @@
     return wrap(original + spikePolys.join(''));
   }
 
-  function applySpikesToPathsMarkup(html, numSpikes, spikeLength) {
-    if (!html || numSpikes < 1 || spikeLength <= 0) return html;
+  /** Spike triangles only (paths unchanged) for overlay outside the gloss/age filter. */
+  function buildSpikePolygonsMarkup(html, numSpikes, spikeLength) {
+    if (!html || numSpikes < 1 || spikeLength <= 0) return '';
     const doc = new DOMParser().parseFromString(
       '<svg xmlns="http://www.w3.org/2000/svg"><g id="spike-root">' + html + '</g></svg>',
       'image/svg+xml'
     );
-    if (doc.querySelector('parsererror')) return html;
+    if (doc.querySelector('parsererror')) return '';
     const root = doc.getElementById('spike-root');
-    if (!root) return html;
+    if (!root) return '';
+    const polys = [];
     root.querySelectorAll('path').forEach((pathEl) => {
       const groupDoc = new DOMParser().parseFromString(
         '<svg xmlns="http://www.w3.org/2000/svg">' +
@@ -540,12 +542,11 @@
           '</svg>',
         'image/svg+xml'
       );
-      const group = groupDoc.documentElement.firstElementChild;
-      if (group) {
-        pathEl.replaceWith(doc.importNode(group, true));
-      }
+      groupDoc.querySelectorAll('polygon.path-spike').forEach((poly) => {
+        polys.push(poly.outerHTML);
+      });
     });
-    return root.innerHTML;
+    return polys.join('');
   }
 
   /**
@@ -605,22 +606,26 @@
     return attrs;
   }
 
-  /** Single pass 45 — gloss/age filter; JS triangle spikes overlay for male / nonbinary. */
+  /** Single pass 45 — gloss/age filter on paths; JS spike triangles on top (unfiltered). */
   function pathOnePass(pathMarkup, style) {
-    let clean = sanitizePathsInner(pathMarkup);
-    if (style.spikeCount > 0 && style.spikeLength > 0) {
-      clean = applySpikesToPathsMarkup(clean, style.spikeCount, style.spikeLength);
-    }
+    const clean = sanitizePathsInner(pathMarkup);
     const filterId = FILTER_ID_COMBINED;
-    return (
+    const spikes =
+      style.spikeCount > 0 && style.spikeLength > 0
+        ? buildSpikePolygonsMarkup(clean, style.spikeCount, style.spikeLength)
+        : '';
+    let out =
       '<g class="path-layers" style="color:' +
       style.strokeColor +
       '"><g ' +
       strokeAttrs(style, 45, filterId) +
       '>' +
       clean +
-      '</g></g>'
-    );
+      '</g>';
+    if (spikes) {
+      out += '<g class="path-spikes" fill="currentColor" stroke="none">' + spikes + '</g>';
+    }
+    return out + '</g>';
   }
 
   function pathLayers(pathMarkup, style) {
@@ -1218,7 +1223,7 @@
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      msg += ' | age=' + style.ageTexture + ' spiky=' + style.spikyScale;
+      msg += ' | age=' + style.ageTexture + ' spikes=' + style.spikeCount;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
