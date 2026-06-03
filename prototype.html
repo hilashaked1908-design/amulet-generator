@@ -62,19 +62,6 @@
       transition: background 0.1s, border-color 0.1s;
     }
     .opt-btn:hover { background: #efefef; }
-    .opt-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-    .field[data-group="gender"] .opt-btn {
-      pointer-events: auto;
-      cursor: pointer;
-    }
-    .field[data-group="gender"] .opt-btn[data-value="male"] {
-      pointer-events: auto;
-      cursor: pointer;
-    }
     .opt-btn.active {
       background: #111;
       color: #fff;
@@ -190,7 +177,7 @@
         <div class="btn-row">
           <button type="button" class="opt-btn active" data-value="female">נקבה</button>
           <button type="button" class="opt-btn" data-value="nonbinary">לא בינארי</button>
-          <button type="button" class="opt-btn" data-value="male" aria-label="זכר">זכר</button>
+          <button type="button" class="opt-btn" data-value="male">זכר</button>
         </div>
       </div>
 
@@ -289,7 +276,7 @@
     male: {
       linecap: 'square',
       linejoin: 'miter',
-      miterlimit: 2,
+      miterlimit: 50,
       scale: GENDER_SCALE_MALE
     }
   };
@@ -358,19 +345,20 @@
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
     const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
 
-    let surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     let linecap = 'round';
     let linejoin = 'round';
     let miterlimit = null;
-    let strokeDasharray = null;
-    if (p.gender === 'male') {
+    let spikyScale = 0;
+    if (p.gender === 'nonbinary') {
+      spikyScale = 8;
+    } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
-      miterlimit = 2;
-      strokeDasharray = '2 3';
-      surfaceScale = Math.min(surfaceScale, 8);
+      miterlimit = 100;
+      spikyScale = 30;
     }
 
     return {
@@ -385,14 +373,11 @@
       miterlimit,
       ageTexture,
       surfaceScale,
-      strokeDasharray,
-      gender: p.gender
+      spikyScale
     };
   }
 
   function buildCombinedFilter(style) {
-    const baseFreq =
-      style.gender === 'male' ? '0.15' : style.gender === 'nonbinary' ? '0.09' : '0.065';
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
@@ -405,11 +390,13 @@
       '<feMergeNode in="SourceGraphic"/>' +
       '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
-      '<feTurbulence type="fractalNoise" baseFrequency="' +
-      baseFreq +
-      '" numOctaves="4" seed="2" result="noise"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
       style.surfaceScale +
+      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
+      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
+      '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
+      style.spikyScale +
       '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
@@ -429,8 +416,8 @@
 
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const dash = style.strokeDasharray ? ' dash=' + style.strokeDasharray : '';
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + dash + ' · ' + style.linecap;
+    const spk = style.spikyScale ? ' spiky=' + style.spikyScale : '';
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + spk + ' · ' + style.linecap;
   }
 
   /**
@@ -484,26 +471,17 @@
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    if (style.strokeDasharray) {
-      attrs += ' stroke-dasharray="' + style.strokeDasharray + '"';
-    }
     if (filterId) {
       attrs += ' filter="url(#' + filterId + ')"';
     }
     return attrs;
   }
 
-  /** Single pass 45 — gloss/age filter; male uses stroke-dasharray for angular look. */
+  /** Single pass 45 — combined age + spiky filter when either applies. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
     const filterId = FILTER_ID_COMBINED;
-    return (
-      '<g class="path-layers"><g ' +
-      strokeAttrs(style, 45, filterId) +
-      '>' +
-      clean +
-      '</g></g>'
-    );
+    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
   }
 
   function pathLayers(pathMarkup, style) {
@@ -921,7 +899,7 @@
     readParams();
     const style = visualStyle(params);
     document.title =
-      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' dash:' + (style.strokeDasharray || '');
+      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' spiky:' + style.spikyScale;
     const intent = style.intent;
     const unique = [];
     for (const ch of letters) {
@@ -1087,7 +1065,7 @@
         strokeColor: style.strokeColor,
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
-        strokeDasharray: style.strokeDasharray,
+        spikyScale: style.spikyScale,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1100,7 +1078,7 @@
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      msg += ' | age=' + style.ageTexture + (style.strokeDasharray ? ' dash=' + style.strokeDasharray : '');
+      msg += ' | age=' + style.ageTexture + ' spiky=' + style.spikyScale;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
