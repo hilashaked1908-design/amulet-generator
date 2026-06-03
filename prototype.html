@@ -364,17 +364,12 @@
     let linecap = 'round';
     let linejoin = 'round';
     let miterlimit = null;
-    let spikeCount = 0;
-    let spikeLength = 0;
-    if (p.gender === 'nonbinary') {
-      spikeCount = 20;
-      spikeLength = 6;
-    } else if (p.gender === 'male') {
+    let strokeDasharray = null;
+    if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 2;
-      spikeCount = 40;
-      spikeLength = 12;
+      strokeDasharray = '2 3';
       surfaceScale = Math.min(surfaceScale, 8);
     }
 
@@ -390,8 +385,7 @@
       miterlimit,
       ageTexture,
       surfaceScale,
-      spikeCount,
-      spikeLength,
+      strokeDasharray,
       gender: p.gender
     };
   }
@@ -435,161 +429,8 @@
 
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const spk = style.spikeCount ? ' spikes=' + style.spikeCount : '';
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + spk + ' · ' + style.linecap;
-  }
-
-  function spikeNum(n) {
-    return Number(n).toFixed(2);
-  }
-
-  function pathDFromSvgPath(svgPath) {
-    const s = String(svgPath || '').trim();
-    if (!s) return '';
-    if (s.charAt(0) !== '<') return s;
-    const m = s.match(/\bd\s*=\s*["']([^"']+)["']/i);
-    return m ? m[1] : '';
-  }
-
-  const SPIKE_STROKE_WIDTH = 45;
-  const SPIKE_STROKE_PROXIMITY = 5;
-
-  function distPointToPath(pathEl, x, y) {
-    const total = pathEl.getTotalLength();
-    if (!total || !isFinite(total)) return Infinity;
-    const steps = Math.max(24, Math.ceil(total / 3));
-    let best = Infinity;
-    for (let i = 0; i <= steps; i++) {
-      const pt = pathEl.getPointAtLength((total * i) / steps);
-      const d = Math.hypot(pt.x - x, pt.y - y);
-      if (d < best) best = d;
-    }
-    return best;
-  }
-
-  /**
-   * Sample points along a path, extrude thin outward triangles on the stroke edge.
-   * Returns original path + spike polygons in one group (paths first, spikes after).
-   */
-  function addSpikesToPath(svgPath, numSpikes, spikeLength, strokeWidth) {
-    const sw = strokeWidth == null ? SPIKE_STROKE_WIDTH : strokeWidth;
-    const strokeHalf = sw / 2;
-    const maxDist = strokeHalf + SPIKE_STROKE_PROXIMITY;
-    const d = pathDFromSvgPath(svgPath);
-    const original =
-      String(svgPath || '').trim().charAt(0) === '<'
-        ? String(svgPath).trim()
-        : '<path fill="none" d="' + d.replace(/"/g, '&quot;') + '"/>';
-    const wrap = (inner) => '<g class="path-with-spikes">' + inner + '</g>';
-    if (!d || numSpikes < 1 || spikeLength <= 0) {
-      return wrap(original);
-    }
-
-    const NS = 'http://www.w3.org/2000/svg';
-    const measure = document.createElementNS(NS, 'svg');
-    measure.setAttribute('width', '0');
-    measure.setAttribute('height', '0');
-    measure.style.cssText =
-      'position:fixed;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none';
-    const pathEl = document.createElementNS(NS, 'path');
-    pathEl.setAttribute('d', d);
-    pathEl.setAttribute('fill', 'none');
-    measure.appendChild(pathEl);
-    document.body.appendChild(measure);
-
-    const spikePolys = [];
-    try {
-      const total = pathEl.getTotalLength();
-      if (!total || !isFinite(total)) {
-        return wrap(original);
-      }
-      const baseHalf = Math.max(0.5, spikeLength * 0.05);
-      const step = Math.min(2, total / Math.max(numSpikes * 2, 1));
-      for (let i = 0; i < numSpikes; i++) {
-        const t = total * (i + 0.5) / numSpikes;
-        const p = pathEl.getPointAtLength(t);
-        const pA = pathEl.getPointAtLength(Math.min(total, t + step));
-        const pB = pathEl.getPointAtLength(Math.max(0, t - step));
-        let tx = pA.x - pB.x;
-        let ty = pA.y - pB.y;
-        const tm = Math.hypot(tx, ty) || 1;
-        tx /= tm;
-        ty /= tm;
-        let nx = -ty;
-        let ny = tx;
-        const midX = (p.x + pA.x + pB.x) / 3;
-        const midY = (p.y + pA.y + pB.y) / 3;
-        const bbox = pathEl.getBBox();
-        const cx = bbox.x + bbox.width / 2;
-        const cy = bbox.y + bbox.height / 2;
-        const outX = midX - cx;
-        const outY = midY - cy;
-        if (nx * outX + ny * outY < 0) {
-          nx = -nx;
-          ny = -ny;
-        }
-        const edgeX = p.x + nx * strokeHalf;
-        const edgeY = p.y + ny * strokeHalf;
-        if (distPointToPath(pathEl, edgeX, edgeY) > maxDist) {
-          continue;
-        }
-        const tipX2 = edgeX + nx * spikeLength;
-        const tipY2 = edgeY + ny * spikeLength;
-        const b1x = edgeX - tx * baseHalf;
-        const b1y = edgeY - ty * baseHalf;
-        const b2x = edgeX + tx * baseHalf;
-        const b2y = edgeY + ty * baseHalf;
-        const baseMidX = (b1x + b2x) / 2;
-        const baseMidY = (b1y + b2y) / 2;
-        if (distPointToPath(pathEl, baseMidX, baseMidY) > maxDist) {
-          continue;
-        }
-        spikePolys.push(
-          '<polygon class="path-spike" fill="currentColor" stroke="none" points="' +
-            spikeNum(tipX2) +
-            ',' +
-            spikeNum(tipY2) +
-            ' ' +
-            spikeNum(b1x) +
-            ',' +
-            spikeNum(b1y) +
-            ' ' +
-            spikeNum(b2x) +
-            ',' +
-            spikeNum(b2y) +
-            '"/>'
-        );
-      }
-    } finally {
-      measure.remove();
-    }
-
-    return wrap(original + spikePolys.join(''));
-  }
-
-  /** Replace each path with path+spikes group in its parent (same transform as glyph). */
-  function embedSpikesInPathsMarkup(html, numSpikes, spikeLength, strokeWidth) {
-    if (!html || numSpikes < 1 || spikeLength <= 0) return html;
-    const doc = new DOMParser().parseFromString(
-      '<svg xmlns="http://www.w3.org/2000/svg"><g id="spike-root">' + html + '</g></svg>',
-      'image/svg+xml'
-    );
-    if (doc.querySelector('parsererror')) return html;
-    const root = doc.getElementById('spike-root');
-    if (!root) return html;
-    root.querySelectorAll('path').forEach((pathEl) => {
-      const groupDoc = new DOMParser().parseFromString(
-        '<svg xmlns="http://www.w3.org/2000/svg">' +
-          addSpikesToPath(pathEl.outerHTML, numSpikes, spikeLength, strokeWidth) +
-          '</svg>',
-        'image/svg+xml'
-      );
-      const group = groupDoc.documentElement.firstElementChild;
-      if (group && pathEl.parentNode) {
-        pathEl.parentNode.replaceChild(doc.importNode(group, true), pathEl);
-      }
-    });
-    return root.innerHTML;
+    const dash = style.strokeDasharray ? ' dash=' + style.strokeDasharray : '';
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + dash + ' · ' + style.linecap;
   }
 
   /**
@@ -643,29 +484,22 @@
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
+    if (style.strokeDasharray) {
+      attrs += ' stroke-dasharray="' + style.strokeDasharray + '"';
+    }
     if (filterId) {
       attrs += ' filter="url(#' + filterId + ')"';
     }
     return attrs;
   }
 
-  /** Single pass 45 — paths and spike polygons in the same stroked group. */
+  /** Single pass 45 — gloss/age filter; male uses stroke-dasharray for angular look. */
   function pathOnePass(pathMarkup, style) {
-    let clean = sanitizePathsInner(pathMarkup);
-    if (style.spikeCount > 0 && style.spikeLength > 0) {
-      clean = embedSpikesInPathsMarkup(
-        clean,
-        style.spikeCount,
-        style.spikeLength,
-        SPIKE_STROKE_WIDTH
-      );
-    }
+    const clean = sanitizePathsInner(pathMarkup);
     const filterId = FILTER_ID_COMBINED;
     return (
-      '<g class="path-layers" style="color:' +
-      style.strokeColor +
-      '"><g ' +
-      strokeAttrs(style, SPIKE_STROKE_WIDTH, filterId) +
+      '<g class="path-layers"><g ' +
+      strokeAttrs(style, 45, filterId) +
       '>' +
       clean +
       '</g></g>'
@@ -1087,7 +921,7 @@
     readParams();
     const style = visualStyle(params);
     document.title =
-      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' spikes:' + style.spikeCount;
+      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' dash:' + (style.strokeDasharray || '');
     const intent = style.intent;
     const unique = [];
     for (const ch of letters) {
@@ -1253,8 +1087,7 @@
         strokeColor: style.strokeColor,
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
-        spikeCount: style.spikeCount,
-        spikeLength: style.spikeLength,
+        strokeDasharray: style.strokeDasharray,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1267,7 +1100,7 @@
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      msg += ' | age=' + style.ageTexture + ' spikes=' + style.spikeCount;
+      msg += ' | age=' + style.ageTexture + (style.strokeDasharray ? ' dash=' + style.strokeDasharray : '');
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
