@@ -232,7 +232,7 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
-  const PASS2_STROKE_WIDTH = 28;
+  const PASS2_STROKE_WIDTH = 70;
   const DOTS_BASE_FREQUENCY = '0.15';
   const FILTER_ID_DOTS3D = 'dots3d';
   const FILTER_ID_SHADOWBLUR = 'shadowblur';
@@ -253,12 +253,12 @@
   /** גיל → surfaceScale בלבד (0 = ללא מסנן מרקם) */
   const AGE_SURFACE_SCALE = {
     under18: 0,
-    '18-24': 1,
-    '25-34': 2,
-    '35-44': 4,
-    '45-59': 6,
-    '60-70': 9,
-    '70plus': 14
+    '18-24': 2,
+    '25-34': 4,
+    '35-44': 6,
+    '45-59': 9,
+    '60-70': 12,
+    '70plus': 18
   };
 
   const GENDER_SCALE_FEMALE = 1.08;
@@ -270,25 +270,19 @@
       linecap: 'round',
       linejoin: 'round',
       miterlimit: null,
-      scale: GENDER_SCALE_FEMALE,
-      displaceScale: 0,
-      displaceBaseFrequency: null
+      scale: GENDER_SCALE_FEMALE
     },
     nonbinary: {
       linecap: 'round',
       linejoin: 'round',
       miterlimit: null,
-      scale: GENDER_SCALE_NONBINARY,
-      displaceScale: 2,
-      displaceBaseFrequency: '0.08'
+      scale: GENDER_SCALE_NONBINARY
     },
     male: {
       linecap: 'square',
       linejoin: 'miter',
       miterlimit: 50,
-      scale: GENDER_SCALE_MALE,
-      displaceScale: 6,
-      displaceBaseFrequency: '0.15'
+      scale: GENDER_SCALE_MALE
     }
   };
 
@@ -346,8 +340,7 @@
     const domain = DOMAINS[p.domain] || DOMAINS.love;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
-    const surfaceScale = AGE_SURFACE_SCALE[p.age] ?? 2;
-    const textureOn = surfaceScale > 0;
+    const surfaceScale = AGE_SURFACE_SCALE[p.age] ?? 4;
 
     return {
       amuletType: p.amuletType,
@@ -359,17 +352,16 @@
       linecap: gender.linecap,
       linejoin: gender.linejoin,
       miterlimit: gender.miterlimit,
-      surfaceScale,
-      displaceScale: textureOn ? gender.displaceScale : 0,
-      displaceBaseFrequency: gender.displaceBaseFrequency
+      surfaceScale
     };
   }
 
   function buildDots3dFilterDef(style) {
     if (style.surfaceScale <= 0) return '';
-    const ds = style.displaceScale || 0;
-    let compositeIn = 'SourceGraphic';
-    let inner =
+    return (
+      '<filter id="' +
+      FILTER_ID_DOTS3D +
+      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
       '<feTurbulence type="fractalNoise" baseFrequency="' +
       DOTS_BASE_FREQUENCY +
       '" numOctaves="4" seed="7" result="noise"/>' +
@@ -377,34 +369,8 @@
       style.surfaceScale +
       '" result="light">' +
       '<feDistantLight azimuth="135" elevation="40"/>' +
-      '</feDiffuseLighting>';
-    if (ds > 0) {
-      const bf = style.displaceBaseFrequency || '0.08';
-      inner =
-        '<feTurbulence type="fractalNoise" baseFrequency="' +
-        bf +
-        '" numOctaves="3" seed="1" result="dispNoise"/>' +
-        '<feDisplacementMap in="SourceGraphic" in2="dispNoise" scale="' +
-        ds +
-        '" xChannelSelector="R" yChannelSelector="G" result="displaced"/>' +
-        inner +
-        '<feComposite in="light" in2="displaced" operator="in"/>';
-      return (
-        '<filter id="' +
-        FILTER_ID_DOTS3D +
-        '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-        inner +
-        '</filter>'
-      );
-    }
-    return (
-      '<filter id="' +
-      FILTER_ID_DOTS3D +
-      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-      inner +
-      '<feComposite in="light" in2="' +
-      compositeIn +
-      '" operator="in"/>' +
+      '</feDiffuseLighting>' +
+      '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
       '</filter>'
     );
   }
@@ -423,8 +389,7 @@
   function effectLabel(style) {
     const tex =
       style.surfaceScale > 0 ? 'dots3d ss=' + style.surfaceScale : 'smooth';
-    const disp = style.displaceScale ? ' disp=' + style.displaceScale : '';
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + disp + ' · ' + style.linecap;
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + style.linecap;
   }
 
   /**
@@ -1064,7 +1029,6 @@
         urgency: params.urgency,
         strokeColor: style.strokeColor,
         surfaceScale: style.surfaceScale,
-        displaceScale: style.displaceScale,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
