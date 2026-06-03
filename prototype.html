@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>אב-טיפוס קמע — Prototype</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #ececec;
+      color: #222;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      background: #1a1a1a;
+      color: #eee;
+      padding: 14px 20px;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header p { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      gap: 0;
+      min-height: calc(100vh - 56px);
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #f8f8f8;
+      border-left: 1px solid #ccc;
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .opt-btn {
+      padding: 6px 10px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-family: inherit;
+      color: #333;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .opt-btn:hover { background: #efefef; }
+    .opt-btn.active {
+      background: #111;
+      color: #fff;
+      border-color: #111;
+    }
+    #sentence {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    #createBtn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: #2a5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #createBtn:hover { background: #248a42; }
+    #createBtn:disabled { opacity: 0.5; cursor: default; }
+    .preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px;
+      background: #e8e8e8;
+      gap: 12px;
+    }
+    #resultWrap {
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    }
+    #resultWrap svg { display: block; }
+    #status {
+      font-size: 0.85rem;
+      color: #444;
+      text-align: center;
+      max-width: 680px;
+    }
+    #debugList {
+      font-family: monospace, "Courier New", Courier, monospace;
+      font-size: 11px;
+      direction: ltr;
+      text-align: left;
+      background: #fff;
+      color: #222;
+      border: 1px dashed #999;
+      padding: 8px 12px;
+      min-width: 220px;
+    }
+    #debugList ul { margin: 4px 0 0; padding: 0; list-style: none; }
+    .hint {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 12px;
+    }
+    .hint code { direction: ltr; unicode-bidi: embed; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>אב-טיפוס — יצירת קמע מפרמטרים</h1>
+    <p>טוען גליפים מ־glyphs/ וחיבורים מ־connections.json · דורש python3 server.py</p>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="field" data-group="type">
+        <label>תחום</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn" data-value="love">אהבה</button>
+          <button type="button" class="opt-btn" data-value="livelihood">פרנסה</button>
+          <button type="button" class="opt-btn" data-value="health">בריאות</button>
+          <button type="button" class="opt-btn active" data-value="protection">הגנה</button>
+          <button type="button" class="opt-btn" data-value="family">משפחה</button>
+        </div>
+      </div>
+
+      <div class="field" data-group="age">
+        <label>גיל</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn" data-value="under18">−18</button>
+          <button type="button" class="opt-btn" data-value="18-24">18–24</button>
+          <button type="button" class="opt-btn active" data-value="25-34">25–34</button>
+          <button type="button" class="opt-btn" data-value="35-44">35–44</button>
+          <button type="button" class="opt-btn" data-value="45-59">45–59</button>
+          <button type="button" class="opt-btn" data-value="60-70">60–70</button>
+          <button type="button" class="opt-btn" data-value="70plus">70+</button>
+        </div>
+      </div>
+
+      <div class="field" data-group="gender">
+        <label>מגדר</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn active" data-value="female">נקבה</button>
+          <button type="button" class="opt-btn" data-value="nonbinary">לא בינארי</button>
+          <button type="button" class="opt-btn" data-value="male">זכר</button>
+        </div>
+      </div>
+
+      <div class="field" data-group="urgency">
+        <label>דחיפות</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn" data-value="far">עתיד רחוק</button>
+          <button type="button" class="opt-btn" data-value="year">שנה הקרובה</button>
+          <button type="button" class="opt-btn" data-value="month">חודש הקרוב</button>
+          <button type="button" class="opt-btn active" data-value="now">עכשיו</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="sentence">משפט כוונה</label>
+        <input id="sentence" type="text" placeholder="לדוגמה: בית גדול בתאילנד אמן" value="בית גדול בתאילנד אמן">
+      </div>
+
+      <button type="button" id="createBtn">צור קמע</button>
+
+      <p class="hint">תחום → צבע ורקע · גיל → עובי צורה · מגדר → פינות · דחיפות → מרווח<br>
+        פתחי דרך <code>http://localhost:8080/prototype.html</code></p>
+    </aside>
+
+    <main class="preview">
+      <div id="resultWrap">
+        <svg id="resultSvg" width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+          <rect width="680" height="680" fill="#E0E4EA"/>
+          <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
+        </svg>
+      </div>
+      <p id="status">—</p>
+      <div id="debugList" hidden></div>
+    </main>
+  </div>
+
+  <script src="connection-core.js"></script>
+  <script>
+(function () {
+  'use strict';
+
+  /* --- Canvas --- */
+  const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
+  const W = 680;
+  const H = 680;
+  const CX = 340;
+  const CY = 340;
+  const GLYPHS_DIR = 'glyphs';
+  const MAX_LETTERS = 8;
+  const HUB_OVERLAP_DIST = 80;
+  const DEFAULT_GLYPH_SIZE = 150;
+
+  const LAYER_DETAIL = 1.5;
+  const VIEWBOX_PAD = 40;
+  const FILTER_REGION = { x: '-35%', y: '-35%', w: '170%', h: '170%' };
+  const FILTER_ID_DILATE_MAIN = 'dilate-main';
+  const FILTER_ID_DILATE_MID = 'dilate-mid';
+  const PATTERN_ID = 'bg-pattern';
+
+  /** תחום: צבעים, רקע, דפוס, intent לחיבורים */
+  const DOMAINS = {
+    love: {
+      main: '#D4A0A0',
+      light: '#F5DEB3',
+      bg: '#F0E8E8',
+      pattern: 'circles',
+      patternOpacity: 0.15,
+      intent: 'summoning'
+    },
+    livelihood: {
+      main: '#8B7355',
+      light: '#C4B89A',
+      bg: '#E8E0D0',
+      pattern: 'lines',
+      patternOpacity: 0.2,
+      intent: 'grounding'
+    },
+    health: {
+      main: '#6B8B6B',
+      light: '#A8C4A8',
+      bg: '#E0EAE0',
+      pattern: 'dots',
+      patternOpacity: 0.15,
+      intent: 'protection'
+    },
+    protection: {
+      main: '#4A5A6B',
+      light: '#8BA0B8',
+      bg: '#E0E4EA',
+      pattern: 'grid',
+      patternOpacity: 0.2,
+      intent: 'protection'
+    },
+    family: {
+      main: '#B87A6B',
+      light: '#D4A898',
+      bg: '#EAE0DC',
+      pattern: 'waves',
+      patternOpacity: 0.15,
+      intent: 'summoning'
+    }
+  };
+
+  /** גיל → רדיוס dilate לצורה מאוחדת (דק → עבה) */
+  const AGE_DILATE_RADIUS = {
+    under18: 6,
+    '18-24': 8,
+    '25-34': 10,
+    '35-44': 12,
+    '45-59': 14,
+    '60-70': 16,
+    '70plus': 18
+  };
+
+  const GENDER_SCALE_FEMALE = 1.08;
+  const GENDER_SCALE_MALE = 1.0;
+  const GENDER_SCALE_NONBINARY = 1.03;
+
+  const GENDER_VISUAL = {
+    female: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: GENDER_SCALE_FEMALE },
+    nonbinary: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: GENDER_SCALE_NONBINARY },
+    male: { linecap: 'square', linejoin: 'miter', miterlimit: 50, scale: GENDER_SCALE_MALE }
+  };
+
+  /* --- Spacing (distance from center; dramatic range) --- */
+  const URGENCY_SPACING = {
+    far: 1.8,
+    year: 1.45,
+    month: 1.15,
+    now: 0.5
+  };
+
+  /* --- Intent keys (match connections.json) --- */
+  const INTENT_TYPES = ['protection', 'summoning', 'grounding'];
+
+  const BUILTIN_SYMBOLS = {
+    circle: { viewBox: '0 0 100 100' },
+    triangle: { viewBox: '0 0 100 100' },
+    arc: { viewBox: '0 0 100 100' },
+    dot: { viewBox: '0 0 100 100' }
+  };
+
+  let glyphLetters = [];
+  const glyphSvgCache = {};
+  const parsedGlyphCache = {};
+  let connections = [];
+
+  const params = {
+    type: 'protection',
+    age: '25-34',
+    gender: 'female',
+    urgency: 'now'
+  };
+
+  function clampNum(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function getGroupValue(group) {
+    const btn = document.querySelector('.field[data-group="' + group + '"] .opt-btn.active');
+    return btn ? btn.dataset.value : null;
+  }
+
+  function readParams() {
+    params.type = getGroupValue('type') || 'protection';
+    params.age = getGroupValue('age') || '25-34';
+    params.gender = getGroupValue('gender') || 'female';
+    params.urgency = getGroupValue('urgency') || 'now';
+    return params;
+  }
+
+  function darkenHex(hex, amount) {
+    const h = hex.replace('#', '');
+    if (h.length !== 6) return '#222222';
+    const r = Math.round(parseInt(h.slice(0, 2), 16) * amount);
+    const g = Math.round(parseInt(h.slice(2, 4), 16) * amount);
+    const b = Math.round(parseInt(h.slice(4, 6), 16) * amount);
+    return (
+      '#' +
+      clampNum(r, 0, 255).toString(16).padStart(2, '0') +
+      clampNum(g, 0, 255).toString(16).padStart(2, '0') +
+      clampNum(b, 0, 255).toString(16).padStart(2, '0')
+    );
+  }
+
+  function visualStyle(p) {
+    const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
+    const domain = DOMAINS[p.type] || DOMAINS.protection;
+    const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    const dilateMain = AGE_DILATE_RADIUS[p.age] ?? 10;
+    const dilateMid = 6;
+
+    return {
+      domainKey: p.type,
+      colorMain: domain.main,
+      colorLight: domain.light,
+      colorDetail: darkenHex(domain.main, 0.45),
+      bg: domain.bg,
+      pattern: domain.pattern,
+      patternOpacity: domain.patternOpacity,
+      intent: domain.intent,
+      dilateMain,
+      dilateMid,
+      layerDetail: LAYER_DETAIL,
+      spacing,
+      amuletScale: gender.scale,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit
+    };
+  }
+
+  function filterRegionAttrs() {
+    return (
+      ' x="' +
+      FILTER_REGION.x +
+      '" y="' +
+      FILTER_REGION.y +
+      '" width="' +
+      FILTER_REGION.w +
+      '" height="' +
+      FILTER_REGION.h +
+      '"'
+    );
+  }
+
+  function buildDilateFilterDef(id, radius) {
+    return (
+      '<filter id="' +
+      id +
+      '"' +
+      filterRegionAttrs() +
+      ' color-interpolation-filters="sRGB">' +
+      '<feMorphology operator="dilate" radius="' +
+      radius +
+      '" result="expanded"/>' +
+      '<feComposite in="SourceGraphic" in2="expanded" operator="over"/>' +
+      '</filter>'
+    );
+  }
+
+  function buildBackgroundPatternDef(style) {
+    const pid = PATTERN_ID;
+    const c = style.colorMain;
+    const p = style.pattern;
+    if (p === 'circles') {
+      return (
+        '<pattern id="' +
+        pid +
+        '" width="48" height="48" patternUnits="userSpaceOnUse">' +
+        '<circle cx="12" cy="12" r="8" fill="' +
+        c +
+        '" opacity="0.35"/>' +
+        '<circle cx="36" cy="30" r="6" fill="' +
+        c +
+        '" opacity="0.25"/>' +
+        '</pattern>'
+      );
+    }
+    if (p === 'lines') {
+      return (
+        '<pattern id="' +
+        pid +
+        '" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(0)">' +
+        '<line x1="0" y1="6" x2="12" y2="6" stroke="' +
+        c +
+        '" stroke-width="1.5"/>' +
+        '</pattern>'
+      );
+    }
+    if (p === 'dots') {
+      return (
+        '<pattern id="' +
+        pid +
+        '" width="32" height="32" patternUnits="userSpaceOnUse">' +
+        '<circle cx="6" cy="8" r="2.5" fill="' +
+        c +
+        '"/>' +
+        '<circle cx="22" cy="6" r="3.5" fill="' +
+        c +
+        '" opacity="0.7"/>' +
+        '<circle cx="14" cy="22" r="2" fill="' +
+        c +
+        '" opacity="0.5"/>' +
+        '<circle cx="26" cy="24" r="4" fill="' +
+        c +
+        '" opacity="0.35"/>' +
+        '</pattern>'
+      );
+    }
+    if (p === 'grid') {
+      return (
+        '<pattern id="' +
+        pid +
+        '" width="24" height="24" patternUnits="userSpaceOnUse">' +
+        '<path d="M24 0H0V24" fill="none" stroke="' +
+        c +
+        '" stroke-width="0.8"/>' +
+        '</pattern>'
+      );
+    }
+    if (p === 'waves') {
+      return (
+        '<pattern id="' +
+        pid +
+        '" width="60" height="20" patternUnits="userSpaceOnUse">' +
+        '<path d="M0 10 Q15 2 30 10 T60 10" fill="none" stroke="' +
+        c +
+        '" stroke-width="1.5"/>' +
+        '<path d="M0 16 Q15 8 30 16 T60 16" fill="none" stroke="' +
+        c +
+        '" stroke-width="1" opacity="0.6"/>' +
+        '</pattern>'
+      );
+    }
+    return '';
+  }
+
+  function buildSvgDefs(style) {
+    return (
+      '<defs>' +
+      buildBackgroundPatternDef(style) +
+      buildDilateFilterDef(FILTER_ID_DILATE_MAIN, style.dilateMain) +
+      buildDilateFilterDef(FILTER_ID_DILATE_MID, style.dilateMid) +
+      '</defs>'
+    );
+  }
+
+  function requireConnectionCore() {
+    if (!window.ConnectionCore) {
+      throw new Error('connection-core.js לא נטען — רענני את הדף');
+    }
+    return window.ConnectionCore;
+  }
+
+  function effectLabel(style) {
+    return (
+      style.domainKey +
+      ' · dilate ' +
+      style.dilateMain +
+      '/' +
+      style.dilateMid +
+      ' · ' +
+      style.linecap
+    );
+  }
+
+  /**
+   * Remove per-path stroke/fill so the three wrapper layers control rendering.
+   */
+  function sanitizePathsInner(html) {
+    if (!html) return '';
+    try {
+      const doc = new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
+        'image/svg+xml'
+      );
+      if (doc.querySelector('parsererror')) return html;
+      doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
+        el.setAttribute('fill', 'none');
+        el.removeAttribute('stroke');
+        el.removeAttribute('stroke-width');
+        el.removeAttribute('stroke-linecap');
+        el.removeAttribute('stroke-linejoin');
+        el.removeAttribute('stroke-opacity');
+        if (el.hasAttribute('style')) {
+          const s = el
+            .getAttribute('style')
+            .replace(/fill\s*:\s*[^;]+;?/gi, 'fill:none;')
+            .replace(/stroke\s*:\s*[^;]+;?/gi, '')
+            .replace(/stroke-width\s*:\s*[^;]+;?/gi, '');
+          el.setAttribute('style', s);
+        }
+      });
+      const root = doc.getElementById('root');
+      return root ? root.innerHTML : html;
+    } catch (_) {
+      return html
+        .replace(/\sstroke\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"');
+    }
+  }
+
+  function strokeLayerG(style, strokeColor, width) {
+    const w = typeof width === 'number' ? width.toFixed(2) : width;
+    let attrs =
+      'fill="none" stroke="' +
+      strokeColor +
+      '" stroke-width="' +
+      w +
+      '" stroke-linecap="' +
+      style.linecap +
+      '" stroke-linejoin="' +
+      style.linejoin +
+      '"';
+    if (style.linejoin === 'miter' && style.miterlimit != null) {
+      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    }
+    return '<g ' + attrs + '>';
+  }
+
+  /** Symbols: domain-colored mini layers */
+  function pathLayers(pathMarkup, style) {
+    const clean = sanitizePathsInner(pathMarkup);
+    const w1 = style.dilateMain * 1.4;
+    const w2 = style.dilateMid * 1.2;
+    return (
+      '<g class="path-layers">' +
+      strokeLayerG(style, style.colorMain, w1) +
+      clean +
+      '</g>' +
+      strokeLayerG(style, style.colorLight, w2) +
+      clean +
+      '</g>' +
+      strokeLayerG(style, style.colorDetail, style.layerDetail) +
+      clean +
+      '</g>' +
+      '</g>'
+    );
+  }
+
+  /** Bounding box for mirrored symmetric layout (includes stroke padding). */
+  function viewBoxForPlacements(placements) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const bump = (x, y) => {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    };
+    for (const p of placements) {
+      const r = p.sz / 2 + VIEWBOX_PAD;
+      bump(p.x - r, p.y - r);
+      bump(p.x + r, p.y + r);
+      const mx = W - p.x;
+      bump(mx - r, p.y - r);
+      bump(mx + r, p.y + r);
+    }
+    if (!isFinite(minX)) {
+      return { x: 0, y: 0, w: W, h: H };
+    }
+    const bw = maxX - minX;
+    const bh = maxY - minY;
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(bw, 120),
+      h: Math.max(bh, 120)
+    };
+  }
+
+  function wrapAmuletScale(content, style) {
+    if (style.amuletScale === 1) return content;
+    return (
+      '<g transform="translate(' +
+      CX +
+      ',' +
+      CY +
+      ') scale(' +
+      style.amuletScale +
+      ') translate(' +
+      -CX +
+      ',' +
+      -CY +
+      ')">' +
+      content +
+      '</g>'
+    );
+  }
+
+  let composeBusy = false;
+  let appReady = false;
+
+  document.querySelectorAll('.field[data-group]').forEach((field) => {
+    field.querySelectorAll('.opt-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        field.querySelectorAll('.opt-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        readParams();
+        if (appReady && document.getElementById('sentence').value.trim()) {
+          composeAmulet();
+        }
+      });
+    });
+  });
+
+  function glyphFilename(letter) {
+    return letter === 'א' ? 'א1.svg' : letter + '2.svg';
+  }
+
+  function letterFromFilename(file) {
+    const base = file.replace(/\.svg$/i, '');
+    if (base === 'א1') return 'א';
+    const m = base.match(/^(.)(?:1|2)$/);
+    return m && HEB.includes(m[1]) ? m[1] : null;
+  }
+
+  async function loadGlyphManifest() {
+    const res = await fetch(GLYPHS_DIR + '/manifest.json');
+    if (!res.ok) throw new Error('manifest.json לא נטען');
+    const data = await res.json();
+    const files = data.files || [];
+    glyphLetters = [];
+    for (const f of files) {
+      const ch = letterFromFilename(f);
+      if (ch && !glyphLetters.includes(ch)) glyphLetters.push(ch);
+    }
+    if (!glyphLetters.length) glyphLetters = HEB.slice();
+  }
+
+  async function loadConnections() {
+    try {
+      const api = await fetch('/api/connections?t=' + Date.now(), { cache: 'no-store' });
+      if (api.ok) {
+        const data = await api.json();
+        connections = data.connections || [];
+        return;
+      }
+    } catch (_) { /* fallback */ }
+    const res = await fetch('connections.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('connections.json לא נטען');
+    const data = await res.json();
+    connections = data.connections || [];
+  }
+
+  function getFirstLetters(str) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const word of str.split(/\s+/).filter((w) => w.length > 0)) {
+      if (out.length >= MAX_LETTERS) break;
+      let picked = null;
+      for (let i = 0; i < word.length; i++) {
+        const ch = word[i];
+        if (!avail.has(ch) || used.has(ch)) continue;
+        picked = ch;
+        break;
+      }
+      if (picked) {
+        used.add(picked);
+        out.push(picked);
+      }
+    }
+    return out;
+  }
+
+  async function loadGlyphSvg(letter) {
+    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
+    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('חסר SVG: ' + letter);
+    glyphSvgCache[letter] = await res.text();
+    return glyphSvgCache[letter];
+  }
+
+  function parseGlyphSvg(svgText) {
+    const clean = svgText.trim().replace(/^<\?xml[^>]*>\s*/i, '').replace(/^<!DOCTYPE[^>]*>\s*/i, '');
+    const doc = new DOMParser().parseFromString(clean, 'image/svg+xml');
+    if (doc.querySelector('parsererror')) throw new Error('SVG לא תקין');
+    const el = doc.querySelector('svg');
+    if (!el) throw new Error('אין svg');
+    const vb = el.getAttribute('viewBox') || '0 0 100 100';
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    const raw = el.innerHTML;
+    const inner = sanitizePathsInner(raw);
+    return { inner, vw, vh, viewBox: el.getAttribute('viewBox') || '0 0 ' + vw + ' ' + vh };
+  }
+
+  async function getParsedGlyph(letter) {
+    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
+    const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
+    parsedGlyphCache[letter] = parsed;
+    return parsed;
+  }
+
+  function hubPositionOverlaps(x, y, byLetter, skipLetter) {
+    for (const [, pl] of byLetter) {
+      if (pl.letter === skipLetter) continue;
+      if (Math.hypot(x - pl.x, y - pl.y) < HUB_OVERLAP_DIST) return true;
+    }
+    return false;
+  }
+
+  function hubCandidatesForLetter(letter, anchor, byLetter, intent, CC) {
+    const candidates = [];
+    const anchorPl = byLetter.get(anchor);
+    const anchorConn = CC.findConnectionBetween(connections, anchor, letter, intent);
+    if (anchorConn) {
+      const pos = CC.placementRelativeTo(anchorConn, anchor, letter, anchorPl.x, anchorPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: true });
+    }
+    for (const [ref, refPl] of byLetter) {
+      if (ref === anchor) continue;
+      const conn = CC.findConnectionBetween(connections, ref, letter, intent);
+      if (!conn) continue;
+      const pos = CC.placementRelativeTo(conn, ref, letter, refPl.x, refPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: false });
+    }
+    return candidates;
+  }
+
+  function pickHubPlacement(candidates, byLetter, letter) {
+    const viaAnchor = candidates.find((c) => c.viaAnchor);
+    if (viaAnchor && !hubPositionOverlaps(viaAnchor.pos.x, viaAnchor.pos.y, byLetter, letter)) {
+      return viaAnchor.pos;
+    }
+    for (const c of candidates) {
+      if (c.viaAnchor) continue;
+      if (!hubPositionOverlaps(c.pos.x, c.pos.y, byLetter, letter)) return c.pos;
+    }
+    if (viaAnchor) return viaAnchor.pos;
+    return candidates.length ? candidates[0].pos : null;
+  }
+
+  function buildHubPlacements(letters, intent) {
+    const CC = requireConnectionCore();
+    const anchor = CC.pickHubAnchor(letters, connections, intent);
+    const defaultSz = CC.CANVAS.DEFAULT_SIZE;
+    const byLetter = new Map();
+    byLetter.set(anchor, {
+      letter: anchor,
+      x: CX,
+      y: CY,
+      rotation: 0,
+      sz: defaultSz,
+      flipX: false,
+      flipY: false
+    });
+
+    const usedPairs = [];
+    const skipped = [];
+    for (const letter of letters.filter((ch) => ch !== anchor)) {
+      const candidates = hubCandidatesForLetter(letter, anchor, byLetter, intent, CC);
+      const pos = pickHubPlacement(candidates, byLetter, letter);
+      if (!pos) {
+        skipped.push(letter);
+        continue;
+      }
+      byLetter.set(letter, {
+        letter: pos.letter,
+        x: pos.x,
+        y: pos.y,
+        rotation: pos.rotation,
+        sz: pos.sz,
+        flipX: pos.flipX,
+        flipY: pos.flipY
+      });
+      usedPairs.push(pos.pair);
+    }
+
+    const placements = [byLetter.get(anchor)];
+    for (const ch of letters) {
+      if (ch !== anchor && byLetter.has(ch)) placements.push(byLetter.get(ch));
+    }
+    return { placements, anchor, usedPairs, skipped, byLetter };
+  }
+
+  function applySpacingToPlacements(placements, anchor, factor) {
+    return placements.map((p) => {
+      if (p.letter === anchor) return p;
+      return {
+        ...p,
+        x: CX + (p.x - CX) * factor,
+        y: CY + (p.y - CY) * factor
+      };
+    });
+  }
+
+  function getRawConnection(from, to, intent) {
+    const matches = connections.filter((c) => c.from === from && c.to === to && c.intent === intent);
+    return matches.length ? matches[matches.length - 1] : null;
+  }
+
+  function collectConnectionSymbols(usedPairs, intent, byLetter) {
+    const CC = requireConnectionCore();
+    const out = [];
+    const seen = new Set();
+    for (const pair of usedPairs) {
+      const key = pair.from + '\u2192' + pair.to;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const raw = getRawConnection(pair.from, pair.to, intent);
+      if (!raw?.symbols?.length) continue;
+      const norm = CC.normalizeConnection(raw);
+      const refPl = byLetter.get(pair.from);
+      if (!norm || !refPl) {
+        out.push(...raw.symbols);
+        continue;
+      }
+      const ox = norm.fromGlyph.x;
+      const oy = norm.fromGlyph.y;
+      for (const sym of raw.symbols) {
+        out.push({
+          ...sym,
+          x: refPl.x + (Number(sym.x) - ox),
+          y: refPl.y + (Number(sym.y) - oy)
+        });
+      }
+    }
+    return out;
+  }
+
+  function buildArcPath(cx, cy, r, spanDeg) {
+    const span = clampNum(spanDeg, 30, 330);
+    const half = (span / 2) * (Math.PI / 180);
+    const x1 = cx + r * Math.cos(Math.PI + half);
+    const y1 = cy + r * Math.sin(Math.PI + half);
+    const x2 = cx + r * Math.cos(Math.PI - half);
+    const y2 = cy + r * Math.sin(Math.PI - half);
+    const large = span > 180 ? 1 : 0;
+    return 'M' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2);
+  }
+
+  function buildSymbolInner(sym) {
+    const t = sym.type;
+    if (t === 'circle') return '<circle cx="50" cy="50" r="40"/>';
+    if (t === 'dot') return '<circle cx="50" cy="50" r="14"/>';
+    if (t === 'triangle') {
+      const ratio = clampNum(sym.triangleRatio || 1, 0.5, 2);
+      return '<g transform="translate(50 50) scale(' + ratio.toFixed(3) + ' 1) translate(-50 -50)"><path d="M50 12 L88 88 L12 88 Z"/></g>';
+    }
+    if (t === 'arc') return '<path d="' + buildArcPath(50, 52, 38, sym.arcAngle || 180) + '"/>';
+    return '';
+  }
+
+  function symbolGroupMarkup(sym, style) {
+    if (!BUILTIN_SYMBOLS[sym.type]) return '';
+    const size = Number(sym.size) || 64;
+    const inner = buildSymbolInner(sym);
+    const rot = Number(sym.rotation) || 0;
+    const fx = sym.flipX ? -1 : 1;
+    const fy = sym.flipY ? -1 : 1;
+    const vb = BUILTIN_SYMBOLS[sym.type].viewBox.trim().split(/[\s,]+/).map(Number);
+    const vw = vb[2] || 100;
+    const vh = vb[3] || 100;
+    const half = size / 2;
+    return (
+      '<g class="amulet-symbol">' +
+      '<g transform="translate(' +
+      sym.x.toFixed(2) +
+      ',' +
+      sym.y.toFixed(2) +
+      ') rotate(' +
+      rot.toFixed(2) +
+      ') scale(' +
+      fx +
+      ',' +
+      fy +
+      ') translate(' +
+      (-half).toFixed(2) +
+      ',' +
+      (-half).toFixed(2) +
+      ')">' +
+      '<svg width="' +
+      size +
+      '" height="' +
+      size +
+      '" viewBox="0 0 ' +
+      vw +
+      ' ' +
+      vh +
+      '" preserveAspectRatio="xMidYMid meet" overflow="visible">' +
+      pathLayers(inner, style) +
+      '</svg></g></g>'
+    );
+  }
+
+  /** Positioned glyph paths only (no per-glyph strokes) for unified group rendering. */
+  function glyphPathsMarkup(placement, glyph) {
+    const vb = glyph.viewBox || '0 0 ' + (glyph.vw || 100) + ' ' + (glyph.vh || 100);
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    const fx = placement.flipX ? -1 : 1;
+    const fy = placement.flipY ? -1 : 1;
+    const half = placement.sz / 2;
+    const rot = Number(placement.rotation) || 0;
+    const scaleX = ((placement.sz / vw) * fx).toFixed(4);
+    const scaleY = ((placement.sz / vh) * fy).toFixed(4);
+    const clean = sanitizePathsInner(glyph.inner);
+    return (
+      '<g class="amulet-glyph amulet-glyph-' +
+      placement.letter +
+      '">' +
+      '<g transform="translate(' +
+      placement.x.toFixed(2) +
+      ',' +
+      placement.y.toFixed(2) +
+      ') rotate(' +
+      rot.toFixed(2) +
+      ') translate(' +
+      (-half).toFixed(2) +
+      ',' +
+      (-half).toFixed(2) +
+      ') scale(' +
+      scaleX +
+      ',' +
+      scaleY +
+      ')">' +
+      clean +
+      '</g></g>'
+    );
+  }
+
+  /**
+   * Unified amulet: one group, three passes — dilate main, dilate mid, detail lines.
+   */
+  function buildUnifiedGlyphRendering(pathsMarkup, style) {
+    if (!pathsMarkup) return '';
+    const wMain = Math.max(18, style.dilateMain * 2.2);
+    const wMid = Math.max(12, style.dilateMid * 2);
+    return (
+      '<g class="amulet-glyphs">' +
+      '<g class="pass-main" filter="url(#' +
+      FILTER_ID_DILATE_MAIN +
+      ')">' +
+      strokeLayerG(style, style.colorMain, wMain) +
+      pathsMarkup +
+      '</g></g>' +
+      '<g class="pass-mid" filter="url(#' +
+      FILTER_ID_DILATE_MID +
+      ')">' +
+      strokeLayerG(style, style.colorLight, wMid) +
+      pathsMarkup +
+      '</g></g>' +
+      '<g class="pass-detail">' +
+      strokeLayerG(style, style.colorDetail, style.layerDetail) +
+      pathsMarkup +
+      '</g></g>' +
+      '</g>'
+    );
+  }
+
+  function wrapSymmetric(content) {
+    return (
+      '<g class="amulet-symmetric">' +
+      '<g class="amulet-half amulet-original">' +
+      content +
+      '</g>' +
+      '<g class="amulet-half amulet-mirror" transform="translate(' +
+      W +
+      ',0) scale(-1,1)">' +
+      content +
+      '</g>' +
+      '</g>'
+    );
+  }
+
+  async function buildAmuletSvg(letters, intent, style) {
+    const unique = [];
+    for (const ch of letters) {
+      if (!unique.includes(ch)) unique.push(ch);
+    }
+
+    let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(unique, intent);
+    placements = applySpacingToPlacements(placements, anchor, style.spacing);
+    byLetter = new Map(placements.map((p) => [p.letter, p]));
+
+    const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+
+    const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style));
+    const glyphPathParts = [];
+    for (const p of placements) {
+      const glyph = await getParsedGlyph(p.letter);
+      glyphPathParts.push(glyphPathsMarkup(p, glyph));
+    }
+    if (!symbolParts.length && !glyphPathParts.length) {
+      throw new Error('לא ניתן לצייר אות — בדקי חיבורים וגליפים');
+    }
+
+    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style);
+    const groups = symbolParts.join('') + unifiedGlyphs;
+    const content = wrapAmuletScale(wrapSymmetric(groups), style);
+    const vb = viewBoxForPlacements(placements);
+    const patternRect =
+      '<rect x="' +
+      vb.x +
+      '" y="' +
+      vb.y +
+      '" width="' +
+      vb.w +
+      '" height="' +
+      vb.h +
+      '" fill="url(#' +
+      PATTERN_ID +
+      ')" opacity="' +
+      style.patternOpacity +
+      '"/>';
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+      W +
+      '" height="' +
+      H +
+      '" viewBox="' +
+      vb.x +
+      ' ' +
+      vb.y +
+      ' ' +
+      vb.w +
+      ' ' +
+      vb.h +
+      '" preserveAspectRatio="xMidYMid meet">' +
+      buildSvgDefs(style) +
+      '<rect x="' +
+      vb.x +
+      '" y="' +
+      vb.y +
+      '" width="' +
+      vb.w +
+      '" height="' +
+      vb.h +
+      '" fill="' +
+      style.bg +
+      '"/>' +
+      patternRect +
+      content +
+      '</svg>';
+    return { svg, placements, anchor, skipped, viewBox: vb };
+  }
+
+  function showDebug(placements, anchor, style) {
+    const el = document.getElementById('debugList');
+    if (!placements.length) {
+      el.hidden = true;
+      return;
+    }
+    const rows = placements
+      .map((p) => {
+        const tag = p.letter === anchor ? ' (hub)' : '';
+        return '<li>' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
+      })
+      .join('');
+    el.innerHTML =
+      '<strong>' +
+      style.domainKey +
+      ' ' +
+      style.dilateMain +
+      '/' +
+      style.dilateMid +
+      '/' +
+      style.layerDetail +
+      ' | cap=' +
+      style.linecap +
+      '/' +
+      style.linejoin +
+      ' | fx=' +
+      effectLabel(style) +
+      ' spacing=' +
+      style.spacing.toFixed(2) +
+      '</strong><ul>' +
+      rows +
+      '</ul>';
+    el.hidden = false;
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  async function init() {
+    requireConnectionCore();
+    if (location.protocol === 'file:') {
+      setStatus('פתחי דרך http://localhost:8080/prototype.html (python3 server.py)');
+      document.getElementById('createBtn').disabled = true;
+      return;
+    }
+    try {
+      await loadGlyphManifest();
+      await loadConnections();
+      appReady = true;
+      setStatus('מוכן — ' + glyphLetters.length + ' גליפים, ' + connections.length + ' חיבורים');
+    } catch (err) {
+      appReady = false;
+      setStatus('שגיאת טעינה: ' + err.message);
+      document.getElementById('createBtn').disabled = true;
+      console.error(err);
+    }
+  }
+
+  async function composeAmulet() {
+    if (composeBusy) return;
+    if (!appReady) {
+      setStatus('המערכת עדיין טוענת — המתיני רגע');
+      return;
+    }
+    readParams();
+    const sentence = document.getElementById('sentence').value.trim();
+    if (!sentence) {
+      setStatus('כתבי משפט כוונה');
+      return;
+    }
+    const letters = getFirstLetters(sentence);
+    if (!letters.length) {
+      setStatus('לא נמצאו אותיות עבריות');
+      return;
+    }
+
+    const btn = document.getElementById('createBtn');
+    composeBusy = true;
+    btn.disabled = true;
+    setStatus('בונה קמע…');
+
+    try {
+      const style = visualStyle(params);
+      console.log('[prototype] compose —', {
+        age: params.age,
+        gender: params.gender,
+        urgency: params.urgency,
+        linecap: style.linecap,
+        linejoin: style.linejoin,
+        miterlimit: style.miterlimit,
+        effect: effectLabel(style),
+        spacing: style.spacing
+      });
+      const { svg, placements, anchor, skipped } = await buildAmuletSvg(letters, style.intent, style);
+      document.getElementById('resultWrap').innerHTML = svg;
+
+      showDebug(placements, anchor, style);
+      let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      msg += ' | cap=' + style.linecap + '/' + style.linejoin;
+      msg += ' | fx=' + effectLabel(style);
+      msg += ' | spacing=' + style.spacing.toFixed(2);
+      msg += ' | קנה×' + style.amuletScale.toFixed(2);
+      if (skipped.length) msg += ' | ללא חיבור: ' + skipped.join(' ');
+      setStatus(msg);
+    } catch (err) {
+      setStatus('שגיאה: ' + err.message);
+      console.error(err);
+    } finally {
+      composeBusy = false;
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('createBtn').addEventListener('click', composeAmulet);
+
+  init();
+})();
+  </script>
+</body>
+</html>

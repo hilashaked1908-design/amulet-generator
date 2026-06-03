@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מחולל קמעות — Amulet Composer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="topbar">
+  <a href="editor.html" class="nav-link">עורך חיבורים</a>
+  <span class="sep">|</span>
+  <input id="sentence" type="text" placeholder="כתבי משפט עברי...">
+  <button type="button" class="btn" id="composeBtn">הרכבה</button>
+  <button type="button" class="btn" id="saveSvgBtn">SVG</button>
+  <button type="button" class="btn" id="savePngBtn">PNG</button>
+</div>
+
+<div id="catbar">
+  <span class="cat-label">סוג:</span>
+  <button type="button" class="catbtn active" data-cat="protection">הגנה</button>
+  <button type="button" class="catbtn" data-cat="summoning">זימון</button>
+  <button type="button" class="catbtn" data-cat="grounding">אישור</button>
+</div>
+
+<div id="main">
+  <aside id="sidebar">
+    <h3>אותיות מהמשפט</h3>
+    <p class="hint-side">האות הראשונה במרכז; הרכבה מחברת אקראית אותיות נוספות מחיבורים שמורים.</p>
+    <div class="extracted-preview" id="extractedPreview" aria-live="polite">—</div>
+
+    <h3>פרמטרים</h3>
+    <div class="sl-row">
+      <label>גודל סמל: <b id="szVal">150</b>px</label>
+      <input type="range" id="slSz" min="60" max="240" value="150">
+    </div>
+    <div class="sl-row">
+      <label>עובי קו: <b id="swVal">2.0</b></label>
+      <input type="range" id="slSW" min="5" max="50" value="20">
+    </div>
+  </aside>
+
+  <div id="canvas-area">
+    <div class="canvas-stack">
+      <div id="svgWrap">
+        <svg id="mainSVG" width="680" height="680" xmlns="http://www.w3.org/2000/svg">
+          <rect width="680" height="680" fill="white"/>
+          <text x="340" y="340" text-anchor="middle" fill="#bbb"
+            font-family="monospace" font-size="13">כתבי משפט ולחצי הרכבה</text>
+        </svg>
+      </div>
+      <div id="composeDebug" class="compose-debug" hidden aria-label="debug positions"></div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar" role="status" aria-live="polite"></div>
+
+<script src="connection-core.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

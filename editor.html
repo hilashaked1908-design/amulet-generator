@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>עורך חיבורי סמלים</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+<header id="editor-topbar">
+  <a href="index.html">← חזרה למחולל</a>
+  <label class="field">
+    אות A:
+    <select id="selFrom"></select>
+  </label>
+  <label class="field">
+    אות B:
+    <select id="selTo"></select>
+  </label>
+  <label class="field">
+    כוונה:
+    <select id="selIntent">
+      <option value="protection">הגנה</option>
+      <option value="summoning">זימון</option>
+      <option value="grounding">אישור</option>
+    </select>
+  </label>
+  <button type="button" class="btn primary" id="saveBtn">שמירת חיבור</button>
+  <button type="button" class="btn" id="resetBtn">איפוס</button>
+  <p class="hint">גרור אותיות וסמלים על הקנבס. שמירה דורשת <code dir="ltr">python3 server.py</code></p>
+</header>
+
+<div id="editor-main">
+  <div id="editor-canvas-wrap">
+    <div id="editor-svg-wrap">
+      <svg id="editorSVG" width="680" height="680" xmlns="http://www.w3.org/2000/svg">
+        <rect width="680" height="680" fill="white"/>
+        <g id="layerGuides" pointer-events="none">
+          <line class="guide-line" x1="0" y1="340" x2="680" y2="340"/>
+          <line class="guide-line" x1="340" y1="0" x2="340" y2="680"/>
+          <circle class="guide-ring" cx="340" cy="340" r="8"/>
+          <circle class="guide-dot" cx="340" cy="340" r="3"/>
+        </g>
+        <g id="layerSymbols"></g>
+        <g id="layerGlyphs"></g>
+      </svg>
+    </div>
+  </div>
+
+  <aside id="editor-sidebar">
+    <h3>מיקומים</h3>
+    <div class="panel" id="relPanel">
+      <b>A:</b> (<span class="val" id="infoAx">340</span>, <span class="val" id="infoAy">340</span>)
+      rot <span class="val" id="infoARot">0</span>°
+      scale <span class="val" id="infoAScale">1</span>
+      flip <span class="val" id="infoAFlip">—</span><br>
+      <b>B:</b> (<span class="val" id="infoBx">430</span>, <span class="val" id="infoBy">340</span>)
+      rot <span class="val" id="infoBRot">0</span>°
+      scale <span class="val" id="infoBScale">1</span>
+      flip <span class="val" id="infoBFlip">—</span>
+    </div>
+
+    <h3>סמל A — שחור</h3>
+    <div class="btn-row">
+      <button type="button" class="btn" id="alignCenterA">יישור למרכז</button>
+    </div>
+    <div class="flip-row">
+      <button type="button" class="btn flip-btn" id="flipAX" data-target="a" data-axis="x">היפוך ↔</button>
+      <button type="button" class="btn flip-btn" id="flipAY" data-target="a" data-axis="y">היפוך ↕</button>
+    </div>
+
+    <h3>סמל B — כחול</h3>
+    <div class="btn-row">
+      <button type="button" class="btn" id="alignCenterB">יישור למרכז</button>
+    </div>
+    <div class="flip-row">
+      <button type="button" class="btn flip-btn" id="flipBX" data-target="b" data-axis="x">היפוך ↔</button>
+      <button type="button" class="btn flip-btn" id="flipBY" data-target="b" data-axis="y">היפוך ↕</button>
+    </div>
+    <div class="sl-row">
+      <label>סיבוב B: <b id="rotVal">0</b>°</label>
+      <input type="range" id="slRot" min="-180" max="180" value="0" step="1">
+    </div>
+    <div class="sl-row">
+      <label>קנה מידה B: <b id="scaleVal">1.00</b></label>
+      <input type="range" id="slScale" min="50" max="200" value="100" step="1">
+    </div>
+    <div class="sl-row">
+      <label>גודל בסיס: <b id="szVal">150</b>px</label>
+      <input type="range" id="slSz" min="80" max="220" value="150">
+    </div>
+
+    <h3>סמלים</h3>
+    <p class="mini">לחצי להוספה, גררי על הקנבס. נשמרים עם החיבור.</p>
+    <div class="symbol-palette" id="symbolPalette"></div>
+    <div class="symbol-list" id="symbolList"></div>
+  </aside>
+</div>
+
+<div id="statusbar" role="status" aria-live="polite"></div>
+
+<script src="editor.js"></script>
+</body>
+</html>
