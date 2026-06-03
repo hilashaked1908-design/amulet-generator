@@ -138,14 +138,24 @@
 
   <div class="layout">
     <aside class="panel">
-      <div class="field" data-group="type">
+      <div class="field" data-group="amuletType">
+        <label>סוג קמע</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn active" data-value="protection">הגנה</button>
+          <button type="button" class="opt-btn" data-value="summoning">זימון</button>
+        </div>
+      </div>
+
+      <div class="field" data-group="domain">
         <label>תחום</label>
         <div class="btn-row">
-          <button type="button" class="opt-btn" data-value="love">אהבה</button>
+          <button type="button" class="opt-btn active" data-value="love">אהבה</button>
           <button type="button" class="opt-btn" data-value="livelihood">פרנסה</button>
           <button type="button" class="opt-btn" data-value="health">בריאות</button>
-          <button type="button" class="opt-btn active" data-value="protection">הגנה</button>
           <button type="button" class="opt-btn" data-value="family">משפחה</button>
+          <button type="button" class="opt-btn" data-value="selfConfidence">ביטחון עצמי</button>
+          <button type="button" class="opt-btn" data-value="meaning">משמעות וזהות</button>
+          <button type="button" class="opt-btn" data-value="housing">מגורים</button>
         </div>
       </div>
 
@@ -188,7 +198,7 @@
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint">תחום → צבע ורקע · גיל → עובי צורה · מגדר → פינות · דחיפות → מרווח<br>
+      <p class="hint">סוג קמע → חיבורים · תחום → צבע קו · גיל → מרקם · מגדר → פינות · דחיפות → מרווח<br>
         פתחי דרך <code>http://localhost:8080/prototype.html</code></p>
     </aside>
 
@@ -222,61 +232,33 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
+  const PASS2_STROKE_WIDTH = 28;
+  const DOTS_BASE_FREQUENCY = '0.15';
   const FILTER_ID_DOTS3D = 'dots3d';
   const FILTER_ID_SHADOWBLUR = 'shadowblur';
-  const DOTS3D_FILTER_DEF =
-    '<filter id="dots3d" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-    '<feTurbulence type="fractalNoise" baseFrequency="0.15" numOctaves="4" seed="7" result="noise"/>' +
-    '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="3" result="light">' +
-    '<feDistantLight azimuth="135" elevation="40"/>' +
-    '</feDiffuseLighting>' +
-    '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
-    '</filter>';
   const SHADOWBLUR_FILTER_DEF =
     '<filter id="shadowblur"><feGaussianBlur stdDeviation="10"/></filter>';
 
-  /** תחום: צבעים, רקע, דפוס, intent לחיבורים */
+  /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
-    love: {
-      main: '#D4A0A0',
-      light: '#F5DEB3',
-      bg: '#F0E8E8',
-      pattern: 'circles',
-      patternOpacity: 0.15,
-      intent: 'summoning'
-    },
-    livelihood: {
-      main: '#8B7355',
-      light: '#C4B89A',
-      bg: '#E8E0D0',
-      pattern: 'lines',
-      patternOpacity: 0.2,
-      intent: 'grounding'
-    },
-    health: {
-      main: '#6B8B6B',
-      light: '#A8C4A8',
-      bg: '#E0EAE0',
-      pattern: 'dots',
-      patternOpacity: 0.15,
-      intent: 'protection'
-    },
-    protection: {
-      main: '#4A5A6B',
-      light: '#8BA0B8',
-      bg: '#E0E4EA',
-      pattern: 'grid',
-      patternOpacity: 0.2,
-      intent: 'protection'
-    },
-    family: {
-      main: '#B87A6B',
-      light: '#D4A898',
-      bg: '#EAE0DC',
-      pattern: 'waves',
-      patternOpacity: 0.15,
-      intent: 'summoning'
-    }
+    love: { stroke: '#D7A2B4' },
+    livelihood: { stroke: '#C8ED14' },
+    health: { stroke: '#cccccc' },
+    family: { stroke: '#6D6455' },
+    selfConfidence: { stroke: '#362514' },
+    meaning: { stroke: '#6C3711' },
+    housing: { stroke: '#8B7355' }
+  };
+
+  /** גיל → surfaceScale בלבד (0 = ללא מסנן מרקם) */
+  const AGE_SURFACE_SCALE = {
+    under18: 0,
+    '18-24': 1,
+    '25-34': 2,
+    '35-44': 4,
+    '45-59': 6,
+    '60-70': 9,
+    '70plus': 14
   };
 
   const GENDER_SCALE_FEMALE = 1.08;
@@ -284,9 +266,30 @@
   const GENDER_SCALE_NONBINARY = 1.03;
 
   const GENDER_VISUAL = {
-    female: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: GENDER_SCALE_FEMALE },
-    nonbinary: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: GENDER_SCALE_NONBINARY },
-    male: { linecap: 'square', linejoin: 'miter', miterlimit: 50, scale: GENDER_SCALE_MALE }
+    female: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      scale: GENDER_SCALE_FEMALE,
+      displaceScale: 0,
+      displaceBaseFrequency: null
+    },
+    nonbinary: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      scale: GENDER_SCALE_NONBINARY,
+      displaceScale: 2,
+      displaceBaseFrequency: '0.08'
+    },
+    male: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 50,
+      scale: GENDER_SCALE_MALE,
+      displaceScale: 6,
+      displaceBaseFrequency: '0.15'
+    }
   };
 
   /* --- Spacing (distance from center; dramatic range) --- */
@@ -313,7 +316,8 @@
   let connections = [];
 
   const params = {
-    type: 'protection',
+    amuletType: 'protection',
+    domain: 'love',
     age: '25-34',
     gender: 'female',
     urgency: 'now'
@@ -329,7 +333,8 @@
   }
 
   function readParams() {
-    params.type = getGroupValue('type') || 'protection';
+    params.amuletType = getGroupValue('amuletType') || 'protection';
+    params.domain = getGroupValue('domain') || 'love';
     params.age = getGroupValue('age') || '25-34';
     params.gender = getGroupValue('gender') || 'female';
     params.urgency = getGroupValue('urgency') || 'now';
@@ -338,22 +343,74 @@
 
   function visualStyle(p) {
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
-    const domain = DOMAINS[p.type] || DOMAINS.protection;
+    const domain = DOMAINS[p.domain] || DOMAINS.love;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
+    const surfaceScale = AGE_SURFACE_SCALE[p.age] ?? 2;
+    const textureOn = surfaceScale > 0;
 
     return {
-      domainKey: p.type,
-      intent: domain.intent,
+      amuletType: p.amuletType,
+      domainKey: p.domain,
+      intent,
+      strokeColor: domain.stroke,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
       linejoin: gender.linejoin,
-      miterlimit: gender.miterlimit
+      miterlimit: gender.miterlimit,
+      surfaceScale,
+      displaceScale: textureOn ? gender.displaceScale : 0,
+      displaceBaseFrequency: gender.displaceBaseFrequency
     };
   }
 
-  function buildSvgDefs() {
-    return '<defs>' + SHADOWBLUR_FILTER_DEF + DOTS3D_FILTER_DEF + '</defs>';
+  function buildDots3dFilterDef(style) {
+    if (style.surfaceScale <= 0) return '';
+    const ds = style.displaceScale || 0;
+    let compositeIn = 'SourceGraphic';
+    let inner =
+      '<feTurbulence type="fractalNoise" baseFrequency="' +
+      DOTS_BASE_FREQUENCY +
+      '" numOctaves="4" seed="7" result="noise"/>' +
+      '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="' +
+      style.surfaceScale +
+      '" result="light">' +
+      '<feDistantLight azimuth="135" elevation="40"/>' +
+      '</feDiffuseLighting>';
+    if (ds > 0) {
+      const bf = style.displaceBaseFrequency || '0.08';
+      inner =
+        '<feTurbulence type="fractalNoise" baseFrequency="' +
+        bf +
+        '" numOctaves="3" seed="1" result="dispNoise"/>' +
+        '<feDisplacementMap in="SourceGraphic" in2="dispNoise" scale="' +
+        ds +
+        '" xChannelSelector="R" yChannelSelector="G" result="displaced"/>' +
+        inner +
+        '<feComposite in="light" in2="displaced" operator="in"/>';
+      return (
+        '<filter id="' +
+        FILTER_ID_DOTS3D +
+        '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
+        inner +
+        '</filter>'
+      );
+    }
+    return (
+      '<filter id="' +
+      FILTER_ID_DOTS3D +
+      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
+      inner +
+      '<feComposite in="light" in2="' +
+      compositeIn +
+      '" operator="in"/>' +
+      '</filter>'
+    );
+  }
+
+  function buildSvgDefs(style) {
+    return '<defs>' + SHADOWBLUR_FILTER_DEF + buildDots3dFilterDef(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -364,7 +421,10 @@
   }
 
   function effectLabel(style) {
-    return style.domainKey + ' · 74/#fff+dots3d · ' + style.linecap;
+    const tex =
+      style.surfaceScale > 0 ? 'dots3d ss=' + style.surfaceScale : 'smooth';
+    const disp = style.displaceScale ? ' disp=' + style.displaceScale : '';
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + disp + ' · ' + style.linecap;
   }
 
   /**
@@ -404,22 +464,34 @@
     }
   }
 
-  function strokePassFixed(strokeColor, width, filterId) {
+  function strokePassFixed(style, filterId) {
     let attrs =
       'fill="none" stroke="' +
-      strokeColor +
+      style.strokeColor +
       '" stroke-width="' +
-      width +
-      '" stroke-linecap="round" stroke-linejoin="round"';
+      PASS2_STROKE_WIDTH +
+      '" stroke-linecap="' +
+      style.linecap +
+      '" stroke-linejoin="' +
+      style.linejoin +
+      '"';
+    if (style.miterlimit != null) {
+      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    }
     if (filterId) {
       attrs += ' filter="url(#' + filterId + ')"';
     }
     return '<g ' + attrs + '>';
   }
 
-  /** Shadow blur · Pass 2 black 28 + dots3d only. */
-  function pathTwoPasses(pathMarkup) {
+  function pass2FilterId(style) {
+    return style.surfaceScale > 0 ? FILTER_ID_DOTS3D : null;
+  }
+
+  /** Shadow blur · Pass 2 stroke 28 + dots3d (when age allows). */
+  function pathTwoPasses(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
+    const pass2Fx = pass2FilterId(style);
     return (
       '<g class="path-layers">' +
       '<g transform="translate(4,6)" fill="none" stroke="#000" stroke-width="80" opacity="0.15" filter="url(#' +
@@ -427,14 +499,14 @@
       ')">' +
       clean +
       '</g>' +
-      strokePassFixed('#000', 28, FILTER_ID_DOTS3D) +
+      strokePassFixed(style, pass2Fx) +
       clean +
       '</g></g>'
     );
   }
 
-  function pathLayers(pathMarkup) {
-    return pathTwoPasses(pathMarkup);
+  function pathLayers(pathMarkup, style) {
+    return pathTwoPasses(pathMarkup, style);
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -783,7 +855,7 @@
       ' ' +
       vh +
       '" preserveAspectRatio="xMidYMid meet" overflow="visible">' +
-      pathLayers(inner) +
+      pathLayers(inner, style) +
       '</svg></g></g>'
     );
   }
@@ -825,9 +897,9 @@
     );
   }
 
-  function buildUnifiedGlyphRendering(pathsMarkup) {
+  function buildUnifiedGlyphRendering(pathsMarkup, style) {
     if (!pathsMarkup) return '';
-    return '<g class="amulet-glyphs">' + pathTwoPasses(pathsMarkup) + '</g>';
+    return '<g class="amulet-glyphs">' + pathTwoPasses(pathsMarkup, style) + '</g>';
   }
 
   function wrapSymmetric(content) {
@@ -867,7 +939,7 @@
       throw new Error('לא ניתן לצייר אות — בדקי חיבורים וגליפים');
     }
 
-    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''));
+    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style);
     const groups = symbolParts.join('') + unifiedGlyphs;
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
     const vb = viewBoxForPlacements(placements);
@@ -885,7 +957,7 @@
       ' ' +
       vb.h +
       '" preserveAspectRatio="xMidYMid meet">' +
-      buildSvgDefs() +
+      buildSvgDefs(style) +
       '<rect x="' +
       vb.x +
       '" y="' +
@@ -916,8 +988,12 @@
       .join('');
     el.innerHTML =
       '<strong>' +
+      style.amuletType +
+      '/' +
       style.domainKey +
-      ' 74/#fff+dots3d | cap=' +
+      ' ss=' +
+      style.surfaceScale +
+      ' | cap=' +
       style.linecap +
       '/' +
       style.linejoin +
@@ -981,9 +1057,14 @@
     try {
       const style = visualStyle(params);
       console.log('[prototype] compose —', {
+        amuletType: params.amuletType,
+        domain: params.domain,
         age: params.age,
         gender: params.gender,
         urgency: params.urgency,
+        strokeColor: style.strokeColor,
+        surfaceScale: style.surfaceScale,
+        displaceScale: style.displaceScale,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -995,7 +1076,9 @@
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
+      msg += ' | ss=' + style.surfaceScale;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
