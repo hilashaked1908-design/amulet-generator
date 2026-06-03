@@ -233,6 +233,7 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
+  const FILTER_ID_SPIKES = 'spikes';
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -352,16 +353,16 @@
     let linejoin = 'round';
     let miterlimit = null;
     let spikyScale = 0;
-    let spikePass = null;
+    let dashHaloPass = null;
     if (p.gender === 'nonbinary') {
       spikyScale = 8;
-      spikePass = { numSpikes: 25, spikeLength: 6 };
+      dashHaloPass = { strokeWidth: 2, displacementScale: 10 };
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
       spikyScale = 30;
-      spikePass = { numSpikes: 50, spikeLength: 12 };
+      dashHaloPass = { strokeWidth: 3, displacementScale: 20 };
     }
 
     return {
@@ -377,9 +378,23 @@
       ageTexture,
       surfaceScale,
       spikyScale,
-      spikePass,
+      dashHaloPass,
       gender: p.gender
     };
+  }
+
+  function buildSpikesFilter(style) {
+    if (!style.dashHaloPass) return '';
+    return (
+      '<filter id="' +
+      FILTER_ID_SPIKES +
+      '" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="turbulence" baseFrequency="0.08" numOctaves="1" seed="5" result="spikeNoise"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="spikeNoise" scale="' +
+      style.dashHaloPass.displacementScale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
+      '</filter>'
+    );
   }
 
   function buildCombinedFilter(style) {
@@ -414,7 +429,7 @@
 
   function buildSvgDefs(style) {
     console.log('surfaceScale:', style.surfaceScale);
-    return '<defs>' + buildCombinedFilter(style) + '</defs>';
+    return '<defs>' + buildCombinedFilter(style) + buildSpikesFilter(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -426,8 +441,8 @@
 
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const spk = style.spikePass
-      ? ' spikes=' + style.spikePass.numSpikes
+    const spk = style.dashHaloPass
+      ? ' halo=' + style.dashHaloPass.displacementScale
       : style.spikyScale
         ? ' spiky=' + style.spikyScale
         : '';
@@ -491,11 +506,25 @@
     return attrs;
   }
 
-  /** Single pass 45 — combined age + spiky filter when either applies. */
+  /** Main stroke pass + optional dashed halo (זכר / לא בינארי). */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
-    const filterId = FILTER_ID_COMBINED;
-    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
+    let layers =
+      '<g class="path-layers"><g ' + strokeAttrs(style, 45, FILTER_ID_COMBINED) + '>' + clean + '</g>';
+    if (style.dashHaloPass) {
+      const halo = style.dashHaloPass;
+      layers +=
+        '<g class="dash-halo-pass" fill="none" stroke="' +
+        style.strokeColor +
+        '" stroke-width="' +
+        halo.strokeWidth +
+        '" stroke-dasharray="1 4" stroke-linecap="square" stroke-linejoin="miter" filter="url(#' +
+        FILTER_ID_SPIKES +
+        ')">' +
+        clean +
+        '</g>';
+    }
+    return layers + '</g>';
   }
 
   function pathLayers(pathMarkup, style) {
@@ -1008,156 +1037,8 @@
     document.getElementById('status').textContent = msg;
   }
 
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const GLYPH_STROKE_WIDTH = 45;
-  const GLYPH_STROKE_HALF = GLYPH_STROKE_WIDTH / 2;
-  let spikeGenToken = 0;
-
-  function clearSpikeLineLayers(svgRoot) {
-    if (!svgRoot) return;
-    svgRoot.querySelectorAll('.spike-lines').forEach((el) => el.remove());
-  }
-
-  function samplePathForSpikes(pathEl, measureSvg, numSpikes) {
-    const d = pathEl.getAttribute('d');
-    if (!d) return [];
-    const measurePath = document.createElementNS(SVG_NS, 'path');
-    measurePath.setAttribute('d', d);
-    measurePath.setAttribute('fill', 'none');
-    measureSvg.appendChild(measurePath);
-    const total = measurePath.getTotalLength();
-    if (!total || !isFinite(total)) {
-      measureSvg.removeChild(measurePath);
-      return [];
-    }
-
-    const samples = [];
-    const step = Math.min(2, total / Math.max(numSpikes * 2, 1));
-    let bbox = null;
-    try {
-      bbox = measurePath.getBBox();
-    } catch (_) {
-      bbox = null;
-    }
-    const cx = bbox ? bbox.x + bbox.width / 2 : 0;
-    const cy = bbox ? bbox.y + bbox.height / 2 : 0;
-
-    for (let i = 0; i < numSpikes; i++) {
-      const t = total * (i + 0.5) / numSpikes;
-      const p = measurePath.getPointAtLength(t);
-      const pA = measurePath.getPointAtLength(Math.min(total, t + step));
-      const pB = measurePath.getPointAtLength(Math.max(0, t - step));
-      let tx = pA.x - pB.x;
-      let ty = pA.y - pB.y;
-      const tm = Math.hypot(tx, ty) || 1;
-      tx /= tm;
-      ty /= tm;
-      let nx = -ty;
-      let ny = tx;
-      if (bbox && nx * (p.x - cx) + ny * (p.y - cy) < 0) {
-        nx = -nx;
-        ny = -ny;
-      }
-      samples.push({ x: p.x, y: p.y, tx: tx, ty: ty, nx: nx, ny: ny });
-    }
-    measureSvg.removeChild(measurePath);
-    return samples;
-  }
-
-  function spikeNum(n) {
-    return Number(n).toFixed(2);
-  }
-
-  /** Spike lines in the stroke group (same local space as the path). */
-  function getOrCreateSpikeLinesGroup(pathEl, strokeColor) {
-    const parent = pathEl.parentNode;
-    if (!parent) return null;
-    let layer = parent.querySelector(':scope > .spike-lines');
-    if (!layer) {
-      layer = document.createElementNS(SVG_NS, 'g');
-      layer.setAttribute('class', 'spike-lines');
-      layer.setAttribute('fill', 'none');
-      layer.setAttribute('stroke', strokeColor);
-      layer.setAttribute('stroke-width', '1');
-      layer.setAttribute('stroke-linecap', 'round');
-      parent.appendChild(layer);
-    }
-    return layer;
-  }
-
-  function appendRadialSpikeLines(pathEl, measureSvg, cfg, layer) {
-    const samples = samplePathForSpikes(pathEl, measureSvg, cfg.numSpikes);
-    for (let i = 0; i < samples.length; i++) {
-      const s = samples[i];
-      const x1 = s.x + s.nx * GLYPH_STROKE_HALF;
-      const y1 = s.y + s.ny * GLYPH_STROKE_HALF;
-      const x2 = x1 + s.nx * cfg.spikeLength;
-      const y2 = y1 + s.ny * cfg.spikeLength;
-      const line = document.createElementNS(SVG_NS, 'line');
-      line.setAttribute('class', 'path-spike-line');
-      line.setAttribute('x1', spikeNum(x1));
-      line.setAttribute('y1', spikeNum(y1));
-      line.setAttribute('x2', spikeNum(x2));
-      line.setAttribute('y2', spikeNum(y2));
-      layer.appendChild(line);
-    }
-  }
-
-  /** Second pass: radial <line> spikes batched with rAF (no worker). */
-  function startSpikeLinePass(svgRoot, style, onDone) {
-    const cfg = style.spikePass;
-    if (!cfg || !svgRoot) {
-      if (onDone) onDone();
-      return;
-    }
-
-    const token = ++spikeGenToken;
-    clearSpikeLineLayers(svgRoot);
-    const paths = Array.from(svgRoot.querySelectorAll('.path-layers path'));
-    if (!paths.length) {
-      if (onDone) onDone();
-      return;
-    }
-
-    const measureSvg = document.createElementNS(SVG_NS, 'svg');
-    measureSvg.setAttribute('width', '0');
-    measureSvg.setAttribute('height', '0');
-    measureSvg.style.cssText =
-      'position:fixed;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none';
-    document.body.appendChild(measureSvg);
-
-    let pathIndex = 0;
-
-    function finish() {
-      measureSvg.remove();
-      if (onDone) onDone();
-    }
-
-    function processPath() {
-      if (token !== spikeGenToken) {
-        finish();
-        return;
-      }
-      if (pathIndex >= paths.length) {
-        finish();
-        return;
-      }
-
-      const pathEl = paths[pathIndex];
-      pathIndex += 1;
-      const layer = getOrCreateSpikeLinesGroup(pathEl, style.strokeColor);
-      if (layer) {
-        appendRadialSpikeLines(pathEl, measureSvg, cfg, layer);
-      }
-      requestAnimationFrame(processPath);
-    }
-
-    requestAnimationFrame(processPath);
-  }
-
-  function setResultSvg(svgString, style) {
+  function setResultSvg(svgString) {
     const wrap = document.getElementById('resultWrap');
-    spikeGenToken += 1;
     const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
     const err = doc.querySelector('parsererror');
     if (err) {
@@ -1170,11 +1051,6 @@
       wrap.removeChild(wrap.firstChild);
     }
     wrap.appendChild(svgEl);
-    if (style && style.spikePass) {
-      startSpikeLinePass(svgEl, style);
-    } else {
-      clearSpikeLineLayers(svgEl);
-    }
   }
 
   async function init() {
@@ -1239,15 +1115,15 @@
         effect: effectLabel(style),
         spacing: style.spacing
       });
-      setResultSvg(svg, style);
+      setResultSvg(svg);
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
       msg += ' | age=' + style.ageTexture;
-      if (style.spikePass) {
-        msg += ' spikes=' + style.spikePass.numSpikes;
+      if (style.dashHaloPass) {
+        msg += ' halo=' + style.dashHaloPass.displacementScale;
       } else {
         msg += ' spiky=' + style.spikyScale;
       }
