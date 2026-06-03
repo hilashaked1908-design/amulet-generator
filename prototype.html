@@ -1063,26 +1063,21 @@
     return Number(n).toFixed(2);
   }
 
-  /** Spike lines group inside same glyph transform as path-layers (sibling). */
+  /** Spike lines in the stroke group (same local space as the path). */
   function getOrCreateSpikeLinesGroup(pathEl, strokeColor) {
-    let node = pathEl.parentNode;
-    while (node && node !== document) {
-      if (node.querySelector && node.querySelector(':scope > .path-layers')) {
-        let layer = node.querySelector(':scope > .spike-lines');
-        if (!layer) {
-          layer = document.createElementNS(SVG_NS, 'g');
-          layer.setAttribute('class', 'spike-lines');
-          layer.setAttribute('fill', 'none');
-          layer.setAttribute('stroke', strokeColor);
-          layer.setAttribute('stroke-width', '1');
-          layer.setAttribute('stroke-linecap', 'round');
-          node.appendChild(layer);
-        }
-        return layer;
-      }
-      node = node.parentNode;
+    const parent = pathEl.parentNode;
+    if (!parent) return null;
+    let layer = parent.querySelector(':scope > .spike-lines');
+    if (!layer) {
+      layer = document.createElementNS(SVG_NS, 'g');
+      layer.setAttribute('class', 'spike-lines');
+      layer.setAttribute('fill', 'none');
+      layer.setAttribute('stroke', strokeColor);
+      layer.setAttribute('stroke-width', '1');
+      layer.setAttribute('stroke-linecap', 'round');
+      parent.appendChild(layer);
     }
-    return null;
+    return layer;
   }
 
   function appendRadialSpikeLines(pathEl, measureSvg, cfg, layer) {
