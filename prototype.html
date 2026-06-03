@@ -260,8 +260,6 @@
   const GENDER_SCALE_MALE = 1.0;
   const GENDER_SCALE_NONBINARY = 1.03;
 
-  const GENDER_SPIKY_SCALE = { female: 0, nonbinary: 5, male: 15 };
-
   const GENDER_VISUAL = {
     female: {
       linecap: 'round',
@@ -278,7 +276,7 @@
     male: {
       linecap: 'square',
       linejoin: 'miter',
-      miterlimit: 2,
+      miterlimit: 50,
       scale: GENDER_SCALE_MALE
     }
   };
@@ -350,7 +348,18 @@
     const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
-    const spikyScale = GENDER_SPIKY_SCALE[p.gender] ?? 0;
+    let linecap = 'round';
+    let linejoin = 'round';
+    let miterlimit = null;
+    let spikyScale = 0;
+    if (p.gender === 'nonbinary') {
+      spikyScale = 8;
+    } else if (p.gender === 'male') {
+      linecap = 'square';
+      linejoin = 'miter';
+      miterlimit = 100;
+      spikyScale = 30;
+    }
 
     return {
       amuletType: p.amuletType,
@@ -359,10 +368,9 @@
       strokeColor,
       spacing,
       amuletScale: gender.scale,
-      gender: p.gender,
-      linecap: gender.linecap,
-      linejoin: gender.linejoin,
-      miterlimit: gender.miterlimit,
+      linecap,
+      linejoin,
+      miterlimit,
       ageTexture,
       surfaceScale,
       spikyScale
@@ -370,26 +378,25 @@
   }
 
   function buildCombinedFilter(style) {
-    const turbType = style.gender === 'male' ? 'turbulence' : 'fractalNoise';
-    const baseFreq = style.gender === 'nonbinary' ? '0.09' : '0.065';
-    const totalScale = style.surfaceScale + style.spikyScale;
-
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
       '" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur stdDeviation="3" result="blur"/>' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
       '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossed"/>' +
-      '<feTurbulence type="' +
-      turbType +
-      '" baseFrequency="' +
-      baseFreq +
-      '" numOctaves="4" seed="2" result="noise"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="gloss"/>' +
+      '</feMerge>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
-      totalScale +
+      style.surfaceScale +
+      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
+      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
+      '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
+      style.spikyScale +
       '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
@@ -409,20 +416,8 @@
 
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const bump = style.surfaceScale + style.spikyScale;
-    return (
-      style.amuletType +
-      '/' +
-      style.domainKey +
-      ' · ' +
-      tex +
-      ' bump=' +
-      bump +
-      ' · ' +
-      style.gender +
-      '/' +
-      style.linecap
-    );
+    const spk = style.spikyScale ? ' spiky=' + style.spikyScale : '';
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + spk + ' · ' + style.linecap;
   }
 
   /**
@@ -482,7 +477,7 @@
     return attrs;
   }
 
-  /** Single pass 45 — gloss + gender/age displacement (fractalNoise vs turbulence). */
+  /** Single pass 45 — combined age + spiky filter when either applies. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
     const filterId = FILTER_ID_COMBINED;
