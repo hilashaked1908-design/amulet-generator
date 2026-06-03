@@ -232,7 +232,7 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
-  const FILTER_ID_DOTS3D = 'dots3d';
+  const FILTER_ID_ROUGHLINE = 'roughline';
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -379,25 +379,22 @@
     };
   }
 
-  function buildDots3dFilterDef(style) {
+  function buildRoughlineFilterDef(style) {
     if (style.surfaceScale <= 0) return '';
     return (
       '<filter id="' +
-      FILTER_ID_DOTS3D +
-      '" color-interpolation-filters="sRGB">' +
-      '<feTurbulence type="turbulence" baseFrequency="0.18" numOctaves="2" seed="3" result="noise"/>' +
-      '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="' +
+      FILTER_ID_ROUGHLINE +
+      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
       style.surfaceScale +
-      '" result="light">' +
-      '<feDistantLight azimuth="225" elevation="50"/>' +
-      '</feDiffuseLighting>' +
-      '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
 
   function buildSvgDefs(style) {
-    return '<defs>' + buildDots3dFilterDef(style) + '</defs>';
+    return '<defs>' + buildRoughlineFilterDef(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -409,12 +406,12 @@
 
   function effectLabel(style) {
     const tex =
-      style.surfaceScale > 0 ? 'dots3d ss=' + style.surfaceScale : 'smooth';
+      style.surfaceScale > 0 ? 'roughline ss=' + style.surfaceScale : 'smooth';
     return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + style.linecap;
   }
 
   /**
-   * Remove per-path stroke/fill so the three stroke passes control rendering.
+   * Remove per-path stroke/fill so the stroke pass controls rendering.
    */
   function sanitizePathsInner(html) {
     if (!html) return '';
@@ -450,41 +447,21 @@
     }
   }
 
-  /** Pass 1 black 74 · Pass 2 domain 62 + dots3d · Pass 3 black 1.5. */
-  function pathThreePasses(pathMarkup, style) {
+  /** Single pass: domain stroke 12 + roughline displacement. */
+  function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
-    let pass2Attrs =
+    let attrs =
       'fill="none" stroke="' +
       style.strokeColor +
-      '" stroke-width="62" stroke-linecap="' +
-      style.linecap +
-      '" stroke-linejoin="' +
-      style.linejoin +
-      '"';
-    if (style.miterlimit != null) {
-      pass2Attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
-    }
+      '" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"';
     if (style.surfaceScale > 0) {
-      pass2Attrs += ' filter="url(#' + FILTER_ID_DOTS3D + ')"';
+      attrs += ' filter="url(#' + FILTER_ID_ROUGHLINE + ')"';
     }
-    return (
-      '<g class="path-layers">' +
-      '<g fill="none" stroke="#000" stroke-width="74" stroke-linecap="round" stroke-linejoin="round">' +
-      clean +
-      '</g>' +
-      '<g ' +
-      pass2Attrs +
-      '>' +
-      clean +
-      '</g>' +
-      '<g fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round">' +
-      clean +
-      '</g></g>'
-    );
+    return '<g class="path-layers"><g ' + attrs + '>' + clean + '</g></g>';
   }
 
   function pathLayers(pathMarkup, style) {
-    return pathThreePasses(pathMarkup, style);
+    return pathOnePass(pathMarkup, style);
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -876,7 +853,7 @@
 
   function buildUnifiedGlyphRendering(pathsMarkup, style) {
     if (!pathsMarkup) return '';
-    return '<g class="amulet-glyphs">' + pathThreePasses(pathsMarkup, style) + '</g>';
+    return '<g class="amulet-glyphs">' + pathOnePass(pathsMarkup, style) + '</g>';
   }
 
   function wrapSymmetric(content) {
