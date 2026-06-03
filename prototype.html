@@ -373,8 +373,20 @@
       miterlimit,
       ageTexture,
       surfaceScale,
-      spikyScale
+      spikyScale,
+      gender: p.gender
     };
+  }
+
+  function buildSpikeMarker(style) {
+    if (style.gender !== 'male') return '';
+    return (
+      '<marker id="spike" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">' +
+      '<path d="M0,5 L5,0 L10,5" fill="none" stroke="' +
+      style.strokeColor +
+      '" stroke-width="1.5"/>' +
+      '</marker>'
+    );
   }
 
   function buildCombinedFilter(style) {
@@ -404,7 +416,7 @@
 
   function buildSvgDefs(style) {
     console.log('surfaceScale:', style.surfaceScale);
-    return '<defs>' + buildCombinedFilter(style) + '</defs>';
+    return '<defs>' + buildCombinedFilter(style) + buildSpikeMarker(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -470,6 +482,9 @@
       '"';
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    }
+    if (style.gender === 'male') {
+      attrs += ' marker-mid="url(#spike)" stroke-dasharray="8 8"';
     }
     if (filterId) {
       attrs += ' filter="url(#' + filterId + ')"';
