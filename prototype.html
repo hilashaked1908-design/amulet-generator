@@ -234,12 +234,16 @@
   const VIEWBOX_PAD = 45;
   const FILTER_ID_STROKEFX = 'strokefx';
 
-  const AGE_YOUNG = new Set(['under18', '18-24', '25-34']);
-  const AGE_OLD = new Set(['45-59', '60-70', '70plus']);
+  const AGE_GLOSS = {
+    under18: { surfaceScale: 12, specularExponent: 80 },
+    '18-24': { surfaceScale: 8, specularExponent: 50 },
+    '25-34': { surfaceScale: 4, specularExponent: 30 }
+  };
   const AGE_ROUGHSTONE_SCALE = {
-    '45-59': 8,
-    '60-70': 14,
-    '70plus': 20
+    '35-44': 4,
+    '45-59': 9,
+    '60-70': 15,
+    '70plus': 22
   };
 
   /** תחום → צבע מעבר Pass 2 */
@@ -344,11 +348,16 @@
 
     let ageTexture = 'none';
     let roughstoneScale = 0;
-    if (AGE_YOUNG.has(p.age)) {
+    let glossSurfaceScale = 0;
+    let glossSpecularExponent = 30;
+    const gloss = AGE_GLOSS[p.age];
+    if (gloss) {
       ageTexture = 'glossy';
-    } else if (AGE_OLD.has(p.age)) {
+      glossSurfaceScale = gloss.surfaceScale;
+      glossSpecularExponent = gloss.specularExponent;
+    } else if (AGE_ROUGHSTONE_SCALE[p.age] != null) {
       ageTexture = 'roughstone';
-      roughstoneScale = AGE_ROUGHSTONE_SCALE[p.age] ?? 8;
+      roughstoneScale = AGE_ROUGHSTONE_SCALE[p.age];
     }
 
     let linecap = 'round';
@@ -356,12 +365,12 @@
     let miterlimit = null;
     let spikyScale = 0;
     if (p.gender === 'nonbinary') {
-      spikyScale = 8;
+      spikyScale = 5;
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
-      spikyScale = 18;
+      spikyScale = 12;
     }
 
     return {
@@ -376,6 +385,8 @@
       miterlimit,
       ageTexture,
       roughstoneScale,
+      glossSurfaceScale,
+      glossSpecularExponent,
       spikyScale
     };
   }
@@ -391,10 +402,17 @@
     if (style.ageTexture === 'glossy') {
       inner +=
         '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
-        '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.5" specularExponent="60" lighting-color="white" result="spec">' +
+        '<feSpecularLighting in="blur" surfaceScale="' +
+        style.glossSurfaceScale +
+        '" specularConstant="1.5" specularExponent="' +
+        style.glossSpecularExponent +
+        '" lighting-color="white" result="spec">' +
         '<fePointLight x="300" y="150" z="200"/>' +
         '</feSpecularLighting>' +
-        '<feComposite in="spec" in2="SourceGraphic" operator="in" result="ageOut"/>';
+        '<feMerge result="ageOut">' +
+        '<feMergeNode in="SourceGraphic"/>' +
+        '<feMergeNode in="spec"/>' +
+        '</feMerge>';
       ageResult = 'ageOut';
     } else if (style.ageTexture === 'roughstone') {
       inner +=
@@ -407,10 +425,11 @@
 
     if (hasSpiky) {
       inner +=
-        '<feTurbulence type="turbulence" baseFrequency="0.4" numOctaves="1" seed="9" result="spikyNoise"/>' +
-        '<feDisplacementMap in="' +
+        '<feMorphology in="' +
         ageResult +
-        '" in2="spikyNoise" scale="' +
+        '" operator="erode" radius="2" result="eroded"/>' +
+        '<feTurbulence type="turbulence" baseFrequency="0.35" numOctaves="1" result="spikyNoise"/>' +
+        '<feDisplacementMap in="eroded" in2="spikyNoise" scale="' +
         style.spikyScale +
         '" xChannelSelector="R" yChannelSelector="G"/>';
     }
@@ -1008,6 +1027,22 @@
     document.getElementById('status').textContent = msg;
   }
 
+  function setResultSvg(svgString) {
+    const wrap = document.getElementById('resultWrap');
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const err = doc.querySelector('parsererror');
+    if (err) {
+      console.error('[prototype] SVG parse error:', err.textContent);
+      wrap.innerHTML = svgString;
+      return;
+    }
+    const svgEl = document.importNode(doc.documentElement, true);
+    while (wrap.firstChild) {
+      wrap.removeChild(wrap.firstChild);
+    }
+    wrap.appendChild(svgEl);
+  }
+
   async function init() {
     requireConnectionCore();
     if (location.protocol === 'file:') {
@@ -1029,6 +1064,7 @@
   }
 
   async function composeAmulet() {
+    console.log('compose called');
     if (composeBusy) return;
     if (!appReady) {
       setStatus('המערכת עדיין טוענת — המתיני רגע');
@@ -1069,7 +1105,7 @@
         effect: effectLabel(style),
         spacing: style.spacing
       });
-      document.getElementById('resultWrap').innerHTML = svg;
+      setResultSvg(svg);
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
@@ -1094,6 +1130,11 @@
 
   init();
 })();
+
+  window.onerror = function (msg, src, line) {
+    document.body.innerHTML +=
+      '<p style="color:red">' + msg + ' line:' + line + '</p>';
+  };
   </script>
 </body>
 </html>
