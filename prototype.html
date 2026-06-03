@@ -232,8 +232,7 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
-  const FILTER_ID_STROKEFX = 'strokefx';
-  const FILTER_ID_SPIKY = 'spiky';
+  const FILTER_ID_COMBINED = 'combined';
 
   const AGE_GLOSS = {
     under18: { surfaceScale: 12, specularExponent: 80 },
@@ -372,12 +371,12 @@
     let miterlimit = null;
     let spikyScale = 0;
     if (p.gender === 'nonbinary') {
-      spikyScale = 12;
+      spikyScale = 8;
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
-      spikyScale = 35;
+      spikyScale = 30;
     }
 
     return {
@@ -399,58 +398,38 @@
     };
   }
 
-  function buildStrokeFilterDef(style) {
-    if (style.surfaceScale <= 0) return '';
+  function buildCombinedFilter(style) {
+    const hasRough = style.surfaceScale > 0;
+    const hasSpiky = style.spikyScale > 0;
+    if (!hasRough && !hasSpiky) return '';
 
-    let inner = '';
-    if (style.ageTexture === 'glossy') {
+    let inner =
+      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="ageNoise"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="ageNoise" scale="' +
+      style.surfaceScale +
+      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>';
+    if (hasSpiky) {
       inner +=
-        '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
-        '<feSpecularLighting in="blur" surfaceScale="' +
-        style.surfaceScale +
-        '" specularConstant="1.5" specularExponent="' +
-        style.glossSpecularExponent +
-        '" lighting-color="white" result="spec">' +
-        '<fePointLight x="300" y="150" z="200"/>' +
-        '</feSpecularLighting>' +
-        '<feMerge result="ageOut">' +
-        '<feMergeNode in="SourceGraphic"/>' +
-        '<feMergeNode in="spec"/>' +
-        '</feMerge>';
-    } else if (style.ageTexture === 'roughstone') {
-      inner +=
-        '<feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="5" seed="2" result="stoneNoise"/>' +
-        '<feDisplacementMap in="SourceGraphic" in2="stoneNoise" scale="' +
-        style.surfaceScale +
+        '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
+        '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
+        style.spikyScale +
         '" xChannelSelector="R" yChannelSelector="G"/>';
+    } else {
+      inner += '<feComposite in="aged" in2="aged" operator="over"/>';
     }
 
     return (
       '<filter id="' +
-      FILTER_ID_STROKEFX +
-      '" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">' +
+      FILTER_ID_COMBINED +
+      '" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">' +
       inner +
-      '</filter>'
-    );
-  }
-
-  function buildSpikyFilterDef(style) {
-    if (style.spikyScale <= 0) return '';
-    return (
-      '<filter id="' +
-      FILTER_ID_SPIKY +
-      '" x="-15%" y="-15%" width="130%" height="130%">' +
-      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="2" result="noise"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
-      style.spikyScale +
-      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
 
   function buildSvgDefs(style) {
     console.log('surfaceScale:', style.surfaceScale);
-    return '<defs>' + buildStrokeFilterDef(style) + buildSpikyFilterDef(style) + '</defs>';
+    return '<defs>' + buildCombinedFilter(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -523,15 +502,11 @@
     return attrs;
   }
 
-  /** Single pass 45 — age (#strokefx) or spiky (#spiky) on full stroke. */
+  /** Single pass 45 — combined age + spiky filter when either applies. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
-    let filterId = null;
-    if (style.spikyScale > 0) {
-      filterId = FILTER_ID_SPIKY;
-    } else if (style.surfaceScale > 0) {
-      filterId = FILTER_ID_STROKEFX;
-    }
+    const filterId =
+      style.surfaceScale > 0 || style.spikyScale > 0 ? FILTER_ID_COMBINED : null;
     return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
   }
 
