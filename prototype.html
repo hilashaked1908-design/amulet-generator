@@ -386,7 +386,10 @@
       '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossed"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="gloss"/>' +
+      '</feMerge>' +
       '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
       style.surfaceScale +
