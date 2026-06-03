@@ -232,12 +232,7 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
-  const PASS2_STROKE_WIDTH = 70;
-  const DOTS_BASE_FREQUENCY = '0.15';
   const FILTER_ID_DOTS3D = 'dots3d';
-  const FILTER_ID_SHADOWBLUR = 'shadowblur';
-  const SHADOWBLUR_FILTER_DEF =
-    '<filter id="shadowblur"><feGaussianBlur stdDeviation="10"/></filter>';
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -336,22 +331,50 @@
   }
 
   function visualStyle(p) {
+    const strokeByDomain = {
+      love: '#D7A2B4',
+      livelihood: '#C8ED14',
+      health: '#cccccc',
+      family: '#6D6455',
+      selfConfidence: '#362514',
+      meaning: '#6C3711',
+      housing: '#8B7355'
+    };
+    const surfaceByAge = {
+      under18: 0,
+      '18-24': 2,
+      '25-34': 4,
+      '35-44': 6,
+      '45-59': 9,
+      '60-70': 12,
+      '70plus': 18
+    };
+
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
-    const domain = DOMAINS[p.domain] || DOMAINS.love;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
-    const surfaceScale = AGE_SURFACE_SCALE[p.age] ?? 4;
+    const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
+    const surfaceScale = surfaceByAge[p.age] ?? 4;
+
+    let linecap = 'round';
+    let linejoin = 'round';
+    let miterlimit = null;
+    if (p.gender === 'male') {
+      linecap = 'square';
+      linejoin = 'miter';
+      miterlimit = 50;
+    }
 
     return {
       amuletType: p.amuletType,
       domainKey: p.domain,
       intent,
-      strokeColor: domain.stroke,
+      strokeColor,
       spacing,
       amuletScale: gender.scale,
-      linecap: gender.linecap,
-      linejoin: gender.linejoin,
-      miterlimit: gender.miterlimit,
+      linecap,
+      linejoin,
+      miterlimit,
       surfaceScale
     };
   }
@@ -361,14 +384,12 @@
     return (
       '<filter id="' +
       FILTER_ID_DOTS3D +
-      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="' +
-      DOTS_BASE_FREQUENCY +
-      '" numOctaves="4" seed="7" result="noise"/>' +
+      '" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="turbulence" baseFrequency="0.18" numOctaves="2" seed="3" result="noise"/>' +
       '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="' +
       style.surfaceScale +
       '" result="light">' +
-      '<feDistantLight azimuth="135" elevation="40"/>' +
+      '<feDistantLight azimuth="225" elevation="50"/>' +
       '</feDiffuseLighting>' +
       '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
       '</filter>'
@@ -376,7 +397,7 @@
   }
 
   function buildSvgDefs(style) {
-    return '<defs>' + SHADOWBLUR_FILTER_DEF + buildDots3dFilterDef(style) + '</defs>';
+    return '<defs>' + buildDots3dFilterDef(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -393,7 +414,7 @@
   }
 
   /**
-   * Remove per-path stroke/fill so the two stroke passes control rendering.
+   * Remove per-path stroke/fill so the three stroke passes control rendering.
    */
   function sanitizePathsInner(html) {
     if (!html) return '';
@@ -429,49 +450,41 @@
     }
   }
 
-  function strokePassFixed(style, filterId) {
-    let attrs =
+  /** Pass 1 black 74 · Pass 2 domain 62 + dots3d · Pass 3 black 1.5. */
+  function pathThreePasses(pathMarkup, style) {
+    const clean = sanitizePathsInner(pathMarkup);
+    let pass2Attrs =
       'fill="none" stroke="' +
       style.strokeColor +
-      '" stroke-width="' +
-      PASS2_STROKE_WIDTH +
-      '" stroke-linecap="' +
+      '" stroke-width="62" stroke-linecap="' +
       style.linecap +
       '" stroke-linejoin="' +
       style.linejoin +
       '"';
     if (style.miterlimit != null) {
-      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+      pass2Attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    if (filterId) {
-      attrs += ' filter="url(#' + filterId + ')"';
+    if (style.surfaceScale > 0) {
+      pass2Attrs += ' filter="url(#' + FILTER_ID_DOTS3D + ')"';
     }
-    return '<g ' + attrs + '>';
-  }
-
-  function pass2FilterId(style) {
-    return style.surfaceScale > 0 ? FILTER_ID_DOTS3D : null;
-  }
-
-  /** Shadow blur · Pass 2 stroke 28 + dots3d (when age allows). */
-  function pathTwoPasses(pathMarkup, style) {
-    const clean = sanitizePathsInner(pathMarkup);
-    const pass2Fx = pass2FilterId(style);
     return (
       '<g class="path-layers">' +
-      '<g transform="translate(4,6)" fill="none" stroke="#000" stroke-width="80" opacity="0.15" filter="url(#' +
-      FILTER_ID_SHADOWBLUR +
-      ')">' +
+      '<g fill="none" stroke="#000" stroke-width="74" stroke-linecap="round" stroke-linejoin="round">' +
       clean +
       '</g>' +
-      strokePassFixed(style, pass2Fx) +
+      '<g ' +
+      pass2Attrs +
+      '>' +
+      clean +
+      '</g>' +
+      '<g fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round">' +
       clean +
       '</g></g>'
     );
   }
 
   function pathLayers(pathMarkup, style) {
-    return pathTwoPasses(pathMarkup, style);
+    return pathThreePasses(pathMarkup, style);
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -528,6 +541,7 @@
 
   let composeBusy = false;
   let appReady = false;
+  let lastComposeLetters = [];
 
   document.querySelectorAll('.field[data-group]').forEach((field) => {
     field.querySelectorAll('.opt-btn').forEach((btn) => {
@@ -535,9 +549,7 @@
         field.querySelectorAll('.opt-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         readParams();
-        if (appReady && document.getElementById('sentence').value.trim()) {
-          composeAmulet();
-        }
+        composeAmulet();
       });
     });
   });
@@ -864,7 +876,7 @@
 
   function buildUnifiedGlyphRendering(pathsMarkup, style) {
     if (!pathsMarkup) return '';
-    return '<g class="amulet-glyphs">' + pathTwoPasses(pathsMarkup, style) + '</g>';
+    return '<g class="amulet-glyphs">' + pathThreePasses(pathsMarkup, style) + '</g>';
   }
 
   function wrapSymmetric(content) {
@@ -882,7 +894,11 @@
     );
   }
 
-  async function buildAmuletSvg(letters, intent, style) {
+  async function buildAmuletSvg(letters) {
+    readParams();
+    const style = visualStyle(params);
+    document.title = 'color:' + style.strokeColor + ' scale:' + style.surfaceScale;
+    const intent = style.intent;
     const unique = [];
     for (const ch of letters) {
       if (!unique.includes(ch)) unique.push(ch);
@@ -936,7 +952,7 @@
       '"/>' +
       content +
       '</svg>';
-    return { svg, placements, anchor, skipped, viewBox: vb };
+    return { svg, placements, anchor, skipped, viewBox: vb, style };
   }
 
   function showDebug(placements, anchor, style) {
@@ -1004,13 +1020,12 @@
     }
     readParams();
     const sentence = document.getElementById('sentence').value.trim();
-    if (!sentence) {
-      setStatus('כתבי משפט כוונה');
-      return;
+    let letters = sentence ? getFirstLetters(sentence) : [];
+    if (!letters.length && lastComposeLetters.length) {
+      letters = lastComposeLetters.slice();
     }
-    const letters = getFirstLetters(sentence);
     if (!letters.length) {
-      setStatus('לא נמצאו אותיות עבריות');
+      setStatus(sentence ? 'לא נמצאו אותיות עבריות' : 'כתבי משפט כוונה');
       return;
     }
 
@@ -1020,7 +1035,8 @@
     setStatus('בונה קמע…');
 
     try {
-      const style = visualStyle(params);
+      const { svg, placements, anchor, skipped, style } = await buildAmuletSvg(letters);
+      lastComposeLetters = letters.slice();
       console.log('[prototype] compose —', {
         amuletType: params.amuletType,
         domain: params.domain,
@@ -1035,7 +1051,6 @@
         effect: effectLabel(style),
         spacing: style.spacing
       });
-      const { svg, placements, anchor, skipped } = await buildAmuletSvg(letters, style.intent, style);
       document.getElementById('resultWrap').innerHTML = svg;
 
       showDebug(placements, anchor, style);
