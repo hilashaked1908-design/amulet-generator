@@ -438,10 +438,30 @@
     return m ? m[1] : '';
   }
 
+  const SPIKE_STROKE_WIDTH = 45;
+  const SPIKE_STROKE_PROXIMITY = 5;
+
+  function distPointToPath(pathEl, x, y) {
+    const total = pathEl.getTotalLength();
+    if (!total || !isFinite(total)) return Infinity;
+    const steps = Math.max(24, Math.ceil(total / 3));
+    let best = Infinity;
+    for (let i = 0; i <= steps; i++) {
+      const pt = pathEl.getPointAtLength((total * i) / steps);
+      const d = Math.hypot(pt.x - x, pt.y - y);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
   /**
-   * Sample points along a path, extrude thin outward triangles, return path + spikes group.
+   * Sample points along a path, extrude thin outward triangles on the stroke edge.
+   * Returns original path + spike polygons in one group (paths first, spikes after).
    */
-  function addSpikesToPath(svgPath, numSpikes, spikeLength) {
+  function addSpikesToPath(svgPath, numSpikes, spikeLength, strokeWidth) {
+    const sw = strokeWidth == null ? SPIKE_STROKE_WIDTH : strokeWidth;
+    const strokeHalf = sw / 2;
+    const maxDist = strokeHalf + SPIKE_STROKE_PROXIMITY;
     const d = pathDFromSvgPath(svgPath);
     const original =
       String(svgPath || '').trim().charAt(0) === '<'
@@ -495,12 +515,22 @@
           nx = -nx;
           ny = -ny;
         }
-        const tipX2 = p.x + nx * spikeLength;
-        const tipY2 = p.y + ny * spikeLength;
-        const b1x = p.x - tx * baseHalf;
-        const b1y = p.y - ty * baseHalf;
-        const b2x = p.x + tx * baseHalf;
-        const b2y = p.y + ty * baseHalf;
+        const edgeX = p.x + nx * strokeHalf;
+        const edgeY = p.y + ny * strokeHalf;
+        if (distPointToPath(pathEl, edgeX, edgeY) > maxDist) {
+          continue;
+        }
+        const tipX2 = edgeX + nx * spikeLength;
+        const tipY2 = edgeY + ny * spikeLength;
+        const b1x = edgeX - tx * baseHalf;
+        const b1y = edgeY - ty * baseHalf;
+        const b2x = edgeX + tx * baseHalf;
+        const b2y = edgeY + ty * baseHalf;
+        const baseMidX = (b1x + b2x) / 2;
+        const baseMidY = (b1y + b2y) / 2;
+        if (distPointToPath(pathEl, baseMidX, baseMidY) > maxDist) {
+          continue;
+        }
         spikePolys.push(
           '<polygon class="path-spike" fill="currentColor" stroke="none" points="' +
             spikeNum(tipX2) +
@@ -524,29 +554,29 @@
     return wrap(original + spikePolys.join(''));
   }
 
-  /** Spike triangles only (paths unchanged) for overlay outside the gloss/age filter. */
-  function buildSpikePolygonsMarkup(html, numSpikes, spikeLength) {
-    if (!html || numSpikes < 1 || spikeLength <= 0) return '';
+  /** Replace each path with path+spikes group in its parent (same transform as glyph). */
+  function embedSpikesInPathsMarkup(html, numSpikes, spikeLength, strokeWidth) {
+    if (!html || numSpikes < 1 || spikeLength <= 0) return html;
     const doc = new DOMParser().parseFromString(
       '<svg xmlns="http://www.w3.org/2000/svg"><g id="spike-root">' + html + '</g></svg>',
       'image/svg+xml'
     );
-    if (doc.querySelector('parsererror')) return '';
+    if (doc.querySelector('parsererror')) return html;
     const root = doc.getElementById('spike-root');
-    if (!root) return '';
-    const polys = [];
+    if (!root) return html;
     root.querySelectorAll('path').forEach((pathEl) => {
       const groupDoc = new DOMParser().parseFromString(
         '<svg xmlns="http://www.w3.org/2000/svg">' +
-          addSpikesToPath(pathEl.outerHTML, numSpikes, spikeLength) +
+          addSpikesToPath(pathEl.outerHTML, numSpikes, spikeLength, strokeWidth) +
           '</svg>',
         'image/svg+xml'
       );
-      groupDoc.querySelectorAll('polygon.path-spike').forEach((poly) => {
-        polys.push(poly.outerHTML);
-      });
+      const group = groupDoc.documentElement.firstElementChild;
+      if (group && pathEl.parentNode) {
+        pathEl.parentNode.replaceChild(doc.importNode(group, true), pathEl);
+      }
     });
-    return polys.join('');
+    return root.innerHTML;
   }
 
   /**
@@ -606,26 +636,27 @@
     return attrs;
   }
 
-  /** Single pass 45 — gloss/age filter on paths; JS spike triangles on top (unfiltered). */
+  /** Single pass 45 — paths and spike polygons in the same stroked group. */
   function pathOnePass(pathMarkup, style) {
-    const clean = sanitizePathsInner(pathMarkup);
+    let clean = sanitizePathsInner(pathMarkup);
+    if (style.spikeCount > 0 && style.spikeLength > 0) {
+      clean = embedSpikesInPathsMarkup(
+        clean,
+        style.spikeCount,
+        style.spikeLength,
+        SPIKE_STROKE_WIDTH
+      );
+    }
     const filterId = FILTER_ID_COMBINED;
-    const spikes =
-      style.spikeCount > 0 && style.spikeLength > 0
-        ? buildSpikePolygonsMarkup(clean, style.spikeCount, style.spikeLength)
-        : '';
-    let out =
+    return (
       '<g class="path-layers" style="color:' +
       style.strokeColor +
       '"><g ' +
-      strokeAttrs(style, 45, filterId) +
+      strokeAttrs(style, SPIKE_STROKE_WIDTH, filterId) +
       '>' +
       clean +
-      '</g>';
-    if (spikes) {
-      out += '<g class="path-spikes" fill="currentColor" stroke="none">' + spikes + '</g>';
-    }
-    return out + '</g>';
+      '</g></g>'
+    );
   }
 
   function pathLayers(pathMarkup, style) {
