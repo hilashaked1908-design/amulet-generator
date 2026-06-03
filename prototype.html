@@ -195,7 +195,7 @@
     <main class="preview">
       <div id="resultWrap">
         <svg id="resultSvg" width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
-          <rect width="680" height="680" fill="#E0E4EA"/>
+          <rect width="680" height="680" fill="#ffffff"/>
           <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
         </svg>
       </div>
@@ -220,12 +220,17 @@
   const HUB_OVERLAP_DIST = 80;
   const DEFAULT_GLYPH_SIZE = 150;
 
-  const LAYER_DETAIL = 1.5;
-  const VIEWBOX_PAD = 40;
-  const FILTER_REGION = { x: '-35%', y: '-35%', w: '170%', h: '170%' };
-  const FILTER_ID_DILATE_MAIN = 'dilate-main';
-  const FILTER_ID_DILATE_MID = 'dilate-mid';
-  const PATTERN_ID = 'bg-pattern';
+  const BG_WHITE = '#ffffff';
+  const VIEWBOX_PAD = 45;
+  const FILTER_ID_DOTS3D = 'dots3d';
+  const DOTS3D_FILTER_DEF =
+    '<filter id="dots3d" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
+    '<feTurbulence type="turbulence" baseFrequency="0.20" numOctaves="2" seed="3" result="noise"/>' +
+    '<feDiffuseLighting in="noise" lighting-color="white" surfaceScale="4" result="light">' +
+    '<feDistantLight azimuth="225" elevation="50"/>' +
+    '</feDiffuseLighting>' +
+    '<feComposite in="light" in2="SourceGraphic" operator="in"/>' +
+    '</filter>';
 
   /** תחום: צבעים, רקע, דפוס, intent לחיבורים */
   const DOMAINS = {
@@ -269,17 +274,6 @@
       patternOpacity: 0.15,
       intent: 'summoning'
     }
-  };
-
-  /** גיל → רדיוס dilate לצורה מאוחדת (דק → עבה) */
-  const AGE_DILATE_RADIUS = {
-    under18: 6,
-    '18-24': 8,
-    '25-34': 10,
-    '35-44': 12,
-    '45-59': 14,
-    '60-70': 16,
-    '70plus': 18
   };
 
   const GENDER_SCALE_FEMALE = 1.08;
@@ -339,39 +333,14 @@
     return params;
   }
 
-  function darkenHex(hex, amount) {
-    const h = hex.replace('#', '');
-    if (h.length !== 6) return '#222222';
-    const r = Math.round(parseInt(h.slice(0, 2), 16) * amount);
-    const g = Math.round(parseInt(h.slice(2, 4), 16) * amount);
-    const b = Math.round(parseInt(h.slice(4, 6), 16) * amount);
-    return (
-      '#' +
-      clampNum(r, 0, 255).toString(16).padStart(2, '0') +
-      clampNum(g, 0, 255).toString(16).padStart(2, '0') +
-      clampNum(b, 0, 255).toString(16).padStart(2, '0')
-    );
-  }
-
   function visualStyle(p) {
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
     const domain = DOMAINS[p.type] || DOMAINS.protection;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
-    const dilateMain = AGE_DILATE_RADIUS[p.age] ?? 10;
-    const dilateMid = 6;
 
     return {
       domainKey: p.type,
-      colorMain: domain.main,
-      colorLight: domain.light,
-      colorDetail: darkenHex(domain.main, 0.45),
-      bg: domain.bg,
-      pattern: domain.pattern,
-      patternOpacity: domain.patternOpacity,
       intent: domain.intent,
-      dilateMain,
-      dilateMid,
-      layerDetail: LAYER_DETAIL,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
@@ -380,120 +349,8 @@
     };
   }
 
-  function filterRegionAttrs() {
-    return (
-      ' x="' +
-      FILTER_REGION.x +
-      '" y="' +
-      FILTER_REGION.y +
-      '" width="' +
-      FILTER_REGION.w +
-      '" height="' +
-      FILTER_REGION.h +
-      '"'
-    );
-  }
-
-  function buildDilateFilterDef(id, radius) {
-    return (
-      '<filter id="' +
-      id +
-      '"' +
-      filterRegionAttrs() +
-      ' color-interpolation-filters="sRGB">' +
-      '<feMorphology operator="dilate" radius="' +
-      radius +
-      '" result="expanded"/>' +
-      '<feComposite in="SourceGraphic" in2="expanded" operator="over"/>' +
-      '</filter>'
-    );
-  }
-
-  function buildBackgroundPatternDef(style) {
-    const pid = PATTERN_ID;
-    const c = style.colorMain;
-    const p = style.pattern;
-    if (p === 'circles') {
-      return (
-        '<pattern id="' +
-        pid +
-        '" width="48" height="48" patternUnits="userSpaceOnUse">' +
-        '<circle cx="12" cy="12" r="8" fill="' +
-        c +
-        '" opacity="0.35"/>' +
-        '<circle cx="36" cy="30" r="6" fill="' +
-        c +
-        '" opacity="0.25"/>' +
-        '</pattern>'
-      );
-    }
-    if (p === 'lines') {
-      return (
-        '<pattern id="' +
-        pid +
-        '" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(0)">' +
-        '<line x1="0" y1="6" x2="12" y2="6" stroke="' +
-        c +
-        '" stroke-width="1.5"/>' +
-        '</pattern>'
-      );
-    }
-    if (p === 'dots') {
-      return (
-        '<pattern id="' +
-        pid +
-        '" width="32" height="32" patternUnits="userSpaceOnUse">' +
-        '<circle cx="6" cy="8" r="2.5" fill="' +
-        c +
-        '"/>' +
-        '<circle cx="22" cy="6" r="3.5" fill="' +
-        c +
-        '" opacity="0.7"/>' +
-        '<circle cx="14" cy="22" r="2" fill="' +
-        c +
-        '" opacity="0.5"/>' +
-        '<circle cx="26" cy="24" r="4" fill="' +
-        c +
-        '" opacity="0.35"/>' +
-        '</pattern>'
-      );
-    }
-    if (p === 'grid') {
-      return (
-        '<pattern id="' +
-        pid +
-        '" width="24" height="24" patternUnits="userSpaceOnUse">' +
-        '<path d="M24 0H0V24" fill="none" stroke="' +
-        c +
-        '" stroke-width="0.8"/>' +
-        '</pattern>'
-      );
-    }
-    if (p === 'waves') {
-      return (
-        '<pattern id="' +
-        pid +
-        '" width="60" height="20" patternUnits="userSpaceOnUse">' +
-        '<path d="M0 10 Q15 2 30 10 T60 10" fill="none" stroke="' +
-        c +
-        '" stroke-width="1.5"/>' +
-        '<path d="M0 16 Q15 8 30 16 T60 16" fill="none" stroke="' +
-        c +
-        '" stroke-width="1" opacity="0.6"/>' +
-        '</pattern>'
-      );
-    }
-    return '';
-  }
-
-  function buildSvgDefs(style) {
-    return (
-      '<defs>' +
-      buildBackgroundPatternDef(style) +
-      buildDilateFilterDef(FILTER_ID_DILATE_MAIN, style.dilateMain) +
-      buildDilateFilterDef(FILTER_ID_DILATE_MID, style.dilateMid) +
-      '</defs>'
-    );
+  function buildSvgDefs() {
+    return '<defs>' + DOTS3D_FILTER_DEF + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -504,19 +361,11 @@
   }
 
   function effectLabel(style) {
-    return (
-      style.domainKey +
-      ' · dilate ' +
-      style.dilateMain +
-      '/' +
-      style.dilateMid +
-      ' · ' +
-      style.linecap
-    );
+    return style.domainKey + ' · 74/#fff+dots3d · ' + style.linecap;
   }
 
   /**
-   * Remove per-path stroke/fill so the three wrapper layers control rendering.
+   * Remove per-path stroke/fill so the two stroke passes control rendering.
    */
   function sanitizePathsInner(html) {
     if (!html) return '';
@@ -552,42 +401,35 @@
     }
   }
 
-  function strokeLayerG(style, strokeColor, width) {
-    const w = typeof width === 'number' ? width.toFixed(2) : width;
+  function strokePassFixed(strokeColor, width, filterId) {
     let attrs =
       'fill="none" stroke="' +
       strokeColor +
       '" stroke-width="' +
-      w +
-      '" stroke-linecap="' +
-      style.linecap +
-      '" stroke-linejoin="' +
-      style.linejoin +
-      '"';
-    if (style.linejoin === 'miter' && style.miterlimit != null) {
-      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+      width +
+      '" stroke-linecap="round" stroke-linejoin="round"';
+    if (filterId) {
+      attrs += ' filter="url(#' + filterId + ')"';
     }
     return '<g ' + attrs + '>';
   }
 
-  /** Symbols: domain-colored mini layers */
-  function pathLayers(pathMarkup, style) {
+  /** Pass 1 black 74 · Pass 2 white 62 + dots3d only. */
+  function pathTwoPasses(pathMarkup) {
     const clean = sanitizePathsInner(pathMarkup);
-    const w1 = style.dilateMain * 1.4;
-    const w2 = style.dilateMid * 1.2;
     return (
       '<g class="path-layers">' +
-      strokeLayerG(style, style.colorMain, w1) +
+      strokePassFixed('#000', 74) +
       clean +
       '</g>' +
-      strokeLayerG(style, style.colorLight, w2) +
+      strokePassFixed('#fff', 62, FILTER_ID_DOTS3D) +
       clean +
-      '</g>' +
-      strokeLayerG(style, style.colorDetail, style.layerDetail) +
-      clean +
-      '</g>' +
-      '</g>'
+      '</g></g>'
     );
+  }
+
+  function pathLayers(pathMarkup) {
+    return pathTwoPasses(pathMarkup);
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -936,7 +778,7 @@
       ' ' +
       vh +
       '" preserveAspectRatio="xMidYMid meet" overflow="visible">' +
-      pathLayers(inner, style) +
+      pathLayers(inner) +
       '</svg></g></g>'
     );
   }
@@ -978,33 +820,9 @@
     );
   }
 
-  /**
-   * Unified amulet: one group, three passes — dilate main, dilate mid, detail lines.
-   */
-  function buildUnifiedGlyphRendering(pathsMarkup, style) {
+  function buildUnifiedGlyphRendering(pathsMarkup) {
     if (!pathsMarkup) return '';
-    const wMain = Math.max(18, style.dilateMain * 2.2);
-    const wMid = Math.max(12, style.dilateMid * 2);
-    return (
-      '<g class="amulet-glyphs">' +
-      '<g class="pass-main" filter="url(#' +
-      FILTER_ID_DILATE_MAIN +
-      ')">' +
-      strokeLayerG(style, style.colorMain, wMain) +
-      pathsMarkup +
-      '</g></g>' +
-      '<g class="pass-mid" filter="url(#' +
-      FILTER_ID_DILATE_MID +
-      ')">' +
-      strokeLayerG(style, style.colorLight, wMid) +
-      pathsMarkup +
-      '</g></g>' +
-      '<g class="pass-detail">' +
-      strokeLayerG(style, style.colorDetail, style.layerDetail) +
-      pathsMarkup +
-      '</g></g>' +
-      '</g>'
-    );
+    return '<g class="amulet-glyphs">' + pathTwoPasses(pathsMarkup) + '</g>';
   }
 
   function wrapSymmetric(content) {
@@ -1044,24 +862,10 @@
       throw new Error('לא ניתן לצייר אות — בדקי חיבורים וגליפים');
     }
 
-    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style);
+    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''));
     const groups = symbolParts.join('') + unifiedGlyphs;
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
     const vb = viewBoxForPlacements(placements);
-    const patternRect =
-      '<rect x="' +
-      vb.x +
-      '" y="' +
-      vb.y +
-      '" width="' +
-      vb.w +
-      '" height="' +
-      vb.h +
-      '" fill="url(#' +
-      PATTERN_ID +
-      ')" opacity="' +
-      style.patternOpacity +
-      '"/>';
     const svg =
       '<svg xmlns="http://www.w3.org/2000/svg" width="' +
       W +
@@ -1076,7 +880,7 @@
       ' ' +
       vb.h +
       '" preserveAspectRatio="xMidYMid meet">' +
-      buildSvgDefs(style) +
+      buildSvgDefs() +
       '<rect x="' +
       vb.x +
       '" y="' +
@@ -1086,9 +890,8 @@
       '" height="' +
       vb.h +
       '" fill="' +
-      style.bg +
+      BG_WHITE +
       '"/>' +
-      patternRect +
       content +
       '</svg>';
     return { svg, placements, anchor, skipped, viewBox: vb };
@@ -1109,13 +912,7 @@
     el.innerHTML =
       '<strong>' +
       style.domainKey +
-      ' ' +
-      style.dilateMain +
-      '/' +
-      style.dilateMid +
-      '/' +
-      style.layerDetail +
-      ' | cap=' +
+      ' 74/#fff+dots3d | cap=' +
       style.linecap +
       '/' +
       style.linejoin +
