@@ -233,7 +233,6 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
-  const FILTER_ID_SPIKY2 = 'spiky2';
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -349,19 +348,6 @@
     const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
-    let linecap = 'round';
-    let linejoin = 'round';
-    let miterlimit = null;
-    let spikyScale = 0;
-    if (p.gender === 'nonbinary') {
-      spikyScale = 8;
-    } else if (p.gender === 'male') {
-      linecap = 'square';
-      linejoin = 'miter';
-      miterlimit = 100;
-      spikyScale = 30;
-    }
-
     return {
       amuletType: p.amuletType,
       domainKey: p.domain,
@@ -369,20 +355,45 @@
       strokeColor,
       spacing,
       amuletScale: gender.scale,
-      linecap,
-      linejoin,
-      miterlimit,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit,
       ageTexture,
       surfaceScale,
-      spikyScale
+      gender: p.gender
+    };
+  }
+
+  /** גיל = עוצמת החספוס; מגדר = אופי (מעוגל מול קוצני) — מעבר age יחיד ב־#combined */
+  function ageBumpByGender(style) {
+    const s = style.surfaceScale;
+    const g = style.gender || 'female';
+    if (g === 'male') {
+      return {
+        type: 'turbulence',
+        baseFrequency: '0.03',
+        numOctaves: 5,
+        scale: s * 4
+      };
+    }
+    if (g === 'nonbinary') {
+      return {
+        type: 'fractalNoise',
+        baseFrequency: '0.07',
+        numOctaves: 3,
+        scale: Math.round(s * 1.35)
+      };
+    }
+    return {
+      type: 'fractalNoise',
+      baseFrequency: '0.09',
+      numOctaves: 2,
+      scale: s
     };
   }
 
   function buildCombinedFilter(style) {
-    const isMale = params.gender === 'male';
-    const ageTurbType = isMale ? 'turbulence' : 'fractalNoise';
-    const ageBaseFreq = isMale ? '0.04' : '0.065';
-    const ageDisplacementScale = isMale ? style.surfaceScale * 3 : style.surfaceScale;
+    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
@@ -396,40 +407,22 @@
       '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
       '<feTurbulence type="' +
-      ageTurbType +
+      bump.type +
       '" baseFrequency="' +
-      ageBaseFreq +
-      '" numOctaves="4" seed="2" result="noise"/>' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
-      ageDisplacementScale +
-      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
-      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
-      '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
-      style.spikyScale +
+      bump.scale +
       '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
 
-  function buildSpiky2Filter() {
-    return (
-      '<filter id="' +
-      FILTER_ID_SPIKY2 +
-      '" x="-20%" y="-20%" width="140%" height="140%">' +
-      '<feTurbulence type="turbulence" baseFrequency="0.06" numOctaves="2" seed="8" result="noise"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="G"/>' +
-      '<feMorphology operator="erode" radius="3"/>' +
-      '</filter>'
-    );
-  }
-
   function buildSvgDefs(style) {
-    console.log('surfaceScale:', style.surfaceScale);
-    let defs = buildCombinedFilter(style);
-    if (params.gender === 'male') {
-      defs += buildSpiky2Filter();
-    }
-    return '<defs>' + defs + '</defs>';
+    console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
+    return '<defs>' + buildCombinedFilter(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -441,8 +434,22 @@
 
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const spk = style.spikyScale ? ' spiky=' + style.spikyScale : '';
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + spk + ' · ' + style.linecap;
+    const bump = ageBumpByGender(style);
+    return (
+      style.amuletType +
+      '/' +
+      style.domainKey +
+      ' · ' +
+      tex +
+      ' · ' +
+      bump.type +
+      '@' +
+      bump.baseFrequency +
+      '×' +
+      bump.scale +
+      ' · ' +
+      style.linecap
+    );
   }
 
   /**
@@ -509,26 +516,8 @@
     return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
   }
 
-  /** Male only: spiky halo pass after main stroke (unchanged). */
-  function pathMaleSpikyHaloPass(pathMarkup, style) {
-    const clean = sanitizePathsInner(pathMarkup);
-    return (
-      '<g class="path-layers path-layers-spiky-halo"><g fill="none" stroke="' +
-      style.strokeColor +
-      '" stroke-width="60" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="0.4" filter="url(#' +
-      FILTER_ID_SPIKY2 +
-      ')">' +
-      clean +
-      '</g></g>'
-    );
-  }
-
   function pathLayers(pathMarkup, style) {
-    let layers = pathOnePass(pathMarkup, style);
-    if (params.gender === 'male') {
-      layers += pathMaleSpikyHaloPass(pathMarkup, style);
-    }
-    return layers;
+    return pathOnePass(pathMarkup, style);
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -942,7 +931,7 @@
     readParams();
     const style = visualStyle(params);
     document.title =
-      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' spiky:' + style.spikyScale;
+      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' g:' + style.gender;
     const intent = style.intent;
     const unique = [];
     for (const ch of letters) {
@@ -1108,7 +1097,7 @@
         strokeColor: style.strokeColor,
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
-        spikyScale: style.spikyScale,
+        ageBump: ageBumpByGender(style),
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1121,7 +1110,7 @@
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      msg += ' | age=' + style.ageTexture + ' spiky=' + style.spikyScale;
+      msg += ' | age=' + style.ageTexture + ' bump×' + ageBumpByGender(style).scale;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
