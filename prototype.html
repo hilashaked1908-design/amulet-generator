@@ -62,6 +62,19 @@
       transition: background 0.1s, border-color 0.1s;
     }
     .opt-btn:hover { background: #efefef; }
+    .opt-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .field[data-group="gender"] .opt-btn {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .field[data-group="gender"] .opt-btn[data-value="male"] {
+      pointer-events: auto;
+      cursor: pointer;
+    }
     .opt-btn.active {
       background: #111;
       color: #fff;
@@ -177,7 +190,7 @@
         <div class="btn-row">
           <button type="button" class="opt-btn active" data-value="female">נקבה</button>
           <button type="button" class="opt-btn" data-value="nonbinary">לא בינארי</button>
-          <button type="button" class="opt-btn" data-value="male">זכר</button>
+          <button type="button" class="opt-btn" data-value="male" aria-label="זכר">זכר</button>
         </div>
       </div>
 
