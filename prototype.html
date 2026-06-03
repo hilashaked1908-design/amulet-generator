@@ -355,13 +355,13 @@
     let spikePass = null;
     if (p.gender === 'nonbinary') {
       spikyScale = 8;
-      spikePass = { numSpikes: 25, spikeLength: 5, baseHalf: 1.5 };
+      spikePass = { numSpikes: 25, spikeLength: 6 };
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 100;
       spikyScale = 30;
-      spikePass = { numSpikes: 60, spikeLength: 10, baseHalf: 1.5 };
+      spikePass = { numSpikes: 50, spikeLength: 12 };
     }
 
     return {
@@ -1004,19 +1004,13 @@
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  const GLYPH_STROKE_WIDTH = 45;
+  const GLYPH_STROKE_HALF = GLYPH_STROKE_WIDTH / 2;
   let spikeGenToken = 0;
-  let spikeWorker = null;
 
-  function getSpikeWorker() {
-    if (!spikeWorker) {
-      spikeWorker = new Worker('spike-worker.js');
-    }
-    return spikeWorker;
-  }
-
-  function clearSpikePassLayers(svgRoot) {
+  function clearSpikeLineLayers(svgRoot) {
     if (!svgRoot) return;
-    svgRoot.querySelectorAll('.spike-pass-layer').forEach((el) => el.remove());
+    svgRoot.querySelectorAll('.spike-lines').forEach((el) => el.remove());
   }
 
   function samplePathForSpikes(pathEl, measureSvg, numSpikes) {
@@ -1065,21 +1059,52 @@
     return samples;
   }
 
-  function getOrCreateSpikeLayer(pathEl, strokeColor) {
-    const parent = pathEl.parentNode;
-    if (!parent) return null;
-    let layer = parent.querySelector(':scope > .spike-pass-layer');
-    if (!layer) {
-      layer = document.createElementNS(SVG_NS, 'g');
-      layer.setAttribute('class', 'spike-pass-layer');
-      layer.setAttribute('fill', strokeColor);
-      layer.setAttribute('stroke', 'none');
-      parent.appendChild(layer);
-    }
-    return layer;
+  function spikeNum(n) {
+    return Number(n).toFixed(2);
   }
 
-  function startSpikePass(svgRoot, style, onDone) {
+  /** Spike lines group inside same glyph transform as path-layers (sibling). */
+  function getOrCreateSpikeLinesGroup(pathEl, strokeColor) {
+    let node = pathEl.parentNode;
+    while (node && node !== document) {
+      if (node.querySelector && node.querySelector(':scope > .path-layers')) {
+        let layer = node.querySelector(':scope > .spike-lines');
+        if (!layer) {
+          layer = document.createElementNS(SVG_NS, 'g');
+          layer.setAttribute('class', 'spike-lines');
+          layer.setAttribute('fill', 'none');
+          layer.setAttribute('stroke', strokeColor);
+          layer.setAttribute('stroke-width', '1');
+          layer.setAttribute('stroke-linecap', 'round');
+          node.appendChild(layer);
+        }
+        return layer;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function appendRadialSpikeLines(pathEl, measureSvg, cfg, layer) {
+    const samples = samplePathForSpikes(pathEl, measureSvg, cfg.numSpikes);
+    for (let i = 0; i < samples.length; i++) {
+      const s = samples[i];
+      const x1 = s.x + s.nx * GLYPH_STROKE_HALF;
+      const y1 = s.y + s.ny * GLYPH_STROKE_HALF;
+      const x2 = x1 + s.nx * cfg.spikeLength;
+      const y2 = y1 + s.ny * cfg.spikeLength;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'path-spike-line');
+      line.setAttribute('x1', spikeNum(x1));
+      line.setAttribute('y1', spikeNum(y1));
+      line.setAttribute('x2', spikeNum(x2));
+      line.setAttribute('y2', spikeNum(y2));
+      layer.appendChild(line);
+    }
+  }
+
+  /** Second pass: radial <line> spikes batched with rAF (no worker). */
+  function startSpikeLinePass(svgRoot, style, onDone) {
     const cfg = style.spikePass;
     if (!cfg || !svgRoot) {
       if (onDone) onDone();
@@ -1087,7 +1112,7 @@
     }
 
     const token = ++spikeGenToken;
-    clearSpikePassLayers(svgRoot);
+    clearSpikeLineLayers(svgRoot);
     const paths = Array.from(svgRoot.querySelectorAll('.path-layers path'));
     if (!paths.length) {
       if (onDone) onDone();
@@ -1101,9 +1126,7 @@
       'position:fixed;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none';
     document.body.appendChild(measureSvg);
 
-    const worker = getSpikeWorker();
     let pathIndex = 0;
-    let workerBusy = false;
 
     function finish() {
       measureSvg.remove();
@@ -1119,39 +1142,14 @@
         finish();
         return;
       }
-      if (workerBusy) return;
 
       const pathEl = paths[pathIndex];
-      const layer = getOrCreateSpikeLayer(pathEl, style.strokeColor);
-      const samples = samplePathForSpikes(pathEl, measureSvg, cfg.numSpikes);
-      const idx = pathIndex;
       pathIndex += 1;
-      workerBusy = true;
-
-      worker.onmessage = function (ev) {
-        workerBusy = false;
-        if (token !== spikeGenToken || ev.data.pathIndex !== idx) {
-          requestAnimationFrame(processPath);
-          return;
-        }
-        if (layer) {
-          (ev.data.polys || []).forEach((pts) => {
-            const poly = document.createElementNS(SVG_NS, 'polygon');
-            poly.setAttribute('class', 'path-spike');
-            poly.setAttribute('points', pts);
-            layer.appendChild(poly);
-          });
-        }
-        requestAnimationFrame(processPath);
-      };
-
-      worker.postMessage({
-        token: token,
-        pathIndex: idx,
-        samples: samples,
-        spikeLength: cfg.spikeLength,
-        baseHalf: cfg.baseHalf
-      });
+      const layer = getOrCreateSpikeLinesGroup(pathEl, style.strokeColor);
+      if (layer) {
+        appendRadialSpikeLines(pathEl, measureSvg, cfg, layer);
+      }
+      requestAnimationFrame(processPath);
     }
 
     requestAnimationFrame(processPath);
@@ -1173,9 +1171,9 @@
     }
     wrap.appendChild(svgEl);
     if (style && style.spikePass) {
-      startSpikePass(svgEl, style);
+      startSpikeLinePass(svgEl, style);
     } else {
-      clearSpikePassLayers(svgEl);
+      clearSpikeLineLayers(svgEl);
     }
   }
 
