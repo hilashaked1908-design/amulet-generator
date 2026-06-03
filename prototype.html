@@ -345,7 +345,7 @@
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
     const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
 
-    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    let surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     let linecap = 'round';
@@ -359,6 +359,7 @@
       linejoin = 'miter';
       miterlimit = 2;
       spikyScale = 30;
+      surfaceScale = Math.min(surfaceScale, 8);
     }
 
     return {
@@ -379,7 +380,8 @@
   }
 
   function buildCombinedFilter(style) {
-    const baseFreq = style.gender === 'nonbinary' ? '0.09' : '0.065';
+    const baseFreq =
+      style.gender === 'male' ? '0.15' : style.gender === 'nonbinary' ? '0.09' : '0.065';
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
@@ -392,9 +394,7 @@
       '<feMergeNode in="SourceGraphic"/>' +
       '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
-      '<feTurbulence type="' +
-      turbType +
-      '" baseFrequency="' +
+      '<feTurbulence type="fractalNoise" baseFrequency="' +
       baseFreq +
       '" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
