@@ -373,11 +373,14 @@
       miterlimit,
       ageTexture,
       surfaceScale,
-      spikyScale
+      spikyScale,
+      gender: p.gender
     };
   }
 
   function buildCombinedFilter(style) {
+    const turbType = style.gender === 'male' ? 'turbulence' : 'fractalNoise';
+    const baseFreq = style.gender === 'nonbinary' ? '0.09' : '0.065';
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
