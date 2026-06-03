@@ -103,7 +103,8 @@
       background: #fff;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     }
-    #resultWrap svg { display: block; }
+    #resultWrap svg,
+    #resultWrap canvas { display: block; max-width: 100%; height: auto; }
     #status {
       font-size: 0.85rem;
       color: #444;
@@ -364,18 +365,10 @@
     };
   }
 
-  /** גיל = עוצמת החספוס; מגדר = אופי (מעוגל מול קוצני) — מעבר age יחיד ב־#combined */
+  /** גיל = עוצמת החספוס. נקבה/זכר: אותו bump על הגוף; זכר מוסיף קוצים ב-canvas (לא שובר את הצורה). */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
     const g = style.gender || 'female';
-    if (g === 'male') {
-      return {
-        type: 'turbulence',
-        baseFrequency: '0.03',
-        numOctaves: 5,
-        scale: s * 4
-      };
-    }
     if (g === 'nonbinary') {
       return {
         type: 'fractalNoise',
@@ -389,6 +382,16 @@
       baseFrequency: '0.09',
       numOctaves: 2,
       scale: s
+    };
+  }
+
+  /** קוצים על קו המתאר — צפיפות ואורך לפי גיל (גם צעיר מקבל קוצים בסיסיים). */
+  function maleSpikeDrawParams(surfaceScale) {
+    const s = Math.max(0, surfaceScale);
+    return {
+      stride: Math.max(10, Math.round(18 - s * 0.3)),
+      tip: 5 + Math.min(s * 0.4, 8),
+      baseHalf: 1.5 + Math.min(s * 0.08, 2)
     };
   }
 
@@ -435,21 +438,17 @@
   function effectLabel(style) {
     const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
     const bump = ageBumpByGender(style);
-    return (
-      style.amuletType +
-      '/' +
-      style.domainKey +
-      ' · ' +
-      tex +
-      ' · ' +
+    let fx =
       bump.type +
       '@' +
       bump.baseFrequency +
       '×' +
-      bump.scale +
-      ' · ' +
-      style.linecap
-    );
+      bump.scale;
+    if (style.gender === 'male') {
+      const sp = maleSpikeDrawParams(style.surfaceScale);
+      fx += '+spikes(stride' + sp.stride + ')';
+    }
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
 
   /**
@@ -1026,6 +1025,11 @@
     document.getElementById('status').textContent = msg;
   }
 
+  let canvasSpikeToken = 0;
+  const CANVAS_ALPHA_EDGE = 28;
+  const CANVAS_EDGE_ROW_BATCH = 56;
+  const CANVAS_SPIKE_BATCH = 100;
+
   function setResultSvg(svgString) {
     const wrap = document.getElementById('resultWrap');
     const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
@@ -1040,6 +1044,156 @@
       wrap.removeChild(wrap.firstChild);
     }
     wrap.appendChild(svgEl);
+  }
+
+  function isEdgePixel(data, width, height, x, y) {
+    const i = (y * width + x) * 4;
+    if (data[i + 3] < CANVAS_ALPHA_EDGE) return false;
+    if (x > 0 && data[i - 4 + 3] < CANVAS_ALPHA_EDGE) return true;
+    if (x < width - 1 && data[i + 4 + 3] < CANVAS_ALPHA_EDGE) return true;
+    if (y > 0 && data[i - width * 4 + 3] < CANVAS_ALPHA_EDGE) return true;
+    if (y < height - 1 && data[i + width * 4 + 3] < CANVAS_ALPHA_EDGE) return true;
+    return false;
+  }
+
+  function outwardNormalAt(data, width, height, x, y) {
+    let nx = 0;
+    let ny = 0;
+    const dirs = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1]
+    ];
+    for (let d = 0; d < dirs.length; d++) {
+      const px = x + dirs[d][0];
+      const py = y + dirs[d][1];
+      if (px < 0 || py < 0 || px >= width || py >= height) {
+        nx += dirs[d][0];
+        ny += dirs[d][1];
+        continue;
+      }
+      const ni = (py * width + px) * 4;
+      if (data[ni + 3] < CANVAS_ALPHA_EDGE) {
+        nx += dirs[d][0];
+        ny += dirs[d][1];
+      }
+    }
+    const len = Math.hypot(nx, ny);
+    if (len < 0.001) return null;
+    return { nx: nx / len, ny: ny / len };
+  }
+
+  function drawCanvasSpike(ctx, x, y, nx, ny, color, tip, baseHalf) {
+    const tx = -ny;
+    const ty = nx;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + nx * tip, y + ny * tip);
+    ctx.lineTo(x - tx * baseHalf, y - ty * baseHalf);
+    ctx.lineTo(x + tx * baseHalf, y + ty * baseHalf);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /** זכר: SVG שלם + קוצים מחוץ לקו המתאר (לא displacement שמפרק). */
+  function setResultMaleWithSpikes(svgString, style, viewBox, onDone) {
+    const token = ++canvasSpikeToken;
+    const wrap = document.getElementById('resultWrap');
+    const spike = maleSpikeDrawParams(style.surfaceScale);
+    const cw = Math.max(1, Math.ceil(viewBox.w) || W);
+    const ch = Math.max(1, Math.ceil(viewBox.h) || H);
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    canvas.className = 'amulet-canvas-result';
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+    wrap.appendChild(canvas);
+    setStatus('מרנדר צורה…');
+
+    const img = new Image();
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      if (token !== canvasSpikeToken) return;
+      ctx.fillStyle = BG_WHITE;
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+
+      requestAnimationFrame(function () {
+        if (token !== canvasSpikeToken) return;
+        const imageData = ctx.getImageData(0, 0, cw, ch);
+        const data = imageData.data;
+        const edges = [];
+        let scanY = 1;
+
+        function scanRows() {
+          if (token !== canvasSpikeToken) return;
+          const yEnd = Math.min(scanY + CANVAS_EDGE_ROW_BATCH, ch - 1);
+          for (; scanY < yEnd; scanY++) {
+            for (let x = 1; x < cw - 1; x++) {
+              if (isEdgePixel(data, cw, ch, x, scanY)) edges.push({ x: x, y: scanY });
+            }
+          }
+          if (scanY < ch - 1) {
+            requestAnimationFrame(scanRows);
+            return;
+          }
+
+          const sampled = [];
+          for (let i = 0; i < edges.length; i += spike.stride) sampled.push(edges[i]);
+          let spikeIdx = 0;
+          setStatus('מוסיף קוצים…');
+
+          function drawSpikeBatch() {
+            if (token !== canvasSpikeToken) return;
+            const end = Math.min(spikeIdx + CANVAS_SPIKE_BATCH, sampled.length);
+            for (; spikeIdx < end; spikeIdx++) {
+              const p = sampled[spikeIdx];
+              const n = outwardNormalAt(data, cw, ch, p.x, p.y);
+              if (n) {
+                drawCanvasSpike(ctx, p.x, p.y, n.nx, n.ny, style.strokeColor, spike.tip, spike.baseHalf);
+              }
+            }
+            if (spikeIdx < sampled.length) {
+              requestAnimationFrame(drawSpikeBatch);
+            } else if (onDone) {
+              onDone();
+            }
+          }
+
+          requestAnimationFrame(drawSpikeBatch);
+        }
+
+        requestAnimationFrame(scanRows);
+      });
+    };
+
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      if (token !== canvasSpikeToken) return;
+      setResultSvg(svgString);
+      if (onDone) onDone();
+    };
+
+    img.src = url;
+  }
+
+  function setResultDisplay(svgString, style, viewBox, onReady) {
+    if (style.gender === 'male') {
+      setResultMaleWithSpikes(svgString, style, viewBox, onReady);
+      return;
+    }
+    setResultSvg(svgString);
+    if (onReady) onReady();
   }
 
   async function init() {
@@ -1086,7 +1240,7 @@
     setStatus('בונה קמע…');
 
     try {
-      const { svg, placements, anchor, skipped, style } = await buildAmuletSvg(letters);
+      const { svg, placements, anchor, skipped, viewBox, style } = await buildAmuletSvg(letters);
       lastComposeLetters = letters.slice();
       console.log('[prototype] compose —', {
         amuletType: params.amuletType,
@@ -1098,19 +1252,27 @@
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
         ageBump: ageBumpByGender(style),
+        maleSpikes: style.gender === 'male' ? maleSpikeDrawParams(style.surfaceScale) : null,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
         effect: effectLabel(style),
         spacing: style.spacing
       });
-      setResultSvg(svg);
+
+      await new Promise(function (resolve) {
+        setResultDisplay(svg, style, viewBox, resolve);
+      });
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
       msg += ' | age=' + style.ageTexture + ' bump×' + ageBumpByGender(style).scale;
+      if (style.gender === 'male') {
+        const sp = maleSpikeDrawParams(style.surfaceScale);
+        msg += ' | קוצים stride=' + sp.stride + ' tip=' + sp.tip.toFixed(1);
+      }
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
