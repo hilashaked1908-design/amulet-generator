@@ -379,7 +379,10 @@
   }
 
   function buildCombinedFilter(style) {
-    const turbType = style.gender === 'male' ? 'turbulence' : 'fractalNoise';
+    const isMale = style.gender === 'male';
+    const turbType = isMale ? 'turbulence' : 'fractalNoise';
+    const baseFreq = isMale ? '0.12' : '0.065';
+    const ageDisplacementScale = isMale ? style.surfaceScale * 2 : style.surfaceScale;
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
@@ -394,9 +397,11 @@
       '</feMerge>' +
       '<feTurbulence type="' +
       turbType +
-      '" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '" baseFrequency="' +
+      baseFreq +
+      '" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
-      style.surfaceScale +
+      ageDisplacementScale +
       '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
       '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
       '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
@@ -1082,11 +1087,7 @@
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
       msg += ' | age=' + style.ageTexture;
-      if (style.dashHaloPass) {
-        msg += ' halo=' + style.dashHaloPass.displacementScale;
-      } else {
-        msg += ' spiky=' + style.spikyScale;
-      }
+      msg += ' spiky=' + style.spikyScale;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
