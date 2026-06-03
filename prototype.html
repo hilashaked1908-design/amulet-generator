@@ -276,7 +276,7 @@
     male: {
       linecap: 'square',
       linejoin: 'miter',
-      miterlimit: 50,
+      miterlimit: 2,
       scale: GENDER_SCALE_MALE
     }
   };
@@ -357,7 +357,7 @@
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
-      miterlimit = 100;
+      miterlimit = 2;
       spikyScale = 30;
     }
 
@@ -379,7 +379,6 @@
   }
 
   function buildCombinedFilter(style) {
-    const turbType = style.gender === 'male' ? 'turbulence' : 'fractalNoise';
     const baseFreq = style.gender === 'nonbinary' ? '0.09' : '0.065';
     return (
       '<filter id="' +
@@ -393,7 +392,11 @@
       '<feMergeNode in="SourceGraphic"/>' +
       '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '<feTurbulence type="' +
+      turbType +
+      '" baseFrequency="' +
+      baseFreq +
+      '" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
       style.surfaceScale +
       '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
