@@ -379,6 +379,10 @@
   }
 
   function buildCombinedFilter(style) {
+    const isMale = params.gender === 'male';
+    const ageTurbType = isMale ? 'turbulence' : 'fractalNoise';
+    const ageBaseFreq = isMale ? '0.04' : '0.065';
+    const ageDisplacementScale = isMale ? style.surfaceScale * 3 : style.surfaceScale;
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
@@ -391,9 +395,13 @@
       '<feMergeNode in="SourceGraphic"/>' +
       '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '<feTurbulence type="' +
+      ageTurbType +
+      '" baseFrequency="' +
+      ageBaseFreq +
+      '" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="glossed" in2="noise" scale="' +
-      style.surfaceScale +
+      ageDisplacementScale +
       '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
       '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
       '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
