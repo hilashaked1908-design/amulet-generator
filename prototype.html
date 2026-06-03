@@ -359,10 +359,16 @@
     let linecap = 'round';
     let linejoin = 'round';
     let miterlimit = null;
-    if (p.gender === 'male') {
+    let displaceScale = surfaceScale;
+    let displaceBaseFrequency = '0.065';
+    if (p.gender === 'nonbinary') {
+      displaceScale = surfaceScale + 3;
+    } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
       miterlimit = 50;
+      displaceScale = surfaceScale + 8;
+      displaceBaseFrequency = '0.15';
     }
 
     return {
@@ -375,19 +381,23 @@
       linecap,
       linejoin,
       miterlimit,
-      surfaceScale
+      surfaceScale,
+      displaceScale,
+      displaceBaseFrequency
     };
   }
 
   function buildRoughlineFilterDef(style) {
-    if (style.surfaceScale <= 0) return '';
+    if (style.displaceScale <= 0) return '';
     return (
       '<filter id="' +
       FILTER_ID_ROUGHLINE +
       '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="' +
+      style.displaceBaseFrequency +
+      '" numOctaves="4" seed="2" result="noise"/>' +
       '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
-      style.surfaceScale +
+      style.displaceScale +
       '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
@@ -447,14 +457,21 @@
     }
   }
 
-  /** Single pass: domain stroke 12 + roughline displacement. */
+  /** Single pass: domain stroke 45 + roughline displacement. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
     let attrs =
       'fill="none" stroke="' +
       style.strokeColor +
-      '" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"';
-    if (style.surfaceScale > 0) {
+      '" stroke-width="45" stroke-linecap="' +
+      style.linecap +
+      '" stroke-linejoin="' +
+      style.linejoin +
+      '"';
+    if (style.miterlimit != null) {
+      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    }
+    if (style.displaceScale > 0) {
       attrs += ' filter="url(#' + FILTER_ID_ROUGHLINE + ')"';
     }
     return '<g class="path-layers"><g ' + attrs + '>' + clean + '</g></g>';
