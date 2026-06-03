@@ -232,7 +232,15 @@
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
-  const FILTER_ID_ROUGHLINE = 'roughline';
+  const FILTER_ID_STROKEFX = 'strokefx';
+
+  const AGE_YOUNG = new Set(['under18', '18-24', '25-34']);
+  const AGE_OLD = new Set(['45-59', '60-70', '70plus']);
+  const AGE_ROUGHSTONE_SCALE = {
+    '45-59': 8,
+    '60-70': 14,
+    '70plus': 20
+  };
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -243,17 +251,6 @@
     selfConfidence: { stroke: '#362514' },
     meaning: { stroke: '#6C3711' },
     housing: { stroke: '#8B7355' }
-  };
-
-  /** גיל → surfaceScale בלבד (0 = ללא מסנן מרקם) */
-  const AGE_SURFACE_SCALE = {
-    under18: 0,
-    '18-24': 2,
-    '25-34': 4,
-    '35-44': 6,
-    '45-59': 9,
-    '60-70': 12,
-    '70plus': 18
   };
 
   const GENDER_SCALE_FEMALE = 1.08;
@@ -340,35 +337,31 @@
       meaning: '#6C3711',
       housing: '#8B7355'
     };
-    const surfaceByAge = {
-      under18: 0,
-      '18-24': 2,
-      '25-34': 4,
-      '35-44': 6,
-      '45-59': 9,
-      '60-70': 12,
-      '70plus': 18
-    };
-
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
     const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
-    const surfaceScale = surfaceByAge[p.age] ?? 4;
+
+    let ageTexture = 'none';
+    let roughstoneScale = 0;
+    if (AGE_YOUNG.has(p.age)) {
+      ageTexture = 'glossy';
+    } else if (AGE_OLD.has(p.age)) {
+      ageTexture = 'roughstone';
+      roughstoneScale = AGE_ROUGHSTONE_SCALE[p.age] ?? 8;
+    }
 
     let linecap = 'round';
     let linejoin = 'round';
     let miterlimit = null;
-    let displaceScale = surfaceScale;
-    let displaceBaseFrequency = '0.065';
+    let spikyScale = 0;
     if (p.gender === 'nonbinary') {
-      displaceScale = surfaceScale + 3;
+      spikyScale = 8;
     } else if (p.gender === 'male') {
       linecap = 'square';
       linejoin = 'miter';
-      miterlimit = 50;
-      displaceScale = surfaceScale + 8;
-      displaceBaseFrequency = '0.15';
+      miterlimit = 100;
+      spikyScale = 18;
     }
 
     return {
@@ -381,30 +374,58 @@
       linecap,
       linejoin,
       miterlimit,
-      surfaceScale,
-      displaceScale,
-      displaceBaseFrequency
+      ageTexture,
+      roughstoneScale,
+      spikyScale
     };
   }
 
-  function buildRoughlineFilterDef(style) {
-    if (style.displaceScale <= 0) return '';
+  function buildStrokeFilterDef(style) {
+    const hasAge = style.ageTexture === 'glossy' || style.ageTexture === 'roughstone';
+    const hasSpiky = style.spikyScale > 0;
+    if (!hasAge && !hasSpiky) return '';
+
+    let inner = '';
+    let ageResult = 'SourceGraphic';
+
+    if (style.ageTexture === 'glossy') {
+      inner +=
+        '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
+        '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.5" specularExponent="60" lighting-color="white" result="spec">' +
+        '<fePointLight x="300" y="150" z="200"/>' +
+        '</feSpecularLighting>' +
+        '<feComposite in="spec" in2="SourceGraphic" operator="in" result="ageOut"/>';
+      ageResult = 'ageOut';
+    } else if (style.ageTexture === 'roughstone') {
+      inner +=
+        '<feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="5" seed="2" result="stoneNoise"/>' +
+        '<feDisplacementMap in="SourceGraphic" in2="stoneNoise" scale="' +
+        style.roughstoneScale +
+        '" xChannelSelector="R" yChannelSelector="G" result="ageOut"/>';
+      ageResult = 'ageOut';
+    }
+
+    if (hasSpiky) {
+      inner +=
+        '<feTurbulence type="turbulence" baseFrequency="0.4" numOctaves="1" seed="9" result="spikyNoise"/>' +
+        '<feDisplacementMap in="' +
+        ageResult +
+        '" in2="spikyNoise" scale="' +
+        style.spikyScale +
+        '" xChannelSelector="R" yChannelSelector="G"/>';
+    }
+
     return (
       '<filter id="' +
-      FILTER_ID_ROUGHLINE +
-      '" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="' +
-      style.displaceBaseFrequency +
-      '" numOctaves="4" seed="2" result="noise"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="' +
-      style.displaceScale +
-      '" xChannelSelector="R" yChannelSelector="G"/>' +
+      FILTER_ID_STROKEFX +
+      '" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">' +
+      inner +
       '</filter>'
     );
   }
 
   function buildSvgDefs(style) {
-    return '<defs>' + buildRoughlineFilterDef(style) + '</defs>';
+    return '<defs>' + buildStrokeFilterDef(style) + '</defs>';
   }
 
   function requireConnectionCore() {
@@ -415,9 +436,9 @@
   }
 
   function effectLabel(style) {
-    const tex =
-      style.surfaceScale > 0 ? 'roughline ss=' + style.surfaceScale : 'smooth';
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + style.linecap;
+    const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
+    const spk = style.spikyScale ? ' spiky=' + style.spikyScale : '';
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + spk + ' · ' + style.linecap;
   }
 
   /**
@@ -471,8 +492,8 @@
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    if (style.displaceScale > 0) {
-      attrs += ' filter="url(#' + FILTER_ID_ROUGHLINE + ')"';
+    if (style.ageTexture !== 'none' || style.spikyScale > 0) {
+      attrs += ' filter="url(#' + FILTER_ID_STROKEFX + ')"';
     }
     return '<g class="path-layers"><g ' + attrs + '>' + clean + '</g></g>';
   }
@@ -891,7 +912,8 @@
   async function buildAmuletSvg(letters) {
     readParams();
     const style = visualStyle(params);
-    document.title = 'color:' + style.strokeColor + ' scale:' + style.surfaceScale;
+    document.title =
+      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' spiky:' + style.spikyScale;
     const intent = style.intent;
     const unique = [];
     for (const ch of letters) {
@@ -966,8 +988,8 @@
       style.amuletType +
       '/' +
       style.domainKey +
-      ' ss=' +
-      style.surfaceScale +
+      ' age=' +
+      style.ageTexture +
       ' | cap=' +
       style.linecap +
       '/' +
@@ -1038,7 +1060,9 @@
         gender: params.gender,
         urgency: params.urgency,
         strokeColor: style.strokeColor,
-        surfaceScale: style.surfaceScale,
+        ageTexture: style.ageTexture,
+        roughstoneScale: style.roughstoneScale,
+        spikyScale: style.spikyScale,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1051,7 +1075,7 @@
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
       msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      msg += ' | ss=' + style.surfaceScale;
+      msg += ' | age=' + style.ageTexture + ' spiky=' + style.spikyScale;
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
       msg += ' | קנה×' + style.amuletScale.toFixed(2);
