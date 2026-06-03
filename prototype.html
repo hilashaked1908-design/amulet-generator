@@ -234,13 +234,12 @@
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
 
-  const AGE_GLOSS = {
-    under18: { surfaceScale: 12, specularExponent: 80 },
-    '18-24': { surfaceScale: 8, specularExponent: 50 },
-    '25-34': { surfaceScale: 4, specularExponent: 30 }
-  };
-  const AGE_ROUGHSTONE_SCALE = {
-    '35-44': 4,
+  /** גיל → bump roughness only (gloss is always in combined filter) */
+  const AGE_BUMP_SCALE = {
+    under18: 0,
+    '18-24': 2,
+    '25-34': 4,
+    '35-44': 6,
     '45-59': 9,
     '60-70': 15,
     '70plus': 22
@@ -346,25 +345,8 @@
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
     const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
 
-    let ageTexture = 'none';
-    let roughstoneScale = 0;
-    let glossSurfaceScale = 0;
-    let glossSpecularExponent = 30;
-    const gloss = AGE_GLOSS[p.age];
-    if (gloss) {
-      ageTexture = 'glossy';
-      glossSurfaceScale = gloss.surfaceScale;
-      glossSpecularExponent = gloss.specularExponent;
-    } else if (AGE_ROUGHSTONE_SCALE[p.age] != null) {
-      ageTexture = 'roughstone';
-      roughstoneScale = AGE_ROUGHSTONE_SCALE[p.age];
-    }
-    const surfaceScale =
-      ageTexture === 'glossy'
-        ? glossSurfaceScale
-        : ageTexture === 'roughstone'
-          ? roughstoneScale
-          : 0;
+    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     let linecap = 'round';
     let linejoin = 'round';
@@ -390,39 +372,29 @@
       linejoin,
       miterlimit,
       ageTexture,
-      roughstoneScale,
-      glossSurfaceScale,
-      glossSpecularExponent,
       surfaceScale,
       spikyScale
     };
   }
 
   function buildCombinedFilter(style) {
-    const hasRough = style.surfaceScale > 0;
-    const hasSpiky = style.spikyScale > 0;
-    if (!hasRough && !hasSpiky) return '';
-
-    let inner =
-      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="ageNoise"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="ageNoise" scale="' +
-      style.surfaceScale +
-      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>';
-    if (hasSpiky) {
-      inner +=
-        '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
-        '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
-        style.spikyScale +
-        '" xChannelSelector="R" yChannelSelector="G"/>';
-    } else {
-      inner += '<feComposite in="aged" in2="aged" operator="over"/>';
-    }
-
     return (
       '<filter id="' +
       FILTER_ID_COMBINED +
       '" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">' +
-      inner +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
+      '<fePointLight x="300" y="150" z="200"/>' +
+      '</feSpecularLighting>' +
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossed"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="glossed" in2="noise" scale="' +
+      style.surfaceScale +
+      '" xChannelSelector="R" yChannelSelector="G" result="aged"/>' +
+      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" seed="9" result="spikyNoise"/>' +
+      '<feDisplacementMap in="aged" in2="spikyNoise" scale="' +
+      style.spikyScale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
@@ -505,8 +477,7 @@
   /** Single pass 45 — combined age + spiky filter when either applies. */
   function pathOnePass(pathMarkup, style) {
     const clean = sanitizePathsInner(pathMarkup);
-    const filterId =
-      style.surfaceScale > 0 || style.spikyScale > 0 ? FILTER_ID_COMBINED : null;
+    const filterId = FILTER_ID_COMBINED;
     return '<g class="path-layers"><g ' + strokeAttrs(style, 45, filterId) + '>' + clean + '</g></g>';
   }
 
