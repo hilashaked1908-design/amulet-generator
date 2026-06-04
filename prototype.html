@@ -414,10 +414,11 @@
       '"' +
       filterRegionAttrs(20) +
       ' color-interpolation-filters="sRGB">' +
+      '<feMorphology in="SourceGraphic" operator="erode" radius="8" result="eroded"/>' +
       '<feTurbulence type="turbulence" baseFrequency="0.15" numOctaves="3" seed="' +
       seed +
       '" result="spikeFine"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="spikeFine" scale="' +
+      '<feDisplacementMap in="eroded" in2="spikeFine" scale="' +
       scale +
       '" xChannelSelector="R" yChannelSelector="G" result="spikedFine"/>' +
       '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" seed="' +
