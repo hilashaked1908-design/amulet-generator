@@ -237,8 +237,8 @@
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
   const MALE_BODY_BUMP_MAX = 12;
-  const MALE_SPIKE_COUNT = 60;
-  const MALE_SPIKE_LENGTH = 8;
+  const MALE_SPIKE_COUNT = 80;
+  const MALE_SPIKE_LENGTH = 10;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -433,79 +433,54 @@
     return '<defs>' + buildCombinedFilter(style) + '</defs>';
   }
 
-  function pathPointInSvgRoot(pathEl, localX, localY) {
-    const svg = pathEl.ownerSVGElement;
-    if (!svg || typeof svg.createSVGPoint !== 'function') {
-      return { x: localX, y: localY };
-    }
-    const pt = svg.createSVGPoint();
-    pt.x = localX;
-    pt.y = localY;
-    const ctm = pathEl.getCTM();
-    if (!ctm) return { x: localX, y: localY };
-    const root = pt.matrixTransform(ctm);
-    return { x: root.x, y: root.y };
-  }
-
-  function computePathsCenter(paths) {
-    let sumX = 0;
-    let sumY = 0;
-    let n = 0;
-    const samplesPerPath = 32;
-    paths.forEach(function (path) {
-      const len = path.getTotalLength();
-      if (!len) return;
-      for (let s = 0; s < samplesPerPath; s++) {
-        const local = path.getPointAtLength((len * s) / samplesPerPath);
-        const root = pathPointInSvgRoot(path, local.x, local.y);
-        sumX += root.x;
-        sumY += root.y;
-        n++;
-      }
-    });
-    if (!n) return { cx: W / 2, cy: H / 2 };
-    return { cx: sumX / n, cy: sumY / n };
-  }
-
   function addSpikesToSvg(svgString, color, count, length) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const paths = doc.querySelectorAll('path');
-    const spikes = [];
-    const center = computePathsCenter(paths);
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    tmp.innerHTML = svgString.replace(/<svg[^>]*>/, '').replace('</svg>', '');
+    document.body.appendChild(tmp);
 
-    paths.forEach(function (path) {
-      const pathLen = path.getTotalLength();
-      if (!pathLen) return;
-      const step = pathLen / count;
-      for (let i = 0; i < pathLen; i += step) {
-        const local = path.getPointAtLength(i);
-        const start = pathPointInSvgRoot(path, local.x, local.y);
-        let vx = start.x - center.cx;
-        let vy = start.y - center.cy;
-        const vlen = Math.hypot(vx, vy);
-        if (vlen < 0.001) continue;
-        vx /= vlen;
-        vy /= vlen;
-        const tipX = start.x + vx * length;
-        const tipY = start.y + vy * length;
+    const spikes = [];
+    tmp.querySelectorAll('path').forEach(function (path) {
+      const total = path.getTotalLength();
+      const step = total / count;
+      for (let i = 0; i < total; i += step) {
+        const pt = path.getPointAtLength(i);
+        const pt2 = path.getPointAtLength(i + 1);
+        const tx = pt2.x - pt.x;
+        const ty = pt2.y - pt.y;
+        const len = Math.sqrt(tx * tx + ty * ty) || 1;
+        const nx = -ty / len;
+        const ny = tx / len;
         spikes.push(
           '<line x1="' +
-            start.x.toFixed(2) +
+            pt.x.toFixed(1) +
             '" y1="' +
-            start.y.toFixed(2) +
+            pt.y.toFixed(1) +
             '" x2="' +
-            tipX.toFixed(2) +
+            (pt.x + nx * length).toFixed(1) +
             '" y2="' +
-            tipY.toFixed(2) +
+            (pt.y + ny * length).toFixed(1) +
             '" stroke="' +
             color +
-            '" stroke-width="1.5" stroke-linecap="square"/>'
+            '" stroke-width="2" stroke-linecap="round"/>'
+        );
+        spikes.push(
+          '<line x1="' +
+            pt.x.toFixed(1) +
+            '" y1="' +
+            pt.y.toFixed(1) +
+            '" x2="' +
+            (pt.x - nx * length).toFixed(1) +
+            '" y2="' +
+            (pt.y - ny * length).toFixed(1) +
+            '" stroke="' +
+            color +
+            '" stroke-width="2" stroke-linecap="round"/>'
         );
       }
     });
 
-    return svgString.replace('</svg>', '<g class="amulet-line-spikes">' + spikes.join('') + '</g></svg>');
+    document.body.removeChild(tmp);
+    return svgString.replace('</svg>', spikes.join('') + '</svg>');
   }
 
   function assembleAmuletSvg(vb, defs, content) {
