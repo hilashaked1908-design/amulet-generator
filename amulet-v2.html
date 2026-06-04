@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קמע v2 — מטקסט חופשי</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #ececec;
+      color: #222;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      background: #1a1a1a;
+      color: #eee;
+      padding: 14px 20px;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header p { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 400px) 1fr;
+      min-height: calc(100vh - 56px);
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #f8f8f8;
+      border-left: 1px solid #ccc;
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+    #freeText {
+      width: 100%;
+      min-height: 120px;
+      padding: 10px 12px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+    #apiKey {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      direction: ltr;
+      text-align: left;
+    }
+    .key-hint { font-size: 0.75rem; color: #888; margin-top: 4px; }
+    #createBtn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: #2a5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #createBtn:hover:not(:disabled) { background: #248a42; }
+    #createBtn:disabled { opacity: 0.55; cursor: default; }
+    .preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      background: #e8e8e8;
+      gap: 12px;
+      position: relative;
+    }
+    #amuletContainer {
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+      width: min(680px, 100%);
+    }
+    #amuletContainer svg { display: block; max-width: 100%; height: auto; }
+    #status { font-size: 0.85rem; color: #444; text-align: center; max-width: 680px; }
+    #paramsPreview {
+      font-family: monospace, ui-monospace, monospace;
+      font-size: 11px;
+      direction: ltr;
+      text-align: left;
+      background: #fff;
+      border: 1px dashed #999;
+      padding: 8px 10px;
+      width: 100%;
+      max-width: 680px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #ccc;
+      border-top-color: #2a5;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { font-weight: 600; color: #333; }
+    .hint {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 12px;
+    }
+    .hint code { direction: ltr; unicode-bidi: embed; }
+    #scriptStubs { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>קמע v2 — מטקסט חופשי</h1>
+    <p>Claude מחלץ פרמטרים · 3 שכבות (רקע · שם · בקשה) · glyphs/ + connections.json</p>
+  </header>
+
+  <div id="scriptStubs" aria-hidden="true">
+    <input id="sentence" type="text" value="">
+    <button type="button" id="composeBtn"></button>
+    <button type="button" id="saveSvgBtn"></button>
+    <button type="button" id="savePngBtn"></button>
+    <input type="range" id="slSz" min="60" max="240" value="150">
+    <input type="range" id="slSW" min="5" max="50" value="20">
+    <div id="statusbar"></div>
+    <div id="extractedPreview"></div>
+    <div id="composeDebug" hidden></div>
+    <svg id="mainSVG" width="680" height="680"></svg>
+  </div>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="field">
+        <label for="freeText">תיאור חופשי בעברית</label>
+        <textarea id="freeText" placeholder="לדוגמה: אני נקבה בת 25 ממרכז הארץ, רווקה, מעצבת גרפית, רוצה בית בתאילנד, עבורי, בדחיפות, זימון">אני נקבה בת 25 ממרכז הארץ, רווקה, מעצבת גרפית, רוצה בית בתאילנד, עבורי, בדחיפות, זימון</textarea>
+      </div>
+      <div class="field">
+        <label for="apiKey">מפתח Anthropic API</label>
+        <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <p class="key-hint">נשמר ב-sessionStorage · נדרש לחילוץ פרמטרים</p>
+      </div>
+      <button type="button" id="createBtn" disabled>צור קמע</button>
+      <p class="hint">פתחי דרך <code>http://localhost:8080/amulet-v2.html</code> (python3 server.py)</p>
+    </aside>
+
+    <main class="preview">
+      <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
+        <div class="spinner" role="status"></div>
+        <p id="loadingMsg">מעבד עם Claude…</p>
+      </div>
+      <div id="amuletContainer">
+        <svg width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+          <rect width="680" height="680" fill="#ffffff"/>
+          <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
+        </svg>
+      </div>
+      <p id="status">טוען מערכת…</p>
+      <pre id="paramsPreview" hidden></pre>
+    </main>
+  </div>
+
+  <script src="connection-core.js"></script>
+  <script src="script.js"></script>
+  <script>
+(function () {
+  'use strict';
+
+  const MODEL = 'claude-sonnet-4-20250514';
+  const SYSTEM_PROMPT =
+    'Extract amulet parameters from the Hebrew text and return ONLY valid JSON:\n' +
+    '{\n' +
+    '  "age": number,\n' +
+    '  "gender": "female"|"male"|"nonbinary",\n' +
+    '  "location": "north"|"center"|"south",\n' +
+    '  "occupation": "creative"|"technical"|"care"|"manual"|"other",\n' +
+    '  "status": "single"|"couple"|"family",\n' +
+    '  "domain": "love"|"livelihood"|"health"|"family"|"confidence"|"meaning"|"housing",\n' +
+    '  "urgency": "low"|"medium"|"high",\n' +
+    '  "intent": "summoning"|"protection"|"grounding",\n' +
+    '  "for_whom": "self"|"partner"|"child"|"parent"|"friend"|"other",\n' +
+    '  "request_sentence": "the actual request in Hebrew",\n' +
+    '  "person_name": "name if mentioned"\n' +
+    '}';
+
+  const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
+  const W = 680;
+  const H = 680;
+  const CX = 340;
+  const CY = 340;
+  const GLYPHS_DIR = 'glyphs';
+  const MAX_LETTERS = 8;
+  const HUB_OVERLAP_DIST = 80;
+  const VIEWBOX_PAD = 45;
+  const FILTER_BG = 'combined-bg';
+  const FILTER_MID = 'combined-mid';
+  const FILTER_TOP = 'combined-top';
+
+  const AGE_BUMP_SCALE = {
+    under18: 0,
+    '18-24': 2,
+    '25-34': 4,
+    '35-44': 6,
+    '45-59': 9,
+    '60-70': 15,
+    '70plus': 22
+  };
+
+  const GENDER_VISUAL = {
+    female: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: 1.08 },
+    nonbinary: { linecap: 'round', linejoin: 'round', miterlimit: null, scale: 1.03 },
+    male: { linecap: 'square', linejoin: 'miter', miterlimit: 1, scale: 1.0 }
+  };
+
+  const URGENCY_SPACING = { low: 1.8, medium: 1.25, high: 0.5 };
+
+  const OCCUPATION_STROKE = {
+    creative: '#6C3711',
+    technical: '#362514',
+    care: '#D7A2B4',
+    manual: '#8B7355',
+    other: '#888888'
+  };
+
+  const DOMAIN_STROKE = {
+    love: '#D7A2B4',
+    livelihood: '#C8ED14',
+    health: '#cccccc',
+    family: '#6D6455',
+    confidence: '#362514',
+    meaning: '#6C3711',
+    housing: '#8B7355'
+  };
+
+  const STATUS_SCALE = { single: 0.88, couple: 1.0, family: 1.12 };
+
+  const OCCUPATION_INTENT = {
+    creative: 'summoning',
+    technical: 'protection',
+    care: 'grounding',
+    manual: 'protection',
+    other: 'protection'
+  };
+
+  const BUILTIN_SYMBOLS = {
+    circle: { viewBox: '0 0 100 100' },
+    triangle: { viewBox: '0 0 100 100' },
+    arc: { viewBox: '0 0 100 100' },
+    dot: { viewBox: '0 0 100 100' }
+  };
+
+  let glyphLetters = [];
+  const glyphSvgCache = {};
+  const parsedGlyphCache = {};
+  let connections = [];
+  let appReady = false;
+  let busy = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function setStatus(msg) {
+    $('status').textContent = msg;
+  }
+
+  function setLoading(on, msg) {
+    const ov = $('loadingOverlay');
+    if (on) {
+      ov.classList.add('active');
+      ov.setAttribute('aria-hidden', 'false');
+      $('loadingMsg').textContent = msg || 'מעבד עם Claude…';
+    } else {
+      ov.classList.remove('active');
+      ov.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function saveApiKey() {
+    const key = $('apiKey').value.trim();
+    if (key) sessionStorage.setItem('anthropic_key', key);
+    else sessionStorage.removeItem('anthropic_key');
+  }
+
+  function loadApiKey() {
+    const saved = sessionStorage.getItem('anthropic_key');
+    if (saved) $('apiKey').value = saved;
+  }
+
+  function getApiKey() {
+    return $('apiKey').value.trim();
+  }
+
+  function parseJsonFromText(text) {
+    const s = text.indexOf('{');
+    const e = text.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('לא נמצא JSON בתשובה');
+    return JSON.parse(text.slice(s, e + 1));
+  }
+
+  function numericAgeToBracket(age) {
+    const n = Number(age);
+    if (!Number.isFinite(n) || n < 18) return 'under18';
+    if (n < 25) return '18-24';
+    if (n < 35) return '25-34';
+    if (n < 45) return '35-44';
+    if (n < 60) return '45-59';
+    if (n < 70) return '60-70';
+    return '70plus';
+  }
+
+  function normalizeExtracted(raw) {
+    const gender = ['female', 'male', 'nonbinary'].includes(raw.gender) ? raw.gender : 'female';
+    const location = ['north', 'center', 'south'].includes(raw.location) ? raw.location : 'center';
+    const occupation = ['creative', 'technical', 'care', 'manual', 'other'].includes(raw.occupation)
+      ? raw.occupation
+      : 'other';
+    const status = ['single', 'couple', 'family'].includes(raw.status) ? raw.status : 'single';
+    const domain = ['love', 'livelihood', 'health', 'family', 'confidence', 'meaning', 'housing'].includes(
+      raw.domain
+    )
+      ? raw.domain
+      : 'housing';
+    const urgency = ['low', 'medium', 'high'].includes(raw.urgency) ? raw.urgency : 'medium';
+    const intent = ['summoning', 'protection', 'grounding'].includes(raw.intent) ? raw.intent : 'summoning';
+    return {
+      age: Number(raw.age) || 25,
+      gender,
+      location,
+      occupation,
+      status,
+      domain,
+      urgency,
+      intent,
+      for_whom: raw.for_whom || 'self',
+      request_sentence: String(raw.request_sentence || '').trim(),
+      person_name: String(raw.person_name || '').trim()
+    };
+  }
+
+  async function extractParamsWithClaude(text, apiKey) {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 800,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(r.status + ': ' + t.slice(0, 280));
+    }
+    const d = await r.json();
+    const body = d.content.map((b) => b.text || '').join('');
+    return normalizeExtracted(parseJsonFromText(body));
+  }
+
+  function requireConnectionCore() {
+    if (!window.ConnectionCore) throw new Error('connection-core.js לא נטען');
+    return window.ConnectionCore;
+  }
+
+  function clampNum(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function styleForBackground(p) {
+    const ageKey = numericAgeToBracket(p.age);
+    const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    return {
+      filterId: FILTER_BG,
+      strokeColor: '#c8c4bc',
+      spacing: 1,
+      amuletScale: gender.scale * 1.15,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit,
+      surfaceScale: AGE_BUMP_SCALE[ageKey] ?? 4,
+      age: ageKey,
+      gender: p.gender,
+      location: p.location,
+      layerOpacity: 0.35
+    };
+  }
+
+  function styleForMiddle(p) {
+    const ageKey = numericAgeToBracket(p.age);
+    const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    const statusScale = STATUS_SCALE[p.status] ?? 1;
+    return {
+      filterId: FILTER_MID,
+      strokeColor: OCCUPATION_STROKE[p.occupation] || OCCUPATION_STROKE.other,
+      spacing: 1.1,
+      amuletScale: gender.scale * statusScale * 0.92,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit,
+      surfaceScale: Math.round((AGE_BUMP_SCALE[ageKey] ?? 4) * 0.65),
+      age: ageKey,
+      gender: p.gender,
+      intent: OCCUPATION_INTENT[p.occupation] || 'protection',
+      layerOpacity: 0.72
+    };
+  }
+
+  function styleForTop(p) {
+    const ageKey = numericAgeToBracket(p.age);
+    const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    return {
+      filterId: FILTER_TOP,
+      strokeColor: DOMAIN_STROKE[p.domain] || DOMAIN_STROKE.housing,
+      spacing: URGENCY_SPACING[p.urgency] ?? 1.25,
+      amuletScale: gender.scale,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit,
+      surfaceScale: AGE_BUMP_SCALE[ageKey] ?? 4,
+      age: ageKey,
+      gender: p.gender,
+      intent: p.intent,
+      layerOpacity: 1
+    };
+  }
+
+  function maleBumpProfile(age, surfaceScale) {
+    const s = surfaceScale;
+    if (s <= 0) return { scale: 0, baseFrequency: '0.10', numOctaves: 2 };
+    if (s <= 9) {
+      return {
+        scale: s,
+        baseFrequency: Math.max(0.08, 0.115 - s * 0.002).toFixed(3),
+        numOctaves: s < 6 ? 2 : 3
+      };
+    }
+    if (age === '70plus') return { scale: 12, baseFrequency: '0.128', numOctaves: 2 };
+    if (age === '60-70') return { scale: 9, baseFrequency: '0.108', numOctaves: 2 };
+    return {
+      scale: Math.min(10, Math.round(8 + (s - 9) * 0.28)),
+      baseFrequency: '0.10',
+      numOctaves: 2
+    };
+  }
+
+  function ageBumpByGender(style) {
+    const s = style.surfaceScale;
+    const g = style.gender || 'female';
+    if (g === 'male') {
+      const profile = maleBumpProfile(style.age, s);
+      return {
+        type: 'turbulence',
+        baseFrequency: profile.baseFrequency,
+        numOctaves: profile.numOctaves,
+        scale: profile.scale
+      };
+    }
+    if (g === 'nonbinary') {
+      return {
+        type: 'fractalNoise',
+        baseFrequency: '0.07',
+        numOctaves: 3,
+        scale: Math.round(s * 1.35)
+      };
+    }
+    return { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2, scale: s };
+  }
+
+  function filterRegionAttrs(surfaceScale, bumpScale) {
+    const s = bumpScale != null ? bumpScale : surfaceScale || 0;
+    if (s > 12) return ' x="-30%" y="-30%" width="160%" height="160%"';
+    if (s > 6) return ' x="-22%" y="-22%" width="144%" height="144%"';
+    return ' x="-15%" y="-15%" width="130%" height="130%"';
+  }
+
+  function buildCombinedFilter(id, style) {
+    const bump = ageBumpByGender(style);
+    return (
+      '<filter id="' +
+      id +
+      '"' +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      ' color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
+      '<fePointLight x="300" y="150" z="200"/>' +
+      '</feSpecularLighting>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="gloss"/>' +
+      '</feMerge>' +
+      '<feTurbulence type="' +
+      bump.type +
+      '" baseFrequency="' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="glossed" in2="noise" scale="' +
+      bump.scale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
+      '</filter>'
+    );
+  }
+
+  function sanitizePathsInner(html) {
+    if (!html) return '';
+    try {
+      const doc = new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
+        'image/svg+xml'
+      );
+      if (doc.querySelector('parsererror')) return html;
+      doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
+        el.setAttribute('fill', 'none');
+        el.removeAttribute('stroke');
+        el.removeAttribute('stroke-width');
+        el.removeAttribute('stroke-linecap');
+        el.removeAttribute('stroke-linejoin');
+      });
+      const root = doc.getElementById('root');
+      return root ? root.innerHTML : html;
+    } catch (_) {
+      return html;
+    }
+  }
+
+  function strokeAttrs(style, width, filterId) {
+    let attrs =
+      'fill="none" stroke="' +
+      style.strokeColor +
+      '" stroke-width="' +
+      width +
+      '" stroke-linecap="' +
+      style.linecap +
+      '" stroke-linejoin="' +
+      style.linejoin +
+      '"';
+    if (style.miterlimit != null) attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    if (filterId) attrs += ' filter="url(#' + filterId + ')"';
+    return attrs;
+  }
+
+  function pathLayers(pathMarkup, style) {
+    const clean = sanitizePathsInner(pathMarkup);
+    return (
+      '<g class="path-layers"><g class="path-main" ' +
+      strokeAttrs(style, 45, style.filterId) +
+      '>' +
+      clean +
+      '</g></g>'
+    );
+  }
+
+  function glyphFilename(letter) {
+    return letter === 'א' ? 'א1.svg' : letter + '2.svg';
+  }
+
+  function letterFromFilename(file) {
+    const base = file.replace(/\.svg$/i, '');
+    if (base === 'א1') return 'א';
+    const m = base.match(/^(.)(?:1|2)$/);
+    return m && HEB.includes(m[1]) ? m[1] : null;
+  }
+
+  async function loadGlyphManifest() {
+    const res = await fetch(GLYPHS_DIR + '/manifest.json');
+    if (!res.ok) throw new Error('manifest.json לא נטען');
+    const data = await res.json();
+    glyphLetters = [];
+    for (const f of data.files || []) {
+      const ch = letterFromFilename(f);
+      if (ch && !glyphLetters.includes(ch)) glyphLetters.push(ch);
+    }
+    if (!glyphLetters.length) glyphLetters = HEB.slice();
+  }
+
+  async function loadConnectionsLocal() {
+    if (typeof window.loadConnections === 'function') {
+      await window.loadConnections(true);
+      if (window.invalidateConnectionsCache) window.invalidateConnectionsCache();
+    }
+    try {
+      const api = await fetch('/api/connections?t=' + Date.now(), { cache: 'no-store' });
+      if (api.ok) {
+        connections = (await api.json()).connections || [];
+        return;
+      }
+    } catch (_) { /* fallback */ }
+    const res = await fetch('connections.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('connections.json לא נטען');
+    connections = (await res.json()).connections || [];
+  }
+
+  function getFirstLetters(str) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const word of String(str || '').split(/\s+/).filter((w) => w.length > 0)) {
+      if (out.length >= MAX_LETTERS) break;
+      let picked = null;
+      for (let i = 0; i < word.length; i++) {
+        const ch = word[i];
+        if (!avail.has(ch) || used.has(ch)) continue;
+        picked = ch;
+        break;
+      }
+      if (picked) {
+        used.add(picked);
+        out.push(picked);
+      }
+    }
+    return out;
+  }
+
+  function lettersFromName(name) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const out = [];
+    const used = new Set();
+    for (const ch of String(name || '').replace(/\s/g, '')) {
+      if (out.length >= MAX_LETTERS) break;
+      if (!avail.has(ch) || used.has(ch)) continue;
+      used.add(ch);
+      out.push(ch);
+    }
+    return out;
+  }
+
+  async function loadGlyphSvg(letter) {
+    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
+    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('חסר SVG: ' + letter);
+    glyphSvgCache[letter] = await res.text();
+    return glyphSvgCache[letter];
+  }
+
+  function parseGlyphSvg(svgText) {
+    const clean = svgText.trim().replace(/^<\?xml[^>]*>\s*/i, '').replace(/^<!DOCTYPE[^>]*>\s*/i, '');
+    const doc = new DOMParser().parseFromString(clean, 'image/svg+xml');
+    if (doc.querySelector('parsererror')) throw new Error('SVG לא תקין');
+    const el = doc.querySelector('svg');
+    if (!el) throw new Error('אין svg');
+    const vb = el.getAttribute('viewBox') || '0 0 100 100';
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    return { inner: sanitizePathsInner(el.innerHTML), vw, vh, viewBox: el.getAttribute('viewBox') || '0 0 ' + vw + ' ' + vh };
+  }
+
+  async function getParsedGlyph(letter) {
+    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
+    const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
+    parsedGlyphCache[letter] = parsed;
+    return parsed;
+  }
+
+  function hubPositionOverlaps(x, y, byLetter, skipLetter) {
+    for (const [, pl] of byLetter) {
+      if (pl.letter === skipLetter) continue;
+      if (Math.hypot(x - pl.x, y - pl.y) < HUB_OVERLAP_DIST) return true;
+    }
+    return false;
+  }
+
+  function hubCandidatesForLetter(letter, anchor, byLetter, intent, CC) {
+    const candidates = [];
+    const anchorPl = byLetter.get(anchor);
+    const anchorConn = CC.findConnectionBetween(connections, anchor, letter, intent);
+    if (anchorConn) {
+      const pos = CC.placementRelativeTo(anchorConn, anchor, letter, anchorPl.x, anchorPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: true });
+    }
+    for (const [ref, refPl] of byLetter) {
+      if (ref === anchor) continue;
+      const conn = CC.findConnectionBetween(connections, ref, letter, intent);
+      if (!conn) continue;
+      const pos = CC.placementRelativeTo(conn, ref, letter, refPl.x, refPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: false });
+    }
+    return candidates;
+  }
+
+  function pickHubPlacement(candidates, byLetter, letter) {
+    const viaAnchor = candidates.find((c) => c.viaAnchor);
+    if (viaAnchor && !hubPositionOverlaps(viaAnchor.pos.x, viaAnchor.pos.y, byLetter, letter)) {
+      return viaAnchor.pos;
+    }
+    for (const c of candidates) {
+      if (c.viaAnchor) continue;
+      if (!hubPositionOverlaps(c.pos.x, c.pos.y, byLetter, letter)) return c.pos;
+    }
+    if (viaAnchor) return viaAnchor.pos;
+    return candidates.length ? candidates[0].pos : null;
+  }
+
+  function buildHubPlacements(letters, intent) {
+    const CC = requireConnectionCore();
+    const anchor = CC.pickHubAnchor(letters, connections, intent);
+    const byLetter = new Map();
+    byLetter.set(anchor, {
+      letter: anchor,
+      x: CX,
+      y: CY,
+      rotation: 0,
+      sz: CC.CANVAS.DEFAULT_SIZE,
+      flipX: false,
+      flipY: false
+    });
+    const usedPairs = [];
+    const skipped = [];
+    for (const letter of letters.filter((ch) => ch !== anchor)) {
+      const candidates = hubCandidatesForLetter(letter, anchor, byLetter, intent, CC);
+      const pos = pickHubPlacement(candidates, byLetter, letter);
+      if (!pos) {
+        skipped.push(letter);
+        continue;
+      }
+      byLetter.set(letter, {
+        letter: pos.letter,
+        x: pos.x,
+        y: pos.y,
+        rotation: pos.rotation,
+        sz: pos.sz,
+        flipX: pos.flipX,
+        flipY: pos.flipY
+      });
+      usedPairs.push(pos.pair);
+    }
+    const placements = [byLetter.get(anchor)];
+    for (const ch of letters) {
+      if (ch !== anchor && byLetter.has(ch)) placements.push(byLetter.get(ch));
+    }
+    return { placements, anchor, usedPairs, skipped, byLetter };
+  }
+
+  function applySpacingToPlacements(placements, anchor, factor) {
+    return placements.map((p) => {
+      if (p.letter === anchor) return p;
+      return { ...p, x: CX + (p.x - CX) * factor, y: CY + (p.y - CY) * factor };
+    });
+  }
+
+  function getRawConnection(from, to, intent) {
+    const matches = connections.filter((c) => c.from === from && c.to === to && c.intent === intent);
+    return matches.length ? matches[matches.length - 1] : null;
+  }
+
+  function collectConnectionSymbols(usedPairs, intent, byLetter) {
+    const CC = requireConnectionCore();
+    const out = [];
+    const seen = new Set();
+    for (const pair of usedPairs) {
+      const key = pair.from + '\u2192' + pair.to;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const raw = getRawConnection(pair.from, pair.to, intent);
+      if (!raw?.symbols?.length) continue;
+      const norm = CC.normalizeConnection(raw);
+      const refPl = byLetter.get(pair.from);
+      if (!norm || !refPl) {
+        out.push(...raw.symbols);
+        continue;
+      }
+      const ox = norm.fromGlyph.x;
+      const oy = norm.fromGlyph.y;
+      for (const sym of raw.symbols) {
+        out.push({
+          ...sym,
+          x: refPl.x + (Number(sym.x) - ox),
+          y: refPl.y + (Number(sym.y) - oy)
+        });
+      }
+    }
+    return out;
+  }
+
+  function buildArcPath(cx, cy, r, spanDeg) {
+    const span = clampNum(spanDeg, 30, 330);
+    const half = (span / 2) * (Math.PI / 180);
+    const x1 = cx + r * Math.cos(Math.PI + half);
+    const y1 = cy + r * Math.sin(Math.PI + half);
+    const x2 = cx + r * Math.cos(Math.PI - half);
+    const y2 = cy + r * Math.sin(Math.PI - half);
+    const large = span > 180 ? 1 : 0;
+    return 'M' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2);
+  }
+
+  function buildSymbolInner(sym) {
+    const t = sym.type;
+    if (t === 'circle') return '<circle cx="50" cy="50" r="40"/>';
+    if (t === 'dot') return '<circle cx="50" cy="50" r="14"/>';
+    if (t === 'triangle') {
+      const ratio = clampNum(sym.triangleRatio || 1, 0.5, 2);
+      return '<g transform="translate(50 50) scale(' + ratio.toFixed(3) + ' 1) translate(-50 -50)"><path d="M50 12 L88 88 L12 88 Z"/></g>';
+    }
+    if (t === 'arc') return '<path d="' + buildArcPath(50, 52, 38, sym.arcAngle || 180) + '"/>';
+    return '';
+  }
+
+  function symbolGroupMarkup(sym, style) {
+    if (!BUILTIN_SYMBOLS[sym.type]) return '';
+    const size = Number(sym.size) || 64;
+    const inner = buildSymbolInner(sym);
+    const rot = Number(sym.rotation) || 0;
+    const fx = sym.flipX ? -1 : 1;
+    const fy = sym.flipY ? -1 : 1;
+    const vb = BUILTIN_SYMBOLS[sym.type].viewBox.trim().split(/[\s,]+/).map(Number);
+    const vw = vb[2] || 100;
+    const vh = vb[3] || 100;
+    const half = size / 2;
+    return (
+      '<g class="amulet-symbol">' +
+      '<g transform="translate(' + sym.x.toFixed(2) + ',' + sym.y.toFixed(2) + ') rotate(' + rot.toFixed(2) + ') scale(' + fx + ',' + fy + ') translate(' + (-half).toFixed(2) + ',' + (-half).toFixed(2) + ')">' +
+      '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + vw + ' ' + vh + '" preserveAspectRatio="xMidYMid meet" overflow="visible">' +
+      pathLayers(inner, style) +
+      '</svg></g></g>'
+    );
+  }
+
+  function glyphPathsMarkup(placement, glyph) {
+    const vb = glyph.viewBox || '0 0 ' + (glyph.vw || 100) + ' ' + (glyph.vh || 100);
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    const fx = placement.flipX ? -1 : 1;
+    const fy = placement.flipY ? -1 : 1;
+    const half = placement.sz / 2;
+    const rot = Number(placement.rotation) || 0;
+    const scaleX = ((placement.sz / vw) * fx).toFixed(4);
+    const scaleY = ((placement.sz / vh) * fy).toFixed(4);
+    return (
+      '<g class="amulet-glyph amulet-glyph-' + placement.letter + '">' +
+      '<g transform="translate(' + placement.x.toFixed(2) + ',' + placement.y.toFixed(2) + ') rotate(' + rot.toFixed(2) + ') translate(' + (-half).toFixed(2) + ',' + (-half).toFixed(2) + ') scale(' + scaleX + ',' + scaleY + ')">' +
+      sanitizePathsInner(glyph.inner) +
+      '</g></g>'
+    );
+  }
+
+  function wrapSymmetric(content) {
+    return (
+      '<g class="amulet-symmetric">' +
+      '<g class="amulet-half amulet-original">' + content + '</g>' +
+      '<g class="amulet-half amulet-mirror" transform="translate(' + W + ',0) scale(-1,1)">' + content + '</g>' +
+      '</g>'
+    );
+  }
+
+  function wrapAmuletScale(content, style) {
+    if (style.amuletScale === 1) return content;
+    return (
+      '<g transform="translate(' + CX + ',' + CY + ') scale(' + style.amuletScale + ') translate(' + -CX + ',' + -CY + ')">' +
+      content +
+      '</g>'
+    );
+  }
+
+  async function buildGlyphLayerContent(letters, intent, style) {
+    if (!letters.length) return '';
+    const unique = [];
+    for (const ch of letters) {
+      if (!unique.includes(ch)) unique.push(ch);
+    }
+    let placements;
+    let anchor;
+    let usedPairs;
+    let byLetter;
+    if (typeof window.buildAmulet === 'function') {
+      const hub = buildHubPlacements(unique, intent);
+      anchor = hub.anchor;
+      usedPairs = hub.usedPairs;
+      byLetter = hub.byLetter;
+      placements = hub.placements;
+      try {
+        const built = await window.buildAmulet(unique, intent, connections);
+        if (built.placements?.length) {
+          placements = built.placements;
+          anchor = built.anchor || anchor;
+        }
+      } catch (err) {
+        console.warn('[v2] buildAmulet fallback to local hub:', err);
+      }
+    } else {
+      const hub = buildHubPlacements(unique, intent);
+      placements = hub.placements;
+      anchor = hub.anchor;
+      usedPairs = hub.usedPairs;
+      byLetter = hub.byLetter;
+    }
+    placements = applySpacingToPlacements(placements, anchor, style.spacing);
+    byLetter = new Map(placements.map((p) => [p.letter, p]));
+    const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+    const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style));
+    const glyphPathParts = [];
+    for (const p of placements) {
+      try {
+        const glyph = await getParsedGlyph(p.letter);
+        glyphPathParts.push(glyphPathsMarkup(p, glyph));
+      } catch (err) {
+        console.warn('[v2] skip glyph', p.letter, err);
+      }
+    }
+    if (!symbolParts.length && !glyphPathParts.length) return '';
+    const unified = '<g class="amulet-glyphs">' + pathLayers(glyphPathParts.join(''), style) + '</g>';
+    return wrapAmuletScale(symbolParts.join('') + unified, style);
+  }
+
+  /** Layer 1: decorative pattern from location + gender + age */
+  function buildBackgroundPattern(p, style) {
+    const loc = p.location;
+    const density = clampNum(Math.round(4 + (style.surfaceScale || 0) / 3), 4, 12);
+    const parts = [];
+    const stroke = style.strokeColor;
+    const isMale = p.gender === 'male';
+
+    if (loc === 'north') {
+      const step = 680 / density;
+      for (let i = 0; i < density; i++) {
+        for (let j = 0; j < density; j++) {
+          const x = step * (i + 0.5);
+          const y = step * (j + 0.5);
+          if (isMale) {
+            parts.push('<rect x="' + (x - 4) + '" y="' + (y - 4) + '" width="8" height="8" fill="none" stroke="' + stroke + '" stroke-width="1.2"/>');
+          } else {
+            parts.push('<circle cx="' + x + '" cy="' + y + '" r="5" fill="none" stroke="' + stroke + '" stroke-width="1"/>');
+          }
+        }
+      }
+    } else if (loc === 'south') {
+      for (let i = 1; i <= density; i++) {
+        const y = (680 / (density + 1)) * i;
+        parts.push(
+          '<path d="M40 ' + y.toFixed(1) + ' Q340 ' + (y + (i % 2 ? 18 : -18)) + ' 640 ' + y.toFixed(1) + '" fill="none" stroke="' + stroke + '" stroke-width="1.5" stroke-linecap="' + style.linecap + '"/>'
+        );
+      }
+    } else {
+      for (let i = 1; i <= density; i++) {
+        const r = 40 + i * (280 / density);
+        parts.push(
+          '<circle cx="' + CX + '" cy="' + CY + '" r="' + r.toFixed(1) + '" fill="none" stroke="' + stroke + '" stroke-width="1.2" stroke-dasharray="' + (isMale ? '4 8' : '2 6') + '"/>'
+        );
+      }
+    }
+
+    const markup = '<g class="layer-bg-pattern" opacity="' + style.layerOpacity + '">' + parts.join('') + '</g>';
+    return wrapSymmetric(wrapAmuletScale(markup, style));
+  }
+
+  function viewBoxForPlacements(placements, surfaceScale) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const extraPad = Math.min((surfaceScale || 0) * 2.5, 60);
+    const bump = (x, y) => {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    };
+    for (const p of placements || [{ x: CX, y: CY, sz: 150 }]) {
+      const r = p.sz / 2 + VIEWBOX_PAD + extraPad;
+      bump(p.x - r, p.y - r);
+      bump(p.x + r, p.y + r);
+      const mx = W - p.x;
+      bump(mx - r, p.y - r);
+      bump(mx + r, p.y + r);
+    }
+    if (!isFinite(minX)) return { x: 0, y: 0, w: W, h: H };
+    return { x: minX, y: minY, w: Math.max(maxX - minX, 120), h: Math.max(maxY - minY, 120) };
+  }
+
+  async function composeThreeLayerAmulet(params) {
+    const bgStyle = styleForBackground(params);
+    const midStyle = styleForMiddle(params);
+    const topStyle = styleForTop(params);
+
+    const bgLetters = getFirstLetters(
+      params.location === 'north' ? 'צפון ארץ' : params.location === 'south' ? 'דרום ארץ' : 'מרכז הארץ'
+    );
+    const nameLetters = params.person_name
+      ? lettersFromName(params.person_name)
+      : getFirstLetters(params.for_whom === 'self' ? 'עבורי' : params.for_whom);
+    const requestText = params.request_sentence || $('freeText').value.trim();
+    const topLetters = getFirstLetters(requestText);
+
+    const bgIntent = 'grounding';
+    const midIntent = midStyle.intent;
+    const topIntent = topStyle.intent;
+
+    const [bgGlyphs, midContent, topContent] = await Promise.all([
+      bgLetters.length ? buildGlyphLayerContent(bgLetters, bgIntent, bgStyle) : Promise.resolve(''),
+      nameLetters.length ? buildGlyphLayerContent(nameLetters, midIntent, midStyle) : Promise.resolve(''),
+      topLetters.length ? buildGlyphLayerContent(topLetters, topIntent, topStyle) : Promise.resolve('')
+    ]);
+
+    const bgPattern = buildBackgroundPattern(params, bgStyle);
+    const layers =
+      '<g class="amulet-layer layer-bg" opacity="' + bgStyle.layerOpacity + '">' +
+      bgPattern +
+      (bgGlyphs ? '<g class="layer-bg-glyphs">' + bgGlyphs + '</g>' : '') +
+      '</g>' +
+      (midContent ? '<g class="amulet-layer layer-mid" opacity="' + midStyle.layerOpacity + '">' + midContent + '</g>' : '') +
+      (topContent ? '<g class="amulet-layer layer-top" opacity="' + topStyle.layerOpacity + '">' + topContent + '</g>' : '');
+
+    const allPlacements = [];
+    if (topLetters.length) {
+      const hub = buildHubPlacements(topLetters, topIntent);
+      allPlacements.push(...hub.placements);
+    }
+
+    const vb = viewBoxForPlacements(allPlacements, topStyle.surfaceScale);
+    const defs =
+      '<defs>' +
+      buildCombinedFilter(FILTER_BG, bgStyle) +
+      buildCombinedFilter(FILTER_MID, midStyle) +
+      buildCombinedFilter(FILTER_TOP, topStyle) +
+      '</defs>';
+
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="' +
+      vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" preserveAspectRatio="xMidYMid meet">' +
+      defs +
+      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="#ffffff"/>' +
+      layers +
+      '</svg>'
+    );
+  }
+
+  function setResultSvg(svgString) {
+    $('amuletContainer').innerHTML = svgString;
+  }
+
+  async function waitForScriptBoot() {
+    const deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {
+      if (typeof window.buildAmulet === 'function' && typeof window.loadConnections === 'function') {
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    return typeof window.buildAmulet === 'function';
+  }
+
+  async function boot() {
+    requireConnectionCore();
+    if (location.protocol === 'file:') {
+      setStatus('פתחי דרך http://localhost:8080/amulet-v2.html (python3 server.py)');
+      return;
+    }
+    try {
+      await waitForScriptBoot();
+      await loadGlyphManifest();
+      await loadConnectionsLocal();
+      appReady = true;
+      $('createBtn').disabled = false;
+      setStatus('מוכן — ' + glyphLetters.length + ' גליפים · הזיני מפתח API ולחצי «צור קמע»');
+    } catch (err) {
+      setStatus('שגיאת טעינה: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  async function createAmulet() {
+    if (busy || !appReady) return;
+    const text = $('freeText').value.trim();
+    if (!text) {
+      setStatus('כתבי תיאור בעברית');
+      return;
+    }
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      setStatus('נדרש מפתח Anthropic API');
+      return;
+    }
+
+    busy = true;
+    $('createBtn').disabled = true;
+    saveApiKey();
+    setLoading(true, 'מחלץ פרמטרים עם Claude…');
+    setStatus('שולח ל-Claude…');
+
+    try {
+      const params = await extractParamsWithClaude(text, apiKey);
+      $('paramsPreview').hidden = false;
+      $('paramsPreview').textContent = JSON.stringify(params, null, 2);
+
+      setLoading(true, 'בונה 3 שכבות קמע…');
+      setStatus('בונה קמע…');
+
+      const svg = await composeThreeLayerAmulet(params);
+      setResultSvg(svg);
+
+      const nameL = params.person_name ? lettersFromName(params.person_name) : [];
+      const topL = getFirstLetters(params.request_sentence || text);
+      setStatus(
+        'הושלם · רקע: ' + params.location + '+' + params.gender + '+' + params.age +
+        ' · אמצע: ' + (nameL.join(' ') || '—') +
+        ' · עליון: ' + (topL.join(' → ') || '—') +
+        ' · ' + params.intent + '/' + params.domain
+      );
+    } catch (err) {
+      setStatus('שגיאה: ' + err.message);
+      console.error(err);
+    } finally {
+      setLoading(false);
+      busy = false;
+      if (appReady) $('createBtn').disabled = false;
+    }
+  }
+
+  $('apiKey').addEventListener('change', saveApiKey);
+  $('apiKey').addEventListener('blur', saveApiKey);
+  $('createBtn').addEventListener('click', createAmulet);
+  loadApiKey();
+  boot();
+})();
+  </script>
+</body>
+</html>
