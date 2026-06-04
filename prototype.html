@@ -236,9 +236,6 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
-  const MALE_BODY_BUMP_MAX = 12;
-  const MALE_SPIKE_COUNT = 60;
-  const MALE_SPIKE_LENGTH = 12;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -366,14 +363,50 @@
       miterlimit: gender.miterlimit,
       ageTexture,
       surfaceScale,
+      age: p.age,
       gender: p.gender
     };
   }
 
-  /** גיל = עוצמת חספוס על הגוף. זכר: אותו גוף (מוגבל), שכבת קוצים נפרדת. */
+  /** זכר: פרופיל לפי גיל — 60–70 קוצני; 70+ עוד יותר, תדירות גבוהה כדי לשמור צורה. */
+  function maleBumpProfile(age, surfaceScale) {
+    const s = surfaceScale;
+    if (s <= 0) {
+      return { scale: 0, baseFrequency: '0.10', numOctaves: 2 };
+    }
+    if (s <= 9) {
+      return {
+        scale: s,
+        baseFrequency: Math.max(0.08, 0.115 - s * 0.002).toFixed(3),
+        numOctaves: s < 6 ? 2 : 3
+      };
+    }
+    if (age === '70plus') {
+      return { scale: 12, baseFrequency: '0.128', numOctaves: 2 };
+    }
+    if (age === '60-70') {
+      return { scale: 9, baseFrequency: '0.108', numOctaves: 2 };
+    }
+    return {
+      scale: Math.min(10, Math.round(8 + (s - 9) * 0.28)),
+      baseFrequency: '0.10',
+      numOctaves: 2
+    };
+  }
+
+  /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
     const g = style.gender || 'female';
+    if (g === 'male') {
+      const profile = maleBumpProfile(style.age, s);
+      return {
+        type: 'turbulence',
+        baseFrequency: profile.baseFrequency,
+        numOctaves: profile.numOctaves,
+        scale: profile.scale
+      };
+    }
     if (g === 'nonbinary') {
       return {
         type: 'fractalNoise',
@@ -382,17 +415,16 @@
         scale: Math.round(s * 1.35)
       };
     }
-    const bodyScale = g === 'male' ? Math.min(s, MALE_BODY_BUMP_MAX) : s;
     return {
       type: 'fractalNoise',
       baseFrequency: '0.09',
       numOctaves: 2,
-      scale: bodyScale
+      scale: s
     };
   }
 
-  function filterRegionAttrs(surfaceScale) {
-    const s = surfaceScale || 0;
+  function filterRegionAttrs(surfaceScale, bumpScale) {
+    const s = bumpScale != null ? bumpScale : surfaceScale || 0;
     if (s > 12) return ' x="-30%" y="-30%" width="160%" height="160%"';
     if (s > 6) return ' x="-22%" y="-22%" width="144%" height="144%"';
     return ' x="-15%" y="-15%" width="130%" height="130%"';
@@ -404,7 +436,7 @@
       '<filter id="' +
       FILTER_ID_COMBINED +
       '"' +
-      filterRegionAttrs(style.surfaceScale) +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
       '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
       '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
@@ -431,62 +463,6 @@
   function buildSvgDefs(style) {
     console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
     return '<defs>' + buildCombinedFilter(style) + '</defs>';
-  }
-
-  let spikeGenToken = 0;
-  let pendingSpikeStyle = null;
-
-  function pathPointOnRootSvg(path, distance, rootSvg) {
-    const local = path.getPointAtLength(distance);
-    if (!rootSvg || typeof rootSvg.createSVGPoint !== 'function') {
-      return { x: local.x, y: local.y };
-    }
-    const pt = rootSvg.createSVGPoint();
-    pt.x = local.x;
-    pt.y = local.y;
-    const ctm = path.getCTM();
-    if (!ctm) return { x: local.x, y: local.y };
-    const root = pt.matrixTransform(ctm);
-    return { x: root.x, y: root.y };
-  }
-
-  function addSpikes() {
-    if (!pendingSpikeStyle) return;
-    const style = pendingSpikeStyle;
-    const container = document.getElementById('amuletContainer');
-    const liveSvg = container && container.querySelector('svg');
-    if (!liveSvg) return;
-
-    const spikeSvgNs = 'http://www.w3.org/2000/svg';
-    const spikeLen = MALE_SPIKE_LENGTH;
-    const count = MALE_SPIKE_COUNT;
-    const spikeGroup = document.createElementNS(spikeSvgNs, 'g');
-    spikeGroup.setAttribute('class', 'amulet-spike-lines');
-
-    document.querySelectorAll('#amuletContainer path').forEach(function (path) {
-      const total = path.getTotalLength();
-      if (!total) return;
-      for (let i = 0; i < total; i += total / count) {
-        const pt = pathPointOnRootSvg(path, i, liveSvg);
-        const pt2 = pathPointOnRootSvg(path, Math.min(i + 2, total), liveSvg);
-        const tx = pt2.x - pt.x;
-        const ty = pt2.y - pt.y;
-        const n = Math.sqrt(tx * tx + ty * ty) || 1;
-        const nx = -ty / n;
-        const ny = tx / n;
-        const line = document.createElementNS(spikeSvgNs, 'line');
-        line.setAttribute('x1', pt.x);
-        line.setAttribute('y1', pt.y);
-        line.setAttribute('x2', pt.x + nx * spikeLen);
-        line.setAttribute('y2', pt.y + ny * spikeLen);
-        line.setAttribute('stroke', style.strokeColor);
-        line.setAttribute('stroke-width', '2');
-        line.setAttribute('stroke-linecap', 'square');
-        spikeGroup.appendChild(line);
-      }
-    });
-
-    liveSvg.appendChild(spikeGroup);
   }
 
   function assembleAmuletSvg(vb, defs, content) {
@@ -538,7 +514,7 @@
       '×' +
       bump.scale;
     if (style.gender === 'male') {
-      fx += '+lineSpikes(' + MALE_SPIKE_COUNT + ',' + MALE_SPIKE_LENGTH + ')';
+      fx += ' spiky-bump';
     }
     return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
@@ -1093,7 +1069,7 @@
     document.getElementById('status').textContent = msg;
   }
 
-  function setResultSvg(svgString, scheduleSpikes, style) {
+  function setResultSvg(svgString) {
     const container = document.getElementById('amuletContainer');
     const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
     const err = doc.querySelector('parsererror');
@@ -1103,15 +1079,6 @@
       return;
     }
     container.innerHTML = svgString;
-    pendingSpikeStyle = scheduleSpikes ? style : null;
-    if (scheduleSpikes) {
-      spikeGenToken++;
-      const token = spikeGenToken;
-      setTimeout(function () {
-        if (token !== spikeGenToken) return;
-        addSpikes();
-      }, 0);
-    }
   }
 
   async function init() {
@@ -1170,7 +1137,6 @@
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
         ageBump: ageBumpByGender(style),
-        maleSpikes: style.gender === 'male' ? { count: MALE_SPIKE_COUNT, length: MALE_SPIKE_LENGTH } : null,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1178,7 +1144,7 @@
         spacing: style.spacing
       });
 
-      setResultSvg(svg, params.gender === 'male', style);
+      setResultSvg(svg);
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
@@ -1187,7 +1153,7 @@
       const bump = ageBumpByGender(style);
       msg += ' | age=' + style.ageTexture + ' bump×' + bump.scale;
       if (style.gender === 'male') {
-        msg += ' | קוצים=' + MALE_SPIKE_COUNT + ' len=' + MALE_SPIKE_LENGTH;
+        msg += ' | זכר bump×' + bump.scale + '@' + bump.baseFrequency;
       }
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
