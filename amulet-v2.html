@@ -52,16 +52,6 @@
       font-family: inherit;
       resize: vertical;
     }
-    #apiKey {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #bbb;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      direction: ltr;
-      text-align: left;
-    }
-    .key-hint { font-size: 0.75rem; color: #888; margin-top: 4px; }
     #createBtn {
       width: 100%;
       padding: 12px;
@@ -140,7 +130,7 @@
 <body>
   <header>
     <h1>קמע v2 — מטקסט חופשי</h1>
-    <p>Claude מחלץ פרמטרים · 3 שכבות (רקע · שם · בקשה) · glyphs/ + connections.json</p>
+    <p>חילוץ פרמטרים מקומי ממילות מפתח · 3 שכבות (רקע · שם · בקשה)</p>
   </header>
 
   <div id="scriptStubs" aria-hidden="true">
@@ -162,11 +152,6 @@
         <label for="freeText">תיאור חופשי בעברית</label>
         <textarea id="freeText" placeholder="לדוגמה: אני נקבה בת 25 ממרכז הארץ, רווקה, מעצבת גרפית, רוצה בית בתאילנד, עבורי, בדחיפות, זימון">אני נקבה בת 25 ממרכז הארץ, רווקה, מעצבת גרפית, רוצה בית בתאילנד, עבורי, בדחיפות, זימון</textarea>
       </div>
-      <div class="field">
-        <label for="apiKey">מפתח Anthropic API</label>
-        <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
-        <p class="key-hint">נשמר ב-sessionStorage · נדרש לחילוץ פרמטרים</p>
-      </div>
       <button type="button" id="createBtn" disabled>צור קמע</button>
       <p class="hint">פתחי דרך <code>http://localhost:8080/amulet-v2.html</code> (python3 server.py)</p>
     </aside>
@@ -174,7 +159,7 @@
     <main class="preview">
       <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
         <div class="spinner" role="status"></div>
-        <p id="loadingMsg">מעבד עם Claude…</p>
+        <p id="loadingMsg">בונה קמע…</p>
       </div>
       <div id="amuletContainer">
         <svg width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
@@ -192,23 +177,6 @@
   <script>
 (function () {
   'use strict';
-
-  const MODEL = 'claude-sonnet-4-20250514';
-  const SYSTEM_PROMPT =
-    'Extract amulet parameters from the Hebrew text and return ONLY valid JSON:\n' +
-    '{\n' +
-    '  "age": number,\n' +
-    '  "gender": "female"|"male"|"nonbinary",\n' +
-    '  "location": "north"|"center"|"south",\n' +
-    '  "occupation": "creative"|"technical"|"care"|"manual"|"other",\n' +
-    '  "status": "single"|"couple"|"family",\n' +
-    '  "domain": "love"|"livelihood"|"health"|"family"|"confidence"|"meaning"|"housing",\n' +
-    '  "urgency": "low"|"medium"|"high",\n' +
-    '  "intent": "summoning"|"protection"|"grounding",\n' +
-    '  "for_whom": "self"|"partner"|"child"|"parent"|"friend"|"other",\n' +
-    '  "request_sentence": "the actual request in Hebrew",\n' +
-    '  "person_name": "name if mentioned"\n' +
-    '}';
 
   const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
   const W = 680;
@@ -294,33 +262,11 @@
     if (on) {
       ov.classList.add('active');
       ov.setAttribute('aria-hidden', 'false');
-      $('loadingMsg').textContent = msg || 'מעבד עם Claude…';
+      $('loadingMsg').textContent = msg || 'בונה קמע…';
     } else {
       ov.classList.remove('active');
       ov.setAttribute('aria-hidden', 'true');
     }
-  }
-
-  function saveApiKey() {
-    const key = $('apiKey').value.trim();
-    if (key) sessionStorage.setItem('anthropic_key', key);
-    else sessionStorage.removeItem('anthropic_key');
-  }
-
-  function loadApiKey() {
-    const saved = sessionStorage.getItem('anthropic_key');
-    if (saved) $('apiKey').value = saved;
-  }
-
-  function getApiKey() {
-    return $('apiKey').value.trim();
-  }
-
-  function parseJsonFromText(text) {
-    const s = text.indexOf('{');
-    const e = text.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('לא נמצא JSON בתשובה');
-    return JSON.parse(text.slice(s, e + 1));
   }
 
   function numericAgeToBracket(age) {
@@ -334,22 +280,129 @@
     return '70plus';
   }
 
-  function normalizeExtracted(raw) {
-    const gender = ['female', 'male', 'nonbinary'].includes(raw.gender) ? raw.gender : 'female';
-    const location = ['north', 'center', 'south'].includes(raw.location) ? raw.location : 'center';
-    const occupation = ['creative', 'technical', 'care', 'manual', 'other'].includes(raw.occupation)
-      ? raw.occupation
-      : 'other';
-    const status = ['single', 'couple', 'family'].includes(raw.status) ? raw.status : 'single';
-    const domain = ['love', 'livelihood', 'health', 'family', 'confidence', 'meaning', 'housing'].includes(
-      raw.domain
-    )
-      ? raw.domain
-      : 'housing';
-    const urgency = ['low', 'medium', 'high'].includes(raw.urgency) ? raw.urgency : 'medium';
-    const intent = ['summoning', 'protection', 'grounding'].includes(raw.intent) ? raw.intent : 'summoning';
+  /** @param {string} text */
+  function parseHebrewText(text) {
+    const t = String(text || '').trim();
+    const norm = t.replace(/\s+/g, ' ');
+
+    function matchKeyword(rules, fallback) {
+      for (const rule of rules) {
+        for (const kw of rule.keywords) {
+          if (norm.includes(kw)) return rule.value;
+        }
+      }
+      return fallback;
+    }
+
+    function parseAge() {
+      let m = norm.match(/גיל\s*[:\s]*(\d{1,3})/);
+      if (m) return Number(m[1]);
+      m = norm.match(/בת\s*(\d{1,3})/);
+      if (m) return Number(m[1]);
+      m = norm.match(/בן\s*(\d{1,3})/);
+      if (m) return Number(m[1]);
+      m = norm.match(/(\d{1,3})\s*(?:שנה|שנים)?\s*ב(?:ת|ן)\b/);
+      if (m) return Number(m[1]);
+      const nums = norm.match(/\d{1,3}/g);
+      if (nums) {
+        for (const raw of nums) {
+          const n = Number(raw);
+          if (n >= 5 && n <= 120) return n;
+        }
+      }
+      return 25;
+    }
+
+    function parseGender() {
+      if (/נקבה|אישה/.test(norm)) return 'female';
+      if (/\bבת\b/.test(norm) && !/בת\s*זוג/.test(norm)) return 'female';
+      if (/זכר|גבר/.test(norm)) return 'male';
+      if (/\bבן\b/.test(norm) && !/בן\s*זוג/.test(norm)) return 'male';
+      return 'female';
+    }
+
+    function parseForWhom() {
+      if (/עבורי|לעצמי|בשבילי/.test(norm)) return 'self';
+      if (/בן\s*זוג|בת\s*זוג/.test(norm)) return 'partner';
+      if (/\bילד\b|\bילדים\b/.test(norm)) return 'child';
+      return 'self';
+    }
+
+    function parseRequestSentence() {
+      const want = norm.match(/(?:רוצה|רוצה ל|צריך|צריכה|מחפש|מחפשת|מבקש|מבקשת)(?:\s+[^,.;]+)?/);
+      if (want) return want[0].trim();
+      const clauses = norm.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      const domainClause = clauses.find((c) =>
+        /בית|דירה|מגורים|עבודה|פרנסה|כסף|אהבה|זוגיות|בריאות/.test(c)
+      );
+      if (domainClause) return domainClause;
+      return clauses[clauses.length - 1] || norm;
+    }
+
+    function parsePersonName() {
+      let m = norm.match(/שמי\s+([א-ת][א-ת\s]{0,18})/);
+      if (m) return m[1].trim();
+      m = norm.match(/קוראים\s+לי\s+([א-ת][א-ת\s]{0,18})/);
+      if (m) return m[1].trim();
+      m = norm.match(/אני\s+([א-ת]{2,12})\s*,/);
+      if (m) return m[1].trim();
+      return '';
+    }
+
+    const age = parseAge();
+    const gender = parseGender();
+    const location = matchKeyword(
+      [
+        { keywords: ['צפון', 'צפונ'], value: 'north' },
+        { keywords: ['דרום', 'דרומ'], value: 'south' },
+        { keywords: ['מרכז', 'מרכזי', 'אמצע הארץ', 'מרכז הארץ'], value: 'center' }
+      ],
+      'center'
+    );
+    const occupation = matchKeyword(
+      [
+        { keywords: ['מעצב', 'מעצבת', 'אמן', 'אמנית', 'יוצר', 'יוצרת', 'גרפי', 'גרפית', 'עיצוב'], value: 'creative' },
+        { keywords: ['הנדס', 'מתכנת', 'מתכנתת', 'טכנ', 'תוכנה', 'מחשבים'], value: 'technical' },
+        { keywords: ['רופא', 'רופאה', 'מטפל', 'מטפלת', 'סיעוד', 'אחות', 'אח'], value: 'care' }
+      ],
+      'other'
+    );
+    const status = matchKeyword(
+      [
+        { keywords: ['רווק', 'רווקה'], value: 'single' },
+        { keywords: ['זוג', 'נשוי', 'נשואה', 'נשוא'], value: 'couple' },
+        { keywords: ['הורה', 'ילדים'], value: 'family' },
+        { keywords: ['ילד'], value: 'family' }
+      ],
+      'single'
+    );
+    const domain = matchKeyword(
+      [
+        { keywords: ['בית', 'דירה', 'מגורים', 'דירת'], value: 'housing' },
+        { keywords: ['עבודה', 'פרנסה', 'כסף', 'שכר'], value: 'livelihood' },
+        { keywords: ['אהבה', 'זוגיות', 'רומנט'], value: 'love' },
+        { keywords: ['בריאות', 'רפוא', 'ריפוי'], value: 'health' }
+      ],
+      'housing'
+    );
+    const urgency = matchKeyword(
+      [
+        { keywords: ['דחוף', 'דחיפות', 'בדחיפות', 'מיד', 'עכשיו', 'דחופה'], value: 'high' },
+        { keywords: ['בקרוב', 'מהר'], value: 'medium' }
+      ],
+      'low'
+    );
+    const intent = matchKeyword(
+      [
+        { keywords: ['זימון'], value: 'summoning' },
+        { keywords: ['הגנה'], value: 'protection' },
+        { keywords: ['אישור'], value: 'grounding' }
+      ],
+      'summoning'
+    );
+
     return {
-      age: Number(raw.age) || 25,
+      age,
       gender,
       location,
       occupation,
@@ -357,36 +410,13 @@
       domain,
       urgency,
       intent,
-      for_whom: raw.for_whom || 'self',
-      request_sentence: String(raw.request_sentence || '').trim(),
-      person_name: String(raw.person_name || '').trim()
+      for_whom: parseForWhom(),
+      request_sentence: parseRequestSentence(),
+      person_name: parsePersonName()
     };
   }
 
-  async function extractParamsWithClaude(text, apiKey) {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 800,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: text }]
-      })
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error(r.status + ': ' + t.slice(0, 280));
-    }
-    const d = await r.json();
-    const body = d.content.map((b) => b.text || '').join('');
-    return normalizeExtracted(parseJsonFromText(body));
-  }
+  window.parseHebrewText = parseHebrewText;
 
   function requireConnectionCore() {
     if (!window.ConnectionCore) throw new Error('connection-core.js לא נטען');
@@ -1085,7 +1115,7 @@
       await loadConnectionsLocal();
       appReady = true;
       $('createBtn').disabled = false;
-      setStatus('מוכן — ' + glyphLetters.length + ' גליפים · הזיני מפתח API ולחצי «צור קמע»');
+      setStatus('מוכן — ' + glyphLetters.length + ' גליפים · לחצי «צור קמע»');
     } catch (err) {
       setStatus('שגיאת טעינה: ' + err.message);
       console.error(err);
@@ -1099,20 +1129,13 @@
       setStatus('כתבי תיאור בעברית');
       return;
     }
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      setStatus('נדרש מפתח Anthropic API');
-      return;
-    }
-
     busy = true;
     $('createBtn').disabled = true;
-    saveApiKey();
-    setLoading(true, 'מחלץ פרמטרים עם Claude…');
-    setStatus('שולח ל-Claude…');
+    setLoading(true, 'מנתח טקסט…');
+    setStatus('מחלץ פרמטרים…');
 
     try {
-      const params = await extractParamsWithClaude(text, apiKey);
+      const params = parseHebrewText(text);
       $('paramsPreview').hidden = false;
       $('paramsPreview').textContent = JSON.stringify(params, null, 2);
 
@@ -1140,10 +1163,7 @@
     }
   }
 
-  $('apiKey').addEventListener('change', saveApiKey);
-  $('apiKey').addEventListener('blur', saveApiKey);
   $('createBtn').addEventListener('click', createAmulet);
-  loadApiKey();
   boot();
 })();
   </script>
