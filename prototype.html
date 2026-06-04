@@ -237,8 +237,8 @@
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
   const MALE_BODY_BUMP_MAX = 12;
-  const MALE_SPIKE_COUNT = 80;
-  const MALE_SPIKE_LENGTH = 10;
+  const MALE_SPIKE_COUNT = 60;
+  const MALE_SPIKE_LENGTH = 12;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -433,59 +433,39 @@
     return '<defs>' + buildCombinedFilter(style) + '</defs>';
   }
 
-  function addSpikesToSvg(svgString, color, count, length) {
-    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    tmp.innerHTML = svgString.replace(/<svg[^>]*>/, '').replace('</svg>', '');
-    document.body.appendChild(tmp);
-
-    const spikes = [];
-    tmp.querySelectorAll('path').forEach(function (path) {
+  function addMaleSpikesToLiveSvg(style) {
+    const liveSvg = document.getElementById('amuletSvg');
+    if (!liveSvg) return;
+    const spikeSvgNs = 'http://www.w3.org/2000/svg';
+    const count = MALE_SPIKE_COUNT;
+    const spikeLen = MALE_SPIKE_LENGTH;
+    liveSvg.querySelectorAll('path').forEach(function (path) {
       const total = path.getTotalLength();
-      const step = total / count;
-      for (let i = 0; i < total; i += step) {
+      if (!total) return;
+      for (let i = 0; i < total; i += total / count) {
         const pt = path.getPointAtLength(i);
-        const pt2 = path.getPointAtLength(i + 1);
+        const pt2 = path.getPointAtLength(Math.min(i + 2, total));
         const tx = pt2.x - pt.x;
         const ty = pt2.y - pt.y;
-        const len = Math.sqrt(tx * tx + ty * ty) || 1;
-        const nx = -ty / len;
-        const ny = tx / len;
-        spikes.push(
-          '<line x1="' +
-            pt.x.toFixed(1) +
-            '" y1="' +
-            pt.y.toFixed(1) +
-            '" x2="' +
-            (pt.x + nx * length).toFixed(1) +
-            '" y2="' +
-            (pt.y + ny * length).toFixed(1) +
-            '" stroke="' +
-            color +
-            '" stroke-width="2" stroke-linecap="round"/>'
-        );
-        spikes.push(
-          '<line x1="' +
-            pt.x.toFixed(1) +
-            '" y1="' +
-            pt.y.toFixed(1) +
-            '" x2="' +
-            (pt.x - nx * length).toFixed(1) +
-            '" y2="' +
-            (pt.y - ny * length).toFixed(1) +
-            '" stroke="' +
-            color +
-            '" stroke-width="2" stroke-linecap="round"/>'
-        );
+        const n = Math.sqrt(tx * tx + ty * ty) || 1;
+        const nx = -ty / n;
+        const ny = tx / n;
+        const line = document.createElementNS(spikeSvgNs, 'line');
+        line.setAttribute('x1', pt.x);
+        line.setAttribute('y1', pt.y);
+        line.setAttribute('x2', pt.x + nx * spikeLen);
+        line.setAttribute('y2', pt.y + ny * spikeLen);
+        line.setAttribute('stroke', style.strokeColor);
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('class', 'amulet-spike-line');
+        liveSvg.appendChild(line);
       }
     });
-
-    document.body.removeChild(tmp);
-    return svgString.replace('</svg>', spikes.join('') + '</svg>');
   }
 
   function assembleAmuletSvg(vb, defs, content) {
     return (
-      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+      '<svg id="amuletSvg" xmlns="http://www.w3.org/2000/svg" width="' +
       W +
       '" height="' +
       H +
@@ -1046,10 +1026,7 @@
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
     const vb = viewBoxForPlacements(placements, style.surfaceScale);
     const defs = buildSvgDefs(style);
-    let svg = assembleAmuletSvg(vb, defs, content);
-    if (style.gender === 'male') {
-      svg = addSpikesToSvg(svg, style.strokeColor, MALE_SPIKE_COUNT, MALE_SPIKE_LENGTH);
-    }
+    const svg = assembleAmuletSvg(vb, defs, content);
     return { svg, placements, anchor, skipped, viewBox: vb, style };
   }
 
@@ -1100,6 +1077,7 @@
       return;
     }
     const svgEl = document.importNode(doc.documentElement, true);
+    svgEl.setAttribute('id', 'amuletSvg');
     while (wrap.firstChild) {
       wrap.removeChild(wrap.firstChild);
     }
@@ -1171,6 +1149,9 @@
       });
 
       setResultSvg(svg);
+      if (params.gender === 'male') {
+        addMaleSpikesToLiveSvg(style);
+      }
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
