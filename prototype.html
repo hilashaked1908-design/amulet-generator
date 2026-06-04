@@ -236,9 +236,9 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
-  const FILTER_ID_MALE_SPIKE = 'maleSpike';
-  const FILTER_ID_MALE_SPIKE_OUTER = 'maleSpikeOuter';
   const MALE_BODY_BUMP_MAX = 12;
+  const MALE_SPIKE_COUNT = 30;
+  const MALE_SPIKE_LENGTH = 14;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -391,52 +391,11 @@
     };
   }
 
-  function maleSpikeFilterScale(surfaceScale) {
-    const s = Math.max(0, surfaceScale);
-    return Math.max(9, Math.min(Math.round(s * 0.75 + 7), 18));
-  }
-
-  function maleSpikeOuterFilterScale(surfaceScale) {
-    return Math.min(maleSpikeFilterScale(surfaceScale) + 7, 24);
-  }
-
   function filterRegionAttrs(surfaceScale) {
     const s = surfaceScale || 0;
     if (s > 12) return ' x="-30%" y="-30%" width="160%" height="160%"';
     if (s > 6) return ' x="-22%" y="-22%" width="144%" height="144%"';
     return ' x="-15%" y="-15%" width="130%" height="130%"';
-  }
-
-  function buildMaleSpikeFilterMarkup(filterId, scale, seed) {
-    return (
-      '<filter id="' +
-      filterId +
-      '"' +
-      filterRegionAttrs(20) +
-      ' color-interpolation-filters="sRGB">' +
-      '<feMorphology in="SourceGraphic" operator="erode" radius="8" result="eroded"/>' +
-      '<feTurbulence type="turbulence" baseFrequency="0.15" numOctaves="3" seed="' +
-      seed +
-      '" result="spikeFine"/>' +
-      '<feDisplacementMap in="eroded" in2="spikeFine" scale="' +
-      scale +
-      '" xChannelSelector="R" yChannelSelector="G" result="spikedFine"/>' +
-      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" seed="' +
-      (seed + 3) +
-      '" result="spikeCoarse"/>' +
-      '<feDisplacementMap in="spikedFine" in2="spikeCoarse" scale="' +
-      Math.round(scale * 0.45) +
-      '" xChannelSelector="R" yChannelSelector="G"/>' +
-      '</filter>'
-    );
-  }
-
-  function buildMaleSpikeFilters(style) {
-    const s = style.surfaceScale;
-    return (
-      buildMaleSpikeFilterMarkup(FILTER_ID_MALE_SPIKE, maleSpikeFilterScale(s), 11) +
-      buildMaleSpikeFilterMarkup(FILTER_ID_MALE_SPIKE_OUTER, maleSpikeOuterFilterScale(s), 17)
-    );
   }
 
   function buildCombinedFilter(style) {
@@ -471,11 +430,45 @@
 
   function buildSvgDefs(style) {
     console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
-    let defs = buildCombinedFilter(style);
-    if (style.gender === 'male') {
-      defs += buildMaleSpikeFilters(style);
-    }
-    return '<defs>' + defs + '</defs>';
+    return '<defs>' + buildCombinedFilter(style) + '</defs>';
+  }
+
+  function addSpikesToSvg(svgString, color, count, length) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const paths = doc.querySelectorAll('path');
+    const spikes = [];
+
+    paths.forEach(function (path) {
+      const len = path.getTotalLength();
+      const step = len / count;
+      for (let i = 0; i < len; i += step) {
+        const p1 = path.getPointAtLength(i);
+        const p2 = path.getPointAtLength(Math.min(i + 2, len));
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const norm = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / norm;
+        const ny = dx / norm;
+        const tipX = p1.x + nx * length;
+        const tipY = p1.y + ny * length;
+        spikes.push(
+          '<line x1="' +
+            p1.x +
+            '" y1="' +
+            p1.y +
+            '" x2="' +
+            tipX +
+            '" y2="' +
+            tipY +
+            '" stroke="' +
+            color +
+            '" stroke-width="1.5" stroke-linecap="square"/>'
+        );
+      }
+    });
+
+    return svgString.replace('</svg>', spikes.join('') + '</svg>');
   }
 
   function assembleAmuletSvg(vb, defs, content) {
@@ -527,11 +520,7 @@
       '×' +
       bump.scale;
     if (style.gender === 'male') {
-      fx +=
-        '+spikes×' +
-        maleSpikeFilterScale(style.surfaceScale) +
-        '/' +
-        maleSpikeOuterFilterScale(style.surfaceScale);
+      fx += '+lineSpikes(' + MALE_SPIKE_COUNT + ',' + MALE_SPIKE_LENGTH + ')';
     }
     return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
@@ -596,33 +585,13 @@
   function pathLayers(pathMarkup, style, filterId) {
     const clean = sanitizePathsInner(pathMarkup);
     const mainFid = filterId || FILTER_ID_COMBINED;
-    let inner = '';
-    if (style.gender === 'male') {
-      const s = style.surfaceScale;
-      const outerOpacity = Math.min(0.28 + s * 0.012, 0.48).toFixed(2);
-      const innerOpacity = Math.min(0.38 + s * 0.014, 0.58).toFixed(2);
-      inner +=
-        '<g class="male-spike-outer" fill="none" stroke="' +
-        style.strokeColor +
-        '" stroke-width="64" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
-        outerOpacity +
-        '" filter="url(#' +
-        FILTER_ID_MALE_SPIKE_OUTER +
-        ')">' +
-        clean +
-        '</g>' +
-        '<g class="male-spike-underlay" fill="none" stroke="' +
-        style.strokeColor +
-        '" stroke-width="54" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
-        innerOpacity +
-        '" filter="url(#' +
-        FILTER_ID_MALE_SPIKE +
-        ')">' +
-        clean +
-        '</g>';
-    }
-    inner += '<g class="path-main" ' + strokeAttrs(style, 45, mainFid) + '>' + clean + '</g>';
-    return '<g class="path-layers">' + inner + '</g>';
+    return (
+      '<g class="path-layers"><g class="path-main" ' +
+      strokeAttrs(style, 45, mainFid) +
+      '>' +
+      clean +
+      '</g></g>'
+    );
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -1065,7 +1034,10 @@
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
     const vb = viewBoxForPlacements(placements, style.surfaceScale);
     const defs = buildSvgDefs(style);
-    const svg = assembleAmuletSvg(vb, defs, content);
+    let svg = assembleAmuletSvg(vb, defs, content);
+    if (style.gender === 'male') {
+      svg = addSpikesToSvg(svg, style.strokeColor, MALE_SPIKE_COUNT, MALE_SPIKE_LENGTH);
+    }
     return { svg, placements, anchor, skipped, viewBox: vb, style };
   }
 
@@ -1178,13 +1150,7 @@
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
         ageBump: ageBumpByGender(style),
-        maleSpikeLayer:
-          style.gender === 'male'
-            ? {
-                inner: maleSpikeFilterScale(style.surfaceScale),
-                outer: maleSpikeOuterFilterScale(style.surfaceScale)
-              }
-            : null,
+        maleSpikes: style.gender === 'male' ? { count: MALE_SPIKE_COUNT, length: MALE_SPIKE_LENGTH } : null,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1201,13 +1167,7 @@
       const bump = ageBumpByGender(style);
       msg += ' | age=' + style.ageTexture + ' bump×' + bump.scale;
       if (style.gender === 'male') {
-        msg +=
-          ' | גוף≤' +
-          MALE_BODY_BUMP_MAX +
-          ' קוצים×' +
-          maleSpikeFilterScale(style.surfaceScale) +
-          '/' +
-          maleSpikeOuterFilterScale(style.surfaceScale);
+        msg += ' | קוצים=' + MALE_SPIKE_COUNT + ' len=' + MALE_SPIKE_LENGTH;
       }
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
