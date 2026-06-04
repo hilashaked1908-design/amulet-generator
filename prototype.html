@@ -237,6 +237,7 @@
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_MALE_SPIKE = 'maleSpike';
+  const FILTER_ID_MALE_SPIKE_OUTER = 'maleSpikeOuter';
   const MALE_BODY_BUMP_MAX = 12;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
@@ -281,7 +282,7 @@
     male: {
       linecap: 'square',
       linejoin: 'miter',
-      miterlimit: 50,
+      miterlimit: 1,
       scale: GENDER_SCALE_MALE
     }
   };
@@ -392,7 +393,11 @@
 
   function maleSpikeFilterScale(surfaceScale) {
     const s = Math.max(0, surfaceScale);
-    return Math.max(4, Math.min(Math.round(s * 0.45 + 3), 11));
+    return Math.max(9, Math.min(Math.round(s * 0.75 + 7), 18));
+  }
+
+  function maleSpikeOuterFilterScale(surfaceScale) {
+    return Math.min(maleSpikeFilterScale(surfaceScale) + 7, 24);
   }
 
   function filterRegionAttrs(surfaceScale) {
@@ -402,19 +407,34 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildMaleSpikeFilter(style) {
-    const scale = maleSpikeFilterScale(style.surfaceScale);
+  function buildMaleSpikeFilterMarkup(filterId, scale, seed) {
     return (
       '<filter id="' +
-      FILTER_ID_MALE_SPIKE +
+      filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale) +
+      filterRegionAttrs(20) +
       ' color-interpolation-filters="sRGB">' +
-      '<feTurbulence type="turbulence" baseFrequency="0.11" numOctaves="2" seed="11" result="spikeNoise"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="spikeNoise" scale="' +
+      '<feTurbulence type="turbulence" baseFrequency="0.15" numOctaves="3" seed="' +
+      seed +
+      '" result="spikeFine"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="spikeFine" scale="' +
       scale +
+      '" xChannelSelector="R" yChannelSelector="G" result="spikedFine"/>' +
+      '<feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" seed="' +
+      (seed + 3) +
+      '" result="spikeCoarse"/>' +
+      '<feDisplacementMap in="spikedFine" in2="spikeCoarse" scale="' +
+      Math.round(scale * 0.45) +
       '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
+    );
+  }
+
+  function buildMaleSpikeFilters(style) {
+    const s = style.surfaceScale;
+    return (
+      buildMaleSpikeFilterMarkup(FILTER_ID_MALE_SPIKE, maleSpikeFilterScale(s), 11) +
+      buildMaleSpikeFilterMarkup(FILTER_ID_MALE_SPIKE_OUTER, maleSpikeOuterFilterScale(s), 17)
     );
   }
 
@@ -452,7 +472,7 @@
     console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
     let defs = buildCombinedFilter(style);
     if (style.gender === 'male') {
-      defs += buildMaleSpikeFilter(style);
+      defs += buildMaleSpikeFilters(style);
     }
     return '<defs>' + defs + '</defs>';
   }
@@ -506,7 +526,11 @@
       '×' +
       bump.scale;
     if (style.gender === 'male') {
-      fx += '+spikeLayer×' + maleSpikeFilterScale(style.surfaceScale);
+      fx +=
+        '+spikes×' +
+        maleSpikeFilterScale(style.surfaceScale) +
+        '/' +
+        maleSpikeOuterFilterScale(style.surfaceScale);
     }
     return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
@@ -574,12 +598,22 @@
     let inner = '';
     if (style.gender === 'male') {
       const s = style.surfaceScale;
-      const underOpacity = Math.min(0.22 + s * 0.01, 0.42).toFixed(2);
+      const outerOpacity = Math.min(0.28 + s * 0.012, 0.48).toFixed(2);
+      const innerOpacity = Math.min(0.38 + s * 0.014, 0.58).toFixed(2);
       inner +=
+        '<g class="male-spike-outer" fill="none" stroke="' +
+        style.strokeColor +
+        '" stroke-width="64" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
+        outerOpacity +
+        '" filter="url(#' +
+        FILTER_ID_MALE_SPIKE_OUTER +
+        ')">' +
+        clean +
+        '</g>' +
         '<g class="male-spike-underlay" fill="none" stroke="' +
         style.strokeColor +
-        '" stroke-width="50" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
-        underOpacity +
+        '" stroke-width="54" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
+        innerOpacity +
         '" filter="url(#' +
         FILTER_ID_MALE_SPIKE +
         ')">' +
@@ -1143,7 +1177,13 @@
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
         ageBump: ageBumpByGender(style),
-        maleSpikeLayer: style.gender === 'male' ? maleSpikeFilterScale(style.surfaceScale) : null,
+        maleSpikeLayer:
+          style.gender === 'male'
+            ? {
+                inner: maleSpikeFilterScale(style.surfaceScale),
+                outer: maleSpikeOuterFilterScale(style.surfaceScale)
+              }
+            : null,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1160,7 +1200,13 @@
       const bump = ageBumpByGender(style);
       msg += ' | age=' + style.ageTexture + ' bump×' + bump.scale;
       if (style.gender === 'male') {
-        msg += ' | גוף≤' + MALE_BODY_BUMP_MAX + ' קוצים×' + maleSpikeFilterScale(style.surfaceScale);
+        msg +=
+          ' | גוף≤' +
+          MALE_BODY_BUMP_MAX +
+          ' קוצים×' +
+          maleSpikeFilterScale(style.surfaceScale) +
+          '/' +
+          maleSpikeOuterFilterScale(style.surfaceScale);
       }
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
