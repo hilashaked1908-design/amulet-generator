@@ -22,12 +22,11 @@
     header p { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
     .layout {
       display: grid;
-      grid-template-columns: 1fr minmax(280px, 380px);
+      grid-template-columns: minmax(280px, 380px) 1fr;
       gap: 0;
       min-height: calc(100vh - 56px);
     }
-    .layout > main.preview { grid-column: 1; min-width: 0; }
-    .layout > aside.panel { grid-column: 2; border-left: none; border-right: 1px solid #ccc; }
+    .layout > main.preview { min-width: 0; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
     }
@@ -141,17 +140,6 @@
   </header>
 
   <div class="layout">
-    <main class="preview">
-      <div id="resultWrap">
-        <svg id="resultSvg" width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
-          <rect width="680" height="680" fill="#ffffff"/>
-          <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
-        </svg>
-      </div>
-      <p id="status">—</p>
-      <div id="debugList" hidden></div>
-    </main>
-
     <aside class="panel">
       <div class="field" data-group="amuletType">
         <label>סוג קמע</label>
@@ -216,6 +204,17 @@
       <p class="hint">סוג קמע → חיבורים · תחום → צבע קו · גיל → מרקם · מגדר → פינות · דחיפות → מרווח<br>
         פתחי דרך <code>http://localhost:8080/prototype.html</code></p>
     </aside>
+
+    <main class="preview">
+      <div id="resultWrap">
+        <svg id="resultSvg" width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+          <rect width="680" height="680" fill="#ffffff"/>
+          <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
+        </svg>
+      </div>
+      <p id="status">—</p>
+      <div id="debugList" hidden></div>
+    </main>
   </div>
 
   <script src="connection-core.js"></script>
@@ -237,8 +236,8 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
-  const FILTER_ID_GLOSS = 'glossOnly';
-  const MALE_BODY_BUMP_MAX = 8;
+  const FILTER_ID_MALE_SPIKE = 'maleSpike';
+  const MALE_BODY_BUMP_MAX = 12;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -370,18 +369,10 @@
     };
   }
 
-  /** גיל = עוצמה; מגדר = אופי. זכר: גוף עם bump מוגבל + קוצים לפי גיל על מתאר חלק. */
+  /** גיל = עוצמת חספוס על הגוף. זכר: אותו גוף (מוגבל), שכבת קוצים נפרדת. */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
     const g = style.gender || 'female';
-    if (g === 'male') {
-      return {
-        type: 'fractalNoise',
-        baseFrequency: '0.09',
-        numOctaves: 2,
-        scale: Math.min(s, MALE_BODY_BUMP_MAX)
-      };
-    }
     if (g === 'nonbinary') {
       return {
         type: 'fractalNoise',
@@ -390,12 +381,18 @@
         scale: Math.round(s * 1.35)
       };
     }
+    const bodyScale = g === 'male' ? Math.min(s, MALE_BODY_BUMP_MAX) : s;
     return {
       type: 'fractalNoise',
       baseFrequency: '0.09',
       numOctaves: 2,
-      scale: s
+      scale: bodyScale
     };
+  }
+
+  function maleSpikeFilterScale(surfaceScale) {
+    const s = Math.max(0, surfaceScale);
+    return Math.max(4, Math.min(Math.round(s * 0.45 + 3), 11));
   }
 
   function filterRegionAttrs(surfaceScale) {
@@ -405,29 +402,18 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  /** קוצים על מתאר חלק — צפיפות ואורך לפי גיל מלא. */
-  function maleSpikeDrawParams(surfaceScale) {
-    const s = Math.max(0, surfaceScale);
-    return {
-      stride: s > 15 ? 16 : Math.max(11, Math.round(18 - s * 0.28)),
-      tip: 5 + Math.min(s * 0.35, 7),
-      baseHalf: 1.5 + Math.min(s * 0.07, 2)
-    };
-  }
-
-  function buildGlossOnlyFilter() {
+  function buildMaleSpikeFilter(style) {
+    const scale = maleSpikeFilterScale(style.surfaceScale);
     return (
       '<filter id="' +
-      FILTER_ID_GLOSS +
-      '" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
-      '<fePointLight x="300" y="150" z="200"/>' +
-      '</feSpecularLighting>' +
-      '<feMerge>' +
-      '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="gloss"/>' +
-      '</feMerge>' +
+      FILTER_ID_MALE_SPIKE +
+      '"' +
+      filterRegionAttrs(style.surfaceScale) +
+      ' color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="turbulence" baseFrequency="0.11" numOctaves="2" seed="11" result="spikeNoise"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="spikeNoise" scale="' +
+      scale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
@@ -466,7 +452,7 @@
     console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
     let defs = buildCombinedFilter(style);
     if (style.gender === 'male') {
-      defs += buildGlossOnlyFilter();
+      defs += buildMaleSpikeFilter(style);
     }
     return '<defs>' + defs + '</defs>';
   }
@@ -520,8 +506,7 @@
       '×' +
       bump.scale;
     if (style.gender === 'male') {
-      const sp = maleSpikeDrawParams(style.surfaceScale);
-      fx += '+spikes(stride' + sp.stride + ')';
+      fx += '+spikeLayer×' + maleSpikeFilterScale(style.surfaceScale);
     }
     return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
@@ -583,15 +568,26 @@
     return attrs;
   }
 
-  /** Single pass 45 — combined age + spiky filter when either applies. */
-  function pathOnePass(pathMarkup, style, filterId) {
-    const clean = sanitizePathsInner(pathMarkup);
-    const fid = filterId || FILTER_ID_COMBINED;
-    return '<g class="path-layers"><g ' + strokeAttrs(style, 45, fid) + '>' + clean + '</g></g>';
-  }
-
   function pathLayers(pathMarkup, style, filterId) {
-    return pathOnePass(pathMarkup, style, filterId);
+    const clean = sanitizePathsInner(pathMarkup);
+    const mainFid = filterId || FILTER_ID_COMBINED;
+    let inner = '';
+    if (style.gender === 'male') {
+      const s = style.surfaceScale;
+      const underOpacity = Math.min(0.22 + s * 0.01, 0.42).toFixed(2);
+      inner +=
+        '<g class="male-spike-underlay" fill="none" stroke="' +
+        style.strokeColor +
+        '" stroke-width="50" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="1" opacity="' +
+        underOpacity +
+        '" filter="url(#' +
+        FILTER_ID_MALE_SPIKE +
+        ')">' +
+        clean +
+        '</g>';
+    }
+    inner += '<g class="path-main" ' + strokeAttrs(style, 45, mainFid) + '>' + clean + '</g>';
+    return '<g class="path-layers">' + inner + '</g>';
   }
 
   /** Bounding box for mirrored symmetric layout (includes stroke padding). */
@@ -1035,16 +1031,7 @@
     const vb = viewBoxForPlacements(placements, style.surfaceScale);
     const defs = buildSvgDefs(style);
     const svg = assembleAmuletSvg(vb, defs, content);
-
-    let svgSpikeGuide = null;
-    if (style.gender === 'male') {
-      const symbolGuide = symbols.map((sym) => symbolGroupMarkup(sym, style, FILTER_ID_GLOSS));
-      const glyphsGuide = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, FILTER_ID_GLOSS);
-      const guideContent = wrapAmuletScale(wrapSymmetric(symbolGuide.join('') + glyphsGuide), style);
-      svgSpikeGuide = assembleAmuletSvg(vb, defs, guideContent);
-    }
-
-    return { svg, svgSpikeGuide, placements, anchor, skipped, viewBox: vb, style };
+    return { svg, placements, anchor, skipped, viewBox: vb, style };
   }
 
   function showDebug(placements, anchor, style) {
@@ -1084,11 +1071,6 @@
     document.getElementById('status').textContent = msg;
   }
 
-  let canvasSpikeToken = 0;
-  const CANVAS_ALPHA_EDGE = 28;
-  const CANVAS_EDGE_ROW_BATCH = 56;
-  const CANVAS_SPIKE_BATCH = 100;
-
   function setResultSvg(svgString) {
     const wrap = document.getElementById('resultWrap');
     const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
@@ -1103,192 +1085,6 @@
       wrap.removeChild(wrap.firstChild);
     }
     wrap.appendChild(svgEl);
-  }
-
-  function alphaAt(data, width, height, x, y) {
-    if (x < 0 || y < 0 || x >= width || y >= height) return 0;
-    return data[((y * width + x) * 4) + 3];
-  }
-
-  function isEdgePixel(data, width, height, x, y) {
-    if (alphaAt(data, width, height, x, y) < CANVAS_ALPHA_EDGE) return false;
-    if (alphaAt(data, width, height, x - 1, y) < CANVAS_ALPHA_EDGE) return true;
-    if (alphaAt(data, width, height, x + 1, y) < CANVAS_ALPHA_EDGE) return true;
-    if (alphaAt(data, width, height, x, y - 1) < CANVAS_ALPHA_EDGE) return true;
-    if (alphaAt(data, width, height, x, y + 1) < CANVAS_ALPHA_EDGE) return true;
-    return false;
-  }
-
-  /** רק על גוף עבה — לא שברי רעש מ-displacement. */
-  function isThickEdgePixel(data, width, height, x, y) {
-    if (!isEdgePixel(data, width, height, x, y)) return false;
-    let opaque = 0;
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        if (alphaAt(data, width, height, x + dx, y + dy) > 100) opaque++;
-      }
-    }
-    return opaque >= 11;
-  }
-
-  function loadSvgAsImage(svgString) {
-    return new Promise(function (resolve, reject) {
-      const img = new Image();
-      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      img.onload = function () {
-        URL.revokeObjectURL(url);
-        resolve(img);
-      };
-      img.onerror = function () {
-        URL.revokeObjectURL(url);
-        reject(new Error('SVG image load failed'));
-      };
-      img.src = url;
-    });
-  }
-
-  function outwardNormalAt(data, width, height, x, y) {
-    let nx = 0;
-    let ny = 0;
-    const dirs = [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1]
-    ];
-    for (let d = 0; d < dirs.length; d++) {
-      const px = x + dirs[d][0];
-      const py = y + dirs[d][1];
-      if (px < 0 || py < 0 || px >= width || py >= height) {
-        nx += dirs[d][0];
-        ny += dirs[d][1];
-        continue;
-      }
-      const ni = (py * width + px) * 4;
-      if (data[ni + 3] < CANVAS_ALPHA_EDGE) {
-        nx += dirs[d][0];
-        ny += dirs[d][1];
-      }
-    }
-    const len = Math.hypot(nx, ny);
-    if (len < 0.001) return null;
-    return { nx: nx / len, ny: ny / len };
-  }
-
-  function drawCanvasSpike(ctx, x, y, nx, ny, color, tip, baseHalf) {
-    const tx = -ny;
-    const ty = nx;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x + nx * tip, y + ny * tip);
-    ctx.lineTo(x - tx * baseHalf, y - ty * baseHalf);
-    ctx.lineTo(x + tx * baseHalf, y + ty * baseHalf);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  /** זכר: גוף עם bump מוגבל; קוצים לפי מתאר חלק (ללא bump). */
-  function setResultMaleWithSpikes(svgBody, svgGuide, style, viewBox, onDone) {
-    const token = ++canvasSpikeToken;
-    const wrap = document.getElementById('resultWrap');
-    const spike = maleSpikeDrawParams(style.surfaceScale);
-    const cw = Math.max(1, Math.ceil(viewBox.w) || W);
-    const ch = Math.max(1, Math.ceil(viewBox.h) || H);
-    const canvas = document.createElement('canvas');
-    canvas.width = cw;
-    canvas.height = ch;
-    canvas.className = 'amulet-canvas-result';
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-    wrap.appendChild(canvas);
-    setStatus('מרנדר צורה…');
-
-    Promise.all([loadSvgAsImage(svgGuide || svgBody), loadSvgAsImage(svgBody)])
-      .then(function (images) {
-        if (token !== canvasSpikeToken) return;
-        const guideImg = images[0];
-        const bodyImg = images[1];
-        const guideCanvas = document.createElement('canvas');
-        guideCanvas.width = cw;
-        guideCanvas.height = ch;
-        const gctx = guideCanvas.getContext('2d', { willReadFrequently: true });
-        gctx.fillStyle = BG_WHITE;
-        gctx.fillRect(0, 0, cw, ch);
-        gctx.drawImage(guideImg, 0, 0, cw, ch);
-        const guideData = gctx.getImageData(0, 0, cw, ch).data;
-
-        ctx.fillStyle = BG_WHITE;
-        ctx.fillRect(0, 0, cw, ch);
-        ctx.drawImage(bodyImg, 0, 0, cw, ch);
-
-        requestAnimationFrame(function () {
-          if (token !== canvasSpikeToken) return;
-          const edges = [];
-          let scanY = 1;
-
-          function scanRows() {
-            if (token !== canvasSpikeToken) return;
-            const yEnd = Math.min(scanY + CANVAS_EDGE_ROW_BATCH, ch - 1);
-            for (; scanY < yEnd; scanY++) {
-              for (let x = 1; x < cw - 1; x++) {
-                if (isThickEdgePixel(guideData, cw, ch, x, scanY)) {
-                  edges.push({ x: x, y: scanY });
-                }
-              }
-            }
-            if (scanY < ch - 1) {
-              requestAnimationFrame(scanRows);
-              return;
-            }
-
-            const sampled = [];
-            for (let i = 0; i < edges.length; i += spike.stride) sampled.push(edges[i]);
-            let spikeIdx = 0;
-            setStatus('מוסיף קוצים… (' + sampled.length + ')');
-
-            function drawSpikeBatch() {
-              if (token !== canvasSpikeToken) return;
-              const end = Math.min(spikeIdx + CANVAS_SPIKE_BATCH, sampled.length);
-              for (; spikeIdx < end; spikeIdx++) {
-                const p = sampled[spikeIdx];
-                const n = outwardNormalAt(guideData, cw, ch, p.x, p.y);
-                if (n) {
-                  drawCanvasSpike(ctx, p.x, p.y, n.nx, n.ny, style.strokeColor, spike.tip, spike.baseHalf);
-                }
-              }
-              if (spikeIdx < sampled.length) {
-                requestAnimationFrame(drawSpikeBatch);
-              } else if (onDone) {
-                onDone();
-              }
-            }
-
-            requestAnimationFrame(drawSpikeBatch);
-          }
-
-          requestAnimationFrame(scanRows);
-        });
-      })
-      .catch(function () {
-        if (token !== canvasSpikeToken) return;
-        setResultSvg(svgBody);
-        if (onDone) onDone();
-      });
-  }
-
-  function setResultDisplay(svgBody, svgGuide, style, viewBox, onReady) {
-    if (style.gender === 'male') {
-      setResultMaleWithSpikes(svgBody, svgGuide, style, viewBox, onReady);
-      return;
-    }
-    setResultSvg(svgBody);
-    if (onReady) onReady();
   }
 
   async function init() {
@@ -1335,8 +1131,7 @@
     setStatus('בונה קמע…');
 
     try {
-      const { svg, svgSpikeGuide, placements, anchor, skipped, viewBox, style } =
-        await buildAmuletSvg(letters);
+      const { svg, placements, anchor, skipped, style } = await buildAmuletSvg(letters);
       lastComposeLetters = letters.slice();
       console.log('[prototype] compose —', {
         amuletType: params.amuletType,
@@ -1348,7 +1143,7 @@
         ageTexture: style.ageTexture,
         surfaceScale: style.surfaceScale,
         ageBump: ageBumpByGender(style),
-        maleSpikes: style.gender === 'male' ? maleSpikeDrawParams(style.surfaceScale) : null,
+        maleSpikeLayer: style.gender === 'male' ? maleSpikeFilterScale(style.surfaceScale) : null,
         linecap: style.linecap,
         linejoin: style.linejoin,
         miterlimit: style.miterlimit,
@@ -1356,9 +1151,7 @@
         spacing: style.spacing
       });
 
-      await new Promise(function (resolve) {
-        setResultDisplay(svg, svgSpikeGuide, style, viewBox, resolve);
-      });
+      setResultSvg(svg);
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
@@ -1367,8 +1160,7 @@
       const bump = ageBumpByGender(style);
       msg += ' | age=' + style.ageTexture + ' bump×' + bump.scale;
       if (style.gender === 'male') {
-        const sp = maleSpikeDrawParams(style.surfaceScale);
-        msg += ' | גוף≤' + MALE_BODY_BUMP_MAX + ' קוצים stride=' + sp.stride;
+        msg += ' | גוף≤' + MALE_BODY_BUMP_MAX + ' קוצים×' + maleSpikeFilterScale(style.surfaceScale);
       }
       msg += ' | fx=' + effectLabel(style);
       msg += ' | spacing=' + style.spacing.toFixed(2);
