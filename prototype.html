@@ -100,13 +100,13 @@
       background: #e8e8e8;
       gap: 12px;
     }
-    #resultWrap {
+    #amuletContainer {
       background: #fff;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
       width: min(680px, 100%);
     }
-    #resultWrap svg,
-    #resultWrap canvas { display: block; max-width: 100%; height: auto; }
+    #amuletContainer svg,
+    #amuletContainer canvas { display: block; max-width: 100%; height: auto; }
     #status {
       font-size: 0.85rem;
       color: #444;
@@ -206,7 +206,7 @@
     </aside>
 
     <main class="preview">
-      <div id="resultWrap">
+      <div id="amuletContainer">
         <svg id="resultSvg" width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
           <rect width="680" height="680" fill="#ffffff"/>
           <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
@@ -433,18 +433,42 @@
     return '<defs>' + buildCombinedFilter(style) + '</defs>';
   }
 
-  function addMaleSpikesToLiveSvg(style) {
-    const liveSvg = document.getElementById('amuletSvg');
+  let spikeGenToken = 0;
+  let pendingSpikeStyle = null;
+
+  function pathPointOnRootSvg(path, distance, rootSvg) {
+    const local = path.getPointAtLength(distance);
+    if (!rootSvg || typeof rootSvg.createSVGPoint !== 'function') {
+      return { x: local.x, y: local.y };
+    }
+    const pt = rootSvg.createSVGPoint();
+    pt.x = local.x;
+    pt.y = local.y;
+    const ctm = path.getCTM();
+    if (!ctm) return { x: local.x, y: local.y };
+    const root = pt.matrixTransform(ctm);
+    return { x: root.x, y: root.y };
+  }
+
+  function addSpikes() {
+    if (!pendingSpikeStyle) return;
+    const style = pendingSpikeStyle;
+    const container = document.getElementById('amuletContainer');
+    const liveSvg = container && container.querySelector('svg');
     if (!liveSvg) return;
+
     const spikeSvgNs = 'http://www.w3.org/2000/svg';
-    const count = MALE_SPIKE_COUNT;
     const spikeLen = MALE_SPIKE_LENGTH;
-    liveSvg.querySelectorAll('path').forEach(function (path) {
+    const count = MALE_SPIKE_COUNT;
+    const spikeGroup = document.createElementNS(spikeSvgNs, 'g');
+    spikeGroup.setAttribute('class', 'amulet-spike-lines');
+
+    document.querySelectorAll('#amuletContainer path').forEach(function (path) {
       const total = path.getTotalLength();
       if (!total) return;
       for (let i = 0; i < total; i += total / count) {
-        const pt = path.getPointAtLength(i);
-        const pt2 = path.getPointAtLength(Math.min(i + 2, total));
+        const pt = pathPointOnRootSvg(path, i, liveSvg);
+        const pt2 = pathPointOnRootSvg(path, Math.min(i + 2, total), liveSvg);
         const tx = pt2.x - pt.x;
         const ty = pt2.y - pt.y;
         const n = Math.sqrt(tx * tx + ty * ty) || 1;
@@ -457,10 +481,12 @@
         line.setAttribute('y2', pt.y + ny * spikeLen);
         line.setAttribute('stroke', style.strokeColor);
         line.setAttribute('stroke-width', '2');
-        line.setAttribute('class', 'amulet-spike-line');
-        liveSvg.appendChild(line);
+        line.setAttribute('stroke-linecap', 'square');
+        spikeGroup.appendChild(line);
       }
     });
+
+    liveSvg.appendChild(spikeGroup);
   }
 
   function assembleAmuletSvg(vb, defs, content) {
@@ -1067,21 +1093,25 @@
     document.getElementById('status').textContent = msg;
   }
 
-  function setResultSvg(svgString) {
-    const wrap = document.getElementById('resultWrap');
+  function setResultSvg(svgString, scheduleSpikes, style) {
+    const container = document.getElementById('amuletContainer');
     const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
     const err = doc.querySelector('parsererror');
     if (err) {
       console.error('[prototype] SVG parse error:', err.textContent);
-      wrap.innerHTML = svgString;
+      container.innerHTML = svgString;
       return;
     }
-    const svgEl = document.importNode(doc.documentElement, true);
-    svgEl.setAttribute('id', 'amuletSvg');
-    while (wrap.firstChild) {
-      wrap.removeChild(wrap.firstChild);
+    container.innerHTML = svgString;
+    pendingSpikeStyle = scheduleSpikes ? style : null;
+    if (scheduleSpikes) {
+      spikeGenToken++;
+      const token = spikeGenToken;
+      setTimeout(function () {
+        if (token !== spikeGenToken) return;
+        addSpikes();
+      }, 0);
     }
-    wrap.appendChild(svgEl);
   }
 
   async function init() {
@@ -1148,10 +1178,7 @@
         spacing: style.spacing
       });
 
-      setResultSvg(svg);
-      if (params.gender === 'male') {
-        addMaleSpikesToLiveSvg(style);
-      }
+      setResultSvg(svg, params.gender === 'male', style);
 
       showDebug(placements, anchor, style);
       let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
