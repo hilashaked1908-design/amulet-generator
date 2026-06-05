@@ -1005,27 +1005,16 @@
     return { placements, anchor, usedPairs, skipped, byLetter };
   }
 
+  /** מרווח אותיות מהמרכז — זהה לדחיפות בשכבה 3 (prototype.html) */
   function applySpacingToPlacements(placements, anchor, factor) {
-    const f = Number(factor);
-    if (!Number.isFinite(f) || f <= 0) return placements;
-    const anchorPl = placements.find((p) => p.letter === anchor);
-    if (!anchorPl) return placements;
     return placements.map((p) => {
       if (p.letter === anchor) return p;
-      const dx = p.x - anchorPl.x;
-      const dy = p.y - anchorPl.y;
-      return { ...p, x: anchorPl.x + dx * f, y: anchorPl.y + dy * f };
+      return {
+        ...p,
+        x: CX + (p.x - CX) * factor,
+        y: CY + (p.y - CY) * factor
+      };
     });
-  }
-
-  /** שכבה 2 בלבד — מרווח לפי סטטוס משפחתי (כולל עדכון סמלי חיבור) */
-  function applyLayer2StatusSpacing(placements, anchor, familyStatus, byLetter, usedPairs, intent) {
-    const factor = getStatusSpacing(familyStatus);
-    const spaced = applySpacingToPlacements(placements, anchor, factor);
-    const spacedMap = new Map(spaced.map((p) => [p.letter, p]));
-    const symbols = collectConnectionSymbols(usedPairs, intent, spacedMap);
-    console.log('[layer2] status spacing:', familyStatus, '→', factor, 'letters:', spaced.length);
-    return { placements: spaced, byLetter: spacedMap, symbols, spacingFactor: factor };
   }
 
   function getRawConnection(from, to, intent) {
@@ -1194,28 +1183,13 @@
     }
 
     let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(unique, intent);
-    let symbols;
-    let spacingFactor = style.spacing;
-
+    const spacingFactor = style.spacing;
     if (style.layer === 2) {
-      const spaced = applyLayer2StatusSpacing(
-        placements,
-        anchor,
-        style.familyStatus,
-        byLetter,
-        usedPairs,
-        intent
-      );
-      placements = spaced.placements;
-      byLetter = spaced.byLetter;
-      symbols = spaced.symbols;
-      spacingFactor = spaced.spacingFactor;
-      style = { ...style, spacing: spacingFactor };
-    } else {
-      placements = applySpacingToPlacements(placements, anchor, style.spacing);
-      byLetter = new Map(placements.map((p) => [p.letter, p]));
-      symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+      console.log('layer2 spacing:', spacingFactor, 'status:', style.familyStatus);
     }
+    placements = applySpacingToPlacements(placements, anchor, spacingFactor);
+    byLetter = new Map(placements.map((p) => [p.letter, p]));
+    const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
 
     const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style, style.filterId));
     const glyphPathParts = [];
@@ -1248,9 +1222,7 @@
     let style2 = null;
     if (nameLetters.length) {
       style2 = visualStyleLayer2(params);
-      const layer2Style = style2;
-      console.log('layer2 spacing:', layer2Style.spacing, 'status:', layer2Style.familyStatus);
-      layer2 = await buildLayerContent(nameLetters, layer2Style, layer2Style.intent);
+      layer2 = await buildLayerContent(nameLetters, style2, style2.intent);
       if (layer2.style) style2 = layer2.style;
     }
 
