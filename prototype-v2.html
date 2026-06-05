@@ -222,6 +222,18 @@
         </div>
       </div>
 
+      <div class="field" data-group="mood">
+        <label>מצב רוח</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn active" data-value="joy">שמחה</button>
+          <button type="button" class="opt-btn" data-value="sadness">עצב</button>
+          <button type="button" class="opt-btn" data-value="anxiety">חרדה</button>
+          <button type="button" class="opt-btn" data-value="calm">רוגע</button>
+          <button type="button" class="opt-btn" data-value="strength">כוח</button>
+          <button type="button" class="opt-btn" data-value="love">אהבה</button>
+        </div>
+      </div>
+
       <div class="field">
         <label for="sentence">משפט כוונה</label>
         <input id="sentence" type="text" placeholder="לדוגמה: בית גדול בתאילנד אמן" value="בית גדול בתאילנד אמן">
@@ -229,7 +241,7 @@
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint">שכבה 2: שם + סטטוס + עיסוק · שכבה 3: כוונה + תחום + גיל + מגדר + דחיפות<br>
+      <p class="hint">שכבה 2: שם + סטטוס + עיסוק + מצב רוח (×1.25) · שכבה 3: כוונה + תחום + גיל + מגדר + דחיפות<br>
         פתחי דרך <code>http://localhost:8080/prototype-v2.html</code></p>
     </aside>
 
@@ -266,7 +278,7 @@
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_LAYER2 = 'combined-layer2';
   const FILTER_ID_LAYER3 = 'combined-layer3';
-  const LAYER2_STROKE_OPACITY = 0.7;
+  const LAYER2_SCALE = 1.25;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -323,13 +335,23 @@
     now: 0.5
   };
 
-  /** שכבה 2 — מרווח לפי סטטוס משפחתי */
+  /** שכבה 2 — מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז) */
   const STATUS_SPACING = {
     single: 1.8,
     divorced: 2.0,
     widowed: 1.3,
     couple: 1.0,
     married: 0.7
+  };
+
+  /** שכבה 2 — צבע קו לפי מצב רוח */
+  const MOOD_STROKE = {
+    joy: '#F5C842',
+    sadness: '#6B7FD4',
+    anxiety: '#E8773A',
+    calm: '#5BAD8F',
+    strength: '#8B2635',
+    love: '#D4748C'
   };
 
   /** שכבה 2 — סגנון קו ומרקם לפי עיסוק */
@@ -389,6 +411,7 @@
     urgency: 'now',
     familyStatus: 'single',
     occupation: 'humanities',
+    mood: 'joy',
     personName: ''
   };
 
@@ -409,8 +432,14 @@
     params.urgency = getGroupValue('urgency') || 'now';
     params.familyStatus = getGroupValue('familyStatus') || 'single';
     params.occupation = getGroupValue('occupation') || 'humanities';
+    params.mood = getGroupValue('mood') || 'joy';
     params.personName = (document.getElementById('personName').value || '').trim();
     return params;
+  }
+
+  function getStatusSpacing(familyStatus) {
+    const key = familyStatus || 'single';
+    return STATUS_SPACING[key] != null ? STATUS_SPACING[key] : STATUS_SPACING.single;
   }
 
   function visualStyleLayer3(p) {
@@ -451,22 +480,25 @@
     };
   }
 
-  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע 70% משכבה 3 */
-  function visualStyleLayer2(p, mainStrokeColor) {
+  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע לפי מצב רוח, ×1.25 */
+  function visualStyleLayer2(p) {
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
     const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
+    const statusSpacing = getStatusSpacing(p.familyStatus);
+    const moodKey = p.mood || 'joy';
 
     return {
       layer: 2,
       familyStatus: p.familyStatus,
       occupationKey: p.occupation,
+      moodKey,
       intent: 'grounding',
-      strokeColor: mainStrokeColor,
-      strokeOpacity: LAYER2_STROKE_OPACITY,
-      spacing: STATUS_SPACING[p.familyStatus] ?? 1.8,
-      amuletScale: gender.scale,
+      strokeColor: MOOD_STROKE[moodKey] || MOOD_STROKE.joy,
+      strokeOpacity: 1,
+      spacing: statusSpacing,
+      amuletScale: gender.scale * LAYER2_SCALE,
       linecap: occ.linecap,
       linejoin: occ.linejoin,
       miterlimit: occ.miterlimit,
@@ -974,14 +1006,26 @@
   }
 
   function applySpacingToPlacements(placements, anchor, factor) {
+    const f = Number(factor);
+    if (!Number.isFinite(f) || f <= 0) return placements;
     return placements.map((p) => {
       if (p.letter === anchor) return p;
       return {
         ...p,
-        x: CX + (p.x - CX) * factor,
-        y: CY + (p.y - CY) * factor
+        x: CX + (p.x - CX) * f,
+        y: CY + (p.y - CY) * f
       };
     });
+  }
+
+  /** שכבה 2 בלבד — מרווח לפי סטטוס משפחתי (כולל עדכון סמלי חיבור) */
+  function applyLayer2StatusSpacing(placements, anchor, familyStatus, byLetter, usedPairs, intent) {
+    const factor = getStatusSpacing(familyStatus);
+    const spaced = applySpacingToPlacements(placements, anchor, factor);
+    const spacedMap = new Map(spaced.map((p) => [p.letter, p]));
+    const symbols = collectConnectionSymbols(usedPairs, intent, spacedMap);
+    console.log('[layer2] status spacing:', familyStatus, '→', factor, 'letters:', spaced.length);
+    return { placements: spaced, byLetter: spacedMap, symbols, spacingFactor: factor };
   }
 
   function getRawConnection(from, to, intent) {
@@ -1150,10 +1194,29 @@
     }
 
     let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(unique, intent);
-    placements = applySpacingToPlacements(placements, anchor, style.spacing);
-    byLetter = new Map(placements.map((p) => [p.letter, p]));
+    let symbols;
+    let spacingFactor = style.spacing;
 
-    const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+    if (style.layer === 2) {
+      const spaced = applyLayer2StatusSpacing(
+        placements,
+        anchor,
+        style.familyStatus,
+        byLetter,
+        usedPairs,
+        intent
+      );
+      placements = spaced.placements;
+      byLetter = spaced.byLetter;
+      symbols = spaced.symbols;
+      spacingFactor = spaced.spacingFactor;
+      style = { ...style, spacing: spacingFactor };
+    } else {
+      placements = applySpacingToPlacements(placements, anchor, style.spacing);
+      byLetter = new Map(placements.map((p) => [p.letter, p]));
+      symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+    }
+
     const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style, style.filterId));
     const glyphPathParts = [];
     for (const p of placements) {
@@ -1167,7 +1230,7 @@
     const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
     const groups = symbolParts.join('') + unifiedGlyphs;
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
-    return { content, placements, anchor, skipped, style };
+    return { content, placements, anchor, skipped, style, spacingFactor };
   }
 
   async function buildDualLayerAmulet(sentenceLetters, nameLetters) {
@@ -1184,8 +1247,9 @@
     let layer2 = null;
     let style2 = null;
     if (nameLetters.length) {
-      style2 = visualStyleLayer2(params, style3.strokeColor);
+      style2 = visualStyleLayer2(params);
       layer2 = await buildLayerContent(nameLetters, style2, style2.intent);
+      if (layer2.style) style2 = layer2.style;
     }
 
     const allPlacements = layer3.placements.slice();
@@ -1238,14 +1302,18 @@
           style2.occupationKey +
           '/' +
           style2.familyStatus +
+          '/' +
+          style2.moodKey +
           ' | cap=' +
           style2.linecap +
           '/' +
           style2.linejoin +
           ' | spacing=' +
           style2.spacing.toFixed(2) +
-          ' | opacity=' +
-          style2.strokeOpacity +
+          ' | color=' +
+          style2.strokeColor +
+          ' | scale×' +
+          LAYER2_SCALE +
           '</strong><ul>' +
           rows2 +
           '</ul>'
@@ -1360,6 +1428,7 @@
         sentenceLetters: letters,
         familyStatus: params.familyStatus,
         occupation: params.occupation,
+        mood: params.mood,
         layer2: style2,
         layer3: style3
       });
@@ -1376,7 +1445,8 @@
       const bump = ageBumpByGender(style3);
       msg += ' | L3 bump×' + bump.scale + ' spacing=' + style3.spacing.toFixed(2);
       if (style2) {
-        msg += ' | L2 ' + style2.occupationKey + ' spacing=' + style2.spacing.toFixed(2);
+        msg += ' | L2 ' + style2.moodKey + ' ' + style2.strokeColor;
+        msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
       if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
       setStatus(msg);
