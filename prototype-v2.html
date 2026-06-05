@@ -494,7 +494,7 @@
       familyStatus: p.familyStatus,
       occupationKey: p.occupation,
       moodKey,
-      intent: 'grounding',
+      intent: 'protection',
       strokeColor: MOOD_STROKE[moodKey] || MOOD_STROKE.joy,
       strokeOpacity: 1,
       spacing: statusSpacing,
@@ -1008,13 +1008,13 @@
   function applySpacingToPlacements(placements, anchor, factor) {
     const f = Number(factor);
     if (!Number.isFinite(f) || f <= 0) return placements;
+    const anchorPl = placements.find((p) => p.letter === anchor);
+    if (!anchorPl) return placements;
     return placements.map((p) => {
       if (p.letter === anchor) return p;
-      return {
-        ...p,
-        x: CX + (p.x - CX) * f,
-        y: CY + (p.y - CY) * f
-      };
+      const dx = p.x - anchorPl.x;
+      const dy = p.y - anchorPl.y;
+      return { ...p, x: anchorPl.x + dx * f, y: anchorPl.y + dy * f };
     });
   }
 
@@ -1248,7 +1248,9 @@
     let style2 = null;
     if (nameLetters.length) {
       style2 = visualStyleLayer2(params);
-      layer2 = await buildLayerContent(nameLetters, style2, style2.intent);
+      const layer2Style = style2;
+      console.log('layer2 spacing:', layer2Style.spacing, 'status:', layer2Style.familyStatus);
+      layer2 = await buildLayerContent(nameLetters, layer2Style, layer2Style.intent);
       if (layer2.style) style2 = layer2.style;
     }
 
