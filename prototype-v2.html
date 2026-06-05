@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>אב-טיפוס קמע — Prototype</title>
+  <title>אב-טיפוס קמע — Prototype v2</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -68,7 +68,8 @@
       color: #fff;
       border-color: #111;
     }
-    #sentence {
+    #sentence,
+    #personName {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid #bbb;
@@ -135,8 +136,8 @@
 </head>
 <body>
   <header>
-    <h1>אב-טיפוס — יצירת קמע מפרמטרים</h1>
-    <p>טוען גליפים מ־glyphs/ וחיבורים מ־connections.json · דורש python3 server.py</p>
+    <h1>אב-טיפוס v2 — שכבת שם + שכבת כוונה</h1>
+    <p>שכבה 2: אותיות השם · שכבה 3: משפט כוונה · glyphs/ + connections.json</p>
   </header>
 
   <div class="layout">
@@ -195,14 +196,41 @@
       </div>
 
       <div class="field">
+        <label for="personName">שם</label>
+        <input id="personName" type="text" placeholder="לדוגמה: הילה" value="הילה">
+      </div>
+
+      <div class="field" data-group="familyStatus">
+        <label>סטטוס משפחתי</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn active" data-value="single">רווק/ה</button>
+          <button type="button" class="opt-btn" data-value="couple">זוגיות</button>
+          <button type="button" class="opt-btn" data-value="married">נשוי/אה</button>
+          <button type="button" class="opt-btn" data-value="divorced">גרוש/ה</button>
+          <button type="button" class="opt-btn" data-value="widowed">אלמן/ה</button>
+        </div>
+      </div>
+
+      <div class="field" data-group="occupation">
+        <label>עיסוק</label>
+        <div class="btn-row">
+          <button type="button" class="opt-btn active" data-value="humanities">הומני</button>
+          <button type="button" class="opt-btn" data-value="technical">טכני</button>
+          <button type="button" class="opt-btn" data-value="creative">יצירתי</button>
+          <button type="button" class="opt-btn" data-value="security">ביטחון</button>
+          <button type="button" class="opt-btn" data-value="student">סטודנט</button>
+        </div>
+      </div>
+
+      <div class="field">
         <label for="sentence">משפט כוונה</label>
         <input id="sentence" type="text" placeholder="לדוגמה: בית גדול בתאילנד אמן" value="בית גדול בתאילנד אמן">
       </div>
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint">סוג קמע → חיבורים · תחום → צבע קו · גיל → מרקם · מגדר → פינות · דחיפות → מרווח<br>
-        פתחי דרך <code>http://localhost:8080/prototype.html</code></p>
+      <p class="hint">שכבה 2: שם + סטטוס + עיסוק · שכבה 3: כוונה + תחום + גיל + מגדר + דחיפות<br>
+        פתחי דרך <code>http://localhost:8080/prototype-v2.html</code></p>
     </aside>
 
     <main class="preview">
@@ -236,6 +264,9 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
+  const FILTER_ID_LAYER2 = 'combined-layer2';
+  const FILTER_ID_LAYER3 = 'combined-layer3';
+  const LAYER2_STROKE_OPACITY = 0.7;
 
   /** גיל → bump roughness only (gloss is always in combined filter) */
   const AGE_BUMP_SCALE = {
@@ -292,6 +323,49 @@
     now: 0.5
   };
 
+  /** שכבה 2 — מרווח לפי סטטוס משפחתי */
+  const STATUS_SPACING = {
+    single: 1.8,
+    divorced: 2.0,
+    widowed: 1.3,
+    couple: 1.0,
+    married: 0.7
+  };
+
+  /** שכבה 2 — סגנון קו ומרקם לפי עיסוק */
+  const OCCUPATION_VISUAL = {
+    humanities: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2, scaleFactor: 1 }
+    },
+    technical: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 1,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.1', numOctaves: 2, scaleFactor: 0.85 }
+    },
+    creative: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.06', numOctaves: 4, scaleFactor: 1.15 }
+    },
+    security: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 1,
+      customBump: { type: 'turbulence', baseFrequency: '0.11', numOctaves: 3, scaleFactor: 1.4 }
+    },
+    student: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.12', numOctaves: 3, scaleFactor: 1.75 }
+    }
+  };
+
   /* --- Intent keys (match connections.json) --- */
   const INTENT_TYPES = ['protection', 'summoning', 'grounding'];
 
@@ -312,7 +386,10 @@
     domain: 'love',
     age: '25-34',
     gender: 'female',
-    urgency: 'now'
+    urgency: 'now',
+    familyStatus: 'single',
+    occupation: 'humanities',
+    personName: ''
   };
 
   function clampNum(n, min, max) {
@@ -330,10 +407,13 @@
     params.age = getGroupValue('age') || '25-34';
     params.gender = getGroupValue('gender') || 'female';
     params.urgency = getGroupValue('urgency') || 'now';
+    params.familyStatus = getGroupValue('familyStatus') || 'single';
+    params.occupation = getGroupValue('occupation') || 'humanities';
+    params.personName = (document.getElementById('personName').value || '').trim();
     return params;
   }
 
-  function visualStyle(p) {
+  function visualStyleLayer3(p) {
     const strokeByDomain = {
       love: '#D7A2B4',
       livelihood: '#C8ED14',
@@ -352,10 +432,12 @@
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     return {
+      layer: 3,
       amuletType: p.amuletType,
       domainKey: p.domain,
       intent,
       strokeColor,
+      strokeOpacity: 1,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
@@ -364,7 +446,36 @@
       ageTexture,
       surfaceScale,
       age: p.age,
-      gender: p.gender
+      gender: p.gender,
+      filterId: FILTER_ID_LAYER3
+    };
+  }
+
+  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע 70% משכבה 3 */
+  function visualStyleLayer2(p, mainStrokeColor) {
+    const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
+    const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
+    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
+
+    return {
+      layer: 2,
+      familyStatus: p.familyStatus,
+      occupationKey: p.occupation,
+      intent: 'grounding',
+      strokeColor: mainStrokeColor,
+      strokeOpacity: LAYER2_STROKE_OPACITY,
+      spacing: STATUS_SPACING[p.familyStatus] ?? 1.8,
+      amuletScale: gender.scale,
+      linecap: occ.linecap,
+      linejoin: occ.linejoin,
+      miterlimit: occ.miterlimit,
+      customBump: occ.customBump,
+      ageTexture,
+      surfaceScale,
+      age: p.age,
+      gender: p.gender,
+      filterId: FILTER_ID_LAYER2
     };
   }
 
@@ -397,6 +508,15 @@
   /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
+    if (style.customBump) {
+      const cb = style.customBump;
+      return {
+        type: cb.type,
+        baseFrequency: cb.baseFrequency,
+        numOctaves: cb.numOctaves,
+        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
+      };
+    }
     const g = style.gender || 'female';
     if (g === 'male') {
       const profile = maleBumpProfile(style.age, s);
@@ -430,11 +550,11 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildCombinedFilter(style) {
+  function buildCombinedFilter(filterId, style) {
     const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
-      FILTER_ID_COMBINED +
+      filterId +
       '"' +
       filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
@@ -460,9 +580,16 @@
     );
   }
 
-  function buildSvgDefs(style) {
-    console.log('surfaceScale:', style.surfaceScale, 'gender:', style.gender);
-    return '<defs>' + buildCombinedFilter(style) + '</defs>';
+  function buildSvgDefs(style2, style3) {
+    let defs = '<defs>';
+    if (style2) {
+      console.log('[layer2] surfaceScale:', style2.surfaceScale, 'occupation:', style2.occupationKey);
+      defs += buildCombinedFilter(FILTER_ID_LAYER2, style2);
+    }
+    console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
+    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
+    defs += '</defs>';
+    return defs;
   }
 
   function assembleAmuletSvg(vb, defs, content) {
@@ -567,6 +694,9 @@
       '" stroke-linejoin="' +
       style.linejoin +
       '"';
+    if (style.strokeOpacity != null && style.strokeOpacity < 1) {
+      attrs += ' stroke-opacity="' + style.strokeOpacity + '"';
+    }
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
@@ -578,7 +708,7 @@
 
   function pathLayers(pathMarkup, style, filterId) {
     const clean = sanitizePathsInner(pathMarkup);
-    const mainFid = filterId || FILTER_ID_COMBINED;
+    const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
     return (
       '<g class="path-layers"><g class="path-main" ' +
       strokeAttrs(style, 45, mainFid) +
@@ -712,6 +842,20 @@
         used.add(picked);
         out.push(picked);
       }
+    }
+    return out;
+  }
+
+  /** אותיות עבריות מהשם — ללא כפילויות, עד MAX_LETTERS */
+  function lettersFromName(name) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const ch of String(name || '').replace(/\s/g, '')) {
+      if (out.length >= MAX_LETTERS) break;
+      if (!avail.has(ch) || used.has(ch)) continue;
+      used.add(ch);
+      out.push(ch);
     }
     return out;
   }
@@ -996,15 +1140,13 @@
     );
   }
 
-  async function buildAmuletSvg(letters) {
-    readParams();
-    const style = visualStyle(params);
-    document.title =
-      'color:' + style.strokeColor + ' age:' + style.ageTexture + ' g:' + style.gender;
-    const intent = style.intent;
+  async function buildLayerContent(letters, style, intent) {
     const unique = [];
     for (const ch of letters) {
       if (!unique.includes(ch)) unique.push(ch);
+    }
+    if (!unique.length) {
+      return { content: '', placements: [], anchor: null, skipped: [], style };
     }
 
     let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(unique, intent);
@@ -1012,56 +1154,137 @@
     byLetter = new Map(placements.map((p) => [p.letter, p]));
 
     const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
-
-    const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style));
+    const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style, style.filterId));
     const glyphPathParts = [];
     for (const p of placements) {
       const glyph = await getParsedGlyph(p.letter);
       glyphPathParts.push(glyphPathsMarkup(p, glyph));
     }
     if (!symbolParts.length && !glyphPathParts.length) {
-      throw new Error('לא ניתן לצייר אות — בדקי חיבורים וגליפים');
+      return { content: '', placements: [], anchor: null, skipped: unique, style };
     }
 
-    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style);
+    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
     const groups = symbolParts.join('') + unifiedGlyphs;
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
-    const vb = viewBoxForPlacements(placements, style.surfaceScale);
-    const defs = buildSvgDefs(style);
-    const svg = assembleAmuletSvg(vb, defs, content);
-    return { svg, placements, anchor, skipped, viewBox: vb, style };
+    return { content, placements, anchor, skipped, style };
   }
 
-  function showDebug(placements, anchor, style) {
+  async function buildDualLayerAmulet(sentenceLetters, nameLetters) {
+    readParams();
+    const style3 = visualStyleLayer3(params);
+    document.title =
+      'v2 color:' + style3.strokeColor + ' age:' + style3.ageTexture + ' g:' + style3.gender;
+
+    const layer3 = await buildLayerContent(sentenceLetters, style3, style3.intent);
+    if (!layer3.content) {
+      throw new Error('לא ניתן לצייר שכבת כוונה — בדקי חיבורים וגליפים');
+    }
+
+    let layer2 = null;
+    let style2 = null;
+    if (nameLetters.length) {
+      style2 = visualStyleLayer2(params, style3.strokeColor);
+      layer2 = await buildLayerContent(nameLetters, style2, style2.intent);
+    }
+
+    const allPlacements = layer3.placements.slice();
+    if (layer2?.placements?.length) {
+      allPlacements.push(...layer2.placements);
+    }
+
+    const maxScale = Math.max(
+      style3.surfaceScale,
+      style2 ? style2.surfaceScale : 0
+    );
+    const vb = viewBoxForPlacements(allPlacements, maxScale);
+    const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3);
+
+    let layers = '';
+    if (layer2?.content) {
+      layers +=
+        '<g class="amulet-layer layer-2" data-layer="name">' + layer2.content + '</g>';
+    }
+    layers +=
+      '<g class="amulet-layer layer-3" data-layer="intent">' + layer3.content + '</g>';
+
+    const svg = assembleAmuletSvg(vb, defs, layers);
+    return {
+      svg,
+      layer2,
+      layer3,
+      style2,
+      style3,
+      viewBox: vb,
+      placements: allPlacements,
+      anchor: layer3.anchor,
+      skipped: layer3.skipped
+    };
+  }
+
+  function showDebug(layer2, layer3, style2, style3) {
     const el = document.getElementById('debugList');
-    if (!placements.length) {
+    const blocks = [];
+
+    if (layer2?.placements?.length && style2) {
+      const rows2 = layer2.placements
+        .map((p) => {
+          const tag = p.letter === layer2.anchor ? ' (hub)' : '';
+          return '<li>L2 ' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
+        })
+        .join('');
+      blocks.push(
+        '<strong>שכבה 2 (שם) · ' +
+          style2.occupationKey +
+          '/' +
+          style2.familyStatus +
+          ' | cap=' +
+          style2.linecap +
+          '/' +
+          style2.linejoin +
+          ' | spacing=' +
+          style2.spacing.toFixed(2) +
+          ' | opacity=' +
+          style2.strokeOpacity +
+          '</strong><ul>' +
+          rows2 +
+          '</ul>'
+      );
+    }
+
+    if (layer3?.placements?.length && style3) {
+      const rows3 = layer3.placements
+        .map((p) => {
+          const tag = p.letter === layer3.anchor ? ' (hub)' : '';
+          return '<li>L3 ' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
+        })
+        .join('');
+      blocks.push(
+        '<strong>שכבה 3 (כוונה) · ' +
+          style3.amuletType +
+          '/' +
+          style3.domainKey +
+          ' age=' +
+          style3.ageTexture +
+          ' | cap=' +
+          style3.linecap +
+          '/' +
+          style3.linejoin +
+          ' | fx=' +
+          effectLabel(style3) +
+          ' spacing=' +
+          style3.spacing.toFixed(2) +
+          '</strong><ul>' +
+          rows3 +
+          '</ul>'
+      );
+    }
+
+    if (!blocks.length) {
       el.hidden = true;
       return;
     }
-    const rows = placements
-      .map((p) => {
-        const tag = p.letter === anchor ? ' (hub)' : '';
-        return '<li>' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
-      })
-      .join('');
-    el.innerHTML =
-      '<strong>' +
-      style.amuletType +
-      '/' +
-      style.domainKey +
-      ' age=' +
-      style.ageTexture +
-      ' | cap=' +
-      style.linecap +
-      '/' +
-      style.linejoin +
-      ' | fx=' +
-      effectLabel(style) +
-      ' spacing=' +
-      style.spacing.toFixed(2) +
-      '</strong><ul>' +
-      rows +
-      '</ul>';
+    el.innerHTML = blocks.join('<hr style="margin:6px 0;border:none;border-top:1px dashed #ccc">');
     el.hidden = false;
   }
 
@@ -1084,7 +1307,7 @@
   async function init() {
     requireConnectionCore();
     if (location.protocol === 'file:') {
-      setStatus('פתחי דרך http://localhost:8080/prototype.html (python3 server.py)');
+      setStatus('פתחי דרך http://localhost:8080/prototype-v2.html (python3 server.py)');
       document.getElementById('createBtn').disabled = true;
       return;
     }
@@ -1115,50 +1338,47 @@
       letters = lastComposeLetters.slice();
     }
     if (!letters.length) {
-      setStatus(sentence ? 'לא נמצאו אותיות עבריות' : 'כתבי משפט כוונה');
+      setStatus(sentence ? 'לא נמצאו אותיות עבריות במשפט' : 'כתבי משפט כוונה');
       return;
     }
+
+    const nameLetters = lettersFromName(params.personName);
 
     const btn = document.getElementById('createBtn');
     composeBusy = true;
     btn.disabled = true;
-    setStatus('בונה קמע…');
+    setStatus('בונה קמע (2 שכבות)…');
 
     try {
-      const { svg, placements, anchor, skipped, style } = await buildAmuletSvg(letters);
+      const result = await buildDualLayerAmulet(letters, nameLetters);
       lastComposeLetters = letters.slice();
-      console.log('[prototype] compose —', {
-        amuletType: params.amuletType,
-        domain: params.domain,
-        age: params.age,
-        gender: params.gender,
-        urgency: params.urgency,
-        strokeColor: style.strokeColor,
-        ageTexture: style.ageTexture,
-        surfaceScale: style.surfaceScale,
-        ageBump: ageBumpByGender(style),
-        linecap: style.linecap,
-        linejoin: style.linejoin,
-        miterlimit: style.miterlimit,
-        effect: effectLabel(style),
-        spacing: style.spacing
+      const { svg, layer2, layer3, style2, style3, anchor, skipped } = result;
+
+      console.log('[prototype-v2] compose —', {
+        name: params.personName,
+        nameLetters,
+        sentenceLetters: letters,
+        familyStatus: params.familyStatus,
+        occupation: params.occupation,
+        layer2: style2,
+        layer3: style3
       });
 
       setResultSvg(svg);
+      showDebug(layer2, layer3, style2, style3);
 
-      showDebug(placements, anchor, style);
-      let msg = 'אותיות: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
-      msg += ' | ' + style.amuletType + ' · ' + style.domainKey;
-      msg += ' | cap=' + style.linecap + '/' + style.linejoin;
-      const bump = ageBumpByGender(style);
-      msg += ' | age=' + style.ageTexture + ' bump×' + bump.scale;
-      if (style.gender === 'male') {
-        msg += ' | זכר bump×' + bump.scale + '@' + bump.baseFrequency;
+      let msg = 'שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      if (nameLetters.length) {
+        msg += ' · שכבה 2 (שם): ' + nameLetters.join(' → ');
+        if (layer2?.skipped?.length) msg += ' | L2 ללא חיבור: ' + layer2.skipped.join(' ');
       }
-      msg += ' | fx=' + effectLabel(style);
-      msg += ' | spacing=' + style.spacing.toFixed(2);
-      msg += ' | קנה×' + style.amuletScale.toFixed(2);
-      if (skipped.length) msg += ' | ללא חיבור: ' + skipped.join(' ');
+      msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
+      const bump = ageBumpByGender(style3);
+      msg += ' | L3 bump×' + bump.scale + ' spacing=' + style3.spacing.toFixed(2);
+      if (style2) {
+        msg += ' | L2 ' + style2.occupationKey + ' spacing=' + style2.spacing.toFixed(2);
+      }
+      if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
       setStatus(msg);
     } catch (err) {
       setStatus('שגיאה: ' + err.message);
