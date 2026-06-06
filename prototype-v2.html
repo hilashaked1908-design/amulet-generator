@@ -272,7 +272,8 @@
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_LAYER2 = 'combined-layer2';
   const FILTER_ID_LAYER3 = 'combined-layer3';
-  const LAYER2_SCALE = 1.25;
+  /** שכבה 2 (שם) — מעט קטנה יותר מהקדמית, ממורכזת מאחור */
+  const LAYER2_SCALE = 0.91125;
 
   function ageToSurfaceScale(age) {
     const a = Math.max(1, Math.min(120, Number(age) || 25));
@@ -323,13 +324,13 @@
     now: 0.5
   };
 
-  /** שכבה 2 — מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז) */
+  /** שכבה 2 — מרווח עדין לפי סטטוס (טווח צר כמו דחיפות — הקמע נשאר צורה אחת) */
   const STATUS_SPACING = {
-    single: 1.8,
-    divorced: 2.0,
-    widowed: 1.3,
-    couple: 1.0,
-    married: 0.7
+    married: 0.55,
+    couple: 0.72,
+    widowed: 0.88,
+    single: 1.0,
+    divorced: 1.2
   };
 
   /** שכבה 2 — צבע קו לפי מצב רוח */
@@ -342,13 +343,13 @@
     love: '#D4748C'
   };
 
-  /** שכבה 2 — סגנון קו ומרקם לפי עיסוק */
+  /** שכבה 2 — סגנון קו + טקסטורת גימור לפי עיסוק */
   const OCCUPATION_VISUAL = {
     humanities: {
       linecap: 'round',
       linejoin: 'round',
       miterlimit: null,
-      customBump: { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2, scaleFactor: 1 }
+      customBump: null
     },
     technical: {
       linecap: 'square',
@@ -430,6 +431,30 @@
     return STATUS_SPACING[key] != null ? STATUS_SPACING[key] : STATUS_SPACING.single;
   }
 
+  function parseHexColor(hex) {
+    const h = (hex || '#000000').replace('#', '');
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16)
+    };
+  }
+
+  function mixHexColor(a, b, t) {
+    const ca = parseHexColor(a);
+    const cb = parseHexColor(b);
+    const mix = (x, y) => Math.round(x + (y - x) * t);
+    const r = mix(ca.r, cb.r);
+    const g = mix(ca.g, cb.g);
+    const bl = mix(ca.b, cb.b);
+    return (
+      '#' +
+      r.toString(16).padStart(2, '0') +
+      g.toString(16).padStart(2, '0') +
+      bl.toString(16).padStart(2, '0')
+    );
+  }
+
   function visualStyleLayer3(p) {
     const strokeByDomain = {
       love: '#D7A2B4',
@@ -443,7 +468,8 @@
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
-    const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
+    const domainColor = strokeByDomain[p.domain] || strokeByDomain.love;
+    const strokeColor = mixHexColor(domainColor, '#ffffff', 0.6);
 
     const surfaceScale = ageToSurfaceScale(p.age);
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
@@ -455,6 +481,7 @@
       intent,
       strokeColor,
       strokeOpacity: 1,
+      layerOpacity: 0.85,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
@@ -468,7 +495,7 @@
     };
   }
 
-  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע לפי מצב רוח, ×1.25 */
+  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע לפי מצב רוח */
   function visualStyleLayer2(p) {
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
@@ -483,7 +510,7 @@
       occupationKey: p.occupation,
       moodKey,
       intent: 'protection',
-      strokeColor: MOOD_STROKE[moodKey] || MOOD_STROKE.joy,
+      strokeColor: '#c0c0c0',
       strokeOpacity: 1,
       spacing: statusSpacing,
       amuletScale: gender.scale * LAYER2_SCALE,
@@ -553,32 +580,48 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildCombinedFilter(filterId, style) {
-    const bump = ageBumpByGender(style);
+  function buildGlossClipMerge() {
+    return (
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>'
+    );
+  }
+
+  /** שכבה 2 — כרום מבריק */
+  function buildChromeFilter(filterId, style) {
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      filterRegionAttrs(style.surfaceScale, 0) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="12" specularConstant="2" specularExponent="80" lighting-color="white" result="gloss">' +
+      '<fePointLight x="200" y="100" z="150"/>' +
+      '</feSpecularLighting>' +
+      buildGlossClipMerge() +
+      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
+      '</filter>'
+    );
+  }
+
+  /** שכבה 3 — זכוכית חלבית רכה */
+  function buildMilkyGlassFilter(filterId, style) {
+    return (
+      '<filter id="' +
+      filterId +
+      '"' +
+      filterRegionAttrs(style.surfaceScale, 0) +
+      ' color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="6" specularConstant="0.8" specularExponent="20" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="gloss"/>' +
-      '</feMerge>' +
-      '<feTurbulence type="' +
-      bump.type +
-      '" baseFrequency="' +
-      bump.baseFrequency +
-      '" numOctaves="' +
-      bump.numOctaves +
-      '" seed="2" result="noise"/>' +
-      '<feDisplacementMap in="glossed" in2="noise" scale="' +
-      bump.scale +
-      '" xChannelSelector="R" yChannelSelector="G"/>' +
+      buildGlossClipMerge() +
+      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
       '</filter>'
     );
   }
@@ -586,11 +629,11 @@
   function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] surfaceScale:', style2.surfaceScale, 'occupation:', style2.occupationKey);
-      defs += buildCombinedFilter(FILTER_ID_LAYER2, style2);
+      console.log('[layer2] chrome · occupation:', style2.occupationKey);
+      defs += buildChromeFilter(FILTER_ID_LAYER2, style2);
     }
-    console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
-    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
+    console.log('[layer3] milky glass · domain:', style3.domainKey);
+    defs += buildMilkyGlassFilter(FILTER_ID_LAYER3, style3);
     defs += '</defs>';
     return defs;
   }
@@ -865,12 +908,14 @@
   }
 
   async function loadGlyphSvg(letter) {
-    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
-    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
-    const res = await fetch(url);
+    const url =
+      GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter)) + '?t=' + Date.now();
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('חסר SVG: ' + letter);
-    glyphSvgCache[letter] = await res.text();
-    return glyphSvgCache[letter];
+    const text = await res.text();
+    glyphSvgCache[letter] = text;
+    delete parsedGlyphCache[letter];
+    return text;
   }
 
   function parseGlyphSvg(svgText) {
@@ -889,7 +934,6 @@
   }
 
   async function getParsedGlyph(letter) {
-    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
     const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
     parsedGlyphCache[letter] = parsed;
     return parsed;
@@ -1130,6 +1174,26 @@
     return '<g class="amulet-glyphs">' + pathLayers(pathsMarkup, style, filterId) + '</g>';
   }
 
+  /** הזזת שכבת שם למרכז הקנבס (ממוצע מיקומי האותיות הגלויות). */
+  function centerLayerGroup(markup, placements) {
+    if (!markup || !placements?.length) return markup;
+    const n = placements.length;
+    const meanX = placements.reduce((s, p) => s + p.x, 0) / n;
+    const meanY = placements.reduce((s, p) => s + p.y, 0) / n;
+    const dx = CX - meanX;
+    const dy = CY - meanY;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return markup;
+    return (
+      '<g class="layer-centered" transform="translate(' +
+      dx.toFixed(2) +
+      ',' +
+      dy.toFixed(2) +
+      ')">' +
+      markup +
+      '</g>'
+    );
+  }
+
   function wrapSymmetric(content) {
     return (
       '<g class="amulet-symmetric">' +
@@ -1186,7 +1250,10 @@
     }
 
     const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
-    const groups = symbolParts.join('') + unifiedGlyphs;
+    let groups = symbolParts.join('') + unifiedGlyphs;
+    if (style.layer === 2) {
+      groups = centerLayerGroup(groups, renderPlacements);
+    }
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
     return { content, placements: renderPlacements, anchor, skipped, style };
   }
@@ -1219,7 +1286,11 @@
         '<g class="amulet-layer layer-2" data-layer="name">' + layer2.content + '</g>';
     }
     layers +=
-      '<g class="amulet-layer layer-3" data-layer="intent">' + layer3.content + '</g>';
+      '<g class="amulet-layer layer-3" data-layer="intent" opacity="' +
+      (style3.layerOpacity ?? 1) +
+      '">' +
+      layer3.content +
+      '</g>';
 
     const svg = assembleAmuletSvg(vb, defs, layers);
     const allPlacements = layer3.placements.slice();
@@ -1249,9 +1320,9 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · ' +
+        '<strong>שכבה 2 (שם) · chrome · ' +
           style2.occupationKey +
-          '/' +
+          ' /' +
           style2.familyStatus +
           '/' +
           style2.moodKey +
@@ -1396,7 +1467,8 @@
       const bump = ageBumpByGender(style3);
       msg += ' | L3 bump×' + bump.scale + ' spacing=' + style3.spacing.toFixed(2);
       if (style2) {
-        msg += ' | L2 ' + style2.moodKey + ' ' + style2.strokeColor;
+        msg += ' | L2 chrome ' + style2.strokeColor;
+        msg += ' ' + style2.moodKey;
         msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
       if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
