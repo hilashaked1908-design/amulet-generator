@@ -272,6 +272,10 @@
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_LAYER2 = 'combined-layer2';
   const FILTER_ID_LAYER3 = 'combined-layer3';
+  const FILTER_ID_LAYER2_MATERIAL = 'material-layer2';
+  const FILTER_ID_LAYER3_MATERIAL = 'material-layer3';
+  const PATH_MAIN_STROKE_WIDTH = 45;
+  const PATH_CERAMIC_STROKE_WIDTH = 42;
   /** שכבה 2 (שם) — מעט קטנה יותר מהקדמית, ממורכזת מאחור */
   const LAYER2_SCALE = 0.91125;
 
@@ -471,9 +475,6 @@
     const domainColor = strokeByDomain[p.domain] || strokeByDomain.love;
     const strokeColor = mixHexColor(domainColor, '#ffffff', 0.6);
 
-    const surfaceScale = ageToSurfaceScale(p.age);
-    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
-
     return {
       layer: 3,
       amuletType: p.amuletType,
@@ -487,9 +488,6 @@
       linecap: gender.linecap,
       linejoin: gender.linejoin,
       miterlimit: gender.miterlimit,
-      ageTexture,
-      surfaceScale,
-      age: p.age,
       gender: p.gender,
       filterId: FILTER_ID_LAYER3
     };
@@ -526,8 +524,39 @@
     };
   }
 
-  function metalRoughness(style) {
-    return (style.surfaceScale || 0) * 0.3;
+  /** גיל = עוצמת חספוס (שכבה 2 בלבד). מגדר משפיע על שכפול גיאומטרי, לא על bump. */
+  function ageBumpByGender(style) {
+    const s = style.surfaceScale;
+    if (style.customBump) {
+      const cb = style.customBump;
+      return {
+        type: cb.type,
+        baseFrequency: cb.baseFrequency,
+        numOctaves: cb.numOctaves,
+        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
+      };
+    }
+    return {
+      type: 'fractalNoise',
+      baseFrequency: '0.09',
+      numOctaves: 2,
+      scale: s
+    };
+  }
+
+  function genderLayoutLabel(gender) {
+    if (gender === 'male') return 'mirror-h+v';
+    if (gender === 'nonbinary') return 'stack-v';
+    return 'mirror-h';
+  }
+
+  function nonbinaryVerticalOffset(placements) {
+    if (!placements?.length) return 90;
+    let extent = 0;
+    for (const p of placements) {
+      extent = Math.max(extent, Math.abs(p.y - CY) + p.sz * 0.55);
+    }
+    return Math.round(Math.max(70, extent + 36));
   }
 
   function filterRegionAttrs(surfaceScale, bumpScale) {
@@ -537,35 +566,103 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  /** שכבה 2 — מתכת: חספוס גיל דרך blur, ואז diffuse + specular */
-  function buildMetalFilter(filterId, style) {
-    const roughness = metalRoughness(style).toFixed(2);
+  function buildBumpDisplacement(bump, inName, resultName) {
+    return (
+      '<feTurbulence type="' +
+      bump.type +
+      '" baseFrequency="' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="' +
+      inName +
+      '" in2="noise" scale="' +
+      bump.scale +
+      '" xChannelSelector="R" yChannelSelector="G" result="' +
+      resultName +
+      '"/>'
+    );
+  }
+
+  function buildGlossClipMerge() {
+    return (
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>'
+    );
+  }
+
+  /** מיזוג ברק על הצורה אחרי displacement */
+  function buildGlossClipMergeOn(baseName) {
+    return (
+      '<feComposite in="gloss" in2="' +
+      baseName +
+      '" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="' +
+      baseName +
+      '"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>' +
+      '<feComposite in="glossed" in2="' +
+      baseName +
+      '" operator="in"/>'
+    );
+  }
+
+  /** שכבה 2 — כרום + חספוס גיל/מגדר/עיסוק, ואז ברק */
+  function buildChromeFilter(filterId, style) {
+    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, 0) +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur stdDeviation="' +
-      roughness +
-      '" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="15" specularConstant="2.5" specularExponent="120" lighting-color="#ffffff" result="spec">' +
-      '<fePointLight x="250" y="80" z="180"/>' +
+      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
+      '<feGaussianBlur in="rough" stdDeviation="2" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="12" specularConstant="2" specularExponent="80" lighting-color="white" result="gloss">' +
+      '<fePointLight x="200" y="100" z="150"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="spec" in2="SourceGraphic" operator="in" result="specClipped"/>' +
-      '<feDiffuseLighting in="blur" surfaceScale="15" diffuseConstant="0.8" lighting-color="#aaaaaa" result="diff">' +
-      '<fePointLight x="250" y="80" z="180"/>' +
-      '</feDiffuseLighting>' +
-      '<feComposite in="diff" in2="SourceGraphic" operator="in" result="diffClipped"/>' +
-      '<feMerge>' +
-      '<feMergeNode in="diffClipped"/>' +
-      '<feMergeNode in="specClipped"/>' +
-      '</feMerge>' +
+      buildGlossClipMergeOn('rough') +
       '</filter>'
     );
   }
 
-  /** שכבה 3 — זכוכית חלבית חלקה (ללא displacement) */
+  /** שכבה 2 — מעבר חומר כסף (מעל הרינדור הקיים) */
+  function buildSilverMaterialFilter(filterId) {
+    return (
+      '<filter id="' +
+      filterId +
+      '" color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur stdDeviation="0.5" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="18" specularConstant="3" specularExponent="120" lighting-color="#ffffff" result="spec">' +
+      '<fePointLight x="180" y="60" z="100"/>' +
+      '</feSpecularLighting>' +
+      '<feComposite in="spec" in2="SourceGraphic" operator="in"/>' +
+      '</filter>'
+    );
+  }
+
+  /** שכבה 3 — מעבר חומר קרמי חם (מעל הרינדור הקיים) */
+  function buildCeramicMaterialFilter(filterId) {
+    return (
+      '<filter id="' +
+      filterId +
+      '" color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur stdDeviation="3" result="blur"/>' +
+      '<feDiffuseLighting in="blur" surfaceScale="6" diffuseConstant="1.5" lighting-color="#fff8e8" result="diff">' +
+      '<feDistantLight azimuth="135" elevation="50"/>' +
+      '</feDiffuseLighting>' +
+      '<feComposite in="diff" in2="SourceGraphic" operator="in"/>' +
+      '</filter>'
+    );
+  }
+
+  /** שכבה 3 — זכוכית חלבית חלקה (ללא חספוס גיל) */
   function buildMilkyGlassFilter(filterId, style) {
     return (
       '<filter id="' +
@@ -577,11 +674,7 @@
       '<feSpecularLighting in="blur" surfaceScale="6" specularConstant="0.8" specularExponent="20" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="glossClip"/>' +
-      '</feMerge>' +
+      buildGlossClipMerge() +
       '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
       '</filter>'
     );
@@ -590,11 +683,13 @@
   function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] metal · occupation:', style2.occupationKey, 'rough=', metalRoughness(style2).toFixed(2));
-      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
+      console.log('[layer2] chrome · occupation:', style2.occupationKey);
+      defs += buildChromeFilter(FILTER_ID_LAYER2, style2);
+      defs += buildSilverMaterialFilter(FILTER_ID_LAYER2_MATERIAL);
     }
     console.log('[layer3] milky glass · domain:', style3.domainKey);
     defs += buildMilkyGlassFilter(FILTER_ID_LAYER3, style3);
+    defs += buildCeramicMaterialFilter(FILTER_ID_LAYER3_MATERIAL);
     defs += '</defs>';
     return defs;
   }
@@ -639,21 +734,18 @@
   }
 
   function effectLabel(style) {
+    const layout = genderLayoutLabel(style.gender);
     if (style.layer === 2) {
-      return (
-        'metal · rough=' +
-        metalRoughness(style).toFixed(2) +
-        ' · ' +
-        style.linecap
-      );
+      const bump = ageBumpByGender(style);
+      const fx =
+        bump.type +
+        '@' +
+        bump.baseFrequency +
+        '×' +
+        bump.scale;
+      return 'chrome · ' + (style.ageTexture || 'gloss') + ' · ' + fx + ' · ' + layout + ' · ' + style.linecap;
     }
-    return (
-      style.amuletType +
-      '/' +
-      style.domainKey +
-      ' · milky-glass · ' +
-      style.linecap
-    );
+    return style.amuletType + '/' + style.domainKey + ' · milky-glass · ' + layout + ' · ' + style.linecap;
   }
 
   /**
@@ -694,10 +786,11 @@
     }
   }
 
-  function strokeAttrs(style, width, filterId) {
+  function strokeAttrs(style, width, filterId, overrides) {
+    const o = overrides || {};
     let attrs =
       'fill="none" stroke="' +
-      style.strokeColor +
+      (o.color != null ? o.color : style.strokeColor) +
       '" stroke-width="' +
       width +
       '" stroke-linecap="' +
@@ -705,14 +798,16 @@
       '" stroke-linejoin="' +
       style.linejoin +
       '"';
-    if (style.strokeOpacity != null && style.strokeOpacity < 1) {
-      attrs += ' stroke-opacity="' + style.strokeOpacity + '"';
+    const opacity = o.opacity != null ? o.opacity : style.strokeOpacity;
+    if (opacity != null && opacity < 1) {
+      attrs += ' stroke-opacity="' + opacity + '"';
     }
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    if (filterId) {
-      attrs += ' filter="url(#' + filterId + ')"';
+    const fid = o.filterId !== undefined ? o.filterId : filterId;
+    if (fid) {
+      attrs += ' filter="url(#' + fid + ')"';
     }
     return attrs;
   }
@@ -720,22 +815,55 @@
   function pathLayers(pathMarkup, style, filterId) {
     const clean = sanitizePathsInner(pathMarkup);
     const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
-    return (
+    let out =
       '<g class="path-layers"><g class="path-main" ' +
-      strokeAttrs(style, 45, mainFid) +
+      strokeAttrs(style, PATH_MAIN_STROKE_WIDTH, mainFid) +
       '>' +
       clean +
-      '</g></g>'
-    );
+      '</g>';
+    if (style.layer === 2) {
+      out +=
+        '<g class="path-material-silver" ' +
+        strokeAttrs(style, PATH_MAIN_STROKE_WIDTH, null, {
+          color: '#b8b8c8',
+          opacity: 0.6,
+          filterId: FILTER_ID_LAYER2_MATERIAL
+        }) +
+        '>' +
+        clean +
+        '</g>';
+    } else if (style.layer === 3) {
+      out +=
+        '<g class="path-material-ceramic" ' +
+        strokeAttrs(style, PATH_CERAMIC_STROKE_WIDTH, null, {
+          color: '#f5f0dd',
+          opacity: 0.5,
+          filterId: FILTER_ID_LAYER3_MATERIAL
+        }) +
+        '>' +
+        clean +
+        '</g>';
+    }
+    return out + '</g>';
   }
 
-  /** Bounding box for mirrored symmetric layout (includes stroke padding). */
-  function viewBoxForPlacements(placements, surfaceScale) {
+  function placementYVariants(y, gender, nbOffset) {
+    const ys = [y];
+    if (gender === 'male') ys.push(H - y);
+    if (gender === 'nonbinary') {
+      ys.push(y - nbOffset, y + nbOffset);
+    }
+    return ys;
+  }
+
+  /** Bounding box for mirrored / gender-stacked layout (includes stroke padding). */
+  function viewBoxForPlacements(placements, surfaceScale, gender) {
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
     const extraPad = Math.min((surfaceScale || 0) * 2.5, 60);
+    const nbOffset = gender === 'nonbinary' ? nonbinaryVerticalOffset(placements) : 0;
     const bump = (x, y) => {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
@@ -744,11 +872,13 @@
     };
     for (const p of placements) {
       const r = p.sz / 2 + VIEWBOX_PAD + extraPad;
-      bump(p.x - r, p.y - r);
-      bump(p.x + r, p.y + r);
-      const mx = W - p.x;
-      bump(mx - r, p.y - r);
-      bump(mx + r, p.y + r);
+      for (const y of placementYVariants(p.y, gender, nbOffset)) {
+        bump(p.x - r, y - r);
+        bump(p.x + r, y + r);
+        const mx = W - p.x;
+        bump(mx - r, y - r);
+        bump(mx + r, y + r);
+      }
     }
     if (!isFinite(minX)) {
       return { x: 0, y: 0, w: W, h: H };
@@ -1173,6 +1303,44 @@
     );
   }
 
+  /** מגדר: נקבה = שיקוף אופקי; זכר = +שיקוף אנכי; לא בינארי = עותק למעלה ולמטה */
+  function wrapGenderLayout(content, gender, placements) {
+    const hSym = wrapSymmetric(content);
+    if (gender === 'male') {
+      return (
+        '<g class="amulet-gender-layout amulet-gender-male">' +
+        '<g class="amulet-half-v amulet-original">' +
+        hSym +
+        '</g>' +
+        '<g class="amulet-half-v amulet-mirror-v" transform="translate(0,' +
+        H +
+        ') scale(1,-1)">' +
+        hSym +
+        '</g>' +
+        '</g>'
+      );
+    }
+    if (gender === 'nonbinary') {
+      const off = nonbinaryVerticalOffset(placements);
+      return (
+        '<g class="amulet-gender-layout amulet-gender-nonbinary">' +
+        '<g class="amulet-copy-above" transform="translate(0,-' +
+        off +
+        ')">' +
+        hSym +
+        '</g>' +
+        hSym +
+        '<g class="amulet-copy-below" transform="translate(0,' +
+        off +
+        ')">' +
+        hSym +
+        '</g>' +
+        '</g>'
+      );
+    }
+    return '<g class="amulet-gender-layout amulet-gender-female">' + hSym + '</g>';
+  }
+
   async function buildLayerContent(letters, style, intent) {
     const unique = [];
     for (const ch of letters) {
@@ -1218,15 +1386,14 @@
     if (style.layer === 2) {
       groups = centerLayerGroup(groups, renderPlacements);
     }
-    const content = wrapAmuletScale(wrapSymmetric(groups), style);
+    const content = wrapAmuletScale(wrapGenderLayout(groups, style.gender, renderPlacements), style);
     return { content, placements: renderPlacements, anchor, skipped, style };
   }
 
   async function buildDualLayerAmulet(sentenceLetters, nameLetters) {
     readParams();
     const style3 = visualStyleLayer3(params);
-    document.title =
-      'v2 color:' + style3.strokeColor + ' age:' + style3.ageTexture + ' g:' + style3.gender;
+    document.title = 'v2 color:' + style3.strokeColor + ' g:' + style3.gender;
 
     const layer3 = await buildLayerContent(sentenceLetters, style3, style3.intent);
     if (!layer3.content) {
@@ -1241,7 +1408,7 @@
       if (layer2.style) style2 = layer2.style;
     }
 
-    const vb = viewBoxForPlacements(layer3.placements, style3.surfaceScale);
+    const vb = viewBoxForPlacements(layer3.placements, 0, params.gender);
     const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3);
 
     let layers = '';
@@ -1284,7 +1451,7 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · metal · ' +
+        '<strong>שכבה 2 (שם) · chrome · ' +
           style2.occupationKey +
           ' /' +
           style2.familyStatus +
@@ -1319,8 +1486,7 @@
           '/' +
           style3.domainKey +
           ' age=' +
-          style3.ageTexture +
-          ' | cap=' +
+          'milky-glass | cap=' +
           style3.linecap +
           '/' +
           style3.linejoin +
@@ -1430,7 +1596,8 @@
       msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
       msg += ' | L3 glass spacing=' + style3.spacing.toFixed(2);
       if (style2) {
-        msg += ' | L2 metal rough=' + metalRoughness(style2).toFixed(2) + ' ' + style2.strokeColor;
+        const bump2 = ageBumpByGender(style2);
+        msg += ' | L2 chrome bump×' + bump2.scale + ' ' + style2.strokeColor;
         msg += ' ' + style2.moodKey;
         msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
