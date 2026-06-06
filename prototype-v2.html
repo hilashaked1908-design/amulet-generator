@@ -183,8 +183,8 @@
 </head>
 <body>
   <header>
-    <h1>אב-טיפוס v2 — שכבת שם + שכבת כוונה <small style="font-weight:400;color:#8cf">[metal+glass]</small></h1>
-    <p>L2 כסף מלוטש (SVG) · L3 זכוכית חלבית · כמו prototype.html</p>
+    <h1>אב-טיפוס v2 — שכבת שם + שכבת כוונה <small style="font-weight:400;color:#8cf">[Three.js PBR]</small></h1>
+    <p>נתיבי SVG → צינור תלת־ממדי + כרום/קרמיקה PBR · לחיצה אחת</p>
   </header>
 
   <div class="layout">
@@ -280,7 +280,7 @@
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint">שכבה 2: <strong>מתכת כסף</strong> · שכבה 3: <strong>זכוכית חלבית</strong> — פילטרי SVG<br>
+      <p class="hint">שתי השכבות: <strong>פילטר combined</strong> כמו <code>prototype.html</code> (ברק + חספוס גיל)<br>
         <strong>קובץ זה:</strong> <code>http://localhost:8080/prototype-v2.html</code> ·
         גרסת gloss: <a href="/prototype-v2-gloss.html">prototype-v2-gloss.html</a></p>
     </aside>
@@ -314,7 +314,6 @@
   const DEFAULT_GLYPH_SIZE = 150;
 
   const AMULET_BG = '#ffffff';
-  const METAL_GRAD_ID = 'metalChrome';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_LAYER2 = 'metal';
@@ -322,9 +321,30 @@
   /** שכבה 2 (שם) — אותו גודל כמו שכבה 3 */
   const LAYER2_SCALE = 1;
 
-  function ageToSurfaceScale(age) {
+  /** גיל → bump — זהה ל-prototype.html */
+  const AGE_BUMP_SCALE = {
+    under18: 0,
+    '18-24': 2,
+    '25-34': 4,
+    '35-44': 6,
+    '45-59': 9,
+    '60-70': 15,
+    '70plus': 22
+  };
+
+  function ageBucketFromNumber(age) {
     const a = Math.max(1, Math.min(120, Number(age) || 25));
-    return Math.round((a / 120) * 20);
+    if (a < 18) return 'under18';
+    if (a < 25) return '18-24';
+    if (a < 35) return '25-34';
+    if (a < 45) return '35-44';
+    if (a < 60) return '45-59';
+    if (a < 70) return '60-70';
+    return '70plus';
+  }
+
+  function surfaceScaleFromAge(age) {
+    return AGE_BUMP_SCALE[ageBucketFromNumber(age)] ?? 4;
   }
 
   /** תחום → צבע מעבר Pass 2 */
@@ -491,9 +511,9 @@
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
-    const strokeColor = milkyStrokeColor(strokeByDomain[p.domain] || strokeByDomain.love);
-
-    const surfaceScale = ageToSurfaceScale(p.age);
+    const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
+    const ageBucket = ageBucketFromNumber(p.age);
+    const surfaceScale = surfaceScaleFromAge(p.age);
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     return {
@@ -502,7 +522,6 @@
       domainKey: p.domain,
       intent,
       strokeColor,
-      strokeOpacity: 0.9,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
@@ -510,7 +529,7 @@
       miterlimit: gender.miterlimit,
       ageTexture,
       surfaceScale,
-      age: p.age,
+      age: ageBucket,
       gender: p.gender,
       filterId: FILTER_ID_LAYER3
     };
@@ -520,7 +539,8 @@
   function visualStyleLayer2(p) {
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
-    const surfaceScale = ageToSurfaceScale(p.age);
+    const ageBucket = ageBucketFromNumber(p.age);
+    const surfaceScale = surfaceScaleFromAge(p.age);
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
     const statusSpacing = getStatusSpacing(p.familyStatus);
     const moodKey = p.mood || 'joy';
@@ -532,66 +552,51 @@
       moodKey,
       intent: 'protection',
       strokeColor: '#B8B8B8',
-      strokeOpacity: 1,
       spacing: statusSpacing,
       amuletScale: gender.scale * LAYER2_SCALE,
       linecap: occ.linecap,
       linejoin: occ.linejoin,
       miterlimit: occ.miterlimit,
-      customBump: occ.customBump,
       ageTexture,
       surfaceScale,
-      age: p.age,
+      age: ageBucket,
       gender: p.gender,
-      filterId: FILTER_ID_LAYER2,
-      metalGradient: true
+      filterId: FILTER_ID_LAYER2
     };
   }
 
-  /** חספוס מתכת — גיל+עיסוק בלבד (מגדר = שכפול גיאומטרי, לא bump) */
-  function metalAgeBump(style) {
-    const s = style.surfaceScale;
-    if (style.customBump) {
-      const cb = style.customBump;
+  /** זכר: פרופיל לפי גיל — זהה ל-prototype.html */
+  function maleBumpProfile(age, surfaceScale) {
+    const s = surfaceScale;
+    if (s <= 0) {
+      return { scale: 0, baseFrequency: '0.10', numOctaves: 2 };
+    }
+    if (s <= 9) {
       return {
-        type: cb.type,
-        baseFrequency: cb.baseFrequency,
-        numOctaves: cb.numOctaves,
-        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
+        scale: s,
+        baseFrequency: Math.max(0.08, 0.115 - s * 0.002).toFixed(3),
+        numOctaves: s < 6 ? 2 : 3
       };
+    }
+    if (age === '70plus') {
+      return { scale: 12, baseFrequency: '0.128', numOctaves: 2 };
+    }
+    if (age === '60-70') {
+      return { scale: 9, baseFrequency: '0.108', numOctaves: 2 };
     }
     return {
-      type: 'fractalNoise',
-      baseFrequency: '0.09',
-      numOctaves: 2,
-      scale: s
+      scale: Math.min(10, Math.round(8 + (s - 9) * 0.28)),
+      baseFrequency: '0.10',
+      numOctaves: 2
     };
   }
 
-  /** זכר: קוצניות מינימלית 8 + חספוס גיל רציף */
-  function maleBumpProfile(age) {
-    const a = Math.max(1, Math.min(120, Number(age) || 25));
-    const scale = Math.max(8, ageToSurfaceScale(age));
-    const baseFrequency = (0.08 + ((120 - a) / 120) * 0.07).toFixed(3);
-    const numOctaves = a < 18 ? 1 : 2;
-    return { scale, baseFrequency, numOctaves };
-  }
-
-  /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
+  /** גיל = עוצמת חספוס — זהה ל-prototype.html */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
-    if (style.customBump) {
-      const cb = style.customBump;
-      return {
-        type: cb.type,
-        baseFrequency: cb.baseFrequency,
-        numOctaves: cb.numOctaves,
-        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
-      };
-    }
     const g = style.gender || 'female';
     if (g === 'male') {
-      const profile = maleBumpProfile(style.age);
+      const profile = maleBumpProfile(style.age, s);
       return {
         type: 'turbulence',
         baseFrequency: profile.baseFrequency,
@@ -622,158 +627,24 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildBumpDisplacement(bump, inName, resultName) {
+  /** פילטר משולב — עותק מדויק מ-prototype.html */
+  function buildCombinedFilter(filterId, style) {
+    const bump = ageBumpByGender(style);
     return (
-      '<feTurbulence type="' +
-      bump.type +
-      '" baseFrequency="' +
-      bump.baseFrequency +
-      '" numOctaves="' +
-      bump.numOctaves +
-      '" seed="2" result="noise"/>' +
-      '<feDisplacementMap in="' +
-      inName +
-      '" in2="noise" scale="' +
-      bump.scale +
-      '" xChannelSelector="R" yChannelSelector="G" result="' +
-      resultName +
-      '"/>'
-    );
-  }
-
-  /** גרדיאנט כסף בהיר — מינימום #7a7a7a, לא שחור */
-  function buildMetalGradients(vb) {
-    const x1 = vb.x.toFixed(1);
-    const y1 = (vb.y + vb.h).toFixed(1);
-    const x2 = (vb.x + vb.w).toFixed(1);
-    const y2 = vb.y.toFixed(1);
-    return (
-      '<linearGradient id="' +
-      METAL_GRAD_ID +
-      '" gradientUnits="userSpaceOnUse" x1="' +
-      x1 +
-      '" y1="' +
-      y1 +
-      '" x2="' +
-      x2 +
-      '" y2="' +
-      y2 +
-      '">' +
-      '<stop offset="5%" stop-color="#8a8a8a"/>' +
-      '<stop offset="18%" stop-color="#b4b4b4"/>' +
-      '<stop offset="30%" stop-color="#e6e6e6"/>' +
-      '<stop offset="40%" stop-color="#9e9e9e"/>' +
-      '<stop offset="52%" stop-color="#b0b0b0"/>' +
-      '<stop offset="64%" stop-color="#d8d8d8"/>' +
-      '<stop offset="76%" stop-color="#f0f0f0"/>' +
-      '<stop offset="86%" stop-color="#a8a8a8"/>' +
-      '<stop offset="95%" stop-color="#7a7a7a"/>' +
-      '</linearGradient>'
-    );
-  }
-
-  /** כסף מלוטש — גרדיאנט נשאר; ברק כמו prototype.html (blur + specular) */
-  function metalSpecularPass(inName) {
-    return (
-      '<feGaussianBlur in="' +
-      inName +
-      '" stdDeviation="2.2" result="metalBlur"/>' +
-      '<feSpecularLighting in="metalBlur" surfaceScale="7" specularConstant="1.15" specularExponent="42" lighting-color="#ffffff" result="metalSpec">' +
+      '<filter id="' +
+      filterId +
+      '"' +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      ' color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="metalSpec" in2="' +
-      inName +
-      '" operator="in" result="metalSpecClip"/>' +
-      '<feComposite in="' +
-      inName +
-      '" in2="metalSpecClip" operator="arithmetic" k1="0" k2="1" k3="0.72" k4="0" result="metalGloss"/>'
-    );
-  }
-
-  /** שכבה 2 — גרדיאנט כסף + ברק + חספוס גיל */
-  function buildMetalFilter(filterId, style) {
-    const bump = metalAgeBump(style);
-    if (bump.scale <= 0) {
-      return (
-        '<filter id="' +
-        filterId +
-        '" color-interpolation-filters="sRGB">' +
-        metalSpecularPass('SourceGraphic') +
-        '</filter>'
-      );
-    }
-    return (
-      '<filter id="' +
-      filterId +
-      '"' +
-      filterRegionAttrs(style.surfaceScale, bump.scale) +
-      ' color-interpolation-filters="sRGB">' +
-      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
-      metalSpecularPass('rough') +
-      '</filter>'
-    );
-  }
-
-  /** ערבוב צבע תחום עם קרם — זכוכית חלבית */
-  function milkyStrokeColor(hex) {
-    const parse = (h) => {
-      const s = String(h || '#D7A2B4').replace('#', '');
-      return {
-        r: parseInt(s.slice(0, 2), 16),
-        g: parseInt(s.slice(2, 4), 16),
-        b: parseInt(s.slice(4, 6), 16)
-      };
-    };
-    const c = parse(hex);
-    const cream = { r: 252, g: 246, b: 220 };
-    const t = 0.52;
-    const mix = (a, b) => Math.round(a * (1 - t) + b * t);
-    const r = mix(c.r, cream.r);
-    const g = mix(c.g, cream.g);
-    const b = mix(c.b, cream.b);
-    return (
-      '#' +
-      r.toString(16).padStart(2, '0') +
-      g.toString(16).padStart(2, '0') +
-      b.toString(16).padStart(2, '0')
-    );
-  }
-
-  /** שכבה 3 — זכוכית חלבית מבריקה + חספוס גיל + קוצים בזכר */
-  function buildMilkyGlassFilter(filterId, style) {
-    const bump = ageBumpByGender(style);
-    const gloss =
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="11" specularConstant="0.58" specularExponent="20" lighting-color="#fff9ed" result="milkySoft">' +
-      '<fePointLight x="310" y="170" z="130"/>' +
-      '</feSpecularLighting>' +
-      '<feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.38" specularExponent="48" lighting-color="#ffffff" result="milkyTight">' +
-      '<fePointLight x="270" y="95" z="210"/>' +
-      '</feSpecularLighting>' +
-      '<feBlend in="milkySoft" in2="milkyTight" mode="screen" result="gloss"/>' +
-      '<feComponentTransfer in="gloss" result="glossDim">' +
-      '<feFuncA type="linear" slope="0.58" intercept="0"/>' +
-      '</feComponentTransfer>' +
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
       '<feMerge result="glossed">' +
       '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="glossDim"/>' +
-      '</feMerge>';
-    if (bump.scale <= 0) {
-      return (
-        '<filter id="' +
-        filterId +
-        '" color-interpolation-filters="sRGB">' +
-        gloss +
-        '</filter>'
-      );
-    }
-    return (
-      '<filter id="' +
-      filterId +
-      '"' +
-      filterRegionAttrs(style.surfaceScale, bump.scale) +
-      ' color-interpolation-filters="sRGB">' +
-      gloss +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>' +
       '<feTurbulence type="' +
       bump.type +
       '" baseFrequency="' +
@@ -788,15 +659,14 @@
     );
   }
 
-  function buildSvgDefs(style2, style3, vb) {
+  function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] chrome SVG · occupation:', style2.occupationKey);
-      if (vb) defs += buildMetalGradients(vb);
-      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
+      console.log('[layer2] combined filter · occupation:', style2.occupationKey);
+      defs += buildCombinedFilter(FILTER_ID_LAYER2, style2);
     }
     console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
-    defs += buildMilkyGlassFilter(FILTER_ID_LAYER3, style3);
+    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
     defs += '</defs>';
     return defs;
   }
@@ -842,9 +712,9 @@
 
   function effectLabel(style) {
     if (style.layer === 2) {
-      const bump = metalAgeBump(style);
+      const bump = ageBumpByGender(style);
       return (
-        'chrome · ' +
+        'combined · ' +
         (style.ageTexture || 'gloss') +
         ' · ' +
         bump.type +
@@ -905,15 +775,10 @@
     }
   }
 
-  function metalStrokePaint(style) {
-    if (style.metalGradient) return 'url(#' + METAL_GRAD_ID + ')';
-    return style.strokeColor;
-  }
-
   function strokeAttrs(style, width, filterId) {
     let attrs =
       'fill="none" stroke="' +
-      metalStrokePaint(style) +
+      style.strokeColor +
       '" stroke-width="' +
       width +
       '" stroke-linecap="' +
@@ -921,9 +786,6 @@
       '" stroke-linejoin="' +
       style.linejoin +
       '"';
-    if (style.strokeOpacity != null && style.strokeOpacity < 1) {
-      attrs += ' stroke-opacity="' + style.strokeOpacity + '"';
-    }
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
@@ -1499,7 +1361,7 @@
     const surfaceScale = Math.max(style3.surfaceScale || 0, style2?.surfaceScale || 0);
     /** כמו prototype.html — חיתוך viewBox לפי תוכן = ממורכז בפריים */
     const vb = viewBoxForPlacements(allPlacements, surfaceScale);
-    const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3, vb);
+    const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3);
 
     let alignDx = 0;
     let alignDy = 0;
@@ -1542,7 +1404,7 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · SVG metal · ' +
+        '<strong>שכבה 2 (שם) · combined · ' +
           style2.occupationKey +
           '/' +
           style2.familyStatus +
@@ -1625,7 +1487,7 @@
       el = document.createElement('div');
       el.id = 'renderSpinner';
       el.className = 'render-spinner';
-      el.innerHTML = '<div class="spinner-ring"></div><span>מעבד Three.js…</span>';
+      el.innerHTML = '<div class="spinner-ring"></div><span>מעבד PBR תלת־ממד…</span>';
       container.appendChild(el);
     }
     el.hidden = !show;
@@ -2172,15 +2034,43 @@
         layer3: style3
       });
 
-      setResultSvg(svg);
       showDebug(layer2, layer3, style2, style3);
 
-      let msg = 'SVG · שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      let renderStats = null;
+      let renderFail = null;
+      showRenderSpinner(true);
+      try {
+        const { renderThreePbrAmulet } = await import('./three-pbr-amulet.js');
+        renderStats = await renderThreePbrAmulet({
+          svg,
+          style2,
+          style3,
+          container: document.getElementById('amuletContainer'),
+          domainHex: domainStrokeHex(style3),
+          ageNum: params.age
+        });
+      } catch (renderErr) {
+        console.warn('[prototype-v2] PBR failed, SVG fallback:', renderErr);
+        renderFail = renderErr.message;
+        setResultSvg(svg);
+      } finally {
+        showRenderSpinner(false);
+      }
+
+      let msg = renderStats
+        ? 'PBR 3D · שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor
+        : 'SVG · שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      if (renderFail) msg += ' | PBR נכשל: ' + renderFail;
       if (nameLetters.length) {
         msg += ' · שכבה 2 (שם): ' + nameLetters.join(' → ');
         if (layer2?.skipped?.length) msg += ' | L2 ללא חיבור: ' + layer2.skipped.join(' ');
       }
-      if (style2) msg += ' | L2=כסף SVG';
+      if (renderStats) {
+        msg += ' | L2=' + renderStats.tubesL2 + ' L3=' + renderStats.tubesL3;
+        msg += ' rough=' + renderStats.metalRough.toFixed(2);
+      } else if (style2) {
+        msg += ' | L2=combined';
+      }
       msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
       msg += ' spacing=' + style3.spacing.toFixed(2);
       if (style2) {
