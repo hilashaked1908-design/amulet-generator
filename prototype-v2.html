@@ -163,17 +163,9 @@
         </div>
       </div>
 
-      <div class="field" data-group="age">
-        <label>גיל</label>
-        <div class="btn-row">
-          <button type="button" class="opt-btn" data-value="under18">−18</button>
-          <button type="button" class="opt-btn" data-value="18-24">18–24</button>
-          <button type="button" class="opt-btn active" data-value="25-34">25–34</button>
-          <button type="button" class="opt-btn" data-value="35-44">35–44</button>
-          <button type="button" class="opt-btn" data-value="45-59">45–59</button>
-          <button type="button" class="opt-btn" data-value="60-70">60–70</button>
-          <button type="button" class="opt-btn" data-value="70plus">70+</button>
-        </div>
+      <div class="field">
+        <label for="ageInput">גיל</label>
+        <input type="number" id="ageInput" min="1" max="120" value="25" placeholder="גיל" style="width:80px; font-size:16px; text-align:center; padding:8px;">
       </div>
 
       <div class="field" data-group="gender">
@@ -280,16 +272,10 @@
   const FILTER_ID_LAYER3 = 'combined-layer3';
   const LAYER2_SCALE = 1.25;
 
-  /** גיל → bump roughness only (gloss is always in combined filter) */
-  const AGE_BUMP_SCALE = {
-    under18: 0,
-    '18-24': 2,
-    '25-34': 4,
-    '35-44': 6,
-    '45-59': 9,
-    '60-70': 15,
-    '70plus': 22
-  };
+  function ageToSurfaceScale(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    return Math.round((a / 120) * 20);
+  }
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -406,7 +392,7 @@
   const params = {
     amuletType: 'protection',
     domain: 'love',
-    age: '25-34',
+    age: 25,
     gender: 'female',
     urgency: 'now',
     familyStatus: 'single',
@@ -427,7 +413,7 @@
   function readParams() {
     params.amuletType = getGroupValue('amuletType') || 'protection';
     params.domain = getGroupValue('domain') || 'love';
-    params.age = getGroupValue('age') || '25-34';
+    params.age = Math.max(1, Math.min(120, Number(document.getElementById('ageInput').value) || 25));
     params.gender = getGroupValue('gender') || 'female';
     params.urgency = getGroupValue('urgency') || 'now';
     params.familyStatus = getGroupValue('familyStatus') || 'single';
@@ -457,7 +443,7 @@
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
     const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
 
-    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    const surfaceScale = ageToSurfaceScale(p.age);
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     return {
@@ -484,7 +470,7 @@
   function visualStyleLayer2(p) {
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
-    const surfaceScale = AGE_BUMP_SCALE[p.age] ?? 4;
+    const surfaceScale = ageToSurfaceScale(p.age);
     const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
     const statusSpacing = getStatusSpacing(p.familyStatus);
     const moodKey = p.mood || 'joy';
@@ -511,22 +497,13 @@
     };
   }
 
-  /**
-   * זכר: קוצניות קבועה לפי גיל (לא תלויה ב-surfaceScale).
-   * צעיר = עור חלק + קוצים; מבוגר = חספוס + קוצים חזקים יותר.
-   */
-  const MALE_BUMP_BY_AGE = {
-    under18: { scale: 8, baseFrequency: '0.15', numOctaves: 1 },
-    '18-24': { scale: 9, baseFrequency: '0.13', numOctaves: 2 },
-    '25-34': { scale: 10, baseFrequency: '0.12', numOctaves: 2 },
-    '35-44': { scale: 11, baseFrequency: '0.11', numOctaves: 2 },
-    '45-59': { scale: 12, baseFrequency: '0.10', numOctaves: 2 },
-    '60-70': { scale: 14, baseFrequency: '0.09', numOctaves: 2 },
-    '70plus': { scale: 16, baseFrequency: '0.08', numOctaves: 2 }
-  };
-
+  /** זכר: קוצניות מינימלית 8 + חספוס גיל רציף */
   function maleBumpProfile(age) {
-    return MALE_BUMP_BY_AGE[age] || MALE_BUMP_BY_AGE['25-34'];
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    const scale = Math.max(8, ageToSurfaceScale(age));
+    const baseFrequency = (0.08 + ((120 - a) / 120) * 0.07).toFixed(3);
+    const numOctaves = a < 18 ? 1 : 2;
+    return { scale, baseFrequency, numOctaves };
   }
 
   /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
@@ -1424,6 +1401,11 @@
       btn.disabled = false;
     }
   }
+
+  document.getElementById('ageInput').addEventListener('input', () => {
+    readParams();
+    composeAmulet();
+  });
 
   document.getElementById('createBtn').addEventListener('click', composeAmulet);
 
