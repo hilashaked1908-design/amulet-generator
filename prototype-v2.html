@@ -511,30 +511,22 @@
     };
   }
 
-  /** זכר: פרופיל לפי גיל — 60–70 קוצני; 70+ עוד יותר, תדירות גבוהה כדי לשמור צורה. */
-  function maleBumpProfile(age, surfaceScale) {
-    const s = surfaceScale;
-    if (s <= 0) {
-      return { scale: 0, baseFrequency: '0.10', numOctaves: 2 };
-    }
-    if (s <= 9) {
-      return {
-        scale: s,
-        baseFrequency: Math.max(0.08, 0.115 - s * 0.002).toFixed(3),
-        numOctaves: s < 6 ? 2 : 3
-      };
-    }
-    if (age === '70plus') {
-      return { scale: 12, baseFrequency: '0.128', numOctaves: 2 };
-    }
-    if (age === '60-70') {
-      return { scale: 9, baseFrequency: '0.108', numOctaves: 2 };
-    }
-    return {
-      scale: Math.min(10, Math.round(8 + (s - 9) * 0.28)),
-      baseFrequency: '0.10',
-      numOctaves: 2
-    };
+  /**
+   * זכר: קוצניות קבועה לפי גיל (לא תלויה ב-surfaceScale).
+   * צעיר = עור חלק + קוצים; מבוגר = חספוס + קוצים חזקים יותר.
+   */
+  const MALE_BUMP_BY_AGE = {
+    under18: { scale: 8, baseFrequency: '0.15', numOctaves: 1 },
+    '18-24': { scale: 9, baseFrequency: '0.13', numOctaves: 2 },
+    '25-34': { scale: 10, baseFrequency: '0.12', numOctaves: 2 },
+    '35-44': { scale: 11, baseFrequency: '0.11', numOctaves: 2 },
+    '45-59': { scale: 12, baseFrequency: '0.10', numOctaves: 2 },
+    '60-70': { scale: 14, baseFrequency: '0.09', numOctaves: 2 },
+    '70plus': { scale: 16, baseFrequency: '0.08', numOctaves: 2 }
+  };
+
+  function maleBumpProfile(age) {
+    return MALE_BUMP_BY_AGE[age] || MALE_BUMP_BY_AGE['25-34'];
   }
 
   /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
@@ -551,7 +543,7 @@
     }
     const g = style.gender || 'female';
     if (g === 'male') {
-      const profile = maleBumpProfile(style.age, s);
+      const profile = maleBumpProfile(style.age);
       return {
         type: 'turbulence',
         baseFrequency: profile.baseFrequency,
