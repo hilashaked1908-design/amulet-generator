@@ -270,12 +270,9 @@
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
-  const FILTER_ID_LAYER2 = 'combined-layer2';
-  const FILTER_ID_LAYER3 = 'combined-layer3';
-  const FILTER_ID_LAYER2_MATERIAL = 'material-layer2';
-  const FILTER_ID_LAYER3_MATERIAL = 'material-layer3';
+  const FILTER_ID_LAYER2 = 'metal';
+  const FILTER_ID_LAYER3 = 'ceramic';
   const PATH_MAIN_STROKE_WIDTH = 45;
-  const PATH_CERAMIC_STROKE_WIDTH = 42;
   /** שכבה 2 (שם) — מעט קטנה יותר מהקדמית, ממורכזת מאחור */
   const LAYER2_SCALE = 0.91125;
 
@@ -585,97 +582,59 @@
     );
   }
 
-  function buildGlossClipMerge() {
-    return (
-      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="glossClip"/>' +
-      '</feMerge>'
-    );
-  }
-
-  /** מיזוג ברק על הצורה אחרי displacement */
-  function buildGlossClipMergeOn(baseName) {
-    return (
-      '<feComposite in="gloss" in2="' +
-      baseName +
-      '" operator="in" result="glossClip"/>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="' +
-      baseName +
-      '"/>' +
-      '<feMergeNode in="glossClip"/>' +
-      '</feMerge>' +
-      '<feComposite in="glossed" in2="' +
-      baseName +
-      '" operator="in"/>'
-    );
-  }
-
-  /** שכבה 2 — כרום + חספוס גיל/מגדר/עיסוק, ואז ברק */
-  function buildChromeFilter(filterId, style) {
+  /** שכבה 2 — מתכת + חספוס קיים (displacement לפני metal) */
+  function buildMetalFilter(filterId, style) {
     const bump = ageBumpByGender(style);
+    const mask = bump.scale > 0 ? 'rough' : 'SourceGraphic';
+    const disp =
+      bump.scale > 0 ? buildBumpDisplacement(bump, 'SourceGraphic', 'rough') : '';
     return (
       '<filter id="' +
       filterId +
       '"' +
       filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
-      '<feGaussianBlur in="rough" stdDeviation="2" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="12" specularConstant="2" specularExponent="80" lighting-color="white" result="gloss">' +
-      '<fePointLight x="200" y="100" z="150"/>' +
+      disp +
+      '<feFlood flood-color="#909090" result="base"/>' +
+      '<feComposite in="base" in2="' +
+      mask +
+      '" operator="in" result="colored"/>' +
+      '<feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="20" specularConstant="4" specularExponent="200" lighting-color="#ffffff" result="spec">' +
+      '<fePointLight x="150" y="50" z="200"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMergeOn('rough') +
+      '<feComposite in="spec" in2="' +
+      mask +
+      '" operator="in" result="specMasked"/>' +
+      '<feMerge>' +
+      '<feMergeNode in="colored"/>' +
+      '<feMergeNode in="specMasked"/>' +
+      '</feMerge>' +
       '</filter>'
     );
   }
 
-  /** שכבה 2 — מעבר חומר כסף (מעל הרינדור הקיים) */
-  function buildSilverMaterialFilter(filterId) {
-    return (
-      '<filter id="' +
-      filterId +
-      '" color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur stdDeviation="0.5" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="18" specularConstant="3" specularExponent="120" lighting-color="#ffffff" result="spec">' +
-      '<fePointLight x="180" y="60" z="100"/>' +
-      '</feSpecularLighting>' +
-      '<feComposite in="spec" in2="SourceGraphic" operator="in"/>' +
-      '</filter>'
-    );
-  }
-
-  /** שכבה 3 — מעבר חומר קרמי חם (מעל הרינדור הקיים) */
-  function buildCeramicMaterialFilter(filterId) {
-    return (
-      '<filter id="' +
-      filterId +
-      '" color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur stdDeviation="3" result="blur"/>' +
-      '<feDiffuseLighting in="blur" surfaceScale="6" diffuseConstant="1.5" lighting-color="#fff8e8" result="diff">' +
-      '<feDistantLight azimuth="135" elevation="50"/>' +
-      '</feDiffuseLighting>' +
-      '<feComposite in="diff" in2="SourceGraphic" operator="in"/>' +
-      '</filter>'
-    );
-  }
-
-  /** שכבה 3 — זכוכית חלבית חלקה (ללא חספוס גיל) */
-  function buildMilkyGlassFilter(filterId, style) {
+  /** שכבה 3 — קרמיקה/זכוכית */
+  function buildCeramicFilter(filterId) {
     return (
       '<filter id="' +
       filterId +
       '"' +
       filterRegionAttrs(0, 0) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="6" specularConstant="0.8" specularExponent="20" lighting-color="white" result="gloss">' +
-      '<fePointLight x="300" y="150" z="200"/>' +
+      '<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>' +
+      '<feDiffuseLighting in="blur" surfaceScale="10" diffuseConstant="2" lighting-color="#fff8e0" result="diff">' +
+      '<feDistantLight azimuth="135" elevation="45"/>' +
+      '</feDiffuseLighting>' +
+      '<feComposite in="diff" in2="SourceGraphic" operator="in" result="diffMasked"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="10" specularConstant="1" specularExponent="30" lighting-color="#ffffff" result="spec">' +
+      '<feDistantLight azimuth="135" elevation="45"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMerge() +
-      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
+      '<feComposite in="spec" in2="SourceGraphic" operator="in" result="specMasked"/>' +
+      '<feMerge>' +
+      '<feMergeNode in="diffMasked"/>' +
+      '<feMergeNode in="specMasked"/>' +
+      '</feMerge>' +
       '</filter>'
     );
   }
@@ -683,13 +642,11 @@
   function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] chrome · occupation:', style2.occupationKey);
-      defs += buildChromeFilter(FILTER_ID_LAYER2, style2);
-      defs += buildSilverMaterialFilter(FILTER_ID_LAYER2_MATERIAL);
+      console.log('[layer2] metal · occupation:', style2.occupationKey);
+      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
     }
-    console.log('[layer3] milky glass · domain:', style3.domainKey);
-    defs += buildMilkyGlassFilter(FILTER_ID_LAYER3, style3);
-    defs += buildCeramicMaterialFilter(FILTER_ID_LAYER3_MATERIAL);
+    console.log('[layer3] ceramic · domain:', style3.domainKey);
+    defs += buildCeramicFilter(FILTER_ID_LAYER3);
     defs += '</defs>';
     return defs;
   }
@@ -743,9 +700,9 @@
         bump.baseFrequency +
         '×' +
         bump.scale;
-      return 'chrome · ' + (style.ageTexture || 'gloss') + ' · ' + fx + ' · ' + layout + ' · ' + style.linecap;
+      return 'metal · ' + (style.ageTexture || 'gloss') + ' · ' + fx + ' · ' + layout + ' · ' + style.linecap;
     }
-    return style.amuletType + '/' + style.domainKey + ' · milky-glass · ' + layout + ' · ' + style.linecap;
+    return style.amuletType + '/' + style.domainKey + ' · ceramic · ' + layout + ' · ' + style.linecap;
   }
 
   /**
@@ -815,36 +772,13 @@
   function pathLayers(pathMarkup, style, filterId) {
     const clean = sanitizePathsInner(pathMarkup);
     const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
-    let out =
+    return (
       '<g class="path-layers"><g class="path-main" ' +
       strokeAttrs(style, PATH_MAIN_STROKE_WIDTH, mainFid) +
       '>' +
       clean +
-      '</g>';
-    if (style.layer === 2) {
-      out +=
-        '<g class="path-material-silver" ' +
-        strokeAttrs(style, PATH_MAIN_STROKE_WIDTH, null, {
-          color: '#b8b8c8',
-          opacity: 0.6,
-          filterId: FILTER_ID_LAYER2_MATERIAL
-        }) +
-        '>' +
-        clean +
-        '</g>';
-    } else if (style.layer === 3) {
-      out +=
-        '<g class="path-material-ceramic" ' +
-        strokeAttrs(style, PATH_CERAMIC_STROKE_WIDTH, null, {
-          color: '#f5f0dd',
-          opacity: 0.5,
-          filterId: FILTER_ID_LAYER3_MATERIAL
-        }) +
-        '>' +
-        clean +
-        '</g>';
-    }
-    return out + '</g>';
+      '</g></g>'
+    );
   }
 
   function placementYVariants(y, gender, nbOffset) {
@@ -1451,7 +1385,7 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · chrome · ' +
+        '<strong>שכבה 2 (שם) · metal · ' +
           style2.occupationKey +
           ' /' +
           style2.familyStatus +
@@ -1486,7 +1420,7 @@
           '/' +
           style3.domainKey +
           ' age=' +
-          'milky-glass | cap=' +
+          'ceramic | cap=' +
           style3.linecap +
           '/' +
           style3.linejoin +
@@ -1594,10 +1528,10 @@
         if (layer2?.skipped?.length) msg += ' | L2 ללא חיבור: ' + layer2.skipped.join(' ');
       }
       msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
-      msg += ' | L3 glass spacing=' + style3.spacing.toFixed(2);
+      msg += ' | L3 ceramic spacing=' + style3.spacing.toFixed(2);
       if (style2) {
         const bump2 = ageBumpByGender(style2);
-        msg += ' | L2 chrome bump×' + bump2.scale + ' ' + style2.strokeColor;
+        msg += ' | L2 metal bump×' + bump2.scale + ' ' + style2.strokeColor;
         msg += ' ' + style2.moodKey;
         msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
