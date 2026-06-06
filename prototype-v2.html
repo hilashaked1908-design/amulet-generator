@@ -580,48 +580,77 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildGlossClipMerge() {
+  function buildBumpDisplacement(bump, inName, resultName) {
     return (
-      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="SourceGraphic"/>' +
-      '<feMergeNode in="glossClip"/>' +
-      '</feMerge>'
+      '<feTurbulence type="' +
+      bump.type +
+      '" baseFrequency="' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="' +
+      inName +
+      '" in2="noise" scale="' +
+      bump.scale +
+      '" xChannelSelector="R" yChannelSelector="G" result="' +
+      resultName +
+      '"/>'
     );
   }
 
-  /** שכבה 2 — כרום מבריק */
+  /** מיזוג ברק על הצורה אחרי displacement (rough), לא על SourceGraphic המקורי */
+  function buildGlossClipMergeOn(baseName) {
+    return (
+      '<feComposite in="gloss" in2="' +
+      baseName +
+      '" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="' +
+      baseName +
+      '"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>' +
+      '<feComposite in="glossed" in2="' +
+      baseName +
+      '" operator="in"/>'
+    );
+  }
+
+  /** שכבה 2 — כרום + חספוס/קוצים (מגדר/עיסוק) קודם, ואז ברק מתכתי */
   function buildChromeFilter(filterId, style) {
+    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, 0) +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
+      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
+      '<feGaussianBlur in="rough" stdDeviation="2" result="blur"/>' +
       '<feSpecularLighting in="blur" surfaceScale="12" specularConstant="2" specularExponent="80" lighting-color="white" result="gloss">' +
       '<fePointLight x="200" y="100" z="150"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMerge() +
-      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
+      buildGlossClipMergeOn('rough') +
       '</filter>'
     );
   }
 
-  /** שכבה 3 — זכוכית חלבית רכה */
+  /** שכבה 3 — זכוכית חלבית + חספוס גיל קודם, ואז ברק רך */
   function buildMilkyGlassFilter(filterId, style) {
+    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, 0) +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>' +
+      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
+      '<feGaussianBlur in="rough" stdDeviation="1" result="blur"/>' +
       '<feSpecularLighting in="blur" surfaceScale="6" specularConstant="0.8" specularExponent="20" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMerge() +
-      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
+      buildGlossClipMergeOn('rough') +
       '</filter>'
     );
   }
