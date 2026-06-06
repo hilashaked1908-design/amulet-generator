@@ -102,28 +102,37 @@
       gap: 12px;
     }
     #amuletContainer {
-      background: #fff;
+      background: #ffffff;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
       width: min(680px, 100%);
-    }
-    .amulet-stack {
       position: relative;
-      width: 100%;
-      aspect-ratio: 1;
-    }
-    .amulet-stack canvas,
-    .amulet-stack svg.layer3-overlay {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-    .amulet-stack svg.layer3-overlay {
-      pointer-events: none;
+      min-height: 200px;
     }
     #amuletContainer svg,
     #amuletContainer canvas { display: block; max-width: 100%; height: auto; }
+    .render-spinner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.88);
+      z-index: 2;
+      gap: 12px;
+      color: #444;
+      font-size: 0.85rem;
+    }
+    .render-spinner[hidden] { display: none !important; }
+    .spinner-ring {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #ddd;
+      border-top-color: #2a5;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     #status {
       font-size: 0.85rem;
       color: #444;
@@ -152,8 +161,8 @@
 </head>
 <body>
   <header>
-    <h1>אב-טיפוס v2 — שכבת שם + שכבת כוונה</h1>
-    <p>שכבה 2: אותיות השם · שכבה 3: משפט כוונה · glyphs/ + connections.json</p>
+    <h1>אב-טיפוס v2 — שכבת שם + שכבת כוונה <small style="font-weight:400;color:#8cf">[three.js r128]</small></h1>
+    <p>שכבה 2: כסף מתכתי 3D · שכבה 3: קרמיקה/זכוכית 3D · glyphs/ + connections.json</p>
   </header>
 
   <div class="layout">
@@ -249,8 +258,9 @@
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint">שכבה 2: שם + סטטוס + עיסוק + מצב רוח (×1.25) · שכבה 3: כוונה + תחום + גיל + מגדר + דחיפות<br>
-        פתחי דרך <code>http://localhost:8080/prototype-v2.html</code></p>
+      <p class="hint">רינדור סופי: <strong>Three.js r128</strong> (TubeGeometry + MeshPhysicalMaterial) · גיבוי SVG: <code>prototype-v2.pre-metal.html</code><br>
+        <strong>קובץ זה:</strong> <code>http://localhost:8080/prototype-v2.html</code> ·
+        גרסת SVG מבריק: <a href="/prototype-v2-gloss.html">prototype-v2-gloss.html</a></p>
     </aside>
 
     <main class="preview">
@@ -281,29 +291,20 @@
   const MAX_LETTERS = 8;
   const HUB_OVERLAP_DIST = 80;
   const DEFAULT_GLYPH_SIZE = 150;
-  /** Normalized path stroke in glyph viewBox units (matches א1.svg, ב2.svg, etc.) */
-  const GLYPH_PATH_STROKE_WIDTH = 46;
 
-  const BG_WHITE = '#ffffff';
+  const AMULET_BG = '#ffffff';
+  const METAL_GRAD_ID = 'metalChrome';
   const VIEWBOX_PAD = 45;
   const FILTER_ID_COMBINED = 'combined';
   const FILTER_ID_LAYER2 = 'metal';
-  const FILTER_ID_LAYER3 = 'ceramic';
-  const PATH_MAIN_STROKE_WIDTH = 45;
-  /** שכבה 2 (שם) — מעט קטנה יותר מהקדמית, ממורכזת מאחור */
-  const LAYER2_SCALE = 0.91125;
+  const FILTER_ID_LAYER3 = 'combined-layer3';
+  /** שכבה 2 (שם) — אותו גודל כמו שכבה 3 */
+  const LAYER2_SCALE = 1;
 
   function ageToSurfaceScale(age) {
     const a = Math.max(1, Math.min(120, Number(age) || 25));
     return Math.round((a / 120) * 20);
   }
-
-  function ageToMetalRoughness(age) {
-    const a = Math.max(1, Math.min(120, Number(age) || 25));
-    return 0.05 + (a / 120) * 0.35;
-  }
-
-  let layer2ThreeState = null;
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -349,13 +350,13 @@
     now: 0.5
   };
 
-  /** שכבה 2 — מרווח עדין לפי סטטוס (טווח צר כמו דחיפות — הקמע נשאר צורה אחת) */
+  /** שכבה 2 — מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז) */
   const STATUS_SPACING = {
-    married: 0.55,
-    couple: 0.72,
-    widowed: 0.88,
-    single: 1.0,
-    divorced: 1.2
+    single: 1.8,
+    divorced: 2.0,
+    widowed: 1.3,
+    couple: 1.0,
+    married: 0.7
   };
 
   /** שכבה 2 — צבע קו לפי מצב רוח */
@@ -368,13 +369,13 @@
     love: '#D4748C'
   };
 
-  /** שכבה 2 — סגנון קו + טקסטורת גימור לפי עיסוק */
+  /** שכבה 2 — סגנון קו ומרקם לפי עיסוק */
   const OCCUPATION_VISUAL = {
     humanities: {
       linecap: 'round',
       linejoin: 'round',
       miterlimit: null,
-      customBump: null
+      customBump: { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2, scaleFactor: 1 }
     },
     technical: {
       linecap: 'square',
@@ -456,30 +457,6 @@
     return STATUS_SPACING[key] != null ? STATUS_SPACING[key] : STATUS_SPACING.single;
   }
 
-  function parseHexColor(hex) {
-    const h = (hex || '#000000').replace('#', '');
-    return {
-      r: parseInt(h.slice(0, 2), 16),
-      g: parseInt(h.slice(2, 4), 16),
-      b: parseInt(h.slice(4, 6), 16)
-    };
-  }
-
-  function mixHexColor(a, b, t) {
-    const ca = parseHexColor(a);
-    const cb = parseHexColor(b);
-    const mix = (x, y) => Math.round(x + (y - x) * t);
-    const r = mix(ca.r, cb.r);
-    const g = mix(ca.g, cb.g);
-    const bl = mix(ca.b, cb.b);
-    return (
-      '#' +
-      r.toString(16).padStart(2, '0') +
-      g.toString(16).padStart(2, '0') +
-      bl.toString(16).padStart(2, '0')
-    );
-  }
-
   function visualStyleLayer3(p) {
     const strokeByDomain = {
       love: '#D7A2B4',
@@ -493,8 +470,10 @@
     const spacing = URGENCY_SPACING[p.urgency] ?? 1.0;
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const intent = p.amuletType === 'summoning' ? 'summoning' : 'protection';
-    const domainColor = strokeByDomain[p.domain] || strokeByDomain.love;
-    const strokeColor = mixHexColor(domainColor, '#ffffff', 0.6);
+    const strokeColor = strokeByDomain[p.domain] || strokeByDomain.love;
+
+    const surfaceScale = ageToSurfaceScale(p.age);
+    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
 
     return {
       layer: 3,
@@ -503,18 +482,20 @@
       intent,
       strokeColor,
       strokeOpacity: 1,
-      layerOpacity: 0.85,
       spacing,
       amuletScale: gender.scale,
       linecap: gender.linecap,
       linejoin: gender.linejoin,
       miterlimit: gender.miterlimit,
+      ageTexture,
+      surfaceScale,
+      age: p.age,
       gender: p.gender,
       filterId: FILTER_ID_LAYER3
     };
   }
 
-  /** שכבה 2 — שם: מרווח לפי סטטוס, קו/מרקם לפי עיסוק, צבע לפי מצב רוח */
+  /** שכבה 2 — שם: כסף ניטרלי, חספוס לפי גיל+עיסוק בלבד */
   function visualStyleLayer2(p) {
     const gender = GENDER_VISUAL[p.gender] || GENDER_VISUAL.female;
     const occ = OCCUPATION_VISUAL[p.occupation] || OCCUPATION_VISUAL.humanities;
@@ -529,7 +510,7 @@
       occupationKey: p.occupation,
       moodKey,
       intent: 'protection',
-      strokeColor: '#c0c0c0',
+      strokeColor: '#B8B8B8',
       strokeOpacity: 1,
       spacing: statusSpacing,
       amuletScale: gender.scale * LAYER2_SCALE,
@@ -541,12 +522,13 @@
       surfaceScale,
       age: p.age,
       gender: p.gender,
-      filterId: FILTER_ID_LAYER2
+      filterId: FILTER_ID_LAYER2,
+      metalGradient: true
     };
   }
 
-  /** גיל = עוצמת חספוס (שכבה 2 בלבד). מגדר משפיע על שכפול גיאומטרי, לא על bump. */
-  function ageBumpByGender(style) {
+  /** חספוס מתכת — גיל+עיסוק בלבד (מגדר = שכפול גיאומטרי, לא bump) */
+  function metalAgeBump(style) {
     const s = style.surfaceScale;
     if (style.customBump) {
       const cb = style.customBump;
@@ -565,19 +547,51 @@
     };
   }
 
-  function genderLayoutLabel(gender) {
-    if (gender === 'male') return 'mirror-h+v';
-    if (gender === 'nonbinary') return 'stack-v';
-    return 'mirror-h';
+  /** זכר: קוצניות מינימלית 8 + חספוס גיל רציף */
+  function maleBumpProfile(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    const scale = Math.max(8, ageToSurfaceScale(age));
+    const baseFrequency = (0.08 + ((120 - a) / 120) * 0.07).toFixed(3);
+    const numOctaves = a < 18 ? 1 : 2;
+    return { scale, baseFrequency, numOctaves };
   }
 
-  function nonbinaryVerticalOffset(placements) {
-    if (!placements?.length) return 90;
-    let extent = 0;
-    for (const p of placements) {
-      extent = Math.max(extent, Math.abs(p.y - CY) + p.sz * 0.55);
+  /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
+  function ageBumpByGender(style) {
+    const s = style.surfaceScale;
+    if (style.customBump) {
+      const cb = style.customBump;
+      return {
+        type: cb.type,
+        baseFrequency: cb.baseFrequency,
+        numOctaves: cb.numOctaves,
+        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
+      };
     }
-    return Math.round(Math.max(70, extent + 36));
+    const g = style.gender || 'female';
+    if (g === 'male') {
+      const profile = maleBumpProfile(style.age);
+      return {
+        type: 'turbulence',
+        baseFrequency: profile.baseFrequency,
+        numOctaves: profile.numOctaves,
+        scale: profile.scale
+      };
+    }
+    if (g === 'nonbinary') {
+      return {
+        type: 'fractalNoise',
+        baseFrequency: '0.07',
+        numOctaves: 3,
+        scale: Math.round(s * 1.35)
+      };
+    }
+    return {
+      type: 'fractalNoise',
+      baseFrequency: '0.09',
+      numOctaves: 2,
+      scale: s
+    };
   }
 
   function filterRegionAttrs(surfaceScale, bumpScale) {
@@ -606,74 +620,113 @@
     );
   }
 
-  /** שכבה 2 — מתכת + חספוס קיים (displacement לפני metal) */
+  /** גרדיאנט כסף מוברש — 45° כמו .metallic-button, שיאים = רקע הסביבה */
+  function buildMetalGradients(vb) {
+    const x1 = vb.x.toFixed(1);
+    const y1 = (vb.y + vb.h).toFixed(1);
+    const x2 = (vb.x + vb.w).toFixed(1);
+    const y2 = vb.y.toFixed(1);
+    return (
+      '<linearGradient id="' +
+      METAL_GRAD_ID +
+      '" gradientUnits="userSpaceOnUse" x1="' +
+      x1 +
+      '" y1="' +
+      y1 +
+      '" x2="' +
+      x2 +
+      '" y2="' +
+      y2 +
+      '">' +
+      '<stop offset="5%" stop-color="#4a4a4a"/>' +
+      '<stop offset="15%" stop-color="#7a7a7a"/>' +
+      '<stop offset="25%" stop-color="#a8a8a8"/>' +
+      '<stop offset="35%" stop-color="#6e6e6e"/>' +
+      '<stop offset="50%" stop-color="#585858"/>' +
+      '<stop offset="65%" stop-color="#6e6e6e"/>' +
+      '<stop offset="75%" stop-color="#a8a8a8"/>' +
+      '<stop offset="85%" stop-color="#7a7a7a"/>' +
+      '<stop offset="95%" stop-color="#4a4a4a"/>' +
+      '</linearGradient>'
+    );
+  }
+
+  /**
+   * שכבה 2 — גרדיאנט = כל המתכת; פילטר רק לחספוס גיל.
+   * feSpecularLighting על קווים עבים במרכז יוצר כתם לבן (alpha מטושטש = blob גדול).
+   */
   function buildMetalFilter(filterId, style) {
-    const bump = ageBumpByGender(style);
-    const mask = bump.scale > 0 ? 'rough' : 'SourceGraphic';
-    const disp =
-      bump.scale > 0 ? buildBumpDisplacement(bump, 'SourceGraphic', 'rough') : '';
+    const bump = metalAgeBump(style);
+    if (bump.scale <= 0) {
+      return (
+        '<filter id="' +
+        filterId +
+        '" color-interpolation-filters="sRGB">' +
+        '<feComponentTransfer>' +
+        '<feFuncR type="identity"/>' +
+        '<feFuncG type="identity"/>' +
+        '<feFuncB type="identity"/>' +
+        '<feFuncA type="identity"/>' +
+        '</feComponentTransfer></filter>'
+      );
+    }
     return (
       '<filter id="' +
       filterId +
       '"' +
       filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      disp +
-      '<feFlood flood-color="#909090" result="base"/>' +
-      '<feComposite in="base" in2="' +
-      mask +
-      '" operator="in" result="colored"/>' +
-      '<feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="20" specularConstant="4" specularExponent="200" lighting-color="#ffffff" result="spec">' +
-      '<fePointLight x="150" y="50" z="200"/>' +
-      '</feSpecularLighting>' +
-      '<feComposite in="spec" in2="' +
-      mask +
-      '" operator="in" result="specMasked"/>' +
-      '<feMerge>' +
-      '<feMergeNode in="colored"/>' +
-      '<feMergeNode in="specMasked"/>' +
-      '</feMerge>' +
+      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
       '</filter>'
     );
   }
 
-  /** שכבה 3 — קרמיקה/זכוכית */
-  function buildCeramicFilter(filterId) {
+  function buildCombinedFilter(filterId, style) {
+    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(0, 0) +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
       ' color-interpolation-filters="sRGB">' +
-      '<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>' +
-      '<feDiffuseLighting in="blur" surfaceScale="10" diffuseConstant="2" lighting-color="#fff8e0" result="diff">' +
-      '<feDistantLight azimuth="135" elevation="45"/>' +
-      '</feDiffuseLighting>' +
-      '<feComposite in="diff" in2="SourceGraphic" operator="in" result="diffMasked"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="10" specularConstant="1" specularExponent="30" lighting-color="#ffffff" result="spec">' +
-      '<feDistantLight azimuth="135" elevation="45"/>' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
+      '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      '<feComposite in="spec" in2="SourceGraphic" operator="in" result="specMasked"/>' +
-      '<feMerge>' +
-      '<feMergeNode in="diffMasked"/>' +
-      '<feMergeNode in="specMasked"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="gloss"/>' +
       '</feMerge>' +
+      '<feTurbulence type="' +
+      bump.type +
+      '" baseFrequency="' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="glossed" in2="noise" scale="' +
+      bump.scale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>'
     );
   }
 
-  function buildSvgDefs(style3) {
+  function buildSvgDefs(style2, style3, vb) {
     let defs = '<defs>';
-    console.log('[layer3] ceramic · domain:', style3.domainKey);
-    defs += buildCeramicFilter(FILTER_ID_LAYER3);
+    if (style2) {
+      console.log('[layer2] chrome SVG · occupation:', style2.occupationKey);
+      if (vb) defs += buildMetalGradients(vb);
+      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
+    }
+    console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
+    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
     defs += '</defs>';
     return defs;
   }
 
-  function assembleLayer3OverlaySvg(vb, defs, content) {
+  function assembleAmuletSvg(vb, defs, content) {
     return (
-      '<svg class="layer3-overlay" xmlns="http://www.w3.org/2000/svg" width="' +
+      '<svg id="amuletSvg" xmlns="http://www.w3.org/2000/svg" width="' +
       W +
       '" height="' +
       H +
@@ -687,128 +740,20 @@
       vb.h +
       '" preserveAspectRatio="xMidYMid meet">' +
       defs +
+      '<rect x="' +
+      vb.x +
+      '" y="' +
+      vb.y +
+      '" width="' +
+      vb.w +
+      '" height="' +
+      vb.h +
+      '" fill="' +
+      AMULET_BG +
+      '"/>' +
       content +
       '</svg>'
     );
-  }
-
-  function disposeLayer2Three() {
-    if (!layer2ThreeState) return;
-    const { renderer, meshes, material } = layer2ThreeState;
-    meshes.forEach((mesh) => {
-      mesh.geometry.dispose();
-    });
-    if (material) material.dispose();
-    if (renderer) renderer.dispose();
-    layer2ThreeState = null;
-  }
-
-  function extractSvgPathPointSets(layerContent, viewBox) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('width', String(W));
-    svg.setAttribute('height', String(H));
-    svg.setAttribute(
-      'viewBox',
-      viewBox.x + ' ' + viewBox.y + ' ' + viewBox.w + ' ' + viewBox.h
-    );
-    svg.setAttribute('xmlns', ns);
-    svg.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;pointer-events:none';
-    const wrap = document.createElementNS(ns, 'g');
-    wrap.innerHTML = layerContent;
-    svg.appendChild(wrap);
-    document.body.appendChild(svg);
-
-    const sets = [];
-    svg.querySelectorAll('path').forEach((path) => {
-      let len = 0;
-      try {
-        len = path.getTotalLength();
-      } catch (_) {
-        return;
-      }
-      if (!isFinite(len) || len < 1) return;
-      const ctm = path.getCTM();
-      if (!ctm) return;
-      const steps = Math.max(24, Math.min(140, Math.ceil(len / 5)));
-      const pts = [];
-      for (let i = 0; i <= steps; i++) {
-        const local = path.getPointAtLength((len * i) / steps);
-        const global = local.matrixTransform(ctm);
-        pts.push({ x: global.x, y: global.y });
-      }
-      if (pts.length >= 2) sets.push(pts);
-    });
-
-    document.body.removeChild(svg);
-    return sets;
-  }
-
-  function renderLayer2Three(layerContent, viewBox, age) {
-    if (typeof THREE === 'undefined') {
-      console.warn('[layer2] Three.js not loaded');
-      return;
-    }
-    disposeLayer2Three();
-
-    const canvas = document.getElementById('layer2Canvas');
-    if (!canvas || !layerContent) return;
-
-    const pathSets = extractSvgPathPointSets(layerContent, viewBox);
-    const cx = viewBox.x + viewBox.w / 2;
-    const cy = viewBox.y + viewBox.h / 2;
-    const roughness = ageToMetalRoughness(age);
-
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(W, H, false);
-    renderer.setClearColor(0xffffff, 1);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(
-      -viewBox.w / 2,
-      viewBox.w / 2,
-      viewBox.h / 2,
-      -viewBox.h / 2,
-      1,
-      2000
-    );
-    camera.position.set(0, 800, 0);
-    camera.lookAt(0, 0, 0);
-    camera.up.set(0, 0, -1);
-    camera.updateProjectionMatrix();
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x909090,
-      metalness: 1.0,
-      roughness: roughness
-    });
-    const meshes = [];
-
-    pathSets.forEach((pts) => {
-      const vectors = pts.map((p) => new THREE.Vector3(p.x - cx, 0, p.y - cy));
-      if (vectors.length === 2) {
-        vectors.push(vectors[1].clone().lerp(vectors[0], 0.5));
-      }
-      if (vectors.length < 2) return;
-      const curve = new THREE.CatmullRomCurve3(vectors);
-      const geometry = new THREE.TubeGeometry(curve, 100, 8, 8, false);
-      const mesh = new THREE.Mesh(geometry, material);
-      scene.add(mesh);
-      meshes.push(mesh);
-    });
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.42));
-    const key = new THREE.DirectionalLight(0xffffff, 0.9);
-    key.position.set(-220, 500, 120);
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-    fill.position.set(260, 500, -180);
-    scene.add(fill);
-
-    renderer.render(scene, camera);
-    layer2ThreeState = { renderer: renderer, meshes: meshes, material: material };
-    console.log('[layer2] Three.js tubes:', meshes.length, 'roughness:', roughness.toFixed(2));
   }
 
   function requireConnectionCore() {
@@ -819,26 +764,38 @@
   }
 
   function effectLabel(style) {
-    const layout = genderLayoutLabel(style.gender);
     if (style.layer === 2) {
-      const bump = ageBumpByGender(style);
-      const fx =
+      const bump = metalAgeBump(style);
+      return (
+        'chrome · ' +
+        (style.ageTexture || 'gloss') +
+        ' · ' +
         bump.type +
         '@' +
         bump.baseFrequency +
         '×' +
-        bump.scale;
-      return 'metal · ' + (style.ageTexture || 'gloss') + ' · ' + fx + ' · ' + layout + ' · ' + style.linecap;
+        bump.scale
+      );
     }
-    return style.amuletType + '/' + style.domainKey + ' · ceramic · ' + layout + ' · ' + style.linecap;
+    const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
+    const bump = ageBumpByGender(style);
+    let fx =
+      bump.type +
+      '@' +
+      bump.baseFrequency +
+      '×' +
+      bump.scale;
+    if (style.gender === 'male') {
+      fx += ' spiky-bump';
+    }
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
   }
 
   /**
-   * Normalize path stroke-width; stroke color/filter come from the unified stroke pass.
+   * Remove per-path stroke/fill so the stroke pass controls rendering.
    */
   function sanitizePathsInner(html) {
     if (!html) return '';
-    const sw = String(GLYPH_PATH_STROKE_WIDTH);
     try {
       const doc = new DOMParser().parseFromString(
         '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
@@ -848,7 +805,7 @@
       doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
         el.setAttribute('fill', 'none');
         el.removeAttribute('stroke');
-        el.setAttribute('stroke-width', sw);
+        el.removeAttribute('stroke-width');
         el.removeAttribute('stroke-linecap');
         el.removeAttribute('stroke-linejoin');
         el.removeAttribute('stroke-opacity');
@@ -857,7 +814,7 @@
             .getAttribute('style')
             .replace(/fill\s*:\s*[^;]+;?/gi, 'fill:none;')
             .replace(/stroke\s*:\s*[^;]+;?/gi, '')
-            .replace(/stroke-width\s*:\s*[^;]+;?/gi, 'stroke-width:' + sw + ';');
+            .replace(/stroke-width\s*:\s*[^;]+;?/gi, '');
           el.setAttribute('style', s);
         }
       });
@@ -866,16 +823,20 @@
     } catch (_) {
       return html
         .replace(/\sstroke\s*=\s*["'][^"']*["']/gi, '')
-        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, ' stroke-width="' + sw + '"')
+        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, '')
         .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"');
     }
   }
 
-  function strokeAttrs(style, width, filterId, overrides) {
-    const o = overrides || {};
+  function metalStrokePaint(style) {
+    if (style.metalGradient) return 'url(#' + METAL_GRAD_ID + ')';
+    return style.strokeColor;
+  }
+
+  function strokeAttrs(style, width, filterId) {
     let attrs =
       'fill="none" stroke="' +
-      (o.color != null ? o.color : style.strokeColor) +
+      metalStrokePaint(style) +
       '" stroke-width="' +
       width +
       '" stroke-linecap="' +
@@ -883,16 +844,14 @@
       '" stroke-linejoin="' +
       style.linejoin +
       '"';
-    const opacity = o.opacity != null ? o.opacity : style.strokeOpacity;
-    if (opacity != null && opacity < 1) {
-      attrs += ' stroke-opacity="' + opacity + '"';
+    if (style.strokeOpacity != null && style.strokeOpacity < 1) {
+      attrs += ' stroke-opacity="' + style.strokeOpacity + '"';
     }
     if (style.miterlimit != null) {
       attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
     }
-    const fid = o.filterId !== undefined ? o.filterId : filterId;
-    if (fid) {
-      attrs += ' filter="url(#' + fid + ')"';
+    if (filterId) {
+      attrs += ' filter="url(#' + filterId + ')"';
     }
     return attrs;
   }
@@ -902,30 +861,20 @@
     const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
     return (
       '<g class="path-layers"><g class="path-main" ' +
-      strokeAttrs(style, PATH_MAIN_STROKE_WIDTH, mainFid) +
+      strokeAttrs(style, 45, mainFid) +
       '>' +
       clean +
       '</g></g>'
     );
   }
 
-  function placementYVariants(y, gender, nbOffset) {
-    const ys = [y];
-    if (gender === 'male') ys.push(H - y);
-    if (gender === 'nonbinary') {
-      ys.push(y - nbOffset, y + nbOffset);
-    }
-    return ys;
-  }
-
-  /** Bounding box for mirrored / gender-stacked layout (includes stroke padding). */
-  function viewBoxForPlacements(placements, surfaceScale, gender) {
+  /** Bounding box for mirrored symmetric layout (includes stroke padding). */
+  function viewBoxForPlacements(placements, surfaceScale) {
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
     const extraPad = Math.min((surfaceScale || 0) * 2.5, 60);
-    const nbOffset = gender === 'nonbinary' ? nonbinaryVerticalOffset(placements) : 0;
     const bump = (x, y) => {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
@@ -934,13 +883,11 @@
     };
     for (const p of placements) {
       const r = p.sz / 2 + VIEWBOX_PAD + extraPad;
-      for (const y of placementYVariants(p.y, gender, nbOffset)) {
-        bump(p.x - r, y - r);
-        bump(p.x + r, y + r);
-        const mx = W - p.x;
-        bump(mx - r, y - r);
-        bump(mx + r, y + r);
-      }
+      bump(p.x - r, p.y - r);
+      bump(p.x + r, p.y + r);
+      const mx = W - p.x;
+      bump(mx - r, p.y - r);
+      bump(mx + r, p.y + r);
     }
     if (!isFinite(minX)) {
       return { x: 0, y: 0, w: W, h: H };
@@ -972,6 +919,65 @@
       content +
       '</g>'
     );
+  }
+
+  /** מודד מרכז ויזואלי אמיתי של שכבה (getBBox אחרי פילטרים) */
+  function measureContentBBox(content, vb, defsHtml) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="' +
+        vb.x +
+        ' ' +
+        vb.y +
+        ' ' +
+        vb.w +
+        ' ' +
+        vb.h +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        content +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return { cx: CX, cy: CY };
+    const svg = doc.documentElement;
+    svg.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(svg);
+    const root = doc.getElementById('measure-root');
+    let bb;
+    try {
+      bb = root.getBBox();
+    } catch (_) {
+      bb = { x: CX, y: CY, width: 0, height: 0 };
+    }
+    document.body.removeChild(svg);
+    return { cx: bb.x + bb.width / 2, cy: bb.y + bb.height / 2 };
+  }
+
+  function alignLayer2ToLayer3(layer2Content, layer3Content, vb, defsHtml) {
+    const c2 = measureContentBBox(layer2Content, vb, defsHtml);
+    const c3 = measureContentBBox(layer3Content, vb, defsHtml);
+    const dx = c3.cx - c2.cx;
+    const dy = c3.cy - c2.cy;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      return { content: layer2Content, dx: 0, dy: 0 };
+    }
+    return {
+      content:
+        '<g class="layer-aligned" transform="translate(' +
+        dx.toFixed(2) +
+        ',' +
+        dy.toFixed(2) +
+        ')">' +
+        layer2Content +
+        '</g>',
+      dx,
+      dy
+    };
   }
 
   let composeBusy = false;
@@ -1064,14 +1070,12 @@
   }
 
   async function loadGlyphSvg(letter) {
-    const url =
-      GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter)) + '?t=' + Date.now();
-    const res = await fetch(url, { cache: 'no-store' });
+    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
+    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
+    const res = await fetch(url);
     if (!res.ok) throw new Error('חסר SVG: ' + letter);
-    const text = await res.text();
-    glyphSvgCache[letter] = text;
-    delete parsedGlyphCache[letter];
-    return text;
+    glyphSvgCache[letter] = await res.text();
+    return glyphSvgCache[letter];
   }
 
   function parseGlyphSvg(svgText) {
@@ -1090,6 +1094,7 @@
   }
 
   async function getParsedGlyph(letter) {
+    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
     const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
     parsedGlyphCache[letter] = parsed;
     return parsed;
@@ -1330,26 +1335,6 @@
     return '<g class="amulet-glyphs">' + pathLayers(pathsMarkup, style, filterId) + '</g>';
   }
 
-  /** הזזת שכבת שם למרכז הקנבס (ממוצע מיקומי האותיות הגלויות). */
-  function centerLayerGroup(markup, placements) {
-    if (!markup || !placements?.length) return markup;
-    const n = placements.length;
-    const meanX = placements.reduce((s, p) => s + p.x, 0) / n;
-    const meanY = placements.reduce((s, p) => s + p.y, 0) / n;
-    const dx = CX - meanX;
-    const dy = CY - meanY;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return markup;
-    return (
-      '<g class="layer-centered" transform="translate(' +
-      dx.toFixed(2) +
-      ',' +
-      dy.toFixed(2) +
-      ')">' +
-      markup +
-      '</g>'
-    );
-  }
-
   function wrapSymmetric(content) {
     return (
       '<g class="amulet-symmetric">' +
@@ -1363,44 +1348,6 @@
       '</g>' +
       '</g>'
     );
-  }
-
-  /** מגדר: נקבה = שיקוף אופקי; זכר = +שיקוף אנכי; לא בינארי = עותק למעלה ולמטה */
-  function wrapGenderLayout(content, gender, placements) {
-    const hSym = wrapSymmetric(content);
-    if (gender === 'male') {
-      return (
-        '<g class="amulet-gender-layout amulet-gender-male">' +
-        '<g class="amulet-half-v amulet-original">' +
-        hSym +
-        '</g>' +
-        '<g class="amulet-half-v amulet-mirror-v" transform="translate(0,' +
-        H +
-        ') scale(1,-1)">' +
-        hSym +
-        '</g>' +
-        '</g>'
-      );
-    }
-    if (gender === 'nonbinary') {
-      const off = nonbinaryVerticalOffset(placements);
-      return (
-        '<g class="amulet-gender-layout amulet-gender-nonbinary">' +
-        '<g class="amulet-copy-above" transform="translate(0,-' +
-        off +
-        ')">' +
-        hSym +
-        '</g>' +
-        hSym +
-        '<g class="amulet-copy-below" transform="translate(0,' +
-        off +
-        ')">' +
-        hSym +
-        '</g>' +
-        '</g>'
-      );
-    }
-    return '<g class="amulet-gender-layout amulet-gender-female">' + hSym + '</g>';
   }
 
   async function buildLayerContent(letters, style, intent) {
@@ -1444,18 +1391,16 @@
     }
 
     const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
-    let groups = symbolParts.join('') + unifiedGlyphs;
-    if (style.layer === 2) {
-      groups = centerLayerGroup(groups, renderPlacements);
-    }
-    const content = wrapAmuletScale(wrapGenderLayout(groups, style.gender, renderPlacements), style);
+    const groups = symbolParts.join('') + unifiedGlyphs;
+    const content = wrapAmuletScale(wrapSymmetric(groups), style);
     return { content, placements: renderPlacements, anchor, skipped, style };
   }
 
   async function buildDualLayerAmulet(sentenceLetters, nameLetters) {
     readParams();
     const style3 = visualStyleLayer3(params);
-    document.title = 'v2 color:' + style3.strokeColor + ' g:' + style3.gender;
+    document.title =
+      'v2 color:' + style3.strokeColor + ' age:' + style3.ageTexture + ' g:' + style3.gender;
 
     const layer3 = await buildLayerContent(sentenceLetters, style3, style3.intent);
     if (!layer3.content) {
@@ -1470,17 +1415,23 @@
       if (layer2.style) style2 = layer2.style;
     }
 
-    const vb = viewBoxForPlacements(layer3.placements, 0, params.gender);
-    const defs = buildSvgDefs(style3);
+    const vb = { x: 0, y: 0, w: W, h: H };
+    const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3, vb);
 
-    const layers =
-      '<g class="amulet-layer layer-3" data-layer="intent" opacity="' +
-      (style3.layerOpacity ?? 1) +
-      '">' +
-      layer3.content +
-      '</g>';
+    let alignDx = 0;
+    let alignDy = 0;
+    let layers = '';
+    if (layer2?.content) {
+      const aligned = alignLayer2ToLayer3(layer2.content, layer3.content, vb, defs);
+      alignDx = aligned.dx;
+      alignDy = aligned.dy;
+      layers +=
+        '<g class="amulet-layer layer-2" data-layer="name">' + aligned.content + '</g>';
+    }
+    layers +=
+      '<g class="amulet-layer layer-3" data-layer="intent">' + layer3.content + '</g>';
 
-    const svg = assembleLayer3OverlaySvg(vb, defs, layers);
+    const svg = assembleAmuletSvg(vb, defs, layers);
     const allPlacements = layer3.placements.slice();
     if (layer2?.placements?.length) allPlacements.push(...layer2.placements);
     return {
@@ -1490,10 +1441,11 @@
       style2,
       style3,
       viewBox: vb,
-      layer2Content: layer2?.content || '',
       placements: allPlacements,
       anchor: layer3.anchor,
-      skipped: layer3.skipped
+      skipped: layer3.skipped,
+      alignDx,
+      alignDy
     };
   }
 
@@ -1511,7 +1463,7 @@
       blocks.push(
         '<strong>שכבה 2 (שם) · Three.js metal · ' +
           style2.occupationKey +
-          ' /' +
+          '/' +
           style2.familyStatus +
           '/' +
           style2.moodKey +
@@ -1521,8 +1473,6 @@
           style2.linejoin +
           ' | spacing=' +
           style2.spacing.toFixed(2) +
-          ' | color=' +
-          style2.strokeColor +
           ' | scale×' +
           LAYER2_SCALE +
           '</strong><ul>' +
@@ -1544,7 +1494,8 @@
           '/' +
           style3.domainKey +
           ' age=' +
-          'ceramic | cap=' +
+          style3.ageTexture +
+          ' | cap=' +
           style3.linecap +
           '/' +
           style3.linejoin +
@@ -1570,21 +1521,176 @@
     document.getElementById('status').textContent = msg;
   }
 
-  function setResultComposite(svgOverlay, layer2Content, viewBox, age) {
+  let activeThreeRenderer = null;
+
+  function showRenderSpinner(show) {
     const container = document.getElementById('amuletContainer');
-    container.innerHTML =
-      '<div class="amulet-stack">' +
-      '<canvas id="layer2Canvas" width="' +
-      W +
-      '" height="' +
-      H +
-      '"></canvas>' +
-      svgOverlay +
-      '</div>';
-    if (layer2Content) {
-      renderLayer2Three(layer2Content, viewBox, age);
-    } else {
-      disposeLayer2Three();
+    let el = document.getElementById('renderSpinner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'renderSpinner';
+      el.className = 'render-spinner';
+      el.innerHTML = '<div class="spinner-ring"></div><span>מעבד Three.js…</span>';
+      container.appendChild(el);
+    }
+    el.hidden = !show;
+  }
+
+  function disposeThreeScene(scene) {
+    if (!scene) return;
+    scene.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+        else obj.material.dispose();
+      }
+    });
+  }
+
+  function disposeActiveThreeRenderer() {
+    if (activeThreeRenderer) {
+      activeThreeRenderer.dispose();
+      activeThreeRenderer = null;
+    }
+  }
+
+  function setResultCanvas(canvas) {
+    const container = document.getElementById('amuletContainer');
+    const spinner = document.getElementById('renderSpinner');
+    container.innerHTML = '';
+    if (spinner) container.appendChild(spinner);
+    container.appendChild(canvas);
+  }
+
+  function mountSvgForPathExtraction(svgString) {
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const err = doc.querySelector('parsererror');
+    if (err) throw new Error('SVG parse error: ' + err.textContent);
+    const svg = doc.documentElement;
+    svg.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(svg);
+    return svg;
+  }
+
+  function ageToRoughness(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    return 0.04 + (a / 120) * 0.35;
+  }
+
+  function sampleSvgPath(pathEl, numPoints) {
+    const len = pathEl.getTotalLength();
+    if (!isFinite(len) || len < 4) return [];
+    const svg = pathEl.ownerSVGElement;
+    const ctm = pathEl.getCTM();
+    if (!ctm || !svg) return [];
+    const pts = [];
+    const steps = Math.max(4, numPoints);
+    for (let i = 0; i < steps; i++) {
+      const t = steps <= 1 ? 0 : i / (steps - 1);
+      const p = pathEl.getPointAtLength(len * t);
+      const tp = svg.createSVGPoint();
+      tp.x = p.x;
+      tp.y = p.y;
+      const g = tp.matrixTransform(ctm);
+      pts.push(new THREE.Vector3(g.x - CX, -(g.y - CY), 0));
+    }
+    return pts;
+  }
+
+  function addTubesFromLayer(layerEl, material, scene, z, numPoints, tubeRadius) {
+    if (!layerEl) return 0;
+    let count = 0;
+    layerEl.querySelectorAll('path').forEach((pathEl) => {
+      const pts = sampleSvgPath(pathEl, numPoints);
+      if (pts.length < 4) return;
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const geom = new THREE.TubeGeometry(curve, 64, tubeRadius, 8, false);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.position.z = z;
+      scene.add(mesh);
+      count++;
+    });
+    return count;
+  }
+
+  function renderAmuletThree(result) {
+    if (typeof THREE === 'undefined') {
+      throw new Error('Three.js לא נטען — בדקי חיבור לאינטרנט');
+    }
+
+    showRenderSpinner(true);
+
+    const { svg, style2, style3 } = result;
+    const mount = mountSvgForPathExtraction(svg);
+    let scene = null;
+
+    try {
+      disposeActiveThreeRenderer();
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(680, 680);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.physicallyCorrectLights = true;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      activeThreeRenderer = renderer;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff);
+
+      const camera = new THREE.OrthographicCamera(-340, 340, 340, -340, 0.1, 2000);
+      camera.position.set(0, 0, 1000);
+      camera.lookAt(0, 0, 0);
+
+      const ageRoughness = style2 ? ageToRoughness(style2.age) : ageToRoughness(style3.age);
+      const metalMat = new THREE.MeshPhysicalMaterial({
+        color: 0xc0c0c0,
+        metalness: 1.0,
+        roughness: ageRoughness,
+        reflectivity: 1.0,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.1
+      });
+
+      const ceramicMat = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(style3.strokeColor),
+        metalness: 0.0,
+        roughness: 0.1,
+        transmission: 0.3,
+        thickness: 2.0,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05
+      });
+      ceramicMat.roughness = Math.min(0.35, 0.1 + (style3.surfaceScale || 0) * 0.012);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 3.0);
+      dirLight1.position.set(200, 400, 300);
+      const dirLight2 = new THREE.DirectionalLight(0x8888ff, 1.0);
+      dirLight2.position.set(-300, -100, 200);
+      const pointLight = new THREE.PointLight(0xffffff, 2.0, 1000);
+      pointLight.position.set(0, 0, 500);
+      scene.add(ambientLight, dirLight1, dirLight2, pointLight);
+
+      const tubeRadius = 15;
+      const numPoints = 200;
+      const layer2El = mount.querySelector('.layer-2');
+      const layer3El = mount.querySelector('.layer-3');
+      const tubeCountL2 = addTubesFromLayer(layer2El, metalMat, scene, -5, numPoints, tubeRadius);
+      const tubeCountL3 = addTubesFromLayer(layer3El, ceramicMat, scene, 5, numPoints, tubeRadius);
+
+      if (!tubeCountL3) {
+        throw new Error('לא נמצאו נתיבים לרינדור Three.js');
+      }
+
+      renderer.render(scene, camera);
+      setResultCanvas(renderer.domElement);
+
+      return { tubeCountL2, tubeCountL3, ageRoughness };
+    } finally {
+      if (mount.parentNode) document.body.removeChild(mount);
+      if (scene) disposeThreeScene(scene);
+      showRenderSpinner(false);
     }
   }
 
@@ -1631,13 +1737,12 @@
     const btn = document.getElementById('createBtn');
     composeBusy = true;
     btn.disabled = true;
-    setStatus('בונה קמע (2 שכבות)…');
+    setStatus('בונה גיאומטריה (2 שכבות)…');
 
     try {
       const result = await buildDualLayerAmulet(letters, nameLetters);
       lastComposeLetters = letters.slice();
-      const { svg, layer2, layer3, style2, style3, anchor, skipped, viewBox, layer2Content } =
-        result;
+      const { layer2, layer3, style2, style3, anchor, skipped, alignDx, alignDy } = result;
 
       console.log('[prototype-v2] compose —', {
         name: params.personName,
@@ -1650,27 +1755,26 @@
         layer3: style3
       });
 
-      setResultComposite(svg, layer2Content, viewBox, params.age);
+      setStatus('מעבד Three.js…');
+      const threeStats = renderAmuletThree(result);
       showDebug(layer2, layer3, style2, style3);
 
-      let msg = 'שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
+      let msg = 'Three.js · שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
       if (nameLetters.length) {
         msg += ' · שכבה 2 (שם): ' + nameLetters.join(' → ');
         if (layer2?.skipped?.length) msg += ' | L2 ללא חיבור: ' + layer2.skipped.join(' ');
       }
       msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
-      msg += ' | L3 ceramic spacing=' + style3.spacing.toFixed(2);
+      msg += ' | tubes L2=' + threeStats.tubeCountL2 + ' L3=' + threeStats.tubeCountL3;
+      msg += ' | metal rough=' + threeStats.ageRoughness.toFixed(2);
+      msg += ' spacing=' + style3.spacing.toFixed(2);
       if (style2) {
-        const bump2 = ageBumpByGender(style2);
-        msg +=
-          ' | L2 Three.js metal rough=' +
-          ageToMetalRoughness(params.age).toFixed(2) +
-          ' bump×' +
-          bump2.scale;
-        msg += ' ' + style2.moodKey;
-        msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
+        msg += ' | L2 spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
       if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
+      if (nameLetters.length) {
+        msg += ' | יישור L2→L3: ' + alignDx.toFixed(1) + ',' + alignDy.toFixed(1);
+      }
       setStatus(msg);
     } catch (err) {
       setStatus('שגיאה: ' + err.message);
