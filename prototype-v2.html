@@ -1164,15 +1164,7 @@
       intent
     );
 
-    if (style.layer === 2) {
-      placements = applySpacingToPlacements(
-        placements,
-        anchor,
-        getStatusSpacing(style.familyStatus)
-      );
-    } else {
-      placements = applySpacingToPlacements(placements, anchor, style.spacing);
-    }
+    placements = applySpacingToPlacements(placements, anchor, style.spacing);
 
     byLetter = new Map(placements.map((p) => [p.letter, p]));
     const renderPlacements = hideHubLetter
@@ -1215,16 +1207,7 @@
       if (layer2.style) style2 = layer2.style;
     }
 
-    const allPlacements = layer3.placements.slice();
-    if (layer2?.placements?.length) {
-      allPlacements.push(...layer2.placements);
-    }
-
-    const maxScale = Math.max(
-      style3.surfaceScale,
-      style2 ? style2.surfaceScale : 0
-    );
-    const vb = viewBoxForPlacements(allPlacements, maxScale);
+    const vb = viewBoxForPlacements(layer3.placements, style3.surfaceScale);
     const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3);
 
     let layers = '';
@@ -1236,6 +1219,8 @@
       '<g class="amulet-layer layer-3" data-layer="intent">' + layer3.content + '</g>';
 
     const svg = assembleAmuletSvg(vb, defs, layers);
+    const allPlacements = layer3.placements.slice();
+    if (layer2?.placements?.length) allPlacements.push(...layer2.placements);
     return {
       svg,
       layer2,
