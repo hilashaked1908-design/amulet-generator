@@ -526,51 +526,8 @@
     };
   }
 
-  /** זכר: קוצניות מינימלית 8 + חספוס גיל רציף */
-  function maleBumpProfile(age) {
-    const a = Math.max(1, Math.min(120, Number(age) || 25));
-    const scale = Math.max(8, ageToSurfaceScale(age));
-    const baseFrequency = (0.08 + ((120 - a) / 120) * 0.07).toFixed(3);
-    const numOctaves = a < 18 ? 1 : 2;
-    return { scale, baseFrequency, numOctaves };
-  }
-
-  /** גיל = עוצמת חספוס. זכר: turbulence — הקוצים נובעים מדפוס ה-displacement על הצורה. */
-  function ageBumpByGender(style) {
-    const s = style.surfaceScale;
-    if (style.customBump) {
-      const cb = style.customBump;
-      return {
-        type: cb.type,
-        baseFrequency: cb.baseFrequency,
-        numOctaves: cb.numOctaves,
-        scale: Math.max(0, Math.round(s * (cb.scaleFactor || 1)))
-      };
-    }
-    const g = style.gender || 'female';
-    if (g === 'male') {
-      const profile = maleBumpProfile(style.age);
-      return {
-        type: 'turbulence',
-        baseFrequency: profile.baseFrequency,
-        numOctaves: profile.numOctaves,
-        scale: profile.scale
-      };
-    }
-    if (g === 'nonbinary') {
-      return {
-        type: 'fractalNoise',
-        baseFrequency: '0.07',
-        numOctaves: 3,
-        scale: Math.round(s * 1.35)
-      };
-    }
-    return {
-      type: 'fractalNoise',
-      baseFrequency: '0.09',
-      numOctaves: 2,
-      scale: s
-    };
+  function metalRoughness(style) {
+    return (style.surfaceScale || 0) * 0.3;
   }
 
   function filterRegionAttrs(surfaceScale, bumpScale) {
@@ -580,77 +537,52 @@
     return ' x="-15%" y="-15%" width="130%" height="130%"';
   }
 
-  function buildBumpDisplacement(bump, inName, resultName) {
-    return (
-      '<feTurbulence type="' +
-      bump.type +
-      '" baseFrequency="' +
-      bump.baseFrequency +
-      '" numOctaves="' +
-      bump.numOctaves +
-      '" seed="2" result="noise"/>' +
-      '<feDisplacementMap in="' +
-      inName +
-      '" in2="noise" scale="' +
-      bump.scale +
-      '" xChannelSelector="R" yChannelSelector="G" result="' +
-      resultName +
-      '"/>'
-    );
-  }
-
-  /** מיזוג ברק על הצורה אחרי displacement (rough), לא על SourceGraphic המקורי */
-  function buildGlossClipMergeOn(baseName) {
-    return (
-      '<feComposite in="gloss" in2="' +
-      baseName +
-      '" operator="in" result="glossClip"/>' +
-      '<feMerge result="glossed">' +
-      '<feMergeNode in="' +
-      baseName +
-      '"/>' +
-      '<feMergeNode in="glossClip"/>' +
-      '</feMerge>' +
-      '<feComposite in="glossed" in2="' +
-      baseName +
-      '" operator="in"/>'
-    );
-  }
-
-  /** שכבה 2 — כרום + חספוס/קוצים (מגדר/עיסוק) קודם, ואז ברק מתכתי */
-  function buildChromeFilter(filterId, style) {
-    const bump = ageBumpByGender(style);
+  /** שכבה 2 — מתכת: חספוס גיל דרך blur, ואז diffuse + specular */
+  function buildMetalFilter(filterId, style) {
+    const roughness = metalRoughness(style).toFixed(2);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      filterRegionAttrs(style.surfaceScale, 0) +
       ' color-interpolation-filters="sRGB">' +
-      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
-      '<feGaussianBlur in="rough" stdDeviation="2" result="blur"/>' +
-      '<feSpecularLighting in="blur" surfaceScale="12" specularConstant="2" specularExponent="80" lighting-color="white" result="gloss">' +
-      '<fePointLight x="200" y="100" z="150"/>' +
+      '<feGaussianBlur stdDeviation="' +
+      roughness +
+      '" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="15" specularConstant="2.5" specularExponent="120" lighting-color="#ffffff" result="spec">' +
+      '<fePointLight x="250" y="80" z="180"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMergeOn('rough') +
+      '<feComposite in="spec" in2="SourceGraphic" operator="in" result="specClipped"/>' +
+      '<feDiffuseLighting in="blur" surfaceScale="15" diffuseConstant="0.8" lighting-color="#aaaaaa" result="diff">' +
+      '<fePointLight x="250" y="80" z="180"/>' +
+      '</feDiffuseLighting>' +
+      '<feComposite in="diff" in2="SourceGraphic" operator="in" result="diffClipped"/>' +
+      '<feMerge>' +
+      '<feMergeNode in="diffClipped"/>' +
+      '<feMergeNode in="specClipped"/>' +
+      '</feMerge>' +
       '</filter>'
     );
   }
 
-  /** שכבה 3 — זכוכית חלבית + חספוס גיל קודם, ואז ברק רך */
+  /** שכבה 3 — זכוכית חלבית חלקה (ללא displacement) */
   function buildMilkyGlassFilter(filterId, style) {
-    const bump = ageBumpByGender(style);
     return (
       '<filter id="' +
       filterId +
       '"' +
-      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      filterRegionAttrs(0, 0) +
       ' color-interpolation-filters="sRGB">' +
-      buildBumpDisplacement(bump, 'SourceGraphic', 'rough') +
-      '<feGaussianBlur in="rough" stdDeviation="1" result="blur"/>' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>' +
       '<feSpecularLighting in="blur" surfaceScale="6" specularConstant="0.8" specularExponent="20" lighting-color="white" result="gloss">' +
       '<fePointLight x="300" y="150" z="200"/>' +
       '</feSpecularLighting>' +
-      buildGlossClipMergeOn('rough') +
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>' +
+      '<feComposite in="glossed" in2="SourceGraphic" operator="in"/>' +
       '</filter>'
     );
   }
@@ -658,8 +590,8 @@
   function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] chrome · occupation:', style2.occupationKey);
-      defs += buildChromeFilter(FILTER_ID_LAYER2, style2);
+      console.log('[layer2] metal · occupation:', style2.occupationKey, 'rough=', metalRoughness(style2).toFixed(2));
+      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
     }
     console.log('[layer3] milky glass · domain:', style3.domainKey);
     defs += buildMilkyGlassFilter(FILTER_ID_LAYER3, style3);
@@ -707,18 +639,21 @@
   }
 
   function effectLabel(style) {
-    const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
-    const bump = ageBumpByGender(style);
-    let fx =
-      bump.type +
-      '@' +
-      bump.baseFrequency +
-      '×' +
-      bump.scale;
-    if (style.gender === 'male') {
-      fx += ' spiky-bump';
+    if (style.layer === 2) {
+      return (
+        'metal · rough=' +
+        metalRoughness(style).toFixed(2) +
+        ' · ' +
+        style.linecap
+      );
     }
-    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
+    return (
+      style.amuletType +
+      '/' +
+      style.domainKey +
+      ' · milky-glass · ' +
+      style.linecap
+    );
   }
 
   /**
@@ -1349,7 +1284,7 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · chrome · ' +
+        '<strong>שכבה 2 (שם) · metal · ' +
           style2.occupationKey +
           ' /' +
           style2.familyStatus +
@@ -1493,10 +1428,9 @@
         if (layer2?.skipped?.length) msg += ' | L2 ללא חיבור: ' + layer2.skipped.join(' ');
       }
       msg += ' | ' + style3.amuletType + ' · ' + style3.domainKey;
-      const bump = ageBumpByGender(style3);
-      msg += ' | L3 bump×' + bump.scale + ' spacing=' + style3.spacing.toFixed(2);
+      msg += ' | L3 glass spacing=' + style3.spacing.toFixed(2);
       if (style2) {
-        msg += ' | L2 chrome ' + style2.strokeColor;
+        msg += ' | L2 metal rough=' + metalRoughness(style2).toFixed(2) + ' ' + style2.strokeColor;
         msg += ' ' + style2.moodKey;
         msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
