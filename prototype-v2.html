@@ -106,6 +106,22 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
       width: min(680px, 100%);
     }
+    .amulet-stack {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+    }
+    .amulet-stack canvas,
+    .amulet-stack svg.layer3-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .amulet-stack svg.layer3-overlay {
+      pointer-events: none;
+    }
     #amuletContainer svg,
     #amuletContainer canvas { display: block; max-width: 100%; height: auto; }
     #status {
@@ -249,6 +265,7 @@
     </main>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="connection-core.js"></script>
   <script>
 (function () {
@@ -280,6 +297,13 @@
     const a = Math.max(1, Math.min(120, Number(age) || 25));
     return Math.round((a / 120) * 20);
   }
+
+  function ageToMetalRoughness(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    return 0.05 + (a / 120) * 0.35;
+  }
+
+  let layer2ThreeState = null;
 
   /** תחום → צבע מעבר Pass 2 */
   const DOMAINS = {
@@ -639,21 +663,17 @@
     );
   }
 
-  function buildSvgDefs(style2, style3) {
+  function buildSvgDefs(style3) {
     let defs = '<defs>';
-    if (style2) {
-      console.log('[layer2] metal · occupation:', style2.occupationKey);
-      defs += buildMetalFilter(FILTER_ID_LAYER2, style2);
-    }
     console.log('[layer3] ceramic · domain:', style3.domainKey);
     defs += buildCeramicFilter(FILTER_ID_LAYER3);
     defs += '</defs>';
     return defs;
   }
 
-  function assembleAmuletSvg(vb, defs, content) {
+  function assembleLayer3OverlaySvg(vb, defs, content) {
     return (
-      '<svg id="amuletSvg" xmlns="http://www.w3.org/2000/svg" width="' +
+      '<svg class="layer3-overlay" xmlns="http://www.w3.org/2000/svg" width="' +
       W +
       '" height="' +
       H +
@@ -667,20 +687,128 @@
       vb.h +
       '" preserveAspectRatio="xMidYMid meet">' +
       defs +
-      '<rect x="' +
-      vb.x +
-      '" y="' +
-      vb.y +
-      '" width="' +
-      vb.w +
-      '" height="' +
-      vb.h +
-      '" fill="' +
-      BG_WHITE +
-      '"/>' +
       content +
       '</svg>'
     );
+  }
+
+  function disposeLayer2Three() {
+    if (!layer2ThreeState) return;
+    const { renderer, meshes, material } = layer2ThreeState;
+    meshes.forEach((mesh) => {
+      mesh.geometry.dispose();
+    });
+    if (material) material.dispose();
+    if (renderer) renderer.dispose();
+    layer2ThreeState = null;
+  }
+
+  function extractSvgPathPointSets(layerContent, viewBox) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.setAttribute(
+      'viewBox',
+      viewBox.x + ' ' + viewBox.y + ' ' + viewBox.w + ' ' + viewBox.h
+    );
+    svg.setAttribute('xmlns', ns);
+    svg.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;pointer-events:none';
+    const wrap = document.createElementNS(ns, 'g');
+    wrap.innerHTML = layerContent;
+    svg.appendChild(wrap);
+    document.body.appendChild(svg);
+
+    const sets = [];
+    svg.querySelectorAll('path').forEach((path) => {
+      let len = 0;
+      try {
+        len = path.getTotalLength();
+      } catch (_) {
+        return;
+      }
+      if (!isFinite(len) || len < 1) return;
+      const ctm = path.getCTM();
+      if (!ctm) return;
+      const steps = Math.max(24, Math.min(140, Math.ceil(len / 5)));
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {
+        const local = path.getPointAtLength((len * i) / steps);
+        const global = local.matrixTransform(ctm);
+        pts.push({ x: global.x, y: global.y });
+      }
+      if (pts.length >= 2) sets.push(pts);
+    });
+
+    document.body.removeChild(svg);
+    return sets;
+  }
+
+  function renderLayer2Three(layerContent, viewBox, age) {
+    if (typeof THREE === 'undefined') {
+      console.warn('[layer2] Three.js not loaded');
+      return;
+    }
+    disposeLayer2Three();
+
+    const canvas = document.getElementById('layer2Canvas');
+    if (!canvas || !layerContent) return;
+
+    const pathSets = extractSvgPathPointSets(layerContent, viewBox);
+    const cx = viewBox.x + viewBox.w / 2;
+    const cy = viewBox.y + viewBox.h / 2;
+    const roughness = ageToMetalRoughness(age);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    renderer.setClearColor(0xffffff, 1);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(
+      -viewBox.w / 2,
+      viewBox.w / 2,
+      viewBox.h / 2,
+      -viewBox.h / 2,
+      1,
+      2000
+    );
+    camera.position.set(0, 800, 0);
+    camera.lookAt(0, 0, 0);
+    camera.up.set(0, 0, -1);
+    camera.updateProjectionMatrix();
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x909090,
+      metalness: 1.0,
+      roughness: roughness
+    });
+    const meshes = [];
+
+    pathSets.forEach((pts) => {
+      const vectors = pts.map((p) => new THREE.Vector3(p.x - cx, 0, p.y - cy));
+      if (vectors.length === 2) {
+        vectors.push(vectors[1].clone().lerp(vectors[0], 0.5));
+      }
+      if (vectors.length < 2) return;
+      const curve = new THREE.CatmullRomCurve3(vectors);
+      const geometry = new THREE.TubeGeometry(curve, 100, 8, 8, false);
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+      meshes.push(mesh);
+    });
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9);
+    key.position.set(-220, 500, 120);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+    fill.position.set(260, 500, -180);
+    scene.add(fill);
+
+    renderer.render(scene, camera);
+    layer2ThreeState = { renderer: renderer, meshes: meshes, material: material };
+    console.log('[layer2] Three.js tubes:', meshes.length, 'roughness:', roughness.toFixed(2));
   }
 
   function requireConnectionCore() {
@@ -1343,21 +1471,16 @@
     }
 
     const vb = viewBoxForPlacements(layer3.placements, 0, params.gender);
-    const defs = buildSvgDefs(style2 && layer2?.content ? style2 : null, style3);
+    const defs = buildSvgDefs(style3);
 
-    let layers = '';
-    if (layer2?.content) {
-      layers +=
-        '<g class="amulet-layer layer-2" data-layer="name">' + layer2.content + '</g>';
-    }
-    layers +=
+    const layers =
       '<g class="amulet-layer layer-3" data-layer="intent" opacity="' +
       (style3.layerOpacity ?? 1) +
       '">' +
       layer3.content +
       '</g>';
 
-    const svg = assembleAmuletSvg(vb, defs, layers);
+    const svg = assembleLayer3OverlaySvg(vb, defs, layers);
     const allPlacements = layer3.placements.slice();
     if (layer2?.placements?.length) allPlacements.push(...layer2.placements);
     return {
@@ -1367,6 +1490,7 @@
       style2,
       style3,
       viewBox: vb,
+      layer2Content: layer2?.content || '',
       placements: allPlacements,
       anchor: layer3.anchor,
       skipped: layer3.skipped
@@ -1385,7 +1509,7 @@
         })
         .join('');
       blocks.push(
-        '<strong>שכבה 2 (שם) · metal · ' +
+        '<strong>שכבה 2 (שם) · Three.js metal · ' +
           style2.occupationKey +
           ' /' +
           style2.familyStatus +
@@ -1446,16 +1570,22 @@
     document.getElementById('status').textContent = msg;
   }
 
-  function setResultSvg(svgString) {
+  function setResultComposite(svgOverlay, layer2Content, viewBox, age) {
     const container = document.getElementById('amuletContainer');
-    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
-    const err = doc.querySelector('parsererror');
-    if (err) {
-      console.error('[prototype] SVG parse error:', err.textContent);
-      container.innerHTML = svgString;
-      return;
+    container.innerHTML =
+      '<div class="amulet-stack">' +
+      '<canvas id="layer2Canvas" width="' +
+      W +
+      '" height="' +
+      H +
+      '"></canvas>' +
+      svgOverlay +
+      '</div>';
+    if (layer2Content) {
+      renderLayer2Three(layer2Content, viewBox, age);
+    } else {
+      disposeLayer2Three();
     }
-    container.innerHTML = svgString;
   }
 
   async function init() {
@@ -1506,7 +1636,8 @@
     try {
       const result = await buildDualLayerAmulet(letters, nameLetters);
       lastComposeLetters = letters.slice();
-      const { svg, layer2, layer3, style2, style3, anchor, skipped } = result;
+      const { svg, layer2, layer3, style2, style3, anchor, skipped, viewBox, layer2Content } =
+        result;
 
       console.log('[prototype-v2] compose —', {
         name: params.personName,
@@ -1519,7 +1650,7 @@
         layer3: style3
       });
 
-      setResultSvg(svg);
+      setResultComposite(svg, layer2Content, viewBox, params.age);
       showDebug(layer2, layer3, style2, style3);
 
       let msg = 'שכבה 3: ' + letters.join(' → ') + ' | מרכז: ' + anchor;
@@ -1531,7 +1662,11 @@
       msg += ' | L3 ceramic spacing=' + style3.spacing.toFixed(2);
       if (style2) {
         const bump2 = ageBumpByGender(style2);
-        msg += ' | L2 metal bump×' + bump2.scale + ' ' + style2.strokeColor;
+        msg +=
+          ' | L2 Three.js metal rough=' +
+          ageToMetalRoughness(params.age).toFixed(2) +
+          ' bump×' +
+          bump2.scale;
         msg += ' ' + style2.moodKey;
         msg += ' spacing=' + style2.spacing.toFixed(2) + ' ×' + LAYER2_SCALE;
       }
