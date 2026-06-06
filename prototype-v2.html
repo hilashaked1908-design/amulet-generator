@@ -1151,18 +1151,38 @@
       return { content: '', placements: [], anchor: null, skipped: [], style };
     }
 
-    let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(unique, intent);
-    const spacingFactor = style.spacing;
-    if (style.layer === 2) {
-      console.log('layer2 spacing:', spacingFactor, 'status:', style.familyStatus);
+    const LAYER2_HUB = 'א';
+    let hubLetters = unique;
+    let hideHubLetter = null;
+    if (style.layer === 2 && !unique.includes(LAYER2_HUB)) {
+      hubLetters = [LAYER2_HUB, ...unique];
+      hideHubLetter = LAYER2_HUB;
     }
-    placements = applySpacingToPlacements(placements, anchor, spacingFactor);
+
+    let { placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(
+      hubLetters,
+      intent
+    );
+
+    if (style.layer === 2) {
+      placements = applySpacingToPlacements(
+        placements,
+        anchor,
+        getStatusSpacing(style.familyStatus)
+      );
+    } else {
+      placements = applySpacingToPlacements(placements, anchor, style.spacing);
+    }
+
     byLetter = new Map(placements.map((p) => [p.letter, p]));
+    const renderPlacements = hideHubLetter
+      ? placements.filter((p) => p.letter !== hideHubLetter)
+      : placements;
     const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
 
     const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style, style.filterId));
     const glyphPathParts = [];
-    for (const p of placements) {
+    for (const p of renderPlacements) {
       const glyph = await getParsedGlyph(p.letter);
       glyphPathParts.push(glyphPathsMarkup(p, glyph));
     }
@@ -1173,7 +1193,7 @@
     const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
     const groups = symbolParts.join('') + unifiedGlyphs;
     const content = wrapAmuletScale(wrapSymmetric(groups), style);
-    return { content, placements, anchor, skipped, style, spacingFactor };
+    return { content, placements: renderPlacements, anchor, skipped, style };
   }
 
   async function buildDualLayerAmulet(sentenceLetters, nameLetters) {
