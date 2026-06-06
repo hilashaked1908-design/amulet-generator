@@ -4,8 +4,6 @@ const CX = 340;
 const CY = 340;
 const GLYPH_SIZE = 150;
 const SYMBOL_SIZE = 64;
-/** Normalized path stroke in glyph viewBox units (matches א1.svg, ב2.svg, etc.) */
-const GLYPH_PATH_STROKE_WIDTH = 46;
 
 const BUILTIN_SYMBOLS = {
   circle: { label: 'עיגול', viewBox: '0 0 100 100' },
@@ -374,7 +372,7 @@ function shapedMarkup(opts) {
   const vb = viewBox.trim().split(/[\s,]+/).map(Number);
   const vw = vb[2] || 100;
   const vh = vb[3] || 100;
-  const strokeW = GLYPH_PATH_STROKE_WIDTH;
+  const strokeW = ((2 * Math.max(vw, vh)) / size).toFixed(3);
   const fx = flipX ? -1 : 1;
   const fy = flipY ? -1 : 1;
   const half = size / 2;
@@ -426,42 +424,6 @@ function shapedMarkup(opts) {
   );
 }
 
-/** Normalize path stroke-width; stroke color comes from the wrapper group. */
-function sanitizeGlyphInner(html) {
-  if (!html) return '';
-  const sw = String(GLYPH_PATH_STROKE_WIDTH);
-  try {
-    const doc = new DOMParser().parseFromString(
-      '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
-      'image/svg+xml'
-    );
-    if (doc.querySelector('parsererror')) return html;
-    doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
-      el.setAttribute('fill', 'none');
-      el.removeAttribute('stroke');
-      el.setAttribute('stroke-width', sw);
-      el.removeAttribute('stroke-linecap');
-      el.removeAttribute('stroke-linejoin');
-      el.removeAttribute('stroke-opacity');
-      if (el.hasAttribute('style')) {
-        const s = el
-          .getAttribute('style')
-          .replace(/fill\s*:\s*[^;]+;?/gi, 'fill:none;')
-          .replace(/stroke\s*:\s*[^;]+;?/gi, '')
-          .replace(/stroke-width\s*:\s*[^;]+;?/gi, 'stroke-width:' + sw + ';');
-        el.setAttribute('style', s);
-      }
-    });
-    const root = doc.getElementById('root');
-    return root ? root.innerHTML : html;
-  } catch (_) {
-    return html
-      .replace(/\sstroke\s*=\s*["'][^"']*["']/gi, '')
-      .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, ' stroke-width="' + sw + '"')
-      .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"');
-  }
-}
-
 function glyphSvgMarkup(svgText, x, y, rot, size, stroke, role, flipX, flipY) {
   const clean = svgText
     .trim()
@@ -472,7 +434,9 @@ function glyphSvgMarkup(svgText, x, y, rot, size, stroke, role, flipX, flipY) {
   if (!root) throw new Error('invalid SVG');
 
   const viewBox = root.getAttribute('viewBox') || '0 0 100 100';
-  const inner = sanitizeGlyphInner(root.innerHTML);
+  let inner = root.innerHTML
+    .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"')
+    .replace(/fill\s*:\s*(?!none)[^;}"']+/gi, 'fill:none');
 
   return shapedMarkup({
     x,

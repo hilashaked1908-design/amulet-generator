@@ -1314,26 +1314,25 @@ async function loadGlyphSvg(letter) {
   if (glyphSvgCache[letter] != null && typeof glyphSvgCache[letter] !== 'string') {
     delete glyphSvgCache[letter];
   }
-  if (typeof glyphSvgCache[letter] === 'string') return glyphSvgCache[letter];
   if (typeof svgStore[letter] === 'string') {
     glyphSvgCache[letter] = svgStore[letter];
     return svgStore[letter];
   }
   const file = glyphFilename(letter);
-  const url = GLYPHS_DIR + '/' + encodeURIComponent(file);
+  const url = GLYPHS_DIR + '/' + encodeURIComponent(file) + '?t=' + Date.now();
   console.log('[glyphs] filename:', file, 'fetch URL:', url);
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error('Glyph not found: ' + file + ' (HTTP ' + res.status + ')');
   }
   const text = ensureSvgString(await res.text());
   glyphSvgCache[letter] = text;
   svgStore[letter] = text;
+  delete parsedGlyphCache[letter];
   return text;
 }
 
 async function getParsedGlyph(letter) {
-  if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
   const text = await loadGlyphSvg(letter);
   const parsed = parseGlyphSvg(text);
   parsedGlyphCache[letter] = parsed;

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קמע v2 — p5.js</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #ececec;
+      color: #222;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      background: #1a1a1a;
+      color: #eee;
+      padding: 14px 20px;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header p { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 400px) 1fr;
+      min-height: calc(100vh - 56px);
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .panel {
+      background: #f8f8f8;
+      border-left: 1px solid #ccc;
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+    #freeText {
+      width: 100%;
+      min-height: 120px;
+      padding: 10px 12px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+    #createBtn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: #2a5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #createBtn:hover { background: #248a42; }
+    .preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      background: #e8e8e8;
+      gap: 12px;
+    }
+    #canvasHost {
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+      width: min(680px, 100%);
+      line-height: 0;
+    }
+    #canvasHost canvas { display: block; max-width: 100%; height: auto !important; }
+    #status { font-size: 0.85rem; color: #444; text-align: center; max-width: 680px; }
+    #paramsPreview {
+      font-family: monospace, ui-monospace, monospace;
+      font-size: 11px;
+      direction: ltr;
+      text-align: left;
+      background: #fff;
+      border: 1px dashed #999;
+      padding: 8px 10px;
+      width: 100%;
+      max-width: 680px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .hint { font-size: 0.75rem; color: #888; margin-top: 12px; }
+    .hint code { direction: ltr; unicode-bidi: embed; }
+    #pathMeasure { position: fixed; left: -9999px; visibility: hidden; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>קמע v2 — p5.js</h1>
+    <p>קובץ יחיד · חילוץ פרמטרים מקומי · שכבת שם + שכבת בקשה · ללא API חיצוני</p>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="field">
+        <label for="freeText">תיאור חופשי בעברית</label>
+        <textarea id="freeText">אני נקבה בת 25 ממרכז הארץ, רווקה, מעצבת גרפית, רוצה בית בתאילנד, עבורי, בדחיפות, זימון</textarea>
+      </div>
+      <button type="button" id="createBtn">צור קמע</button>
+      <p class="hint">קובץ עצמאי <code>amulet_v2.html</code> — ניתן לפתוח ישירות בדפדפן (file://) או דרך שרת מקומי.</p>
+    </aside>
+
+    <main class="preview">
+      <div id="canvasHost"></div>
+      <p id="status">מוכן</p>
+      <pre id="paramsPreview" hidden></pre>
+    </main>
+  </div>
+
+  <svg id="pathMeasure" xmlns="http://www.w3.org/2000/svg"></svg>
+
+  <script>
+  const AMULET_DATA = {"glyphs":{"א":{"vb":"0 0 1182 1306","d":["M23.0039 273.647C36.451 199.296 174.607 -11.4686 376.295 27.8607C570.4 65.7114 622.021 269.561 596.134 459.472C573.116 628.335 316.542 863.155 296.884 1040.51C285.11 1146.73 326.881 1207.73 395.455 1252.1C465.438 1297.39 575.966 1288.41 621.326 1246.97M746.448 362.373C926.779 478.041 1094.2 418.161 1147.97 297.178C1189.52 162.753 1106.42 57.6572 984.054 30.0704C782.578 -5.88917 606.905 162.952 600.2 431.818C589.402 580.636 710.386 800.254 825.648 983.935C896.952 1097.56 952.428 1175.83 1040.87 1269.75"]},"ב":{"vb":"0 0 1292 1302","d":["M23 23.6686C185.447 23.6686 336.261 110.532 361.078 248.16C380.257 110.532 524.761 13.9134 696.119 23.6686C853.24 32.6134 1009.95 191.219 967.634 401.567C940.256 537.652 703.692 863.546 673.897 1028.87C653.22 1213.13 505.841 1278.29 379.322 1278.29C163.366 1278.29 76.1113 1057.97 76.1113 863.826M673.897 1028.87C694.574 1213.13 838.665 1278.29 965.184 1278.29C1181.14 1278.29 1268.39 1057.97 1268.39 863.826"]},"ג":{"vb":"0 0 831 1314","d":["M196.123 23H620.913C653.101 23 666.334 88.1003 620.913 115.836C372.354 267.609 22.9999 542.086 22.9999 871.659C22.9999 1103.19 210.689 1290.87 442.215 1290.87C523.401 1290.87 599.196 1267.8 663.399 1227.84M272.646 750.895C329.174 691.24 409.154 654.031 497.825 654.031C669.126 654.031 807.992 792.897 807.992 964.198C807.992 1072.95 752.021 1168.63 667.314 1224"]},"ד":{"vb":"0 0 1165 1316","d":["M729.18 360.115C909.512 475.782 1076.93 415.902 1130.7 294.92C1172.25 160.495 1089.15 55.3985 966.787 27.8118C765.311 -8.14784 589.638 160.693 582.933 429.559M435.339 360.115C255.007 475.782 87.5871 415.902 33.8171 294.92C-7.73248 160.495 75.3663 55.3985 197.732 27.8118C399.209 -8.14784 574.881 160.693 581.586 429.559V1100.59M581.586 1100.59C562.299 1201.74 426.663 1292.42 256.994 1292.42M581.586 1100.59C603.788 1203.33 741.019 1292.42 905.378 1292.42"]},"ה":{"vb":"0 0 998 1288","d":["M185.68 485.237C295.995 485.237 369.149 537.401 369.149 627.193M369.149 627.193V1147.93M369.149 627.193C369.149 537.401 442.304 485.237 552.619 485.237M369.149 1147.93C369.149 1208.91 278.892 1270.48 187.39 1263.64M369.149 1147.93C369.149 1208.91 459.407 1270.48 550.909 1263.64M970.002 1232.33C824.499 1313.9 636.557 1236.07 673.897 1028.87C703.692 863.545 940.256 537.651 967.634 401.566C1009.95 191.219 853.24 32.6129 696.119 23.6681C524.761 13.9129 380.257 110.531 361.078 248.159C336.261 110.531 185.447 23.6681 23 23.6681"]},"ו":{"vb":"0 0 699 1271","d":["M23 23C219.133 23.0001 349.196 115.744 349.196 275.388M349.196 275.388V1041.21M349.196 275.388C349.196 115.744 479.26 23.0001 675.393 23M349.196 1041.21C349.196 1149.62 188.724 1259.09 26.0404 1246.93M349.196 1041.21C349.196 1149.62 509.668 1259.09 672.352 1246.93"]},"ז":{"vb":"0 0 623 1281","d":["M582.936 1257.27C304.864 882.57 139.827 525.485 139.827 306.54C139.827 169.777 250.353 68.4907 387.116 68.4907C425.86 68.4907 462.525 77.3882 495.18 93.2512M23 23H599.26"]},"ח":{"vb":"0 0 819 1313","d":["M27 1281.42V388.738M27 46.4532V377.981M594.027 548.297C474.657 648.628 381.976 663.716 224.635 632.463C140.471 615.746 43.5845 516.073 27 388.738M27 388.738V377.981M27 377.981C27 130.264 233.256 6.32915 441.64 24.8C717.344 49.2381 813.662 309.909 787.185 486.975C754.854 741.308 613.678 883.562 378.743 1072.16C313.385 1124.62 267.666 1149.35 222.919 1182.95C178.171 1216.54 203.081 1265.42 250.499 1265.42H631.676","filter0_d_264_165"]},"ט":{"vb":"0 0 1230 1285","d":["M349.196 36.7608C153.064 36.7609 23 129.505 23 289.149V1054.97C23 1163.38 197.24 1261.62 356.766 1261.62H667.255M994.539 562.633C792.731 680.569 428.309 680.567 448.008 312.378C458.482 116.609 685.826 -39.0049 949.89 47.1968C1200.22 128.914 1271.79 465.118 1144.12 680.569C1034.43 865.671 881.146 1023.8 667.255 1151.32C606.113 1187.77 602.324 1261.62 667.255 1261.62M667.255 1261.62H1040.56"]},"י":{"vb":"0 0 926 707","d":["M254.26 692.063C419.716 704.434 582.923 593.099 582.923 482.834L581.554 426.892C582.923 157.084 396.069 -18.2733 191.159 18.299C66.7079 46.3559 -17.8069 153.243 24.4508 289.959C79.137 413.003 249.41 473.903 432.814 356.265M582.923 482.834C582.923 593.099 746.129 704.434 911.586 692.063"]},"כ":{"vb":"0 0 1082 1271","d":["M732.436 275.388C732.436 115.744 602.372 23.0001 406.239 23H52.7723M732.436 275.388V1041.21M732.436 275.388C732.436 115.744 862.499 23.0001 1058.63 23M732.436 1041.21C732.436 1149.62 571.964 1259.09 409.28 1246.93H23M732.436 1041.21C732.436 1149.62 892.907 1259.09 1055.59 1246.93"]},"ל":{"vb":"0 0 533 1223","d":["M410.591 1214.18H131.401C110.246 1214.18 101.549 1171.4 131.401 1153.17C294.765 1053.42 524.375 873.018 524.375 656.409C524.375 504.24 401.018 380.883 248.85 380.883C195.491 380.883 143.102 398.574 100.905 424.833C45.2319 461.227 8.44531 524.112 8.44531 595.589M8.44531 595.589C8.44531 708.175 99.7141 799.443 212.3 799.443C270.578 799.443 323.145 774.988 360.297 735.78M8.44531 595.589V284.083C12.991 101.798 133.007 -12.6733 269.604 11.7066C352.565 30.4099 408.905 101.663 380.735 192.8C344.28 274.824 230.772 315.422 108.511 237.001"]},"מ":{"vb":"0 0 1038 1299","d":["M109.244 1090.71V30.7139C270.13 253.046 373.515 411.631 486.836 637.638C600.158 863.644 672.06 1017.44 896.308 1274.78M608.783 365.497C743.055 444.851 863.395 440.087 931.53 392.751C1013.39 335.883 1051.36 209.813 965.957 98.6907C899.255 11.9058 667.12 -28.7866 539.929 135.986C455.948 244.78 449.676 414.061 480.447 622.641M23 1192.71C114.697 1265.4 275.727 1292.23 380.845 1265.4C525.101 1235.2 620.036 1125.34 595.552 978.001C570.556 833.395 541.875 734.221 470.306 602.266"]},"נ":{"vb":"0 0 612 1298","d":["M141.022 23.0002C366.049 281.237 770.467 808.048 497.401 1161.8C370.21 1326.57 138.074 1285.88 71.3734 1199.09C-14.0333 1087.97 23.9445 961.899 105.8 905.031C173.935 857.695 294.275 852.931 428.547 932.286"]},"ס":{"vb":"0 0 1302 1318","d":["M1066.89 562.634C865.087 680.57 500.665 680.568 520.364 312.379C530.838 116.609 758.182 -39.0044 1022.25 47.1973C1272.57 128.915 1344.14 465.119 1216.47 680.569C1106.79 865.672 953.502 1023.8 739.612 1151.32C678.469 1187.77 674.68 1261.62 739.612 1261.62H1112.92M234.842 754.417C436.868 636.856 801.29 637.534 780.908 1005.69C770.07 1201.44 542.438 1356.63 278.534 1269.94C28.3586 1187.75 -42.5869 851.418 85.4828 636.205C195.513 451.306 349.089 293.462 563.216 166.344C624.427 130.005 628.352 56.1614 563.421 56.0409L190.114 55.3485"]},"ע":{"vb":"0 0 902 1319","d":["M141.025 43.5022C365.273 300.844 502.667 550.906 550.496 680.647C572.019 739.028 580.426 824.417 575.512 910.598M428.55 952.788C294.278 873.433 173.938 878.197 105.803 925.533C23.9475 982.401 -14.0303 1108.47 71.3763 1219.59C138.077 1306.38 370.213 1347.07 497.404 1182.3C543.594 1122.46 569.504 1015.94 575.512 910.598M568.177 62.4967C630.203 6.84852 782.618 1.09702 846.843 103.666C907.512 200.552 853.067 330.148 790.289 446.839C691.062 631.264 639.838 716.607 575.512 910.598M575.512 910.598C562.442 1139.79 657.666 1280.99 878.512 1269.61"]},"פ":{"vb":"0 0 805 1285","d":["M570.298 562.633C368.491 680.569 4.06795 680.567 23.7672 312.378C34.2414 116.608 261.585 -39.0054 525.65 47.1964C775.977 128.914 847.546 465.118 719.876 680.568C610.189 865.671 456.906 1023.8 243.015 1151.31C181.872 1187.77 178.083 1261.62 243.015 1261.62H616.323"]},"צ":{"vb":"0 0 1116 1319","d":["M642.82 952.788C508.547 873.433 388.208 878.197 320.072 925.533C238.217 982.401 200.239 1108.47 285.646 1219.59C352.347 1306.38 584.483 1347.07 711.674 1182.3C757.864 1122.46 783.774 1015.94 789.781 910.598M782.447 62.4967C844.473 6.84852 996.888 1.09702 1061.11 103.666C1121.78 200.552 1067.34 330.148 1004.56 446.839C905.332 631.264 854.107 716.607 789.781 910.598M789.781 910.598C776.711 1139.79 871.935 1280.99 1092.78 1269.61M789.781 910.598C789.781 625.319 713.933 385.695 492.047 153.536C320.072 -26.4001 83.7323 60.0451 36.9526 184.829C-12.395 316.463 77.6386 432.047 189.572 455.163C285.646 475.005 370.856 432.047 439.818 395.019"]},"ק":{"vb":"0 0 998 1668","d":["M185.68 485.238C295.995 485.238 369.149 537.402 369.149 627.194M369.149 627.194V1527.93M369.149 627.194C369.149 537.402 442.304 485.238 552.619 485.238M369.149 1527.93C369.149 1588.91 278.892 1650.48 187.39 1643.64M369.149 1527.93C369.149 1588.91 459.407 1650.48 550.909 1643.64M970.002 1232.33C824.499 1313.9 636.557 1236.07 673.897 1028.87C703.692 863.546 940.256 537.652 967.634 401.567C1009.95 191.219 853.24 32.6134 696.119 23.6686C524.761 13.9134 380.257 110.532 361.078 248.16C336.261 110.532 185.447 23.6686 23 23.6686"]},"ר":{"vb":"0 0 998 1288","d":["M970.002 1232.33C824.499 1313.9 636.557 1236.07 673.897 1028.87C703.692 863.546 940.256 537.652 967.634 401.567C1009.95 191.219 853.24 32.6134 696.119 23.6686C524.761 13.9134 380.257 110.532 361.078 248.16C336.261 110.532 185.447 23.6686 23 23.6686"]},"ש":{"vb":"0 0 2064 1276","d":["M1521.22 546.463C1576.02 604.293 1653.55 640.364 1739.51 640.364C1905.57 640.364 2040.19 505.745 2040.19 339.684C2040.19 234.258 1985.93 141.504 1903.81 87.8252M1900.02 84.1044C1837.78 45.3727 1764.3 23.0005 1685.6 23.0005C1461.15 23.0005 1279.21 204.948 1279.21 429.392C1279.21 516.307 1315.61 596.971 1352.96 662.92C1491.73 907.896 1606.98 1008.31 1858.83 1162.1C1902.86 1188.98 1890.03 1252.09 1858.83 1252.09H1447.03C1283.44 1252.09 1031.59 1153.86 1031.59 1045.44M541.971 546.462C487.172 604.293 409.638 640.363 323.679 640.363C157.619 640.363 23 505.745 23 339.684C23 234.257 77.2591 141.504 159.375 87.8247M163.17 84.1039C225.409 45.3722 298.886 23 377.589 23C602.033 23 783.98 204.948 783.98 429.392C783.98 516.306 747.581 596.971 710.225 662.919C571.459 907.896 456.211 1008.31 204.356 1162.1C160.325 1188.98 173.154 1252.09 204.356 1252.09L708.439 1251.16C870.832 1251.16 1031.59 1153.86 1031.59 1045.44M705.398 27.2338C901.531 27.2339 1031.59 119.978 1031.59 279.622M1031.59 279.622V1045.44M1031.59 279.622C1031.59 119.978 1161.66 27.2339 1357.79 27.2338"]},"ת":{"vb":"0 0 1378 1288","d":["M1349.46 1232.93C1203.96 1314.5 1016.02 1236.67 1053.36 1029.47C1083.16 864.145 1319.72 538.251 1347.1 402.166C1389.42 191.819 1232.7 33.2127 1075.58 24.2679C904.224 14.5126 759.72 111.131 740.541 248.759C715.724 111.131 565.161 23 402.714 23H243.015C178.083 23 181.872 99.8512 243.015 136.303C456.906 263.819 610.189 421.947 719.876 607.049C847.546 822.5 775.977 1158.7 525.65 1240.42C261.585 1326.62 34.2414 1171.01 23.7672 975.24C4.06795 607.051 368.491 607.049 570.298 724.985"]}},"connections":[{"from":"א","to":"ו","intent":"protection","x":1.0,"y":-145.0,"scale":1.0,"rotation":0.0},{"from":"א","to":"א","intent":"protection","x":103.0,"y":0.0,"scale":1.0,"rotation":0.0},{"from":"א","to":"ה","intent":"protection","fromGlyph":{"x":378.0,"y":341.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":297.0,"y":341.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":true,"flipY":false}},{"from":"א","to":"ד","intent":"protection","fromGlyph":{"x":336.0,"y":412.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":340.0,"y":267.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"א","to":"ג","intent":"protection","fromGlyph":{"x":337.0,"y":409.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":338.0,"y":268.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ג","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":290.0,"y":293.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ד","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":274.0,"y":367.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ד","to":"ב","intent":"protection","fromGlyph":{"x":293.0,"y":332.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":375.0,"y":274.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ג","to":"ב","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":430.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ת","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":303.0,"y":297.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"א","to":"ת","intent":"protection","fromGlyph":{"x":304.0,"y":337.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":389.0,"y":310.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ג","to":"ת","intent":"protection","fromGlyph":{"x":381.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":282.0,"y":292.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":true,"flipY":true}},{"from":"א","to":"ז","intent":"protection","fromGlyph":{"x":360.0,"y":347.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":276.0,"y":353.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":true,"flipY":false}},{"from":"א","to":"ח","intent":"protection","fromGlyph":{"x":376.0,"y":342.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":true},"toGlyph":{"x":298.0,"y":315.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"א","to":"ט","intent":"protection","fromGlyph":{"x":287.0,"y":333.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":386.0,"y":334.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":true,"flipY":true}},{"from":"א","to":"י","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":325.0,"y":209.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"מ","intent":"protection","fromGlyph":{"x":285.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":385.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":true,"flipY":false}},{"from":"א","to":"נ","intent":"protection","fromGlyph":{"x":359.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":290.0,"y":345.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"ע","intent":"protection","fromGlyph":{"x":338.0,"y":358.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":326.0,"y":276.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"פ","intent":"protection","fromGlyph":{"x":362.0,"y":332.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":290.0,"y":362.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"צ","intent":"protection","fromGlyph":{"x":376.0,"y":355.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":280.0,"y":284.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"ר","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":351.0,"y":326.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ש","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":322.0,"y":221.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ח","to":"מ","intent":"protection","fromGlyph":{"x":311.0,"y":363.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":391.0,"y":287.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ח","to":"א","intent":"protection","fromGlyph":{"x":378.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":293.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ח","to":"ב","intent":"protection","fromGlyph":{"x":308.0,"y":341.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":395.0,"y":304.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ח","to":"ג","intent":"protection","fromGlyph":{"x":339.0,"y":377.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":340.0,"y":271.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":true,"flipY":false}},{"from":"ח","to":"ד","intent":"protection","fromGlyph":{"x":344.0,"y":382.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":338.0,"y":239.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ה","intent":"protection","fromGlyph":{"x":347.0,"y":404.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":328.0,"y":261.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ו","intent":"protection","fromGlyph":{"x":338.0,"y":384.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":305.0,"y":239.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ז","intent":"protection","fromGlyph":{"x":343.0,"y":333.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":400.0,"y":283.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":true}},{"from":"ב","to":"ח","intent":"protection","fromGlyph":{"x":374.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":303.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"ב","to":"ט","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":244.0,"y":291.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false}},{"from":"א","to":"ש","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false},"toGlyph":{"x":338.0,"y":219.0,"rotation":0.0,"scale":1.0,"size":156.0,"flipX":false,"flipY":false}},{"from":"א","to":"ב","intent":"protection","fromGlyph":{"x":287.0,"y":335.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":361.0,"y":303.0,"rotation":0.0,"scale":1.36,"size":204.0,"flipX":false,"flipY":false}},{"from":"ה","to":"ב","intent":"protection","fromGlyph":{"x":305.0,"y":339.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":413.0,"y":340.0,"rotation":0.0,"scale":1.02,"size":153.0,"flipX":false,"flipY":false}},{"from":"ה","to":"ל","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":286.0,"y":308.0,"rotation":0.0,"scale":1.4,"size":210.0,"flipX":false,"flipY":false}},{"from":"ה","to":"י","intent":"protection","fromGlyph":{"x":340.0,"y":340.0,"rotation":0.0,"scale":1.0,"size":150.0,"flipX":false,"flipY":false},"toGlyph":{"x":308.0,"y":229.0,"rotation":0.0,"scale":0.69,"size":103.5,"flipX":false,"flipY":false}}]};
+
+  (function () {
+    'use strict';
+
+    const W = 680, H = 680, CX = 340, CY = 340, DEFAULT_SZ = 150;
+    const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
+    const MAX_LETTERS = 8;
+
+    const DOMAIN_COLOR = {
+      love: '#D7A2B4', livelihood: '#C8ED14', health: '#cccccc',
+      family: '#6D6455', housing: '#8B7355', confidence: '#362514', meaning: '#6C3711'
+    };
+    const URGENCY_SPACING = { low: 1.8, medium: 1.25, high: 0.5 };
+    const STATUS_SPACING = { single: 1.8, couple: 1.0, family: 0.7 };
+    const GENDER_SCALE = { female: 1.08, male: 1.0, nonbinary: 1.03 };
+
+    let sketchState = { layers: [], align: { dx: 0, dy: 0 } };
+    let p5inst = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    function setStatus(msg) { $('status').textContent = msg; }
+
+    function parseHebrewText(text) {
+      const norm = String(text || '').trim().replace(/\s+/g, ' ');
+      function matchKeyword(rules, fallback) {
+        for (const rule of rules) {
+          for (const kw of rule.keywords) {
+            if (norm.includes(kw)) return rule.value;
+          }
+        }
+        return fallback;
+      }
+      function parseAge() {
+        let m = norm.match(/גיל\s*[:\s]*(\d{1,3})/);
+        if (m) return Number(m[1]);
+        m = norm.match(/בת\s*(\d{1,3})/);
+        if (m) return Number(m[1]);
+        m = norm.match(/בן\s*(\d{1,3})/);
+        if (m) return Number(m[1]);
+        const nums = norm.match(/\d{1,3}/g);
+        if (nums) {
+          for (const raw of nums) {
+            const n = Number(raw);
+            if (n >= 5 && n <= 120) return n;
+          }
+        }
+        return 25;
+      }
+      function parseGender() {
+        if (/נקבה|אישה/.test(norm)) return 'female';
+        if (/\bבת\b/.test(norm) && !/בת\s*זוג/.test(norm)) return 'female';
+        if (/זכר|גבר/.test(norm)) return 'male';
+        if (/\bבן\b/.test(norm) && !/בן\s*זוג/.test(norm)) return 'male';
+        return 'female';
+      }
+      function parseRequestSentence() {
+        const want = norm.match(/(?:רוצה|רוצה ל|צריך|צריכה|מחפש|מחפשת|מבקש|מבקשת)(?:\s+[^,.;]+)?/);
+        if (want) return want[0].trim();
+        const clauses = norm.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+        const domainClause = clauses.find((c) => /בית|דירה|מגורים|עבודה|פרנסה|אהבה|בריאות/.test(c));
+        return domainClause || clauses[clauses.length - 1] || norm;
+      }
+      function parsePersonName() {
+        let m = norm.match(/שמי\s+([א-ת][א-ת\s]{0,18})/);
+        if (m) return m[1].trim();
+        m = norm.match(/קוראים\s+לי\s+([א-ת][א-ת\s]{0,18})/);
+        if (m) return m[1].trim();
+        m = norm.match(/אני\s+([א-ת]{2,12})\s*,/);
+        if (m) return m[1].trim();
+        return '';
+      }
+      const age = parseAge();
+      const gender = parseGender();
+      const domain = matchKeyword([
+        { keywords: ['בית', 'דירה', 'מגורים'], value: 'housing' },
+        { keywords: ['עבודה', 'פרנסה', 'כסף'], value: 'livelihood' },
+        { keywords: ['אהבה', 'זוגיות'], value: 'love' },
+        { keywords: ['בריאות', 'רפוא'], value: 'health' }
+      ], 'housing');
+      const urgency = matchKeyword([
+        { keywords: ['דחוף', 'דחיפות', 'בדחיפות', 'מיד', 'עכשיו'], value: 'high' },
+        { keywords: ['בקרוב', 'מהר'], value: 'medium' }
+      ], 'low');
+      const status = matchKeyword([
+        { keywords: ['רווק', 'רווקה'], value: 'single' },
+        { keywords: ['זוג', 'נשוי', 'נשואה'], value: 'couple' },
+        { keywords: ['הורה', 'ילדים', 'ילד'], value: 'family' }
+      ], 'single');
+      const intent = matchKeyword([
+        { keywords: ['זימון'], value: 'summoning' },
+        { keywords: ['הגנה'], value: 'protection' },
+        { keywords: ['אישור'], value: 'grounding' }
+      ], 'summoning');
+      return {
+        age, gender, domain, urgency, status, intent,
+        request_sentence: parseRequestSentence(),
+        person_name: parsePersonName()
+      };
+    }
+
+    function getFirstLetters(sentence) {
+      const out = [];
+      for (const ch of String(sentence || '')) {
+        if (HEB.includes(ch) && !out.includes(ch)) out.push(ch);
+        if (out.length >= MAX_LETTERS) break;
+      }
+      return out;
+    }
+
+    function lettersFromName(name) {
+      const out = [];
+      for (const ch of String(name || '').replace(/\s/g, '')) {
+        if (HEB.includes(ch) && !out.includes(ch)) out.push(ch);
+        if (out.length >= MAX_LETTERS) break;
+      }
+      return out;
+    }
+
+    function normalizeConnection(conn) {
+      if (!conn) return null;
+      if (conn.fromGlyph && conn.toGlyph) return conn;
+      return null;
+    }
+
+    function findConnectionBetween(connections, a, b, intent) {
+      for (let i = connections.length - 1; i >= 0; i--) {
+        const c = connections[i];
+        if (c.intent !== intent) continue;
+        if ((c.from === a && c.to === b) || (c.from === b && c.to === a)) return normalizeConnection(c);
+      }
+      return null;
+    }
+
+    function pickHubAnchor(letters, connections, intent) {
+      const set = new Set(letters);
+      let best = letters[0];
+      let bestCount = -1;
+      for (const letter of letters) {
+        let count = 0;
+        for (const c of connections) {
+          if (c.intent !== intent) continue;
+          const other = c.from === letter ? c.to : c.to === letter ? c.from : null;
+          if (other && other !== letter && set.has(other)) count++;
+        }
+        if (count > bestCount) { bestCount = count; best = letter; }
+      }
+      return best;
+    }
+
+    function placementRelativeTo(conn, refLetter, targetLetter, refX, refY) {
+      const f = conn.fromGlyph, t = conn.toGlyph;
+      const dx = t.x - f.x, dy = t.y - f.y;
+      if (conn.from === refLetter && conn.to === targetLetter) {
+        return { letter: targetLetter, x: refX + dx, y: refY + dy, rotation: t.rotation, sz: t.size, flipX: t.flipX, flipY: t.flipY };
+      }
+      if (conn.from === targetLetter && conn.to === refLetter) {
+        return { letter: targetLetter, x: refX - dx, y: refY - dy, rotation: f.rotation, sz: f.size, flipX: f.flipX, flipY: f.flipY };
+      }
+      return null;
+    }
+
+    function buildHubPlacements(letters, intent) {
+      const connections = AMULET_DATA.connections;
+      const anchor = pickHubAnchor(letters, connections, intent) || letters[0];
+      const order = [anchor, ...letters.filter((l) => l !== anchor)];
+      const placements = [{ letter: anchor, x: CX, y: CY, rotation: 0, sz: DEFAULT_SZ, flipX: false, flipY: false }];
+      const usedPairs = [];
+      const skipped = [];
+      for (let i = 1; i < order.length; i++) {
+        const target = order[i];
+        let placed = false;
+        for (let j = 0; j < placements.length; j++) {
+          const ref = placements[j];
+          const conn = findConnectionBetween(connections, ref.letter, target, intent);
+          if (!conn) continue;
+          const pos = placementRelativeTo(conn, ref.letter, target, ref.x, ref.y);
+          if (!pos) continue;
+          placements.push(pos);
+          usedPairs.push({ from: ref.letter, to: target });
+          placed = true;
+          break;
+        }
+        if (!placed) skipped.push(target);
+      }
+      return { placements, anchor, skipped };
+    }
+
+    function applySpacing(placements, anchor, spacing) {
+      if (!spacing || spacing === 1) return placements;
+      const hub = placements.find((p) => p.letter === anchor) || placements[0];
+      return placements.map((p) => {
+        if (p.letter === hub.letter) return p;
+        const dx = p.x - hub.x, dy = p.y - hub.y;
+        return { ...p, x: hub.x + dx * spacing, y: hub.y + dy * spacing };
+      });
+    }
+
+    function layerStyle(params, layer) {
+      const gScale = GENDER_SCALE[params.gender] || 1;
+      if (layer === 2) {
+        return {
+          color: '#B0B0B0',
+          strokeW: 42,
+          spacing: STATUS_SPACING[params.status] || 1,
+          scale: gScale,
+          gloss: 0.55
+        };
+      }
+      return {
+        color: DOMAIN_COLOR[params.domain] || DOMAIN_COLOR.housing,
+        strokeW: 45,
+        spacing: URGENCY_SPACING[params.urgency] || 1.25,
+        scale: gScale,
+        gloss: 0.85
+      };
+    }
+
+    function samplePathD(d, vb, placement, steps) {
+      const svg = $('pathMeasure');
+      const parts = vb.split(/\s+/).map(Number);
+      const vw = parts[2] || 100, vh = parts[3] || 100;
+      const half = DEFAULT_SZ / 2;
+      const scaleX = placement.sz / vw;
+      const scaleY = placement.sz / vh;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      svg.innerHTML = '';
+      svg.appendChild(path);
+      const len = path.getTotalLength();
+      if (!len || len < 2) return [];
+      const pts = [];
+      for (let i = 0; i < steps; i++) {
+        const t = steps <= 1 ? 0 : i / (steps - 1);
+        const p = path.getPointAtLength(len * t);
+        let x = p.x * scaleX - half;
+        let y = p.y * scaleY - half;
+        if (placement.flipX) x = -x;
+        if (placement.flipY) y = -y;
+        const rad = (placement.rotation || 0) * Math.PI / 180;
+        const rx = x * Math.cos(rad) - y * Math.sin(rad);
+        const ry = x * Math.sin(rad) + y * Math.cos(rad);
+        pts.push({ x: placement.x + rx, y: placement.y + ry });
+      }
+      return pts;
+    }
+
+    function buildLayerPaths(letters, params, layerNum) {
+      if (!letters.length) return [];
+      const intent = layerNum === 2 ? 'protection' : params.intent;
+      let { placements, anchor } = buildHubPlacements(letters, intent);
+      const style = layerStyle(params, layerNum);
+      placements = applySpacing(placements, anchor, style.spacing);
+      const polylines = [];
+      for (const pl of placements) {
+        const glyph = AMULET_DATA.glyphs[pl.letter];
+        if (!glyph) continue;
+        for (const d of glyph.d) {
+          const pts = samplePathD(d, glyph.vb, pl, 48);
+          if (pts.length >= 2) polylines.push({ pts, style });
+        }
+      }
+      return { polylines, style, anchor };
+    }
+
+    function bboxOfPolylines(polylines) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const pl of polylines) {
+        for (const p of pl.pts) {
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+          const mx = W - p.x;
+          minX = Math.min(minX, mx); maxX = Math.max(maxX, mx);
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        }
+      }
+      if (!isFinite(minX)) return { cx: CX, cy: CY };
+      return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+    }
+
+    function composeAmulet(params) {
+      const reqLetters = getFirstLetters(params.request_sentence);
+      const nameLetters = lettersFromName(params.person_name);
+      if (!reqLetters.length) throw new Error('לא נמצאו אותיות במשפט הבקשה');
+
+      const layer3 = buildLayerPaths(reqLetters, params, 3);
+      const layer2 = nameLetters.length ? buildLayerPaths(nameLetters, params, 2) : { polylines: [], style: null, anchor: null };
+
+      const c3 = bboxOfPolylines(layer3.polylines);
+      const c2 = layer2.polylines.length ? bboxOfPolylines(layer2.polylines) : c3;
+      const align = { dx: c3.cx - c2.cx, dy: c3.cy - c2.cy };
+
+      sketchState = {
+        layers: [
+          { polylines: layer2.polylines, style: layer2.style, offset: align },
+          { polylines: layer3.polylines, style: layer3.style, offset: { dx: 0, dy: 0 } }
+        ],
+        align,
+        reqLetters,
+        nameLetters,
+        anchor: layer3.anchor
+      };
+      if (p5inst) p5inst.redraw();
+      return sketchState;
+    }
+
+    function drawPolyline(p, pts, strokeW, col, gloss, mirror) {
+      const drawOne = (flip) => {
+        p.noFill();
+        p.strokeWeight(strokeW);
+        p.stroke(col);
+        p.beginShape();
+        for (const pt of pts) {
+          const x = flip ? W - pt.x : pt.x;
+          p.vertex(x, pt.y);
+        }
+        p.endShape();
+        if (gloss > 0) {
+          p.strokeWeight(strokeW * 0.35);
+          const c = p.color(col);
+          p.stroke(p.red(c) + 40, p.green(c) + 40, p.blue(c) + 40, 180 * gloss);
+          p.beginShape();
+          for (const pt of pts) {
+            const x = flip ? W - pt.x : pt.x;
+            p.vertex(x + 1.5, pt.y - 2);
+          }
+          p.endShape();
+        }
+      };
+      drawOne(false);
+      if (mirror) drawOne(true);
+    }
+
+    function startSketch() {
+      p5inst = new p5((p) => {
+        p.setup = function () {
+          const c = p.createCanvas(W, H);
+          c.parent('canvasHost');
+          p.noLoop();
+          p.background(255);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.fill(180);
+          p.noStroke();
+          p.textSize(14);
+          p.text('לחצי «צור קמע»', W / 2, H / 2);
+        };
+
+        p.draw = function () {
+          p.background(255);
+          if (!sketchState.layers.length) return;
+          for (const layer of sketchState.layers) {
+            if (!layer.polylines.length || !layer.style) continue;
+            const ox = layer.offset.dx || 0;
+            const oy = layer.offset.dy || 0;
+            const scale = layer.style.scale || 1;
+            for (const pl of layer.polylines) {
+              const shifted = pl.pts.map((pt) => {
+                let x = (pt.x - CX) * scale + CX + ox;
+                let y = (pt.y - CY) * scale + CY + oy;
+                return { x, y };
+              });
+              drawPolyline(p, shifted, layer.style.strokeW, layer.style.color, layer.style.gloss, true);
+            }
+          }
+        };
+      });
+    }
+
+    $('createBtn').addEventListener('click', () => {
+      try {
+        const params = parseHebrewText($('freeText').value);
+        $('paramsPreview').hidden = false;
+        $('paramsPreview').textContent = JSON.stringify(params, null, 2);
+        setStatus('בונה קמע…');
+        const state = composeAmulet(params);
+        let msg = 'שכבה 3: ' + state.reqLetters.join(' → ') + ' | מרכז: ' + state.anchor;
+        if (state.nameLetters.length) msg += ' · שכבה 2: ' + state.nameLetters.join(' → ');
+        msg += ' | יישור: ' + state.align.dx.toFixed(1) + ',' + state.align.dy.toFixed(1);
+        setStatus(msg);
+      } catch (err) {
+        setStatus('שגיאה: ' + err.message);
+        console.error(err);
+      }
+    });
+
+    if (typeof p5 === 'undefined') {
+      setStatus('p5.js לא נטען — בדקי חיבור לאינטרנט');
+    } else {
+      startSketch();
+      setStatus('מוכן — p5.js');
+    }
+  })();
+  </script>
+</body>
+</html>

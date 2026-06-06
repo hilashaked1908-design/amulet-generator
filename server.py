@@ -3,13 +3,17 @@
 
 import json
 import os
+import re
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONNECTIONS_PATH = os.path.join(ROOT, "connections.json")
 GLYPHS_DIR = os.path.join(ROOT, "glyphs")
+LETTERS_DIR = os.path.join(ROOT, "אותיות")
 PORT = int(os.environ.get("PORT", "8080"))
+GLYPH_FILE_RE = re.compile(r"^.\d+\.svg$", re.UNICODE)
+SERVER_VERSION = 2
 
 
 def read_connections():
@@ -23,6 +27,63 @@ def write_connections(data):
     with open(CONNECTIONS_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
+
+
+def glyph_filename_for_letter(letter):
+    if not letter or len(letter) != 1:
+        raise ValueError("Invalid letter")
+    return "א1.svg" if letter == "א" else f"{letter}2.svg"
+
+
+def is_valid_glyph_filename(filename):
+    return bool(GLYPH_FILE_RE.match(filename))
+
+
+def bootstrap_glyph_from_letters(filename):
+    """Copy אותיות/<filename> into glyphs/ only when glyphs/ is missing that file."""
+    if not is_valid_glyph_filename(filename):
+        return False
+    dst = os.path.join(GLYPHS_DIR, filename)
+    if os.path.isfile(dst):
+        return False
+    src = os.path.join(LETTERS_DIR, filename)
+    if not os.path.isfile(src):
+        return False
+    try:
+        os.makedirs(GLYPHS_DIR, exist_ok=True)
+        with open(src, "rb") as f:
+            data = f.read()
+        with open(dst, "wb") as f:
+            f.write(data)
+        print(f"[bootstrap] אותיות/{filename} → glyphs/{filename}")
+        return True
+    except OSError as err:
+        print(f"[bootstrap] failed for {filename}: {err}")
+        return False
+
+
+def bootstrap_all_glyphs_from_letters():
+    if not os.path.isdir(LETTERS_DIR):
+        return []
+    return [name for name in sorted(os.listdir(LETTERS_DIR)) if bootstrap_glyph_from_letters(name)]
+
+
+def save_glyph_file(letter, svg_text):
+    filename = glyph_filename_for_letter(letter)
+    text = (svg_text or "").strip()
+    lower = text.lower()
+    if "<svg" not in lower:
+        raise ValueError("Invalid SVG content")
+    if "</svg>" not in lower:
+        raise ValueError("SVG must contain </svg>")
+    os.makedirs(GLYPHS_DIR, exist_ok=True)
+    path = os.path.join(GLYPHS_DIR, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+        if not text.endswith("\n"):
+            f.write("\n")
+    print(f"[API] saved glyph {filename} ({len(text)} bytes)")
+    return filename
 
 
 def decode_request_path(raw_path):
@@ -116,6 +177,11 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def end_headers(self):
+        path = urlparse(self.path).path
+        if path.endswith((".js", ".html", ".css")):
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        else:
+            self.send_header("Cache-Control", "no-cache")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
@@ -142,6 +208,9 @@ class Handler(SimpleHTTPRequestHandler):
         self._set_decoded_path()
         parsed_path = urlparse(self.path).path
 
+        if parsed_path == "/api/server-info":
+            self._send_json({"ok": True, "version": SERVER_VERSION, "glyphUpload": True})
+            return
         if parsed_path == "/api/glyphs":
             data = self._list_glyphs()
             print(f"[API] GET /api/glyphs -> {len(data.get('files', []))} files")
@@ -162,18 +231,40 @@ class Handler(SimpleHTTPRequestHandler):
 
         return super().do_GET()
 
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8") if length else "{}"
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            return None
+
+    def _handle_glyph_upload(self):
+        payload = self._read_json_body()
+        if payload is None:
+            self.send_error(400, "Invalid JSON")
+            return
+        letter = (payload.get("letter") or "").strip()
+        svg = payload.get("svg") or ""
+        try:
+            filename = save_glyph_file(letter, svg)
+        except ValueError as err:
+            self.send_error(400, str(err))
+            return
+        self._send_json({"ok": True, "letter": letter, "filename": filename})
+
     def do_POST(self):
         self._set_decoded_path()
         parsed_path = urlparse(self.path).path
+        if parsed_path == "/api/glyphs":
+            self._handle_glyph_upload()
+            return
         if parsed_path != "/api/connections":
             self.send_error(404)
             return
 
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length else "{}"
-        try:
-            payload = json.loads(body)
-        except json.JSONDecodeError:
+        payload = self._read_json_body()
+        if payload is None:
             self.send_error(400, "Invalid JSON")
             return
 
@@ -257,8 +348,12 @@ def print_glyphs_startup_info():
 
 
 if __name__ == "__main__":
+    bootstrapped = bootstrap_all_glyphs_from_letters()
+    if bootstrapped:
+        print(f"Bootstrapped {len(bootstrapped)} missing glyph(s) from אותיות/: {', '.join(bootstrapped)}")
     print_glyphs_startup_info()
+    print("Glyph files are read from glyphs/ only. Use editor upload or save directly there.")
     print(f"Serving at http://localhost:{PORT}")
-    print("Open editor: http://localhost:{PORT}/editor.html")
+    print(f"Open editor: http://localhost:{PORT}/editor.html")
     print("All paths URL-decoded (unquote) for Hebrew filenames")
     HTTPServer(("", PORT), Handler).serve_forever()

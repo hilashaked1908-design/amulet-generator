@@ -688,12 +688,14 @@
   }
 
   async function loadGlyphSvg(letter) {
-    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
-    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
-    const res = await fetch(url);
+    const url =
+      GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter)) + '?t=' + Date.now();
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('חסר SVG: ' + letter);
-    glyphSvgCache[letter] = await res.text();
-    return glyphSvgCache[letter];
+    const text = await res.text();
+    glyphSvgCache[letter] = text;
+    delete parsedGlyphCache[letter];
+    return text;
   }
 
   function parseGlyphSvg(svgText) {
@@ -710,7 +712,6 @@
   }
 
   async function getParsedGlyph(letter) {
-    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
     const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
     parsedGlyphCache[letter] = parsed;
     return parsed;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>עורך חיבורי סמלים</title>
-  <link rel="stylesheet" href="editor.css">
+  <link rel="stylesheet" href="editor.css?v=3">
 </head>
 <body>
 
@@ -26,9 +26,12 @@
       <option value="grounding">אישור</option>
     </select>
   </label>
+  <button type="button" class="btn" id="uploadFromBtn" title="החלפת קובץ SVG של אות A">העלאת SVG — A</button>
+  <button type="button" class="btn" id="uploadToBtn" title="החלפת קובץ SVG של אות B">העלאת SVG — B</button>
+  <input type="file" id="glyphFileInput" accept=".svg,image/svg+xml" hidden>
   <button type="button" class="btn primary" id="saveBtn">שמירת חיבור</button>
   <button type="button" class="btn" id="resetBtn">איפוס</button>
-  <p class="hint">גרור אותיות וסמלים על הקנבס. שמירה דורשת <code dir="ltr">python3 server.py</code></p>
+  <p class="hint">החלפת אות: לחצי «העלאת SVG» — נשמר ב־<code dir="ltr">glyphs/</code> (למשל <code dir="ltr">ל2.svg</code>). שם הקובץ חייב להתאים לאות.</p>
 </header>
 
 <div id="editor-main">
@@ -69,6 +72,10 @@
       <button type="button" class="btn flip-btn" id="flipAX" data-target="a" data-axis="x">היפוך ↔</button>
       <button type="button" class="btn flip-btn" id="flipAY" data-target="a" data-axis="y">היפוך ↕</button>
     </div>
+    <div class="sl-row">
+      <label>גודל A: <b id="scaleAVal">1.00</b>× · <b id="sizeAVal">150</b>px</label>
+      <input type="range" id="slScaleA" min="25" max="250" value="100" step="1">
+    </div>
 
     <h3>סמל B — כחול</h3>
     <div class="btn-row">
@@ -83,8 +90,8 @@
       <input type="range" id="slRot" min="-180" max="180" value="0" step="1">
     </div>
     <div class="sl-row">
-      <label>קנה מידה B: <b id="scaleVal">1.00</b></label>
-      <input type="range" id="slScale" min="50" max="200" value="100" step="1">
+      <label>גודל B: <b id="scaleVal">1.00</b>× · <b id="sizeBVal">150</b>px</label>
+      <input type="range" id="slScale" min="25" max="250" value="100" step="1">
     </div>
     <div class="sl-row">
       <label>גודל בסיס: <b id="szVal">150</b>px</label>
@@ -100,6 +107,6 @@
 
 <div id="statusbar" role="status" aria-live="polite"></div>
 
-<script src="editor.js"></script>
+<script src="editor.js?v=6"></script>
 </body>
 </html>
