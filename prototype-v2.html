@@ -264,6 +264,8 @@
   const MAX_LETTERS = 8;
   const HUB_OVERLAP_DIST = 80;
   const DEFAULT_GLYPH_SIZE = 150;
+  /** Normalized path stroke in glyph viewBox units (matches א1.svg, ב2.svg, etc.) */
+  const GLYPH_PATH_STROKE_WIDTH = 46;
 
   const BG_WHITE = '#ffffff';
   const VIEWBOX_PAD = 45;
@@ -648,10 +650,11 @@
   }
 
   /**
-   * Remove per-path stroke/fill so the stroke pass controls rendering.
+   * Normalize path stroke-width; stroke color/filter come from the unified stroke pass.
    */
   function sanitizePathsInner(html) {
     if (!html) return '';
+    const sw = String(GLYPH_PATH_STROKE_WIDTH);
     try {
       const doc = new DOMParser().parseFromString(
         '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
@@ -661,7 +664,7 @@
       doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
         el.setAttribute('fill', 'none');
         el.removeAttribute('stroke');
-        el.removeAttribute('stroke-width');
+        el.setAttribute('stroke-width', sw);
         el.removeAttribute('stroke-linecap');
         el.removeAttribute('stroke-linejoin');
         el.removeAttribute('stroke-opacity');
@@ -670,7 +673,7 @@
             .getAttribute('style')
             .replace(/fill\s*:\s*[^;]+;?/gi, 'fill:none;')
             .replace(/stroke\s*:\s*[^;]+;?/gi, '')
-            .replace(/stroke-width\s*:\s*[^;]+;?/gi, '');
+            .replace(/stroke-width\s*:\s*[^;]+;?/gi, 'stroke-width:' + sw + ';');
           el.setAttribute('style', s);
         }
       });
@@ -679,7 +682,7 @@
     } catch (_) {
       return html
         .replace(/\sstroke\s*=\s*["'][^"']*["']/gi, '')
-        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, ' stroke-width="' + sw + '"')
         .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"');
     }
   }
