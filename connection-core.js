@@ -2,6 +2,14 @@
 
 const CANVAS = { W: 680, H: 680, CX: 340, CY: 340, DEFAULT_SIZE: 150 };
 
+/** Dev cap — max letters per connected glyph chain (reduces SDF / render load). */
+const MAX_CONNECTED_LETTERS = 3;
+
+function limitConnectedLetters(letters, max = MAX_CONNECTED_LETTERS) {
+  if (!letters?.length) return [];
+  return letters.slice(0, Math.max(0, max));
+}
+
 const DEFAULT_GLYPH = () => ({
   x: CANVAS.CX,
   y: CANVAS.CY,
@@ -110,6 +118,16 @@ function findConnectionBetween(connections, a, b, intent) {
   return findConnection(connections, a, b, intent) || findConnection(connections, b, a, intent);
 }
 
+/** שכבת שם — אם אין חיבור בכוונה הנוכחית (למשל זימון), מנסה גם הגנה */
+function findConnectionBetweenWithFallback(connections, a, b, intent) {
+  const primary = findConnectionBetween(connections, a, b, intent);
+  if (primary) return primary;
+  if (intent !== 'protection') {
+    return findConnectionBetween(connections, a, b, 'protection');
+  }
+  return null;
+}
+
 /**
  * Among `letters`, pick the one with the most saved connections (this intent)
  * to another letter in the same set. Ties keep the earlier entry in `letters`.
@@ -199,6 +217,7 @@ function placementRelativeTo(conn, refLetter, targetLetter, refX, refY) {
  * Build placements for a letter sequence using relative offsets chained from center.
  */
 function getPlacementsForLetters(letters, connections, intent) {
+  letters = limitConnectedLetters(letters);
   const placements = [];
   const n = letters.length;
   if (!n) return placements;
@@ -265,10 +284,13 @@ function buildConnectionPayload(from, to, intent, glyphA, glyphB) {
 
 window.ConnectionCore = {
   CANVAS,
+  MAX_CONNECTED_LETTERS,
+  limitConnectedLetters,
   normalizeConnection,
   normalizeGlyph,
   findConnection,
   findConnectionBetween,
+  findConnectionBetweenWithFallback,
   pickHubAnchor,
   connectionOffset,
   placementRelativeTo,

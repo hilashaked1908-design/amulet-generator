@@ -287,7 +287,8 @@ class Handler(SimpleHTTPRequestHandler):
         data = read_connections()
         items = data.get("connections", [])
         key = connection_key(entry)
-        items = [c for c in items if connection_key(c) != key]
+        rev_key = (entry["to"], entry["from"], entry["intent"])
+        items = [c for c in items if connection_key(c) not in (key, rev_key)]
         items.append(entry)
         data["connections"] = items
         write_connections(data)
