@@ -461,6 +461,22 @@ function sampleMaskField(px, py, params) {
   return { inside: !!grid[i], distIn: distIn[i], distOut: distOut[i] };
 }
 
+function sampleMaskGridBilinear(field, w, h, px, py) {
+  const x0 = Math.max(0, Math.min(w - 1, Math.floor(px)));
+  const y0 = Math.max(0, Math.min(h - 1, Math.floor(py)));
+  const x1 = Math.min(w - 1, x0 + 1);
+  const y1 = Math.min(h - 1, y0 + 1);
+  const tx = px - x0;
+  const ty = py - y0;
+  const v00 = field[y0 * w + x0];
+  const v10 = field[y0 * w + x1];
+  const v01 = field[y1 * w + x0];
+  const v11 = field[y1 * w + x1];
+  const a = v00 + (v10 - v00) * tx;
+  const b = v01 + (v11 - v01) * tx;
+  return a + (b - a) * ty;
+}
+
 function distPointToSegment(px, py, ax, ay, bx, by) {
   const abx = bx - ax;
   const aby = by - ay;
@@ -565,6 +581,68 @@ function metalPlateCradleSdfAt(x, y, z, params) {
   return Math.max(outerPhi, sdfZ) - roundR * 0.09;
 }
 
+/** Stone seat + collar following the emboss silhouette halo (mask-based). */
+function metalHaloWrapSdfAt(x, y, z, params) {
+  const c = params.metalHaloWrap;
+  if (!c) return 1e6;
+
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  if (px < -1 || py < -1 || px > c.w || py > c.h) return 1e6;
+
+  const distIn = sampleMaskGridBilinear(c.distIn, c.w, c.h, px, py);
+  const distOut = sampleMaskGridBilinear(c.distOut, c.w, c.h, px, py);
+  const ms = params.maskScale;
+  const din = distIn / ms;
+  const dout = distOut / ms;
+  const { wrapBand, seatDepth, collarH, maxH, roundR } = c;
+
+  if (dout > wrapBand * 1.06) return 1e6;
+
+  let hSurf;
+  if (distOut < 0.5) {
+    const edgeT = Math.min(1, din / Math.max(wrapBand * 0.42, 0.02));
+    if (edgeT > 0.22) {
+      hSurf = maxH * 0.78 - seatDepth * (1 - edgeT * 0.3);
+    } else {
+      const rimT = Math.sin((edgeT / 0.22) * Math.PI * 0.5);
+      hSurf = maxH * 0.58 + collarH * rimT;
+    }
+  } else {
+    const ringT = Math.min(1, dout / Math.max(wrapBand, 0.02));
+    const rimT = Math.sin((1 - ringT) * Math.PI * 0.5);
+    hSurf = maxH * 0.54 + collarH * rimT * 0.9;
+  }
+
+  const outerPhi = Math.max(0, dout - wrapBand);
+  const basePad = roundR * 0.24;
+  const sdfZ = Math.max(z - hSurf, -(z + basePad));
+  return Math.max(outerPhi, sdfZ) - roundR * 0.08;
+}
+
+/** Continuous domed plateau from slab silhouette — fills interior so name tubes never punch holes. */
+function slabMaskPlateauSdfAt(x, y, z, params) {
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  const { maskScale, roundR, maxH } = params;
+  if (!s.inside) {
+    return s.distOut / maskScale + roundR * 0.12;
+  }
+  const din = s.distIn / maskScale;
+  const edgeT = Math.min(1, din / Math.max(roundR * 1.1, 0.01));
+  const domeT = Math.sin(edgeT * Math.PI * 0.5);
+  const baseH = params.basePlateHeight ?? maxH * 0.4;
+  const lobePeak = maxH * (0.92 + 0.08 * domeT);
+  let hSurf = baseH + (lobePeak - baseH) * domeT;
+  hSurf -= effectiveEngraveDepthAt(x, y, params);
+  hSurf = Math.max(baseH * 0.94, hSurf);
+  const basePad = roundR * 0.5;
+  const sdfZ = Math.max(z - hSurf, -(z + basePad));
+  const phi2d = roundR - din;
+  return Math.max(phi2d, sdfZ) - roundR * 0.06;
+}
+
 /** Slab + name-tube body: soft domed lobes on a plate — no vertical cliff at silhouette. */
 function slabTubeStoneSdfAt(x, y, z, params) {
   const { segments, segmentIndex, roundR, maxH } = params;
@@ -582,7 +660,7 @@ function slabTubeStoneSdfAt(x, y, z, params) {
 
   const coreR = roundR * 0.55;
   const valleyOuter = roundR * 2.6;
-  if (dist2d > coreR && dist2d < valleyOuter) {
+  if (!params.solidInterior && dist2d > coreR && dist2d < valleyOuter) {
     const t = (dist2d - coreR) / (valleyOuter - coreR);
     hSurf -= (peakH - baseH) * 0.38 * Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
     hSurf = Math.max(baseH * 0.92, hSurf);
@@ -601,9 +679,16 @@ function slabTubeStoneSdfAt(x, y, z, params) {
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.14;
 
-  if (params.metalPlateCradle) {
+  if (params.metalHaloWrap) {
+    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
+    letterSdf = Math.min(letterSdf, haloSdf);
+  } else if (params.metalPlateCradle) {
     const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
     letterSdf = Math.min(letterSdf, cradleSdf);
+  }
+
+  if (params.solidInterior) {
+    return Math.min(letterSdf, slabMaskPlateauSdfAt(x, y, z, params));
   }
 
   return letterSdf;
@@ -632,7 +717,10 @@ function tubeStoneSdfAt(x, y, z, params) {
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
 
-  if (params.metalPlateCradle) {
+  if (params.metalHaloWrap) {
+    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
+    letterSdf = Math.min(letterSdf, haloSdf);
+  } else if (params.metalPlateCradle) {
     const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
     letterSdf = Math.min(letterSdf, cradleSdf);
   }
@@ -741,8 +829,20 @@ function metalBedShoulderAt(x, y, params) {
   return shoulderH * rimT * Math.min(1, bed / Math.max(shoulderH, 0.001));
 }
 
+function insideEmbossFootprintAt(x, y, params) {
+  const fp = params.embossFootprintMask;
+  if (!fp?.grid) return false;
+  const px = (x - fp.maskOrigin.minX) * params.maskScale;
+  const py = (fp.maskOrigin.maxY - y) * params.maskScale;
+  const mx = Math.round(px);
+  const my = Math.round(py);
+  if (mx < 0 || mx >= fp.w || my < 0 || my >= fp.h) return false;
+  return !!fp.grid[my * fp.w + mx];
+}
+
 /** Engrave depth — sunk into stone, suppressed only under raised emboss. */
 function effectiveEngraveDepthAt(x, y, params) {
+  if (insideEmbossFootprintAt(x, y, params)) return 0;
   let depth = engraveDepthAt(x, y, params);
   if (depth <= 0) return 0;
 
@@ -995,7 +1095,13 @@ function stoneSdfAt(x, y, z, params) {
     hSurf = Math.max(baseH * 0.94, hSurf);
     const basePad = roundR * 0.5;
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
-    return Math.max(phi2d, sdfZ) - roundR * 0.06;
+    let reliefSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
+    if (params.metalHaloWrap) {
+      reliefSdf = Math.min(reliefSdf, metalHaloWrapSdfAt(x, y, z, params));
+    } else if (params.metalPlateCradle) {
+      reliefSdf = Math.min(reliefSdf, metalPlateCradleSdfAt(x, y, z, params));
+    }
+    return reliefSdf;
   }
 
   let hSurf;
@@ -1015,7 +1121,17 @@ function stoneSdfAt(x, y, z, params) {
   }
   const basePad = params.slabMode ? roundR * 0.5 : roundR * 0.32;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
-  return Math.max(phi2d, sdfZ) - roundR * (params.slabMode ? 0.06 : 0.1);
+  let slabSdf = Math.max(phi2d, sdfZ) - roundR * (params.slabMode ? 0.06 : 0.1);
+
+  if (params.metalHaloWrap) {
+    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
+    slabSdf = Math.min(slabSdf, haloSdf);
+  } else if (params.metalPlateCradle) {
+    const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
+    slabSdf = Math.min(slabSdf, cradleSdf);
+  }
+
+  return slabSdf;
 }
 
 /**
@@ -1379,23 +1495,23 @@ export function buildStoneSculptureMeshFromMask(
   const spanZ = maxZ - minZ;
   const maxSpan = Math.max(spanX, spanY, spanZ);
   const res = Math.min(
-    96,
-    Math.max(60, Math.round(maxSpan / (roundR * (hasStrokeRelief ? 0.26 : 0.28))))
+    58,
+    Math.max(44, Math.round(maxSpan / (roundR * (hasStrokeRelief ? 0.34 : 0.36))))
   );
 
-  let nx = Math.max(40, Math.round(res * (spanX / maxSpan)));
-  let ny = Math.max(40, Math.round(res * (spanY / maxSpan)));
+  let nx = Math.max(28, Math.round(res * (spanX / maxSpan)));
+  let ny = Math.max(28, Math.round(res * (spanY / maxSpan)));
   let nz = Math.max(
-    hasStrokeRelief ? 56 : hasRelief ? 40 : 24,
+    hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
     Math.round(res * (spanZ / maxSpan))
   );
-  const maxVoxels = 220000;
+  const maxVoxels = 65000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
-    nx = Math.max(36, Math.round(nx * s));
-    ny = Math.max(36, Math.round(ny * s));
-    nz = Math.max(32, Math.round(nz * s));
+    nx = Math.max(24, Math.round(nx * s));
+    ny = Math.max(24, Math.round(ny * s));
+    nz = Math.max(20, Math.round(nz * s));
   }
 
   const params = {
@@ -1450,6 +1566,9 @@ export function buildStoneSculptureMeshFromMask(
     engraveOverlays: options?.engraveOverlays || null,
     embossOverlays: options?.embossOverlays || null,
     metalPlateCradle: options?.metalPlateCradle || null,
+    metalHaloWrap: options?.metalHaloWrap || null,
+    embossFootprintMask: options?.embossFootprintMask || null,
+    solidInterior: !!options?.solidInterior,
   };
 
   const potential = (x, y, z) => stoneSdfAt(x, y, z, params);
@@ -1464,20 +1583,22 @@ export function buildStoneSculptureMeshFromMask(
 
   let geom = mcResultToGeometry(mc);
   const tubeMode = !!segments?.length && !slabMode;
-  const smoothIter = slabMode ? (hasRelief ? 4 : 4) : tubeMode ? 6 : 8;
+  const smoothIter = slabMode ? (hasRelief ? 2 : 2) : tubeMode ? 4 : 6;
   const smoothLambda = slabMode
     ? hasStrokeRelief
-      ? 0.11
+      ? 0.1
       : hasOverlays
-        ? 0.12
-        : 0.2
+        ? 0.11
+        : 0.16
     : tubeMode
-      ? 0.22
-      : 0.27;
+      ? 0.2
+      : 0.24;
   if (smoothIter > 0) laplacianSmoothGeometry(geom, smoothIter, smoothLambda);
   geom.computeVertexNormals();
-  laplacianSmoothGeometry(geom, hasStrokeRelief ? 2 : 2, hasStrokeRelief ? 0.03 : tubeMode ? 0.08 : 0.05);
-  geom.computeVertexNormals();
+  if (!slabMode) {
+    laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
+    geom.computeVertexNormals();
+  }
   // Slab stone: no vertex AO — mask-edge darkening looked like a silhouette outline and
   // washed out procedural grain on flat plateaus. Sculptural shading comes from lights + maps.
   if (!slabMode) applySculptureVertexAO(geom, params);

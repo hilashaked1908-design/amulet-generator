@@ -6,17 +6,101 @@ import * as THREE from 'https://esm.sh/three@0.160.0';
 
 const MASK_SCALE = 2;
 
-/** Shared repoussé height-field tuning — stone-derived sheet + sharp emboss relief. */
+/** Shared repoussé height-field tuning — emboss relief + flat halo plate. */
 export const REPOUSSE_FIELD_DEFAULTS = {
   maxReliefHeight: 11,
   reliefStroke: 18,
   sheetStroke: 56,
-  blurRadius: 5,
+  blurRadius: 4,
   reliefGridBlur: 2,
-  baseThickness: 3.2,
+  baseThickness: 2.4,
   domePower: 0.36,
-  rimHeight: 2.0,
+  rimHeight: 0,
+  /** Fraction of maxRelief kept at emboss outer edge (creates step above flat halo). */
+  edgeReliefFrac: 0.88,
+  /** Softer blur when flat halo — preserves emboss/halo height step. */
+  haloBlurRadius: 2,
 };
+
+/** GPU displacement tessellation — moderate subdivisions; detail from 512² height/normal maps. */
+export const REPOUSSE_MESH_SEGMENTS = 80;
+/** Upsampled height/normal texture resolution (GPU linear filtering = smooth relief). */
+export const METAL_HEIGHT_TEX_SIZE = 512;
+
+function buildEmbossSegments(polylines, maxPts = 64) {
+  const segments = [];
+  for (const { pts, closed } of polylines) {
+    if (pts.length < 2) continue;
+    let draw = pts;
+    if (pts.length > maxPts) {
+      draw = [];
+      const step = (pts.length - 1) / (maxPts - 1);
+      for (let i = 0; i < maxPts; i++) draw.push(pts[Math.round(i * step)]);
+    }
+    const n = closed ? draw.length : draw.length - 1;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % draw.length;
+      segments.push({ ax: draw[i].x, ay: draw[i].y, bx: draw[j].x, by: draw[j].y });
+    }
+  }
+  return segments;
+}
+
+function buildSegmentSpatialIndex(segments, cellSize) {
+  let minX = Infinity;
+  let minY = Infinity;
+  for (const seg of segments) {
+    minX = Math.min(minX, seg.ax, seg.bx);
+    minY = Math.min(minY, seg.ay, seg.by);
+  }
+  const buckets = new Map();
+  const add = (cx, cy, si) => {
+    const k = cx + ',' + cy;
+    let list = buckets.get(k);
+    if (!list) {
+      list = [];
+      buckets.set(k, list);
+    }
+    list.push(si);
+  };
+  for (let si = 0; si < segments.length; si++) {
+    const seg = segments[si];
+    const c0 = Math.floor((Math.min(seg.ax, seg.bx) - minX) / cellSize);
+    const c1 = Math.floor((Math.max(seg.ax, seg.bx) - minX) / cellSize);
+    const r0 = Math.floor((Math.min(seg.ay, seg.by) - minY) / cellSize);
+    const r1 = Math.floor((Math.max(seg.ay, seg.by) - minY) / cellSize);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) add(c, r, si);
+    }
+  }
+  return { buckets, minX, minY, cellSize };
+}
+
+function nearestTubeDist(x, y, segments, segmentIndex) {
+  if (!segments.length) return Infinity;
+  if (!segmentIndex) {
+    let best = Infinity;
+    for (const seg of segments) {
+      best = Math.min(best, distPointToSegment(x, y, seg.ax, seg.ay, seg.bx, seg.by));
+    }
+    return best;
+  }
+  const { buckets, minX, minY, cellSize } = segmentIndex;
+  const cx = Math.floor((x - minX) / cellSize);
+  const cy = Math.floor((y - minY) / cellSize);
+  let best = Infinity;
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const list = buckets.get(cx + dc + ',' + (cy + dr));
+      if (!list) continue;
+      for (const si of list) {
+        const seg = segments[si];
+        best = Math.min(best, distPointToSegment(x, y, seg.ax, seg.ay, seg.bx, seg.by));
+      }
+    }
+  }
+  return best;
+}
 
 function dilateMaskGrid1px(grid, w, h) {
   const out = new Uint8Array(grid.length);
@@ -249,6 +333,12 @@ function blurFloatHeights(heights, w, h, radiusPx) {
   return blurred;
 }
 
+function sampleHeightNearest(heights, w, h, px, py) {
+  const ix = Math.max(0, Math.min(w - 1, Math.round(px)));
+  const iy = Math.max(0, Math.min(h - 1, Math.round(py)));
+  return heights[iy * w + ix];
+}
+
 function sampleHeightBilinear(heights, w, h, px, py) {
   const x = Math.max(0, Math.min(w - 1.001, px));
   const y = Math.max(0, Math.min(h - 1.001, py));
@@ -267,6 +357,73 @@ function sampleHeightBilinear(heights, w, h, px, py) {
   );
 }
 
+function distPointToSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const len2 = abx * abx + aby * aby;
+  if (len2 < 1e-8) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * abx + (py - ay) * aby) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * abx), py - (ay + t * aby));
+}
+
+function nearestPolylineDist(sx, sy, polylines) {
+  let best = Infinity;
+  for (const { pts, closed } of polylines) {
+    if (pts.length < 2) continue;
+    for (let i = 0; i < pts.length - 1; i++) {
+      best = Math.min(
+        best,
+        distPointToSegment(sx, sy, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y)
+      );
+    }
+    if (closed) {
+      const last = pts.length - 1;
+      best = Math.min(
+        best,
+        distPointToSegment(sx, sy, pts[last].x, pts[last].y, pts[0].x, pts[0].y)
+      );
+    }
+  }
+  return best;
+}
+
+function sampleMaskBilinear(grid, w, h, px, py) {
+  const x0 = Math.max(0, Math.min(w - 1, Math.floor(px)));
+  const y0 = Math.max(0, Math.min(h - 1, Math.floor(py)));
+  const x1 = Math.min(w - 1, x0 + 1);
+  const y1 = Math.min(h - 1, y0 + 1);
+  const tx = px - x0;
+  const ty = py - y0;
+  const v00 = grid[y0 * w + x0];
+  const v10 = grid[y0 * w + x1];
+  const v01 = grid[y1 * w + x0];
+  const v11 = grid[y1 * w + x1];
+  const a = v00 + (v10 - v00) * tx;
+  const b = v01 + (v11 - v01) * tx;
+  return a + (b - a) * ty;
+}
+
+/** Continuous tube-dome height from emboss centerlines (smooth 3D letter ribbons). */
+function repousseHeightAtScene(sx, sy, field) {
+  const { px, py } = sceneToMaskPx(sx, sy, field.maskOrigin);
+  if (px < -0.5 || py < -0.5 || px > field.w || py > field.h) return 0;
+  if (sampleMaskBilinear(field.sheetMask, field.w, field.h, px, py) < 0.35) return 0;
+
+  if (field.usePolylineRelief && field.embossPolylines?.length) {
+    const dist = nearestPolylineDist(sx, sy, field.embossPolylines);
+    const tubeR = field.reliefTubeR;
+    if (dist <= tubeR) {
+      const dome = Math.cos((dist / tubeR) * Math.PI * 0.5);
+      const profile = field.edgeReliefFrac + (1 - field.edgeReliefFrac) * dome;
+      return field.baseThickness + profile * field.maxRelief;
+    }
+    return field.baseThickness;
+  }
+
+  return sampleHeightBilinear(field.heights, field.w, field.h, px, py);
+}
+
 function sceneToMaskPx(x, y, maskOrigin) {
   return {
     px: (x - maskOrigin.minX) * MASK_SCALE,
@@ -275,17 +432,19 @@ function sceneToMaskPx(x, y, maskOrigin) {
 }
 
 /**
- * Positive-only height field: sheet silhouette + puffy relief from emboss paths.
+ * Height field: raised emboss (inner) + completely flat halo plate (outer ring).
+ * Center → emboss dome on base; halo ring → constant baseThickness only.
  */
 export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOrigin, options = {}) {
   const embossMul = options.embossHeightMul ?? 1;
   const maxRelief = (options.maxReliefHeight ?? REPOUSSE_FIELD_DEFAULTS.maxReliefHeight) * embossMul;
-  const domePower = options.domePower ?? REPOUSSE_FIELD_DEFAULTS.domePower;
-  const rimHeight = (options.rimHeight ?? REPOUSSE_FIELD_DEFAULTS.rimHeight) * embossMul;
   const sheetStroke = options.sheetStroke ?? 52;
-  const reliefStroke = options.reliefStroke ?? 20;
+  const reliefStroke = options.reliefStroke ?? REPOUSSE_FIELD_DEFAULTS.reliefStroke ?? 20;
+  const flatHalo = options.flatHalo !== false && !!options.stoneSheetMask?.fromEmboss;
+  const baseTh = options.baseThickness ?? REPOUSSE_FIELD_DEFAULTS.baseThickness ?? 2.4;
 
   let sheetGrid;
+  let reliefGrid;
   let w;
   let h;
   const bounds =
@@ -293,13 +452,45 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
     maskBoundsFromPolylines([...shapePolylines, ...embossPolylines], options.margin ?? 28);
   if (!bounds) throw new Error('repousse: empty polylines');
 
-  if (options.stoneSheetMask?.grid) {
+  if (options.stoneSheetMask?.fromEmboss && options.stoneSheetMask?.reliefGrid) {
     const sg = options.stoneSheetMask;
     w = sg.w;
     h = sg.h;
-    const insetPx = Math.round((options.metalInsetPx ?? 14) * MASK_SCALE);
-    sheetGrid = erodeMaskGrid(sg.grid, w, h, insetPx);
-    sheetGrid = dilateMaskGridBlur(sheetGrid, w, h, 2);
+    sheetGrid = new Uint8Array(sg.grid);
+    reliefGrid = new Uint8Array(sg.reliefGrid);
+    for (let i = 0; i < reliefGrid.length; i++) {
+      if (reliefGrid[i] && !sheetGrid[i]) reliefGrid[i] = 0;
+    }
+  } else if (options.stoneSheetMask?.grid) {
+    const sg = options.stoneSheetMask;
+    w = sg.w;
+    h = sg.h;
+    if (sg.fromEmboss) {
+      sheetGrid = new Uint8Array(sg.grid);
+    } else {
+      const insetPx = Math.round((options.metalInsetPx ?? 14) * MASK_SCALE);
+      sheetGrid =
+        insetPx > 0 ? erodeMaskGrid(sg.grid, w, h, insetPx) : new Uint8Array(sg.grid);
+      sheetGrid = dilateMaskGridBlur(sheetGrid, w, h, 2);
+    }
+    let { grid: rg } = rasterizePolylinesToGrid(embossPolylines, reliefStroke, bounds);
+    const reliefBlur = options.reliefGridBlur ?? REPOUSSE_FIELD_DEFAULTS.reliefGridBlur ?? 3;
+    if (reliefBlur > 0) rg = dilateMaskGridBlur(rg, w, h, reliefBlur);
+    if (options.stoneSheetMask?.fromEmboss) {
+      reliefGrid = closeStrokeMaskGrid(
+        rg,
+        w,
+        h,
+        Math.round(4 * MASK_SCALE),
+        Math.round(2 * MASK_SCALE)
+      );
+      for (let i = 0; i < reliefGrid.length; i++) {
+        if (reliefGrid[i] && !sheetGrid[i]) reliefGrid[i] = 0;
+      }
+    } else {
+      reliefGrid = rg;
+      for (let i = 0; i < reliefGrid.length; i++) reliefGrid[i] = reliefGrid[i] && sheetGrid[i] ? 1 : 0;
+    }
   } else {
     const raster = rasterizePolylinesToGrid(shapePolylines, sheetStroke, bounds);
     sheetGrid = raster.grid;
@@ -308,45 +499,85 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
     sheetGrid = closeStrokeMaskGrid(sheetGrid, w, h, Math.round(14 * MASK_SCALE), Math.round(10 * MASK_SCALE));
     sheetGrid = fillMaskInteriorHoles(sheetGrid, w, h);
     sheetGrid = dilateMaskGridBlur(sheetGrid, w, h, 3);
+    let { grid: rg } = rasterizePolylinesToGrid(embossPolylines, reliefStroke, bounds);
+    const reliefBlur = options.reliefGridBlur ?? REPOUSSE_FIELD_DEFAULTS.reliefGridBlur ?? 3;
+    if (reliefBlur > 0) rg = dilateMaskGridBlur(rg, w, h, reliefBlur);
+    reliefGrid = rg;
+    for (let i = 0; i < reliefGrid.length; i++) reliefGrid[i] = reliefGrid[i] && sheetGrid[i] ? 1 : 0;
   }
 
-  let { grid: reliefGrid } = rasterizePolylinesToGrid(embossPolylines, reliefStroke, bounds);
-  const reliefBlur = options.reliefGridBlur ?? REPOUSSE_FIELD_DEFAULTS.reliefGridBlur ?? 3;
-  if (reliefBlur > 0) reliefGrid = dilateMaskGridBlur(reliefGrid, w, h, reliefBlur);
-  for (let i = 0; i < reliefGrid.length; i++) reliefGrid[i] = reliefGrid[i] && sheetGrid[i] ? 1 : 0;
-
   const reliefDist = distanceTransform(reliefGrid, w, h);
-  const edgeDist = distanceTransform(sheetGrid, w, h);
   let maxReliefDist = 1;
   for (let i = 0; i < reliefDist.length; i++) {
     if (reliefGrid[i] && reliefDist[i] < 1e6) maxReliefDist = Math.max(maxReliefDist, reliefDist[i]);
   }
 
+  const edgeFrac = options.edgeReliefFrac ?? REPOUSSE_FIELD_DEFAULTS.edgeReliefFrac ?? 0.82;
+  const reliefTubeR = reliefStroke * 0.5;
+  const usePolylineRelief = flatHalo && embossPolylines?.length > 0;
   const heights = new Float32Array(w * h);
-  const rimPx = Math.round(10 * MASK_SCALE);
-  for (let i = 0; i < heights.length; i++) {
-    if (!sheetGrid[i]) continue;
-    let hVal = options.baseThickness ?? 1.2;
 
-    if (reliefGrid[i] && reliefDist[i] < 1e6) {
-      const t = Math.min(1, reliefDist[i] / maxReliefDist);
-      // Sinusoidal dome — rounded puffy peak, no flat plateau (avoids white sticker highlights)
-      const profile = Math.sin(t * Math.PI * 0.5);
-      hVal += profile * maxRelief;
+  if (usePolylineRelief) {
+    const segments = buildEmbossSegments(embossPolylines, 64);
+    const segmentIndex = buildSegmentSpatialIndex(segments, Math.max(reliefTubeR * 0.9, 3));
+    for (let y = 0; y < h; y++) {
+      const sy = bounds.maxY - (y + 0.5) / MASK_SCALE;
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (!sheetGrid[i]) continue;
+        const sx = bounds.minX + (x + 0.5) / MASK_SCALE;
+        const dist = nearestTubeDist(sx, sy, segments, segmentIndex);
+        if (dist <= reliefTubeR) {
+          const dome = Math.cos((dist / reliefTubeR) * Math.PI * 0.5);
+          const profile = edgeFrac + (1 - edgeFrac) * dome;
+          heights[i] = baseTh + profile * maxRelief;
+        } else {
+          heights[i] = baseTh;
+        }
+      }
     }
-
-    if (edgeDist[i] < rimPx) {
-      const t = edgeDist[i] / rimPx;
-      hVal += (1 - t * t) * rimHeight;
+  } else {
+    for (let i = 0; i < heights.length; i++) {
+      if (!sheetGrid[i]) continue;
+      const isEmboss = !!reliefGrid[i];
+      if (isEmboss && reliefDist[i] < 1e6) {
+        const t = Math.min(1, reliefDist[i] / maxReliefDist);
+        const dome = Math.sin(t * Math.PI * 0.5);
+        const profile = edgeFrac + (1 - edgeFrac) * dome;
+        heights[i] = baseTh + profile * maxRelief;
+      } else if (flatHalo || !isEmboss) {
+        heights[i] = baseTh;
+      }
     }
-
-    heights[i] = hVal;
   }
 
-  const smoothed = blurFloatHeights(heights, w, h, options.blurRadius ?? 7);
+  const blurR = flatHalo
+    ? (options.haloBlurRadius ?? REPOUSSE_FIELD_DEFAULTS.haloBlurRadius ?? 2)
+    : (options.blurRadius ?? REPOUSSE_FIELD_DEFAULTS.blurRadius ?? 4);
+  let smoothed = blurFloatHeights(heights, w, h, blurR);
+  const edgeFloor = baseTh + edgeFrac * maxRelief;
   for (let i = 0; i < smoothed.length; i++) {
-    if (!sheetGrid[i]) smoothed[i] = 0;
+    if (!sheetGrid[i]) {
+      smoothed[i] = 0;
+    } else if (usePolylineRelief) {
+      if (heights[i] > baseTh + 0.01) {
+        smoothed[i] = Math.max(smoothed[i], heights[i], edgeFloor);
+      } else {
+        smoothed[i] = baseTh;
+      }
+    } else if (reliefGrid[i]) {
+      smoothed[i] = Math.max(smoothed[i], heights[i], edgeFloor);
+    } else if (flatHalo) {
+      smoothed[i] = baseTh;
+    }
   }
+
+  const haloMask = new Uint8Array(w * h);
+  for (let i = 0; i < haloMask.length; i++) {
+    haloMask[i] = sheetGrid[i] && !reliefGrid[i] ? 1 : 0;
+  }
+
+  const distInSheet = distanceTransform(sheetGrid, w, h);
 
   return {
     heights: smoothed,
@@ -354,8 +585,11 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
     h,
     maskOrigin: bounds,
     sheetMask: sheetGrid,
-    maxHeight: maxRelief + rimHeight + (options.baseThickness ?? 1.2),
-    baseThickness: options.baseThickness ?? 1.2,
+    reliefMask: reliefGrid,
+    haloMask,
+    distIn: distInSheet,
+    maxHeight: baseTh + maxRelief,
+    baseThickness: baseTh,
   };
 }
 
@@ -363,15 +597,15 @@ export function buildRepousseMeshFromHeightField(field, options = {}) {
   const { heights, w, h, maskOrigin, sheetMask } = field;
   const spanX = maskOrigin.maxX - maskOrigin.minX;
   const spanY = maskOrigin.maxY - maskOrigin.minY;
-  const segX = Math.min(options.segmentsX ?? 160, w);
-  const segY = Math.min(options.segmentsY ?? 160, h);
+  const segX = options.segmentsX ?? REPOUSSE_MESH_SEGMENTS;
+  const segY = options.segmentsY ?? REPOUSSE_MESH_SEGMENTS;
   const zScale = options.zScale ?? 1;
-  const dropVerts = options.cullOutside !== false;
+  const gpuDisplacement = options.gpuDisplacement !== false;
+  const sampleHeight = options.sharpHeights ? sampleHeightNearest : sampleHeightBilinear;
 
   const geom = new THREE.PlaneGeometry(spanX, spanY, segX, segY);
   const pos = geom.attributes.position;
   const uvs = geom.attributes.uv;
-  const kept = [];
 
   for (let i = 0; i < pos.count; i++) {
     const lx = pos.getX(i);
@@ -379,34 +613,111 @@ export function buildRepousseMeshFromHeightField(field, options = {}) {
     const sx = maskOrigin.minX + (lx / spanX + 0.5) * spanX;
     const sy = maskOrigin.minY + (ly / spanY + 0.5) * spanY;
     const { px, py } = sceneToMaskPx(sx, sy, maskOrigin);
-    const inside = px >= 0 && py >= 0 && px < w && py < h && sheetMask[Math.round(py) * w + Math.round(px)];
-    const hz = inside ? sampleHeightBilinear(heights, w, h, px, py) * zScale : 0;
     if (options.sceneCoords !== false) {
       pos.setX(i, sx);
       pos.setY(i, sy);
     }
-    pos.setZ(i, hz);
     uvs.setXY(i, px / w, py / h);
+    if (gpuDisplacement) {
+      pos.setZ(i, 0);
+    } else {
+      const inside =
+        px >= 0 && py >= 0 && px < w && py < h && sheetMask[Math.round(py) * w + Math.round(px)];
+      pos.setZ(i, inside ? sampleHeight(heights, w, h, px, py) * zScale : 0);
+    }
   }
 
   geom.computeVertexNormals();
   return geom;
 }
 
-export function buildHeightTextures(field) {
-  const { heights, w, h, sheetMask } = field;
+function upsampleHeights(heights, w, h, outW, outH) {
+  const out = new Float32Array(outW * outH);
+  for (let y = 0; y < outH; y++) {
+    const py = outH > 1 ? (y / (outH - 1)) * (h - 1) : 0;
+    for (let x = 0; x < outW; x++) {
+      const px = outW > 1 ? (x / (outW - 1)) * (w - 1) : 0;
+      out[y * outW + x] = sampleHeightBilinear(heights, w, h, px, py);
+    }
+  }
+  return out;
+}
+
+function upsampleMask(sheetMask, w, h, outW, outH) {
+  const out = new Uint8Array(outW * outH);
+  for (let y = 0; y < outH; y++) {
+    const py = outH > 1 ? (y / (outH - 1)) * (h - 1) : 0;
+    for (let x = 0; x < outW; x++) {
+      const px = outW > 1 ? (x / (outW - 1)) * (w - 1) : 0;
+      out[y * outW + x] = sampleMaskBilinear(sheetMask, w, h, px, py) >= 0.5 ? 1 : 0;
+    }
+  }
+  return out;
+}
+
+function buildNormalMapFromHeights(heights, w, h, sheetMask, strength = 5.5) {
+  const img = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const o = i * 4;
+      if (!sheetMask[i] || heights[i] <= 0) {
+        img[o] = 128;
+        img[o + 1] = 128;
+        img[o + 2] = 255;
+        img[o + 3] = 255;
+        continue;
+      }
+      const l = x > 0 ? heights[i - 1] : heights[i];
+      const r = x < w - 1 ? heights[i + 1] : heights[i];
+      const u = y > 0 ? heights[i - w] : heights[i];
+      const d = y < h - 1 ? heights[i + w] : heights[i];
+      let nx = -(r - l) * strength;
+      let ny = -(d - u) * strength;
+      let nz = 1;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len;
+      ny /= len;
+      nz /= len;
+      img[o] = Math.round((nx * 0.5 + 0.5) * 255);
+      img[o + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+      img[o + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+      img[o + 3] = 255;
+    }
+  }
+  return img;
+}
+
+export function buildHeightTextures(field, options = {}) {
+  const { heights, w, h, sheetMask, distIn } = field;
+  const texSize = options.texSize ?? METAL_HEIGHT_TEX_SIZE;
+  const aspect = w / h;
+  let outW = texSize;
+  let outH = texSize;
+  if (aspect >= 1) {
+    outH = Math.max(64, Math.round(texSize / aspect));
+  } else {
+    outW = Math.max(64, Math.round(texSize * aspect));
+  }
+
+  const hiHeights = upsampleHeights(heights, w, h, outW, outH);
+  const hiMask = upsampleMask(sheetMask, w, h, outW, outH);
+
   let maxH = 0;
-  for (let i = 0; i < heights.length; i++) maxH = Math.max(maxH, heights[i]);
+  for (let i = 0; i < hiHeights.length; i++) {
+    if (hiMask[i]) maxH = Math.max(maxH, hiHeights[i]);
+  }
   const inv = maxH > 1e-6 ? 1 / maxH : 1;
+  const edgeSoft = 3.2;
 
   const dispCanvas = document.createElement('canvas');
-  dispCanvas.width = w;
-  dispCanvas.height = h;
+  dispCanvas.width = outW;
+  dispCanvas.height = outH;
   const ctx = dispCanvas.getContext('2d');
-  const img = ctx.createImageData(w, h);
-  for (let i = 0; i < heights.length; i++) {
-    const on = sheetMask[i];
-    const v = on ? Math.round(Math.min(255, heights[i] * inv * 255)) : 0;
+  const img = ctx.createImageData(outW, outH);
+  for (let i = 0; i < hiHeights.length; i++) {
+    const on = hiMask[i];
+    const v = on ? Math.round(Math.min(255, hiHeights[i] * inv * 255)) : 0;
     img.data[i * 4] = v;
     img.data[i * 4 + 1] = v;
     img.data[i * 4 + 2] = v;
@@ -420,17 +731,37 @@ export function buildHeightTextures(field) {
   dispMap.minFilter = THREE.LinearFilter;
   dispMap.magFilter = THREE.LinearFilter;
 
+  const normalImg = buildNormalMapFromHeights(hiHeights, outW, outH, hiMask);
+  const normalCanvas = document.createElement('canvas');
+  normalCanvas.width = outW;
+  normalCanvas.height = outH;
+  normalCanvas.getContext('2d').putImageData(new ImageData(normalImg, outW, outH), 0, 0);
+  const normalMap = new THREE.CanvasTexture(normalCanvas);
+  normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
+  normalMap.colorSpace = THREE.NoColorSpace;
+  normalMap.minFilter = THREE.LinearFilter;
+  normalMap.magFilter = THREE.LinearFilter;
+
   const alphaCanvas = document.createElement('canvas');
-  alphaCanvas.width = w;
-  alphaCanvas.height = h;
+  alphaCanvas.width = outW;
+  alphaCanvas.height = outH;
   const actx = alphaCanvas.getContext('2d');
-  const aimg = actx.createImageData(w, h);
-  for (let i = 0; i < sheetMask.length; i++) {
-    const a = sheetMask[i] ? 255 : 0;
-    aimg.data[i * 4] = a;
-    aimg.data[i * 4 + 1] = a;
-    aimg.data[i * 4 + 2] = a;
-    aimg.data[i * 4 + 3] = 255;
+  const aimg = actx.createImageData(outW, outH);
+  for (let y = 0; y < outH; y++) {
+    for (let x = 0; x < outW; x++) {
+      const i = y * outW + x;
+      if (!hiMask[i]) continue;
+      const px = outW > 1 ? (x / (outW - 1)) * (w - 1) : 0;
+      const py = outH > 1 ? (y / (outH - 1)) * (h - 1) : 0;
+      const ix = Math.max(0, Math.min(w - 1, Math.round(px)));
+      const iy = Math.max(0, Math.min(h - 1, Math.round(py)));
+      const din = distIn?.[iy * w + ix] ?? 1;
+      const a = Math.round(Math.min(255, 255 * Math.min(1, din / edgeSoft)));
+      aimg.data[i * 4] = a;
+      aimg.data[i * 4 + 1] = a;
+      aimg.data[i * 4 + 2] = a;
+      aimg.data[i * 4 + 3] = 255;
+    }
   }
   actx.putImageData(aimg, 0, 0);
   const alphaMap = new THREE.CanvasTexture(alphaCanvas);
@@ -439,7 +770,7 @@ export function buildHeightTextures(field) {
   alphaMap.minFilter = THREE.LinearFilter;
   alphaMap.magFilter = THREE.LinearFilter;
 
-  return { dispMap, alphaMap, maxH };
+  return { dispMap, normalMap, alphaMap, maxH };
 }
 
 let brushedMetalBumpCache = null;
@@ -473,6 +804,30 @@ function createBrushedMetalBumpTexture() {
   return tex;
 }
 
+/** Polished pewter/silver — GPU displacement + normal map from precomputed height field. */
+export function buildRepoussePewterMaterial(field, envMap = null, options = {}) {
+  const { dispMap, normalMap, alphaMap, maxH } = buildHeightTextures(field);
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(options.color ?? 0xadb4be),
+    metalness: 1.0,
+    roughness: options.roughness ?? 0.13,
+    clearcoat: options.clearcoat ?? 0.48,
+    clearcoatRoughness: options.clearcoatRoughness ?? 0.07,
+    displacementMap: dispMap,
+    displacementScale: maxH,
+    displacementBias: 0,
+    normalMap,
+    normalScale: new THREE.Vector2(1, 1),
+    alphaMap,
+    transparent: true,
+    alphaTest: 0.04,
+    envMap,
+    envMapIntensity: envMap ? (options.envMapIntensity ?? 2.85) : 1.0,
+    side: THREE.FrontSide,
+    depthWrite: true,
+  });
+}
+
 /** Hand-worked pewter plate — satin, soft highlights (not mirror polish). */
 export function buildSatinPewterMaterial(field, envMap = null, options = {}) {
   const { alphaMap } = buildHeightTextures(field);
@@ -488,6 +843,7 @@ export function buildSatinPewterMaterial(field, envMap = null, options = {}) {
     alphaMap,
     transparent: true,
     alphaTest: 0.32,
+    flatShading: !!options.flatShading,
     envMap,
     envMapIntensity: envMap ? (options.envMapIntensity ?? 1.05) : 0.55,
     side: THREE.FrontSide,

@@ -202,7 +202,7 @@
 <body>
   <header>
     <h1>אב-טיפוס v2 — <span style="color:#f5c842">שאלון קמע</span> <small style="font-weight:400;color:#8cf">[אבן + slab]</small></h1>
-    <p>7 שאלות → לוח אבן (slab) · three-pbr-amulet.js · ללא מסגרת עגולה</p>
+    <p>7 שאלות → לוח אבן (slab) · three-pbr-amulet.js · מסגרת Q5 לפי צורת האבן</p>
   </header>
 
   <div class="layout">
@@ -264,7 +264,7 @@
 
       <button type="button" id="createBtn">צור קמע</button>
 
-      <p class="hint"><strong>שאלון + slab</strong> — L3 אבן sage · ללא מסגרת · <code>?stone=1</code> / <code>?metal=1</code><br>
+      <p class="hint"><strong>שאלון + slab</strong> — L3 אבן בהיר · מסגרת Q5 · ללא מתכת מאחור · <code>?stone=1</code> / <code>?metal=1</code><br>
         <code>http://localhost:8080/prototype-v2-thick.html</code></p>
     </aside>
 
@@ -322,6 +322,9 @@
   const LAYER3_SCALE = 1.2;
   const FRAME_PAD = 40;
   const SUMMONING_FRAME_PAD = 30;
+  /** מרווח מסגרת מחוץ לצורת אבן (תואם ל-SLAB_STONE_FRAME_MARGIN ב-PBR) */
+  const STONE_FRAME_PAD = 16;
+  const FRAME_MASK_SCALE = 2;
   const FRAME_STROKE = 3;
 
   /** גיל → bump — זהה ל-prototype.html */
@@ -504,6 +507,46 @@
     decision: 0.92
   };
 
+  /** Q5 → חלקות מסגרת מתכת (1=חלק לגמרי, 0=קוצני מקסימלי) */
+  const Q5_FRAME_SMOOTHNESS = {
+    hope: 1.0,
+    longing: 0.82,
+    excitement: 0.62,
+    fear: 0.42,
+    impatience: 0.22,
+    confusion: 0.0
+  };
+
+  /** פרמטרי עיקול מסגרת לפי תחושה — כל תשובה עם אופי שונה */
+  const Q5_FRAME_CONTOUR = {
+    hope: { wobbleMix: 0, curlMix: 0, ampScale: 0, freqBias: 0, phase: 0 },
+    longing: { wobbleMix: 0.38, curlMix: 0.55, ampScale: 0.45, freqBias: 0.18, phase: 0.6 },
+    excitement: { wobbleMix: 0.52, curlMix: 0.35, ampScale: 0.58, freqBias: 0.32, phase: 1.1 },
+    fear: { wobbleMix: 0.68, curlMix: 0.42, ampScale: 0.78, freqBias: 0.41, phase: 2.3 },
+    impatience: { wobbleMix: 0.82, curlMix: 0.38, ampScale: 0.95, freqBias: 0.48, phase: 3.7 },
+    confusion: { wobbleMix: 1.0, curlMix: 0.72, ampScale: 1.28, freqBias: 0.55, phase: 4.9 }
+  };
+
+  /** טקסטורת קוצניות מסגרת לפי Q5 — מדורג כמו OCCUPATION ב-unified */
+  const Q5_FRAME_TEXTURE = {
+    hope: { type: 'fractalNoise', baseFrequency: '0.14', numOctaves: 1, scaleMul: 0, scaleLin: 0 },
+    longing: { type: 'fractalNoise', baseFrequency: '0.12', numOctaves: 2, scaleMul: 3, scaleLin: 2 },
+    excitement: { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2, scaleMul: 7, scaleLin: 4 },
+    fear: { type: 'fractalNoise', baseFrequency: '0.08', numOctaves: 3, scaleMul: 12, scaleLin: 6 },
+    impatience: { type: 'turbulence', baseFrequency: '0.07', numOctaves: 4, scaleMul: 18, scaleLin: 8 },
+    confusion: { type: 'turbulence', baseFrequency: '0.05', numOctaves: 5, scaleMul: 26, scaleLin: 10 }
+  };
+
+  /** סגנון קו מסגרת לפי Q5 */
+  const Q5_FRAME_VISUAL = {
+    hope: { linecap: 'round', linejoin: 'round', miterlimit: null },
+    longing: { linecap: 'round', linejoin: 'round', miterlimit: null },
+    excitement: { linecap: 'round', linejoin: 'miter', miterlimit: 4 },
+    fear: { linecap: 'round', linejoin: 'round', miterlimit: null },
+    impatience: { linecap: 'round', linejoin: 'round', miterlimit: null },
+    confusion: { linecap: 'round', linejoin: 'round', miterlimit: null }
+  };
+
   /** ברירות מחדל פנימיות לסגנון SVG (שדות ישנים הוסרו מהטופס) */
   const INTERNAL_STYLE_DEFAULTS = {
     amuletType: 'protection',
@@ -515,11 +558,22 @@
     occupation: 'care_health'
   };
 
+  function frameSmoothnessFromStyle(style2) {
+    return style2?.frameSmoothness ?? style2?.occupationSmoothness ?? 0.5;
+  }
+
   function questionnaireStyleBase(p) {
     const spike = L3_SPIKE_BY_DIFFICULTY[p.q6Difficulty] ?? 0.5;
+    const q5 = p.q5Feeling || 'hope';
+    const frameSmoothness = Q5_FRAME_SMOOTHNESS[q5] ?? 0.5;
     return {
       ...INTERNAL_STYLE_DEFAULTS,
       occupationSmoothness: 1 - spike,
+      frameSmoothness,
+      q5Feeling: q5,
+      frameContour: Q5_FRAME_CONTOUR[q5] ?? Q5_FRAME_CONTOUR.hope,
+      frameTexture: Q5_FRAME_TEXTURE[q5] ?? Q5_FRAME_TEXTURE.hope,
+      frameVisual: Q5_FRAME_VISUAL[q5] ?? Q5_FRAME_VISUAL.hope,
       stoneTone: STONE_TONE_BY_BELIEF[p.q4Belief] ?? STONE_TONE_BY_BELIEF.signs,
       l3Spike: spike
     };
@@ -578,13 +632,18 @@
       'מרחק ← סטטוס ' + style2.familyStatus + ' → spacing×' + style2.spacing.toFixed(2),
       'שם ← SVG bump=' +
         layer2LetterBumpProfile(style2).scale +
-        ' · מסגרת ← עיקולים בלבד (' +
-        style2.occupationKey +
-        ' ' +
-        ((style2.occupationSmoothness ?? 0.5) * 100).toFixed(0) +
-        '%)',
+        ' · מסגרת ← Q5 ' +
+        (style2.q5Feeling || 'hope') +
+        ' חלקות ' +
+        (frameSmoothnessFromStyle(style2) * 100).toFixed(0) +
+        '%',
       'גודל ← מגדר ' + style2.gender + ' → scale×' + style2.amuletScale.toFixed(2),
-      'שילוב: מרחק×' + style2.spacing.toFixed(2) + ' + מסגרת ' + ((style2.occupationSmoothness ?? 0.5) * 100).toFixed(0) + '% + גודל×' + style2.amuletScale.toFixed(2)
+      'שילוב: מרחק×' +
+        style2.spacing.toFixed(2) +
+        ' + מסגרת Q5 ' +
+        (frameSmoothnessFromStyle(style2) * 100).toFixed(0) +
+        '% + גודל×' +
+        style2.amuletScale.toFixed(2)
     ];
     return lines;
   }
@@ -700,6 +759,7 @@
     const occ = OCCUPATION_VISUAL[styleP.occupation] || OCCUPATION_VISUAL.care_health;
     const statusSpacing = getStatusSpacing(styleP.familyStatus);
     const smoothness = styleP.occupationSmoothness ?? 0.5;
+    const frameSmoothness = styleP.frameSmoothness ?? 0.5;
     const ageTexture =
       smoothness >= 0.95 ? 'gloss' : smoothness < 0.45 ? 'gloss+rough' : 'gloss+bump';
     const seed = seedOverride ?? letterHashSeed(p.q2Name);
@@ -710,6 +770,11 @@
       familyStatus: styleP.familyStatus,
       occupationKey: styleP.occupation,
       occupationSmoothness: smoothness,
+      frameSmoothness,
+      q5Feeling: styleP.q5Feeling,
+      frameContour: styleP.frameContour,
+      frameTexture: styleP.frameTexture,
+      frameVisual: styleP.frameVisual,
       intent: amuletPlacementIntent(styleP.amuletType),
       strokeColor: '#B8B8B8',
       spacing: statusSpacing,
@@ -768,9 +833,19 @@
     };
   }
 
-  /** מסגרת — ללא פילטר קוצניות (רק עיקולים בגיאומטריה) */
+  /** מסגרת — טקסטורת קוצניות לפי Q5 (כמו עיסוק ב-unified) */
   function frameBumpProfile(style) {
-    return { type: 'fractalNoise', baseFrequency: '0.12', numOctaves: 2, scale: 0 };
+    const smooth = frameSmoothnessFromStyle(style);
+    const rough = 1 - smooth;
+    const feeling = style.q5Feeling || 'hope';
+    const preset = Q5_FRAME_TEXTURE[feeling] || Q5_FRAME_TEXTURE.hope;
+    const scale = Math.round(rough * rough * preset.scaleMul + rough * preset.scaleLin);
+    return {
+      type: preset.type,
+      baseFrequency: preset.baseFrequency,
+      numOctaves: preset.numOctaves,
+      scale: smooth >= 0.98 ? 0 : Math.max(rough > 0.04 ? 2 : 0, scale)
+    };
   }
 
   function layer2BumpProfile(style) {
@@ -862,8 +937,9 @@
   function buildSvgDefs(style2, style3) {
     let defs = '<defs>';
     if (style2) {
-      console.log('[layer2] name bump + frame hint · occupation:', style2.occupationKey);
+      console.log('[layer2] name bump + frame Q5 · feeling:', style2.q5Feeling);
       defs += buildCombinedFilter(FILTER_ID_LAYER2, { ...style2, layer: 2 });
+      defs += buildCombinedFilter(FILTER_ID_FRAME, { ...style2, layer: 'frame' });
     }
     console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
     defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
@@ -962,8 +1038,8 @@
     if (style.layer === 'frame') {
       const bump = frameBumpProfile(style);
       return (
-        'frame · ' +
-        style.occupationKey +
+        'frame · Q5 ' +
+        (style.q5Feeling || 'hope') +
         ' · ' +
         bump.type +
         '@' +
@@ -1205,21 +1281,20 @@
   }
 
   function frameStrokeAttrs(strokeColor, style2) {
-    const occ = style2
-      ? OCCUPATION_VISUAL[style2.occupationKey] || OCCUPATION_VISUAL.care_health
-      : null;
-    const smooth = style2?.occupationSmoothness ?? 1;
+    const feeling = style2?.q5Feeling || 'hope';
+    const visual = Q5_FRAME_VISUAL[feeling] || Q5_FRAME_VISUAL.hope;
     let attrs =
       'fill="none" stroke="' +
       strokeColor +
       '" stroke-width="' +
       FRAME_STROKE +
       '" stroke-linecap="' +
-      (occ?.linecap || 'round') +
+      visual.linecap +
       '" stroke-linejoin="' +
-      (occ?.linejoin || 'round') +
+      visual.linejoin +
       '"';
-    if (occ?.miterlimit != null) attrs += ' stroke-miterlimit="' + occ.miterlimit + '"';
+    if (visual.miterlimit != null) attrs += ' stroke-miterlimit="' + visual.miterlimit + '"';
+    attrs += ' filter="url(#' + FILTER_ID_FRAME + ')"';
     return attrs;
   }
 
@@ -1332,6 +1407,71 @@
 
   const PBR_TUBE_RADIUS = 6;
 
+  /** רוחב מסכת אבן — תואם ל-rasterizeNameLettersStoneMask ב-PBR */
+  function stoneSlabMaskStroke(style2, style3) {
+    const scale = style3?.amuletScale || 1;
+    const strokeW = PATH_MAIN_W * scale;
+    const gender = style3?.gender || style2?.gender || 'female';
+    const tubeR =
+      gender === 'nonbinary' ? strokeW * 0.52 : gender === 'male' ? strokeW * 0.42 : strokeW * 0.5;
+    return tubeR * 1.48 * 3.45 * 2;
+  }
+
+  function applyFrameQ5Wobble(contourPts, style2) {
+    const smooth = frameSmoothnessFromStyle(style2);
+    const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
+    if (rough < 0.18 || !contourPts.length) return contourPts;
+    let cx = 0;
+    let cy = 0;
+    for (const p of contourPts) {
+      cx += p.x;
+      cy += p.y;
+    }
+    cx /= contourPts.length;
+    cy /= contourPts.length;
+    return contourPts.map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const dist = Math.hypot(dx, dy) || 1;
+      const amp = rough * 4.5 * (preset.ampScale || 1);
+      const phase = preset.phase || 0;
+      const wobble =
+        Math.sin(ang * (0.28 + rough * 0.14 + (preset.freqBias || 0) * 0.12)) * (preset.wobbleMix ?? 1) +
+        Math.cos(ang * (0.51 - rough * 0.09)) * 0.33 * (preset.wobbleMix ?? 1);
+      const curl =
+        Math.sin(ang * 0.07 + rough * 1.2 + phase) *
+        Math.cos(ang * (0.18 + rough * 0.11)) *
+        (preset.curlMix ?? 1);
+      const delta = (wobble * 0.55 + curl * 0.28) * amp;
+      return { x: p.x + (dx / dist) * delta, y: p.y + (dy / dist) * delta };
+    });
+  }
+
+  /** קונטור מסגרת — מסכת L2 ממוזגת (צורת האבן), dilation + offset */
+  async function buildStoneSlabFrameContour(layersHtml, defsHtml, pad, style2, style3) {
+    const mount = mountLayersRoot(layersHtml, defsHtml);
+    if (!mount) return { points: [] };
+    const scale = FRAME_MASK_SCALE;
+    try {
+      const l2 = mount.root.querySelector('.layer-2');
+      if (!l2) return { points: [] };
+      const stroke = stoneSlabMaskStroke(style2, style3);
+      let grid = await rasterGridFromMaskMarkup(layerElToMaskMarkup(l2, stroke), scale);
+      if (countGridFilled(grid) < 40) return { points: [] };
+      const bw = W * scale;
+      const bh = H * scale;
+      for (const r of [28, 20, 14, 8]) {
+        grid = dilateCircularGrid(grid, bw, bh, Math.round(r * scale * 0.45));
+      }
+      const points = contourFromGrid(grid, bw, bh, pad, scale);
+      return points.length >= 8 ? { points } : { points: [] };
+    } finally {
+      if (mount.svg.parentNode) mount.svg.parentNode.removeChild(mount.svg);
+    }
+  }
+
   /** רוחב מסכה ל-L2 — תואם לצינורות דקים ב-3D + organic */
   function pbrL2MaskStroke(style2) {
     const gender = style2?.gender || 'female';
@@ -1356,7 +1496,7 @@
 
   /** מרחק מסגרת — מרווח שווה מחוץ למסכה המשולבת */
   function computeFrameContourPad(style2, style3) {
-    const rough = style2 ? 1 - (style2.occupationSmoothness ?? 0.5) : 0;
+    const rough = style2 ? 1 - frameSmoothnessFromStyle(style2) : 0;
     const bump3 = ageBumpByGender(style3).scale || 0;
     const frameExtra = rough > 0.12 ? Math.ceil(rough * 16) : 0;
     return FRAME_PAD + Math.ceil(bump3 * 2) + 10 + frameExtra;
@@ -1706,6 +1846,56 @@
     return { x, y };
   }
 
+  /** דגימת נקודות מ-L2 בלבד — צורת האבן נגזרת מהשם (Q2) */
+  function sampleStoneShapePathPoints(layersHtml, defsHtml, style2, centerDx, centerDy) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="0 0 ' +
+        W +
+        ' ' +
+        H +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        layersHtml +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return [];
+    const svg = doc.documentElement;
+    svg.style.cssText =
+      'position:fixed;left:0;top:0;width:' +
+      W +
+      'px;height:' +
+      H +
+      'px;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(svg);
+    const root = svg.querySelector('#measure-root');
+    const dx = centerDx || 0;
+    const dy = centerDy || 0;
+    const samples = [];
+    const step = 2;
+    const stoneOutset = style2 ? pbrL2MaskStroke(style2) * 0.68 + 22 : PATH_MAIN_W;
+    if (root) {
+      root.querySelectorAll('.layer-2 path').forEach((pathEl) => {
+        const len = pathEl.getTotalLength();
+        if (!isFinite(len) || len < 2) return;
+        const steps = Math.max(2, Math.ceil(len / step));
+        for (let i = 0; i < steps; i++) {
+          const t = steps <= 1 ? 0 : i / (steps - 1);
+          const p = pathEl.getPointAtLength(len * t);
+          const pt = pathPointInRoot(svg, pathEl, p.x, p.y);
+          samples.push({ x: pt.x + dx, y: pt.y + dy, outset: stoneOutset });
+        }
+      });
+    }
+    document.body.removeChild(svg);
+    return samples;
+  }
+
   /** דגימת נקודות מ-paths של L2+L3 — עם outset לפי סוג שכבה */
   function sampleAmuletPathPoints(layersHtml, defsHtml, style2) {
     const doc = new DOMParser().parseFromString(
@@ -1798,22 +1988,28 @@
     return cur;
   }
 
-  /** מעגל הגנה — עיקולים לפי עיסוק (במקום עיגול מושלם) */
+  /** מעגל הגנה — עיקולים לפי Q5 (במקום עיגול מושלם) */
   function buildCircularFrameContour(cx, cy, r, style2) {
-    const smooth = style2?.occupationSmoothness ?? 0.5;
+    const smooth = frameSmoothnessFromStyle(style2);
     const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
     const points = [];
     for (let a = 0; a < 360; a++) {
       const rad = (a * Math.PI) / 180;
       let radius = r;
       if (rough > 0.18) {
-        const amp = rough * (2.5 + r * 0.018);
+        const amp = rough * (2.5 + r * 0.018) * (preset.ampScale || 1);
+        const freqA = 0.28 + rough * 0.14 + (preset.freqBias || 0) * 0.12;
+        const freqB = 0.51 - rough * 0.09;
+        const phase = preset.phase || 0;
         const wobble =
-          Math.sin(a * (0.28 + rough * 0.14)) * 0.42 +
-          Math.cos(a * (0.51 - rough * 0.09)) * 0.33 +
-          Math.sin(a * (0.11 + rough * 0.06) + 1.4) * 0.25;
+          Math.sin(a * freqA) * 0.42 * (preset.wobbleMix ?? 1) +
+          Math.cos(a * freqB) * 0.33 * (preset.wobbleMix ?? 1) +
+          Math.sin(a * (0.11 + rough * 0.06) + phase) * 0.25 * (preset.wobbleMix ?? 1);
         const curl =
-          Math.sin(a * 0.07 + rough * 1.2) * Math.cos(a * (0.18 + rough * 0.11));
+          Math.sin(a * 0.07 + rough * 1.2 + phase) *
+          Math.cos(a * (0.18 + rough * 0.11)) *
+          (preset.curlMix ?? 1);
         radius += (wobble * 0.55 + curl * 0.28) * amp;
       }
       points.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius });
@@ -1841,17 +2037,24 @@
       radii[a] = sym;
       radii[mirror] = sym;
     }
-    const smooth = style2?.occupationSmoothness ?? 0.5;
+    const smooth = frameSmoothnessFromStyle(style2);
     const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
     const smoothIters = Math.max(1, Math.round(1 + smooth * 4));
     radii = smoothCircularRadii(radii, smoothIters);
     if (rough > 0.28) {
-      const amp = rough * 7;
+      const amp = rough * 7 * (preset.ampScale || 1);
+      const phase = preset.phase || 0;
       for (let a = 0; a < 360; a++) {
         const wobble =
-          Math.sin(a * (0.24 + rough * 0.2)) * 0.55 + Math.cos(a * (0.43 - rough * 0.1)) * 0.45;
+          Math.sin(a * (0.24 + rough * 0.2 + (preset.freqBias || 0) * 0.1)) *
+            0.55 *
+            (preset.wobbleMix ?? 1) +
+          Math.cos(a * (0.43 - rough * 0.1)) * 0.45 * (preset.wobbleMix ?? 1);
         const curl =
-          Math.sin(a * 0.08 + rough * 1.5) * Math.cos(a * (0.17 + rough * 0.13));
+          Math.sin(a * 0.08 + rough * 1.5 + phase) *
+          Math.cos(a * (0.17 + rough * 0.13)) *
+          (preset.curlMix ?? 1);
         radii[a] += (wobble * 0.5 + curl * 0.32) * amp;
       }
       radii = smoothCircularRadii(radii, rough > 0.72 ? 1 : 2);
@@ -1865,69 +2068,40 @@
     return points;
   }
 
-  /** מסגרת — נבנית אחרי מירכוז: מרכז ב-(CX,CY), נקודות מוזזות ב-centerDx/centerDy */
-  function buildIntentFrameLayer(style3, extentBBox, layersHtml, defsHtml, style2, centerDx, centerDy) {
+  /** מסגרת — עוטפת צורת האבן (מסכת L2 ממוזגת), עם עיקולים לפי Q5 */
+  async function buildIntentFrameLayer(style3, extentBBox, layersHtml, defsHtml, style2, centerDx, centerDy) {
     const intent = style3.intent || (style3.amuletType === 'summoning' ? 'summoning' : 'protection');
     if (intent !== 'protection' && intent !== 'summoning') return null;
 
-    const dx = centerDx || 0;
-    const dy = centerDy || 0;
     const cx = CX;
     const cy = CY;
     const halfW = extentBBox.halfW;
     const halfH = extentBBox.halfH;
     const attrs = frameStrokeAttrs(style3.strokeColor, style2);
     const strokePad = PATH_MAIN_W / 2;
+    const framePad = STONE_FRAME_PAD;
 
-    if (intent === 'protection') {
-      const r = Math.max(halfW, halfH) + strokePad + FRAME_PAD;
-      const rough = 1 - (style2?.occupationSmoothness ?? 0.5);
-      if (rough > 0.18) {
-        const contourPts = buildCircularFrameContour(cx, cy, r, style2);
-        const pathD = closedCatmullRomPath(contourPts);
-        return {
-          markup:
-            '<path class="amulet-frame amulet-frame-protection" d="' + pathD + '" ' + attrs + '/>',
-          bounds: boundsFromContour(contourPts)
-        };
-      }
-      return {
-        markup:
-          '<circle class="amulet-frame amulet-frame-protection" cx="' +
-          cx.toFixed(2) +
-          '" cy="' +
-          cy.toFixed(2) +
-          '" r="' +
-          r.toFixed(2) +
-          '" ' +
-          attrs +
-          '/>',
-        bounds: frameBounds(cx, cy, r, r)
-      };
-    }
-
-    const rawSamples = sampleAmuletPathPoints(layersHtml, defsHtml, style2);
-    const samples = rawSamples.map((s) => ({
-      x: s.x + dx,
-      y: s.y + dy,
-      outset: s.outset
-    }));
-    let contourPts;
-    if (samples.length) {
-      contourPts = buildSummoningFrameContour(cx, cy, samples, SUMMONING_FRAME_PAD, style2);
+    let contourPts = [];
+    const { points } = await buildStoneSlabFrameContour(layersHtml, defsHtml, framePad, style2, style3);
+    if (points.length >= 8) {
+      contourPts = applyFrameQ5Wobble(points, style2);
     } else {
-      const rx = halfW + strokePad + SUMMONING_FRAME_PAD;
-      const ry = halfH + strokePad + SUMMONING_FRAME_PAD;
-      contourPts = [];
+      const rx = halfW + strokePad + framePad;
+      const ry = halfH + strokePad + framePad;
       for (let a = 0; a < 360; a++) {
         const rad = (a * Math.PI) / 180;
         contourPts.push({ x: cx + Math.cos(rad) * rx, y: cy + Math.sin(rad) * ry });
       }
     }
+
     const pathD = closedCatmullRomPath(contourPts);
     return {
       markup:
-        '<path class="amulet-frame amulet-frame-summoning" d="' + pathD + '" ' + attrs + '/>',
+        '<path class="amulet-frame amulet-frame-stone" data-shape="stone" d="' +
+        pathD +
+        '" ' +
+        attrs +
+        '/>',
       bounds: boundsFromContour(contourPts)
     };
   }
@@ -2645,7 +2819,9 @@
     }
 
     let metalFringeMarkup = '';
-    if (q4Letters.length) {
+    /* Q4 metal fringe behind stone — disabled per user request */
+    const ENABLE_METAL_FRINGE_SVG = false;
+    if (ENABLE_METAL_FRINGE_SVG && q4Letters.length) {
       const fringeStyle = visualStyleMetalFringe(params);
       const q4Layer = await buildQ4MetalLayer(q4Letters, fringeStyle, fringeStyle.intent);
       if (q4Layer.content) {
@@ -2679,10 +2855,10 @@
 
     const centered = centerLayersOnCanvas(contentForMeasure, defs);
     const extentBBox = measureSvgContentBBox(layer2Group + layer3Group, vb, defs);
-    const frameLayer = buildIntentFrameLayer(
+    const frameLayer = await buildIntentFrameLayer(
       style3,
       extentBBox,
-      contentForMeasure,
+      layer2Group || layer3Group,
       defs,
       style2,
       centered.dx,
@@ -2826,6 +3002,21 @@
       container.appendChild(el);
     }
     el.hidden = !show;
+  }
+
+  /** Yield to browser + cap PBR work so tab/server don't freeze. */
+  function withRenderTimeout(promise, ms = 120000) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('PBR timeout — נסי שוב')), ms)
+      )
+    ]);
+  }
+
+  async function yieldToBrowser() {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) => setTimeout(r, 16));
   }
 
   function disposeThreeScene(scene, envMap) {
@@ -3583,31 +3774,32 @@
       let renderFail = null;
       showRenderSpinner(true);
       try {
-        const PBR_MODULE_VER = '20250617-stone-neutral-curve';
+        await yieldToBrowser();
+        const PBR_MODULE_VER = '20250620-gpu-metal-relief';
         if (stoneOnly) {
           const { renderStoneLayerPreview } = await import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
-          renderStats = await renderStoneLayerPreview({
+          renderStats = await withRenderTimeout(renderStoneLayerPreview({
             svg,
             style2,
             style3: { ...style3, l3MassScale: L3_MASS_SCALE },
             container: document.getElementById('amuletContainer'),
             questionnaire,
             ageNum: questionnaireStyleBase(params).age
-          });
+          }));
         } else if (metalOnly) {
           const { renderMetalLayerPreview } = await import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
-          renderStats = await renderMetalLayerPreview({
+          renderStats = await withRenderTimeout(renderMetalLayerPreview({
             svg,
             style2,
             style3: { ...style3, l3MassScale: L3_MASS_SCALE },
             container: document.getElementById('amuletContainer'),
             questionnaire,
             ageNum: questionnaireStyleBase(params).age
-          });
+          }));
         } else {
           const { renderThreePbrAmulet } = await import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
           const styleBase = questionnaireStyleBase(params);
-          renderStats = await renderThreePbrAmulet({
+          renderStats = await withRenderTimeout(renderThreePbrAmulet({
             svg,
             style2,
             style3: { ...style3, l3MassScale: L3_MASS_SCALE },
@@ -3616,7 +3808,7 @@
             ageNum: styleBase.age,
             l3MaterialMode: 'stone',
             questionnaire
-          });
+          }));
         }
       } catch (renderErr) {
         console.warn('[prototype-v2] PBR failed:', renderErr);
@@ -3643,7 +3835,7 @@
           ? 'תצוגת מתכת · Q1 הטבעה: ' + l3Display + ' · Q4 אליפסה: ' + (Q4_LABELS[params.q4Belief] || params.q4Belief)
           : 'תצוגת מתכת · Q1: ' + l3Display
         : renderStats
-          ? 'PBR 3D · Q2 אבן | Q3 חריטה | Q4 מאחור | Q1 הטבעה: ' + l3Display
+          ? 'PBR 3D · Q2 אבן | Q3 חריטה | Q1 הטבעה: ' + l3Display
           : 'SVG · Q1 הטבעה: ' + l3Display + ' | מרכז: ' + anchor;
       if (renderFail) msg += ' | PBR נכשל: ' + renderFail;
       if (params.q1Wish) msg += ' · Q1: ' + params.q1Wish.slice(0, 20) + (params.q1Wish.length > 20 ? '…' : '');
@@ -3672,7 +3864,12 @@
       msg += ' | spike Q6=' + (questionnaire.l3Spike * 100).toFixed(0) + '%';
       msg += ' | Q5=' + params.q5Feeling;
       if (style2) {
-        msg += ' | מרקם ' + ((style2.occupationSmoothness ?? 0.5) * 100).toFixed(0) + '%';
+        msg +=
+          ' | מסגרת ' +
+          (frameSmoothnessFromStyle(style2) * 100).toFixed(0) +
+          '% · שם ' +
+          ((style2.occupationSmoothness ?? 0.5) * 100).toFixed(0) +
+          '%';
       }
       if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
       msg += ' | שאלון+slab';

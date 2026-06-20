@@ -4,6 +4,7 @@
 import json
 import os
 import re
+import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote, urlparse
 
@@ -354,7 +355,21 @@ if __name__ == "__main__":
         print(f"Bootstrapped {len(bootstrapped)} missing glyph(s) from אותיות/: {', '.join(bootstrapped)}")
     print_glyphs_startup_info()
     print("Glyph files are read from glyphs/ only. Use editor upload or save directly there.")
-    print(f"Serving at http://localhost:{PORT}")
-    print(f"Open editor: http://localhost:{PORT}/editor.html")
-    print("All paths URL-decoded (unquote) for Hebrew filenames")
-    HTTPServer(("", PORT), Handler).serve_forever()
+    print(f"Serving at http://localhost:{PORT}", flush=True)
+    print(f"Open editor: http://localhost:{PORT}/editor.html", flush=True)
+    print(f"Open prototype: http://localhost:{PORT}/prototype-v2-thick.html", flush=True)
+    print("All paths URL-decoded (unquote) for Hebrew filenames", flush=True)
+    try:
+        httpd = HTTPServer(("", PORT), Handler)
+    except OSError as err:
+        if getattr(err, "errno", None) in (48, 98, 10048):
+            print(f"\nPort {PORT} is already in use.")
+            print(f"If another server is running, open: http://localhost:{PORT}/prototype-v2-thick.html")
+            print("To stop the old server: lsof -ti :8080 | xargs kill")
+            sys.exit(1)
+        raise
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+        httpd.server_close()
