@@ -2,8 +2,9 @@
  * Signed-distance sculptural mesh extraction (marching cubes + Laplacian smooth).
  * Marching cubes tables: Paul Bourke / Mikola Lysenko (isosurface).
  */
-import * as THREE from 'https://esm.sh/three@0.160.0';
-import { mergeVertices } from 'https://esm.sh/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js';
+import * as THREE from 'https://esm.sh/three@0.170.0';
+import { yieldToMainThread } from './render-yield.js';
+import { mergeVertices } from 'https://esm.sh/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * Javascript Marching Cubes
@@ -384,6 +385,69 @@ function marchingCubes(dims, potential, bounds) {
   return { positions: vertices, cells: faces };
 }
 
+/** Marching cubes with periodic yields — keeps UI responsive during SDF sampling. */
+async function marchingCubesAsync(dims, potential, bounds, options = {}) {
+  if (!bounds) bounds = [[0, 0, 0], dims];
+  const scale = [0, 0, 0];
+  const shift = [0, 0, 0];
+  for (let i = 0; i < 3; ++i) {
+    scale[i] = (bounds[1][i] - bounds[0][i]) / dims[i];
+    shift[i] = bounds[0][i];
+  }
+
+  const vertices = [];
+  const faces = [];
+  const grid = new Array(8);
+  const edges = new Array(12);
+  const zSteps = Math.max(1, dims[2] - 1);
+  const onProgress = options.onProgress;
+
+  for (let z = 0; z < dims[2] - 1; z++) {
+    for (let y = 0; y < dims[1] - 1; y++) {
+      for (let x0 = 0; x0 < dims[0] - 1; x0++) {
+        const x = [x0, y, z];
+        let cube_index = 0;
+        for (let i = 0; i < 8; ++i) {
+          const v = cubeVerts[i];
+          const s = potential(
+            scale[0] * (x[0] + v[0]) + shift[0],
+            scale[1] * (x[1] + v[1]) + shift[1],
+            scale[2] * (x[2] + v[2]) + shift[2]
+          );
+          grid[i] = s;
+          cube_index |= s > 0 ? 1 << i : 0;
+        }
+        const edge_mask = edgeTable[cube_index];
+        if (edge_mask === 0) continue;
+        for (let i = 0; i < 12; ++i) {
+          if ((edge_mask & (1 << i)) === 0) continue;
+          edges[i] = vertices.length;
+          const nv = [0, 0, 0];
+          const e = edgeIndex[i];
+          const p0 = cubeVerts[e[0]];
+          const p1 = cubeVerts[e[1]];
+          const a = grid[e[0]];
+          const b = grid[e[1]];
+          const d = a - b;
+          let t = 0;
+          if (Math.abs(d) > 1e-6) t = a / d;
+          for (let j = 0; j < 3; ++j) {
+            nv[j] = scale[j] * (x[j] + p0[j] + t * (p1[j] - p0[j])) + shift[j];
+          }
+          vertices.push(nv);
+        }
+        const f = triTable[cube_index];
+        for (let i = 0; i < f.length; i += 3) {
+          faces.push([edges[f[i]], edges[f[i + 1]], edges[f[i + 2]]]);
+        }
+      }
+    }
+    if (onProgress) onProgress((z + 1) / zSteps);
+    if (z % 2 === 0) await yieldToMainThread();
+  }
+  return { positions: vertices, cells: faces };
+}
+
 function distanceTransform(grid, w, h) {
   const INF = 1e7;
   const dist = new Float32Array(w * h);
@@ -581,6 +645,21 @@ function metalPlateCradleSdfAt(x, y, z, params) {
   return Math.max(outerPhi, sdfZ) - roundR * 0.09;
 }
 
+/** Union of metal and/or glass inset halo wraps (stone bezel around embedded layers). */
+function minHaloWrapSdfAt(x, y, z, params) {
+  let best = 1e6;
+  if (params.metalHaloWrap) {
+    best = Math.min(best, metalHaloWrapSdfAt(x, y, z, params));
+  }
+  if (params.glassHaloWrap) {
+    best = Math.min(
+      best,
+      metalHaloWrapSdfAt(x, y, z, { ...params, metalHaloWrap: params.glassHaloWrap })
+    );
+  }
+  return best;
+}
+
 /** Stone seat + collar following the emboss silhouette halo (mask-based). */
 function metalHaloWrapSdfAt(x, y, z, params) {
   const c = params.metalHaloWrap;
@@ -620,8 +699,23 @@ function metalHaloWrapSdfAt(x, y, z, params) {
   return Math.max(outerPhi, sdfZ) - roundR * 0.08;
 }
 
+/** Through-hole from enclosed vector counters — pierces full slab depth. */
+function pierceHoleSdfAt(x, y, params) {
+  const hole = params.pierceHoleMask;
+  if (!hole?.grid) return null;
+  const px = (x - hole.maskOrigin.minX) * params.maskScale;
+  const py = (hole.maskOrigin.maxY - y) * params.maskScale;
+  const mx = Math.round(px);
+  const my = Math.round(py);
+  if (mx < 0 || mx >= hole.w || my < 0 || my >= hole.h) return null;
+  if (!hole.grid[my * hole.w + mx]) return null;
+  return params.roundR * 0.42;
+}
+
 /** Continuous domed plateau from slab silhouette — fills interior so name tubes never punch holes. */
 function slabMaskPlateauSdfAt(x, y, z, params) {
+  const pierce = pierceHoleSdfAt(x, y, params);
+  if (pierce != null) return pierce;
   const px = (x - params.maskOrigin.minX) * params.maskScale;
   const py = (params.maskOrigin.maxY - y) * params.maskScale;
   const s = sampleMaskField(px, py, params);
@@ -645,6 +739,9 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
 
 /** Slab + name-tube body: soft domed lobes on a plate — no vertical cliff at silhouette. */
 function slabTubeStoneSdfAt(x, y, z, params) {
+  const pierce = pierceHoleSdfAt(x, y, params);
+  if (pierce != null) return pierce;
+
   const { segments, segmentIndex, roundR, maxH } = params;
   const dist2d = nearestTubeDist(x, y, segments, segmentIndex);
   const softR = roundR * 1.04;
@@ -660,10 +757,11 @@ function slabTubeStoneSdfAt(x, y, z, params) {
 
   const coreR = roundR * 0.55;
   const valleyOuter = roundR * 2.6;
+  const valleyMul = params.letterGapRelief ? 0.54 : 0.38;
   if (!params.solidInterior && dist2d > coreR && dist2d < valleyOuter) {
     const t = (dist2d - coreR) / (valleyOuter - coreR);
-    hSurf -= (peakH - baseH) * 0.38 * Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
-    hSurf = Math.max(baseH * 0.92, hSurf);
+    hSurf -= (peakH - baseH) * valleyMul * Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
+    hSurf = Math.max(baseH * 0.88, hSurf);
   }
 
   const swell =
@@ -679,15 +777,14 @@ function slabTubeStoneSdfAt(x, y, z, params) {
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.14;
 
-  if (params.metalHaloWrap) {
-    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
-    letterSdf = Math.min(letterSdf, haloSdf);
+  if (params.metalHaloWrap || params.glassHaloWrap) {
+    letterSdf = Math.min(letterSdf, minHaloWrapSdfAt(x, y, z, params));
   } else if (params.metalPlateCradle) {
     const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
     letterSdf = Math.min(letterSdf, cradleSdf);
   }
 
-  if (params.solidInterior) {
+  if (params.solidInterior || params.slabMode) {
     return Math.min(letterSdf, slabMaskPlateauSdfAt(x, y, z, params));
   }
 
@@ -717,9 +814,8 @@ function tubeStoneSdfAt(x, y, z, params) {
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
 
-  if (params.metalHaloWrap) {
-    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
-    letterSdf = Math.min(letterSdf, haloSdf);
+  if (params.metalHaloWrap || params.glassHaloWrap) {
+    letterSdf = Math.min(letterSdf, minHaloWrapSdfAt(x, y, z, params));
   } else if (params.metalPlateCradle) {
     const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
     letterSdf = Math.min(letterSdf, cradleSdf);
@@ -1096,8 +1192,8 @@ function stoneSdfAt(x, y, z, params) {
     const basePad = roundR * 0.5;
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
     let reliefSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
-    if (params.metalHaloWrap) {
-      reliefSdf = Math.min(reliefSdf, metalHaloWrapSdfAt(x, y, z, params));
+    if (params.metalHaloWrap || params.glassHaloWrap) {
+      reliefSdf = Math.min(reliefSdf, minHaloWrapSdfAt(x, y, z, params));
     } else if (params.metalPlateCradle) {
       reliefSdf = Math.min(reliefSdf, metalPlateCradleSdfAt(x, y, z, params));
     }
@@ -1123,9 +1219,8 @@ function stoneSdfAt(x, y, z, params) {
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let slabSdf = Math.max(phi2d, sdfZ) - roundR * (params.slabMode ? 0.06 : 0.1);
 
-  if (params.metalHaloWrap) {
-    const haloSdf = metalHaloWrapSdfAt(x, y, z, params);
-    slabSdf = Math.min(slabSdf, haloSdf);
+  if (params.metalHaloWrap || params.glassHaloWrap) {
+    slabSdf = Math.min(slabSdf, minHaloWrapSdfAt(x, y, z, params));
   } else if (params.metalPlateCradle) {
     const cradleSdf = metalPlateCradleSdfAt(x, y, z, params);
     slabSdf = Math.min(slabSdf, cradleSdf);
@@ -1436,6 +1531,16 @@ function applySlabMetalContactColors(geom, params) {
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
+/** Marching-cubes Z extent — metal halo collars can exceed default maxH. */
+function slabStoneMaxZ(maxH, roundR, embossExtraH, options) {
+  let zTop = maxH + roundR * 0.55 + embossExtraH;
+  if (options?.metalHaloWrap) {
+    const c = options.metalHaloWrap;
+    zTop = Math.max(zTop, (c.maxH || maxH) + (c.collarH || 0) * 0.45);
+  }
+  return zTop;
+}
+
 /**
  * SVG silhouette mask → signed distance field → marching cubes → smoothed sculptural mesh.
  */
@@ -1488,7 +1593,7 @@ export function buildStoneSculptureMeshFromMask(
   for (const ov of options?.embossOverlays || []) {
     embossExtraH = Math.max(embossExtraH, ov.height || 0);
   }
-  const maxZ = maxH + roundR * 0.55 + embossExtraH;
+  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH, options);
 
   const spanX = maxX - minX;
   const spanY = maxY - minY;
@@ -1567,8 +1672,11 @@ export function buildStoneSculptureMeshFromMask(
     embossOverlays: options?.embossOverlays || null,
     metalPlateCradle: options?.metalPlateCradle || null,
     metalHaloWrap: options?.metalHaloWrap || null,
+    glassHaloWrap: options?.glassHaloWrap || null,
     embossFootprintMask: options?.embossFootprintMask || null,
     solidInterior: !!options?.solidInterior,
+    pierceHoleMask: options?.pierceHoleMask ?? null,
+    letterGapRelief: !!options?.letterGapRelief,
   };
 
   const potential = (x, y, z) => stoneSdfAt(x, y, z, params);
@@ -1603,5 +1711,182 @@ export function buildStoneSculptureMeshFromMask(
   // washed out procedural grain on flat plateaus. Sculptural shading comes from lights + maps.
   if (!slabMode) applySculptureVertexAO(geom, params);
   addSculptureUvs(geom, maskOrigin);
+  return geom;
+}
+
+/**
+ * Async stone mesh build — yields during marching cubes so the tab stays responsive.
+ * @param {object} [asyncOpts] — { onProgress(0..1) }
+ */
+export async function buildStoneSculptureMeshFromMaskAsync(
+  grid,
+  w,
+  h,
+  maskOrigin,
+  tubeRadius,
+  maskScale = 2,
+  distToL2 = null,
+  segments = null,
+  options = null,
+  asyncOpts = null
+) {
+  const onProgress = asyncOpts?.onProgress;
+  const slabMode = !!options?.slabMode;
+  const hasStrokeRelief =
+    (options?.engraveSegments?.length || 0) +
+      (options?.embossSegments?.length || 0) +
+      (options?.embossDetailSegments?.length || 0) >
+    0;
+  const hasOverlays =
+    (options?.engraveOverlays?.length || 0) + (options?.embossOverlays?.length || 0) > 0;
+  const hasRelief = hasStrokeRelief || hasOverlays;
+  const distIn = distanceTransform(grid, w, h);
+  const distOut = distanceToMaskGrid(grid, w, h);
+
+  let maxDistIn = 1;
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
+  }
+
+  const roundR = slabMode ? tubeRadius * 1.35 : tubeRadius * 1.02;
+  const maxH = slabMode
+    ? tubeRadius * (hasRelief ? 1.22 : 1.02)
+    : segments?.length
+      ? tubeRadius * 1.28
+      : tubeRadius * 1.08;
+  const maxDistInScene = maxDistIn / maskScale;
+  const pad = roundR * 2.4;
+  const segmentIndex =
+    segments?.length > 0 ? buildSegmentSpatialIndex(segments, Math.max(roundR * 0.75, 2)) : null;
+
+  const minX = maskOrigin.minX - pad;
+  const maxX = maskOrigin.maxX + pad;
+  const minY = maskOrigin.minY - pad;
+  const maxY = maskOrigin.maxY + pad;
+  const engraveExtra = options?.engraveDepth || 0;
+  const minZ = -(roundR * 0.42 + engraveExtra * 0.9);
+  let embossExtraH = Math.max(options?.embossHeight || 0, options?.embossDetailHeight || 0);
+  for (const ov of options?.embossOverlays || []) {
+    embossExtraH = Math.max(embossExtraH, ov.height || 0);
+  }
+  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH, options);
+
+  const spanX = maxX - minX;
+  const spanY = maxY - minY;
+  const spanZ = maxZ - minZ;
+  const maxSpan = Math.max(spanX, spanY, spanZ);
+  const res = Math.min(
+    58,
+    Math.max(44, Math.round(maxSpan / (roundR * (hasStrokeRelief ? 0.34 : 0.36))))
+  );
+
+  let nx = Math.max(28, Math.round(res * (spanX / maxSpan)));
+  let ny = Math.max(28, Math.round(res * (spanY / maxSpan)));
+  let nz = Math.max(
+    hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
+    Math.round(res * (spanZ / maxSpan))
+  );
+  const maxVoxels = 65000;
+  const voxels = nx * ny * nz;
+  if (voxels > maxVoxels) {
+    const s = Math.cbrt(maxVoxels / voxels);
+    nx = Math.max(24, Math.round(nx * s));
+    ny = Math.max(24, Math.round(ny * s));
+    nz = Math.max(20, Math.round(nz * s));
+  }
+
+  const params = {
+    grid,
+    w,
+    h,
+    distIn,
+    distOut,
+    distToL2,
+    segments,
+    segmentIndex,
+    maskOrigin,
+    maskScale,
+    roundR,
+    maxH,
+    maxDistInScene,
+    slabMode,
+    engraveSegments: options?.engraveSegments || null,
+    embossSegments: options?.embossSegments || null,
+    embossDetailSegments: options?.embossDetailSegments || null,
+    engraveSegmentIndex:
+      options?.engraveSegments?.length > 0
+        ? buildSegmentSpatialIndex(options.engraveSegments, Math.max(roundR * 0.75, 2))
+        : null,
+    embossSegmentIndex:
+      options?.embossSegments?.length > 0
+        ? buildSegmentSpatialIndex(options.embossSegments, Math.max(roundR * 0.75, 2))
+        : null,
+    embossDetailSegmentIndex:
+      options?.embossDetailSegments?.length > 0
+        ? buildSegmentSpatialIndex(options.embossDetailSegments, Math.max(roundR * 0.75, 2))
+        : null,
+    engraveTubeR: options?.engraveTubeR ?? null,
+    engraveDepth: options?.engraveDepth ?? null,
+    engraveEmbossGap: options?.engraveEmbossGap ?? null,
+    embossTubeR: options?.embossTubeR ?? null,
+    embossHeight: options?.embossHeight ?? null,
+    embossRipple: options?.embossRipple ?? 0,
+    embossDetailTubeR: options?.embossDetailTubeR ?? null,
+    embossDetailHeight: options?.embossDetailHeight ?? null,
+    metalBedSegments: options?.metalBedSegments || null,
+    metalBedSegmentIndex:
+      options?.metalBedSegments?.length > 0
+        ? buildSegmentSpatialIndex(options.metalBedSegments, Math.max(roundR * 0.75, 2))
+        : null,
+    metalBedTubeR: options?.metalBedTubeR ?? null,
+    metalBedDepth: options?.metalBedDepth ?? null,
+    metalBedShoulder: options?.metalBedShoulder ?? null,
+    maxEngraveSinkFrac: options?.maxEngraveSinkFrac ?? 0.58,
+    maxEngraveSink: options?.maxEngraveSink ?? null,
+    basePlateHeight: options?.basePlateHeight ?? null,
+    engraveOverlays: options?.engraveOverlays || null,
+    embossOverlays: options?.embossOverlays || null,
+    metalPlateCradle: options?.metalPlateCradle || null,
+    metalHaloWrap: options?.metalHaloWrap || null,
+    glassHaloWrap: options?.glassHaloWrap || null,
+    embossFootprintMask: options?.embossFootprintMask || null,
+    solidInterior: !!options?.solidInterior,
+    pierceHoleMask: options?.pierceHoleMask ?? null,
+    letterGapRelief: !!options?.letterGapRelief,
+  };
+
+  const potential = (x, y, z) => stoneSdfAt(x, y, z, params);
+  const mc = await marchingCubesAsync(
+    [nx, ny, nz],
+    potential,
+    [
+      [minX, minY, minZ],
+      [maxX, maxY, maxZ],
+    ],
+    { onProgress }
+  );
+
+  await yieldToMainThread();
+  let geom = mcResultToGeometry(mc);
+  const tubeMode = !!segments?.length && !slabMode;
+  const smoothIter = slabMode ? (hasRelief ? 2 : 2) : tubeMode ? 4 : 6;
+  const smoothLambda = slabMode
+    ? hasStrokeRelief
+      ? 0.1
+      : hasOverlays
+        ? 0.11
+        : 0.16
+    : tubeMode
+      ? 0.2
+      : 0.24;
+  if (smoothIter > 0) laplacianSmoothGeometry(geom, smoothIter, smoothLambda);
+  geom.computeVertexNormals();
+  if (!slabMode) {
+    laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
+    geom.computeVertexNormals();
+  }
+  if (!slabMode) applySculptureVertexAO(geom, params);
+  addSculptureUvs(geom, maskOrigin);
+  await yieldToMainThread();
   return geom;
 }
