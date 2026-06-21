@@ -2963,13 +2963,62 @@ function collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire 
   return appendQ3FrameBridgePolylines(polylines, slabMask, style3);
 }
 
-function q3MetalThreadZ(stoneMesh) {
-  stoneMesh.geometry.computeBoundingBox();
-  const stoneBack = stoneMesh.geometry.boundingBox.min.z * stoneMesh.scale.z;
-  return stoneMesh.position.z + stoneBack - Q3_THREAD_BEHIND_STONE_Z_OFFSET;
+function scenePointInMaskGrid(x, y, mask) {
+  if (!mask?.grid) return false;
+  const { grid, w, h, maskOrigin } = mask;
+  const px = Math.round((x - maskOrigin.minX) * MASK_SCALE);
+  const py = Math.round((maskOrigin.maxY - y) * MASK_SCALE);
+  if (px < 0 || py < 0 || px >= w || py >= h) return false;
+  return grid[py * w + px] > 0;
 }
 
-/** Q3 answer glyphs as metal tubes — behind stone slab; same material as frame. */
+/** Forbidden zone — Q1 ceramic footprint + gap (+ optional tube radius for clip). */
+function buildCeramicQ3HoleMask(rootSvg, slabMask, style3, style2, extraMarginScene = 0) {
+  const q1Polys = collectCeramicQ1TubePolylines(rootSvg, slabMask, style3);
+  if (!q1Polys.length || !slabMask?.maskOrigin) return null;
+  const scaled = scalePolylinesFromCenter(q1Polys, SLAB_STONE_XY_SCALE);
+  const tubeR =
+    frameTubeBaseRadius(style3) *
+    SLAB_Q1_CERAMIC_TUBE_RADIUS_SCALE *
+    frameRadiusScaleFromStyle2(style2) *
+    SLAB_STONE_XY_SCALE;
+  const { w, h, maskOrigin } = slabMask;
+  const q1Mask = rasterizePolylinesToGrid(scaled, tubeR * 2.08, maskOrigin);
+  if (q1Mask.w !== w || q1Mask.h !== h) return null;
+  const gapPx = Math.max(
+    2,
+    Math.round((SLAB_FRAME_EQUAL_GAP_SCENE + extraMarginScene) * MASK_SCALE)
+  );
+  const grid = dilateMaskGridBlur(q1Mask.grid, w, h, gapPx);
+  return { grid, w, h, maskOrigin };
+}
+
+/** Split polylines — drop segments inside the ceramic hole mask. */
+function clipPolylinesOutsideMask(polylines, mask) {
+  if (!mask?.grid || !polylines.length) return polylines;
+  const out = [];
+  for (const { pts } of polylines) {
+    let run = [];
+    const flush = () => {
+      if (run.length >= 2) out.push({ pts: run, closed: false });
+      run = [];
+    };
+    for (const p of pts) {
+      if (!scenePointInMaskGrid(p.x, p.y, mask)) run.push(p);
+      else flush();
+    }
+    flush();
+  }
+  return out;
+}
+
+function q3MetalThreadZ(stoneMesh) {
+  stoneMesh.geometry.computeBoundingBox();
+  const stoneTop = stoneMesh.geometry.boundingBox.max.z * stoneMesh.scale.z;
+  return stoneMesh.position.z + stoneTop + Q3_THREAD_ABOVE_STONE_Z;
+}
+
+/** Q3 metal — above stone, below ceramic; punched hole around Q1 + 20px gap. */
 function addQ3MetalThreadLayer(
   scene,
   rootSvg,
@@ -2982,7 +3031,15 @@ function addQ3MetalThreadLayer(
   questionnaire = null
 ) {
   if (!stoneMesh || !slabMask?.maskOrigin || !metalMat) return 0;
-  const polylines = collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire);
+  let polylines = collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire);
+  if (!polylines.length) return 0;
+  const q3TubeR =
+    frameTubeBaseRadius(style3) *
+    SLAB_STONE_FRAME_RADIUS_SCALE *
+    frameRadiusScaleFromStyle2(style2) *
+    SLAB_STONE_XY_SCALE;
+  const holeMask = buildCeramicQ3HoleMask(rootSvg, slabMask, style3, style2, q3TubeR);
+  if (holeMask) polylines = clipPolylinesOutsideMask(polylines, holeMask);
   if (!polylines.length) return 0;
   const z = q3MetalThreadZ(stoneMesh);
   return addTubesFromPolylines(polylines, metalMat, scene, z, Q3_THREAD_RENDER_ORDER, style3, ageNum, style2, {

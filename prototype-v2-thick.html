@@ -322,6 +322,8 @@
   const MAX_LETTERS = 3;
   /** מקסימום אותיות בשרשרת חיבורים (Q1/Q2/L3) — כרגע 3 להפחתת עומס */
   const MAX_LETTERS_LAYER3 = 3;
+  /** שכבת Q1 (קרמיקה) — שתי אותיות מחוברות */
+  const MAX_Q1_CERAMIC_LETTERS = 2;
   /** מקסימום אותיות בשכבת Q4 (מתכת מאחורי האבן) */
   const MAX_FRINGE_LETTERS = 3;
   /** כוונת חיבורים לפריסת אותיות — לפי סוג הקמע (הגנה / זימון) */
@@ -2283,6 +2285,34 @@
     return out;
   }
 
+  /** שכבת Q1 (קרמיקה) — עד 2 אותיות: ראשונה מכל מילה, עם גיבוי לאות שנייה במילה הראשונה */
+  function getQ1CeramicLetters(str) {
+    const letters = getSentenceLetters(str);
+    if (letters.length >= MAX_Q1_CERAMIC_LETTERS) return letters.slice(0, MAX_Q1_CERAMIC_LETTERS);
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const words = String(str || '')
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+    const out = letters.slice();
+    if (words.length && out.length === 1) {
+      for (const ch of [...words[0]]) {
+        if (!avail.has(ch) || out.includes(ch)) continue;
+        out.push(ch);
+        break;
+      }
+    }
+    for (const word of words.slice(1)) {
+      if (out.length >= MAX_Q1_CERAMIC_LETTERS) break;
+      for (const ch of [...word]) {
+        if (!avail.has(ch) || out.includes(ch)) continue;
+        out.push(ch);
+        break;
+      }
+    }
+    return out.slice(0, MAX_Q1_CERAMIC_LETTERS);
+  }
+
   /** אותיות עבריות מהשם — ללא כפילויות, עד 3 */
   function lettersFromName(name) {
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
@@ -3956,7 +3986,7 @@
       const onProgress = (frac, label) => updateRenderProgress(0.12 + frac * 0.88, label);
       try {
         await yieldToBrowser();
-        const PBR_MODULE_VER = '20250621-frame-gap20';
+        const PBR_MODULE_VER = '20250621-q3-hole-wrap';
         const renderOpts = {
           svg,
           style2,
