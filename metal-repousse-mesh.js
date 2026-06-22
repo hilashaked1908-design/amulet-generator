@@ -3,6 +3,7 @@
  * One continuous displaced surface (not wireframe tubes).
  */
 import * as THREE from 'https://esm.sh/three@0.160.0';
+import { yieldToMainThread } from './render-yield.js';
 
 const MASK_SCALE = 2;
 
@@ -435,7 +436,8 @@ function sceneToMaskPx(x, y, maskOrigin) {
  * Height field: raised emboss (inner) + completely flat halo plate (outer ring).
  * Center → emboss dome on base; halo ring → constant baseThickness only.
  */
-export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOrigin, options = {}) {
+export async function buildRepousseHeightField(shapePolylines, embossPolylines, maskOrigin, options = {}) {
+  const onProgress = options.onProgress;
   const embossMul = options.embossHeightMul ?? 1;
   const maxRelief = (options.maxReliefHeight ?? REPOUSSE_FIELD_DEFAULTS.maxReliefHeight) * embossMul;
   const sheetStroke = options.sheetStroke ?? 52;
@@ -514,7 +516,8 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
 
   const edgeFrac = options.edgeReliefFrac ?? REPOUSSE_FIELD_DEFAULTS.edgeReliefFrac ?? 0.82;
   const reliefTubeR = reliefStroke * 0.5;
-  const usePolylineRelief = flatHalo && embossPolylines?.length > 0;
+  const usePolylineRelief =
+    (options.usePolylineRelief === true || flatHalo) && embossPolylines?.length > 0;
   const heights = new Float32Array(w * h);
 
   if (usePolylineRelief) {
@@ -535,6 +538,10 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
           heights[i] = baseTh;
         }
       }
+      if (y % 6 === 0) {
+        onProgress?.((y + 1) / h);
+        await yieldToMainThread();
+      }
     }
   } else {
     for (let i = 0; i < heights.length; i++) {
@@ -548,8 +555,15 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
       } else if (flatHalo || !isEmboss) {
         heights[i] = baseTh;
       }
+      if (i % 16384 === 0) {
+        onProgress?.(i / heights.length);
+        await yieldToMainThread();
+      }
     }
   }
+
+  onProgress?.(1);
+  await yieldToMainThread();
 
   const blurR = flatHalo
     ? (options.haloBlurRadius ?? REPOUSSE_FIELD_DEFAULTS.haloBlurRadius ?? 2)
@@ -593,10 +607,66 @@ export function buildRepousseHeightField(shapePolylines, embossPolylines, maskOr
   };
 }
 
-export function buildRepousseMeshFromHeightField(field, options = {}) {
+/** Tight scene bounds around the metal sheet (not the full stone mask). */
+export function computeSheetTightMaskOrigin(field, padScene = 3) {
+  const { sheetMask, w, h, maskOrigin } = field;
+  const padPx = Math.max(1, Math.round(padScene * MASK_SCALE));
+  let minPx = w;
+  let maxPx = -1;
+  let minPy = h;
+  let maxPy = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!sheetMask[y * w + x]) continue;
+      minPx = Math.min(minPx, x);
+      maxPx = Math.max(maxPx, x);
+      minPy = Math.min(minPy, y);
+      maxPy = Math.max(maxPy, y);
+    }
+  }
+  if (maxPx < 0) return { ...maskOrigin };
+  minPx = Math.max(0, minPx - padPx);
+  maxPx = Math.min(w - 1, maxPx + padPx);
+  minPy = Math.max(0, minPy - padPx);
+  maxPy = Math.min(h - 1, maxPy + padPx);
+  return {
+    minX: maskOrigin.minX + minPx / MASK_SCALE,
+    maxX: maskOrigin.minX + (maxPx + 1) / MASK_SCALE,
+    minY: maskOrigin.maxY - (maxPy + 1) / MASK_SCALE,
+    maxY: maskOrigin.maxY - minPy / MASK_SCALE,
+  };
+}
+
+/** Drop triangles outside the sheet mask so opaque metal needs no alphaMap. */
+export function trimRepousseGeometryToMask(geom, field) {
+  const { sheetMask, w, h, maskOrigin } = field;
+  const pos = geom.attributes.position;
+  const inside = new Uint8Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const { px, py } = sceneToMaskPx(pos.getX(i), pos.getY(i), maskOrigin);
+    inside[i] =
+      px >= 0 && py >= 0 && px < w && py < h && sheetMask[Math.round(py) * w + Math.round(px)] ? 1 : 0;
+  }
+  const src = geom.index;
+  if (!src) return geom;
+  const kept = [];
+  for (let f = 0; f < src.count; f += 3) {
+    const a = src.getX(f);
+    const b = src.getX(f + 1);
+    const c = src.getX(f + 2);
+    if (inside[a] || inside[b] || inside[c]) kept.push(a, b, c);
+  }
+  if (kept.length) geom.setIndex(kept);
+  return geom;
+}
+
+export async function buildRepousseMeshFromHeightField(field, options = {}) {
   const { heights, w, h, maskOrigin, sheetMask } = field;
-  const spanX = maskOrigin.maxX - maskOrigin.minX;
-  const spanY = maskOrigin.maxY - maskOrigin.minY;
+  const onProgress = options.onProgress;
+  const planeOrigin =
+    options.tightBounds === false ? maskOrigin : computeSheetTightMaskOrigin(field, options.padScene ?? 3);
+  const spanX = planeOrigin.maxX - planeOrigin.minX;
+  const spanY = planeOrigin.maxY - planeOrigin.minY;
   const segX = options.segmentsX ?? REPOUSSE_MESH_SEGMENTS;
   const segY = options.segmentsY ?? REPOUSSE_MESH_SEGMENTS;
   const zScale = options.zScale ?? 1;
@@ -607,11 +677,12 @@ export function buildRepousseMeshFromHeightField(field, options = {}) {
   const pos = geom.attributes.position;
   const uvs = geom.attributes.uv;
 
-  for (let i = 0; i < pos.count; i++) {
+  const vertCount = pos.count;
+  for (let i = 0; i < vertCount; i++) {
     const lx = pos.getX(i);
     const ly = pos.getY(i);
-    const sx = maskOrigin.minX + (lx / spanX + 0.5) * spanX;
-    const sy = maskOrigin.minY + (ly / spanY + 0.5) * spanY;
+    const sx = planeOrigin.minX + (lx / spanX + 0.5) * spanX;
+    const sy = planeOrigin.minY + (ly / spanY + 0.5) * spanY;
     const { px, py } = sceneToMaskPx(sx, sy, maskOrigin);
     if (options.sceneCoords !== false) {
       pos.setX(i, sx);
@@ -625,8 +696,14 @@ export function buildRepousseMeshFromHeightField(field, options = {}) {
         px >= 0 && py >= 0 && px < w && py < h && sheetMask[Math.round(py) * w + Math.round(px)];
       pos.setZ(i, inside ? sampleHeight(heights, w, h, px, py) * zScale : 0);
     }
+    if (i % 512 === 0) {
+      onProgress?.(i / vertCount);
+      await yieldToMainThread();
+    }
   }
 
+  geom.computeVertexNormals();
+  trimRepousseGeometryToMask(geom, field);
   geom.computeVertexNormals();
   return geom;
 }
@@ -655,7 +732,23 @@ function upsampleMask(sheetMask, w, h, outW, outH) {
   return out;
 }
 
-function buildNormalMapFromHeights(heights, w, h, sheetMask, strength = 5.5) {
+/** Isotropic satin micro-normal — kept for satin pewter variant. */
+function sampleSatinBrushNormal(x, y, strength = 0.11) {
+  const a = Math.sin(x * 0.81 + y * 0.57) * Math.cos(x * 0.23 - y * 0.69);
+  const b = Math.sin(x * 0.47 - y * 0.83) * Math.cos(x * 0.61 + y * 0.31);
+  const dx = (a * 0.81 + b * 0.47) * strength;
+  const dy = (a * 0.57 - b * 0.83) * strength;
+  let nx = -dx;
+  let ny = -dy;
+  let nz = 1;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  return [nx / len, ny / len, nz / len];
+}
+
+function buildNormalMapFromHeights(heights, w, h, sheetMask, options = {}) {
+  const strength = options.strength ?? 5.5;
+  const baseTh = options.baseThickness ?? REPOUSSE_FIELD_DEFAULTS.baseThickness ?? 2.4;
+  const flatEps = options.flatEps ?? 0.06;
   const img = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -668,13 +761,17 @@ function buildNormalMapFromHeights(heights, w, h, sheetMask, strength = 5.5) {
         img[o + 3] = 255;
         continue;
       }
+      const isEmboss = heights[i] > baseTh + 0.35;
+      let nx;
+      let ny;
+      let nz;
       const l = x > 0 ? heights[i - 1] : heights[i];
       const r = x < w - 1 ? heights[i + 1] : heights[i];
       const u = y > 0 ? heights[i - w] : heights[i];
       const d = y < h - 1 ? heights[i + w] : heights[i];
-      let nx = -(r - l) * strength;
-      let ny = -(d - u) * strength;
-      let nz = 1;
+      nx = -(r - l) * (isEmboss ? strength : strength * 0.65);
+      ny = -(d - u) * (isEmboss ? strength : strength * 0.65);
+      nz = 1;
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len;
       ny /= len;
@@ -689,7 +786,7 @@ function buildNormalMapFromHeights(heights, w, h, sheetMask, strength = 5.5) {
 }
 
 export function buildHeightTextures(field, options = {}) {
-  const { heights, w, h, sheetMask, distIn } = field;
+  const { heights, w, h, sheetMask, distIn, baseThickness } = field;
   const texSize = options.texSize ?? METAL_HEIGHT_TEX_SIZE;
   const aspect = w / h;
   let outW = texSize;
@@ -731,7 +828,10 @@ export function buildHeightTextures(field, options = {}) {
   dispMap.minFilter = THREE.LinearFilter;
   dispMap.magFilter = THREE.LinearFilter;
 
-  const normalImg = buildNormalMapFromHeights(hiHeights, outW, outH, hiMask);
+  const normalImg = buildNormalMapFromHeights(hiHeights, outW, outH, hiMask, {
+    baseThickness: baseThickness ?? REPOUSSE_FIELD_DEFAULTS.baseThickness,
+    brushStrength: options.brushStrength ?? 0.11,
+  });
   const normalCanvas = document.createElement('canvas');
   normalCanvas.width = outW;
   normalCanvas.height = outH;
@@ -747,21 +847,12 @@ export function buildHeightTextures(field, options = {}) {
   alphaCanvas.height = outH;
   const actx = alphaCanvas.getContext('2d');
   const aimg = actx.createImageData(outW, outH);
-  for (let y = 0; y < outH; y++) {
-    for (let x = 0; x < outW; x++) {
-      const i = y * outW + x;
-      if (!hiMask[i]) continue;
-      const px = outW > 1 ? (x / (outW - 1)) * (w - 1) : 0;
-      const py = outH > 1 ? (y / (outH - 1)) * (h - 1) : 0;
-      const ix = Math.max(0, Math.min(w - 1, Math.round(px)));
-      const iy = Math.max(0, Math.min(h - 1, Math.round(py)));
-      const din = distIn?.[iy * w + ix] ?? 1;
-      const a = Math.round(Math.min(255, 255 * Math.min(1, din / edgeSoft)));
-      aimg.data[i * 4] = a;
-      aimg.data[i * 4 + 1] = a;
-      aimg.data[i * 4 + 2] = a;
-      aimg.data[i * 4 + 3] = 255;
-    }
+  for (let i = 0; i < hiMask.length; i++) {
+    if (!hiMask[i]) continue;
+    aimg.data[i * 4] = 255;
+    aimg.data[i * 4 + 1] = 255;
+    aimg.data[i * 4 + 2] = 255;
+    aimg.data[i * 4 + 3] = 255;
   }
   actx.putImageData(aimg, 0, 0);
   const alphaMap = new THREE.CanvasTexture(alphaCanvas);
@@ -776,7 +867,7 @@ export function buildHeightTextures(field, options = {}) {
 let brushedMetalBumpCache = null;
 
 /** Fine horizontal brush grain — satin pewter / hand-worked silver plate. */
-function createBrushedMetalBumpTexture() {
+export function createBrushedMetalBumpTexture() {
   if (brushedMetalBumpCache) return brushedMetalBumpCache;
   const size = 256;
   const canvas = document.createElement('canvas');
@@ -804,27 +895,23 @@ function createBrushedMetalBumpTexture() {
   return tex;
 }
 
-/** Polished pewter/silver — GPU displacement + normal map from precomputed height field. */
-export function buildRepoussePewterMaterial(field, envMap = null, options = {}) {
-  const { dispMap, normalMap, alphaMap, maxH } = buildHeightTextures(field);
+/** Opaque unified metal (prototype-v2-unified.html) — relief from geometry only. */
+export function buildRepoussePewterMaterial(envMap = null, options = {}) {
   return new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(options.color ?? 0xadb4be),
+    color: new THREE.Color(options.color ?? 0xd0d0d8),
     metalness: 1.0,
-    roughness: options.roughness ?? 0.13,
-    clearcoat: options.clearcoat ?? 0.48,
-    clearcoatRoughness: options.clearcoatRoughness ?? 0.07,
-    displacementMap: dispMap,
-    displacementScale: maxH,
-    displacementBias: 0,
-    normalMap,
-    normalScale: new THREE.Vector2(1, 1),
-    alphaMap,
-    transparent: true,
-    alphaTest: 0.04,
+    roughness: options.roughness ?? 0.1,
     envMap,
-    envMapIntensity: envMap ? (options.envMapIntensity ?? 2.85) : 1.0,
+    envMapIntensity: options.envMapIntensity ?? 3.0,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.06,
+    reflectivity: 1.0,
+    transmission: 0,
+    transparent: false,
+    opacity: 1,
     side: THREE.FrontSide,
     depthWrite: true,
+    depthTest: true,
   });
 }
 

@@ -21,9 +21,8 @@ let fromLetter = 'א';
 let toLetter = 'ב';
 let intent = 'protection';
 
-const glyphA = { x: CX, y: CY, rot: 0, scale: 1, flipX: false, flipY: false };
-const glyphB = { x: CX + 90, y: CY, rot: 0, scale: 1, flipX: false, flipY: false };
-let baseSize = GLYPH_SIZE;
+const glyphA = { x: CX, y: CY, rot: 0, sizePx: GLYPH_SIZE, flipX: false, flipY: false };
+const glyphB = { x: CX + 90, y: CY, rot: 0, sizePx: GLYPH_SIZE, flipX: false, flipY: false };
 
 /** @type {object[]} */
 let symbols = [];
@@ -31,6 +30,7 @@ let nextSymbolId = 1;
 let selectedSymbolId = null;
 
 let drag = null;
+let uploadTarget = null;
 
 function defaultSymbolProps() {
   return {
@@ -345,12 +345,34 @@ function updateSymbolList() {
 
 async function fetchSvgText(filename) {
   if (svgCache[filename]) return svgCache[filename];
-  const url = 'glyphs/' + encodeURIComponent(filename);
-  const res = await fetch(url);
+  const url = 'glyphs/' + encodeURIComponent(filename) + '?t=' + Date.now();
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(url + ' → HTTP ' + res.status);
   const text = await res.text();
   svgCache[filename] = text;
   return text;
+}
+
+function clearGlyphCache(filename) {
+  delete svgCache[filename];
+}
+
+async function uploadGlyphSvg(letter, svgText) {
+  const res = await fetch('/api/glyphs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ letter, svg: svgText })
+  });
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(bodyText || 'HTTP ' + res.status);
+  }
+  const data = JSON.parse(bodyText);
+  if (!data.ok) throw new Error('השרת לא אישר שמירה');
+  clearGlyphCache(data.filename || fileForLetter(letter));
+  await fetchGlyphList();
+  fillDropdowns();
+  return data;
 }
 
 /** Nested SVG with preserveAspectRatio so glyphs are not stretched */
@@ -527,8 +549,8 @@ async function drawCanvas() {
   const glyphLayer = $('layerGlyphs');
   const fileA = fileForLetter(fromLetter);
   const fileB = fileForLetter(toLetter);
-  const sizeA = baseSize * glyphA.scale;
-  const sizeB = baseSize * glyphB.scale;
+  const sizeA = glyphA.sizePx;
+  const sizeB = glyphB.sizePx;
 
   const [textA, textB] = await Promise.all([fetchSvgText(fileA), fetchSvgText(fileB)]);
 
@@ -543,10 +565,12 @@ async function drawCanvas() {
   $('infoBy').textContent = Math.round(glyphB.y);
   $('infoARot').textContent = glyphA.rot;
   $('infoBRot').textContent = glyphB.rot;
-  $('infoAScale').textContent = glyphA.scale;
-  $('infoBScale').textContent = glyphB.scale;
+  $('infoAScale').textContent = (glyphA.sizePx / GLYPH_SIZE).toFixed(2);
+  $('infoBScale').textContent = (glyphB.sizePx / GLYPH_SIZE).toFixed(2);
   $('infoAFlip').textContent = (glyphA.flipX ? '↔' : '') + (glyphA.flipY ? '↕' : '') || '—';
   $('infoBFlip').textContent = (glyphB.flipX ? '↔' : '') + (glyphB.flipY ? '↕' : '') || '—';
+  $('sizeAVal').textContent = Math.round(sizeA);
+  $('sizeBVal').textContent = Math.round(sizeB);
 
   updateFlipButtons();
   updateSymbolList();
@@ -650,16 +674,27 @@ function setupDrag() {
   svg.addEventListener('pointercancel', endDrag);
 }
 
+function syncGlyphsFromSliders() {
+  glyphA.rot = Number($('slRotA').value);
+  glyphB.rot = Number($('slRot').value);
+  glyphA.sizePx = Number($('slSizeA').value);
+  glyphB.sizePx = Number($('slSizeB').value);
+  $('rotAVal').textContent = glyphA.rot;
+  $('rotVal').textContent = glyphB.rot;
+}
+
+function setGlyphSliders(glyph, rotId, sizeId, rot, sizePx) {
+  $(rotId).value = String(rot);
+  $(sizeId).value = String(sizePx);
+  glyph.rot = rot;
+  glyph.sizePx = sizePx;
+}
+
 function readUi() {
   fromLetter = $('selFrom').value;
   toLetter = $('selTo').value;
   intent = $('selIntent').value;
-  glyphB.rot = Number($('slRot').value);
-  glyphB.scale = Number($('slScale').value) / 100;
-  baseSize = Number($('slSz').value);
-  $('rotVal').textContent = glyphB.rot;
-  $('scaleVal').textContent = glyphB.scale.toFixed(2);
-  $('szVal').textContent = baseSize;
+  syncGlyphsFromSliders();
 }
 
 function applyGlyphState(target, g) {
@@ -667,43 +702,71 @@ function applyGlyphState(target, g) {
   target.x = g.x;
   target.y = g.y;
   target.rot = g.rotation || 0;
-  target.scale = g.scale > 0 ? g.scale : 1;
+  target.sizePx = g.size > 0 ? g.size : GLYPH_SIZE;
   target.flipX = !!g.flipX;
   target.flipY = !!g.flipY;
 }
 
-function applySavedConnection(conn) {
-  if (conn.fromGlyph && conn.toGlyph) {
-    applyGlyphState(glyphA, conn.fromGlyph);
-    applyGlyphState(glyphB, conn.toGlyph);
-    const baseFromSize = conn.fromGlyph.size / (glyphA.scale || 1);
-    const baseToSize = conn.toGlyph.size / (glyphB.scale || 1);
-    baseSize = Math.round((baseFromSize + baseToSize) / 2) || GLYPH_SIZE;
-    $('slRot').value = glyphB.rot;
-    $('slScale').value = Math.round(glyphB.scale * 100);
-    $('slSz').value = baseSize;
-    readUi();
+function applySavedConnection(conn, reversed) {
+  const CC = window.ConnectionCore;
+  const norm = CC ? CC.normalizeConnection(conn) : conn;
+  if (norm?.fromGlyph && norm?.toGlyph) {
+    const gA = reversed ? norm.toGlyph : norm.fromGlyph;
+    const gB = reversed ? norm.fromGlyph : norm.toGlyph;
+    applyGlyphState(glyphA, gA);
+    applyGlyphState(glyphB, gB);
+    setGlyphSliders(glyphA, 'slRotA', 'slSizeA', glyphA.rot, Math.round(glyphA.sizePx));
+    setGlyphSliders(glyphB, 'slRot', 'slSizeB', glyphB.rot, Math.round(glyphB.sizePx));
+    $('rotAVal').textContent = glyphA.rot;
+    $('rotVal').textContent = glyphB.rot;
   }
   symbols = (conn.symbols || []).map((s) => normalizeSymbolFromApi(s));
   selectedSymbolId = symbols.length ? symbols[0].id : null;
 }
 
+/** @returns {{ loaded: boolean, reversed?: boolean } | null} */
 async function loadSavedConnection() {
   try {
     const res = await fetch('/api/connections?t=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
-    const matches = (data.connections || []).filter(
-      (c) => c.from === fromLetter && c.to === toLetter && c.intent === intent
-    );
-    if (!matches.length) {
-      symbols = [];
-      return false;
+    const connections = data.connections || [];
+    const CC = window.ConnectionCore;
+
+    let conn = null;
+    let reversed = false;
+
+    if (CC) {
+      conn = CC.findConnection(connections, fromLetter, toLetter, intent);
+      if (!conn) {
+        conn = CC.findConnection(connections, toLetter, fromLetter, intent);
+        reversed = !!conn;
+      }
+    } else {
+      const forward = connections.filter(
+        (c) => c.from === fromLetter && c.to === toLetter && c.intent === intent
+      );
+      if (forward.length) {
+        conn = forward[forward.length - 1];
+      } else {
+        const backward = connections.filter(
+          (c) => c.from === toLetter && c.to === fromLetter && c.intent === intent
+        );
+        if (backward.length) {
+          conn = backward[backward.length - 1];
+          reversed = true;
+        }
+      }
     }
-    applySavedConnection(matches[matches.length - 1]);
-    return true;
+
+    if (!conn) {
+      symbols = [];
+      return { loaded: false };
+    }
+    applySavedConnection(conn, reversed);
+    return { loaded: true, reversed };
   } catch (_) {
-    return false;
+    return null;
   }
 }
 
@@ -711,21 +774,21 @@ function resetLayout() {
   glyphA.x = CX;
   glyphA.y = CY;
   glyphA.rot = 0;
-  glyphA.scale = 1;
+  glyphA.sizePx = GLYPH_SIZE;
   glyphA.flipX = false;
   glyphA.flipY = false;
   glyphB.x = CX + 90;
   glyphB.y = CY;
   glyphB.rot = 0;
-  glyphB.scale = 1;
+  glyphB.sizePx = GLYPH_SIZE;
   glyphB.flipX = false;
   glyphB.flipY = false;
   symbols = [];
   selectedSymbolId = null;
-  $('slRot').value = 0;
-  $('slScale').value = 100;
+  setGlyphSliders(glyphA, 'slRotA', 'slSizeA', 0, GLYPH_SIZE);
+  setGlyphSliders(glyphB, 'slRot', 'slSizeB', 0, GLYPH_SIZE);
+  $('rotAVal').textContent = '0';
   $('rotVal').textContent = '0';
-  $('scaleVal').textContent = '1.00';
 }
 
 function symbolPayload() {
@@ -756,8 +819,8 @@ async function saveConnection() {
       x: Math.round(glyphA.x * 100) / 100,
       y: Math.round(glyphA.y * 100) / 100,
       rotation: glyphA.rot,
-      scale: glyphA.scale,
-      size: baseSize * glyphA.scale,
+      scale: glyphA.sizePx / GLYPH_SIZE,
+      size: glyphA.sizePx,
       flipX: glyphA.flipX,
       flipY: glyphA.flipY
     },
@@ -765,8 +828,8 @@ async function saveConnection() {
       x: Math.round(glyphB.x * 100) / 100,
       y: Math.round(glyphB.y * 100) / 100,
       rotation: glyphB.rot,
-      scale: glyphB.scale,
-      size: baseSize * glyphB.scale,
+      scale: glyphB.sizePx / GLYPH_SIZE,
+      size: glyphB.sizePx,
       flipX: glyphB.flipX,
       flipY: glyphB.flipY
     },
@@ -818,14 +881,24 @@ async function saveConnection() {
 }
 
 async function onPairChange() {
-  readUi();
-  const loaded = await loadSavedConnection();
-  if (!loaded) {
+  fromLetter = $('selFrom').value;
+  toLetter = $('selTo').value;
+  intent = $('selIntent').value;
+  const result = await loadSavedConnection();
+  if (!result?.loaded) {
     resetLayout();
     glyphA.x = CX;
     glyphA.y = CY;
     glyphB.x = CX + 90;
     glyphB.y = CY;
+    setStatus('');
+  } else if (result.reversed) {
+    setStatus(
+      'נטען חיבור קיים (' + toLetter + ' → ' + fromLetter + ') — אותה פריסה ל־' + fromLetter + ' → ' + toLetter,
+      false
+    );
+  } else {
+    setStatus('נטען חיבור קיים', false);
   }
   await drawCanvas();
 }
@@ -841,17 +914,11 @@ function bindEvents() {
     onPairChange().catch((err) => setStatus(String(err.message), true));
   });
 
-  $('slRot').addEventListener('input', () => {
-    readUi();
-    drawCanvas().catch((err) => setStatus(String(err.message), true));
-  });
-  $('slScale').addEventListener('input', () => {
-    readUi();
-    drawCanvas().catch((err) => setStatus(String(err.message), true));
-  });
-  $('slSz').addEventListener('input', () => {
-    readUi();
-    drawCanvas().catch((err) => setStatus(String(err.message), true));
+  ['slRotA', 'slSizeA', 'slRot', 'slSizeB'].forEach((id) => {
+    $(id).addEventListener('input', () => {
+      readUi();
+      drawCanvas().catch((err) => setStatus(String(err.message), true));
+    });
   });
 
   document.querySelectorAll('.flip-btn').forEach((btn) => {
@@ -878,6 +945,34 @@ function bindEvents() {
     glyphB.y = CY;
     drawCanvas().catch((err) => setStatus(String(err.message), true));
   });
+
+  $('uploadFromBtn').addEventListener('click', () => {
+    uploadTarget = 'a';
+    $('glyphFileInput').click();
+  });
+  $('uploadToBtn').addEventListener('click', () => {
+    uploadTarget = 'b';
+    $('glyphFileInput').click();
+  });
+  $('glyphFileInput').addEventListener('change', () => {
+    const input = $('glyphFileInput');
+    const file = input.files?.[0];
+    if (!file || !uploadTarget) return;
+    const letter = uploadTarget === 'a' ? fromLetter : toLetter;
+    setStatus('מעלה SVG…');
+    file
+      .text()
+      .then((svgText) => uploadGlyphSvg(letter, svgText))
+      .then((data) => {
+        setStatus('✓ SVG נשמר: ' + data.filename + ' (אות ' + letter + ')', false);
+        return drawCanvas();
+      })
+      .catch((err) => setStatus('העלאה נכשלה: ' + err.message, true))
+      .finally(() => {
+        input.value = '';
+        uploadTarget = null;
+      });
+  });
 }
 
 async function start() {
@@ -893,9 +988,18 @@ async function start() {
     buildSymbolPalette();
     bindEvents();
     setupDrag();
-    await loadSavedConnection();
+    const initial = await loadSavedConnection();
     await drawCanvas();
-    setStatus('');
+    if (initial?.loaded && initial.reversed) {
+      setStatus(
+        'נטען חיבור קיים (' + toLetter + ' → ' + fromLetter + ') — אותה פריסה ל־' + fromLetter + ' → ' + toLetter,
+        false
+      );
+    } else if (initial?.loaded) {
+      setStatus('נטען חיבור קיים', false);
+    } else {
+      setStatus('');
+    }
   } catch (err) {
     console.error(err);
     setStatus('שגיאה: ' + err.message, true);
