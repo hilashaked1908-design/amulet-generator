@@ -731,10 +731,14 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
   let hSurf = baseH + (lobePeak - baseH) * domeT;
   hSurf -= effectiveEngraveDepthAt(x, y, params);
   hSurf = Math.max(baseH * 0.94, hSurf);
+  const swell =
+    (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.09 +
+    (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.038;
+  hSurf += swell;
   const basePad = roundR * 0.5;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   const phi2d = roundR - din;
-  return Math.max(phi2d, sdfZ) - roundR * 0.06;
+  return applyStoneEmbossUnion(Math.max(phi2d, sdfZ) - roundR * 0.06, x, y, z, params);
 }
 
 /** Slab + name-tube body: soft domed lobes on a plate — no vertical cliff at silhouette. */
@@ -785,10 +789,11 @@ function slabTubeStoneSdfAt(x, y, z, params) {
   }
 
   if (params.solidInterior || params.slabMode) {
-    return Math.min(letterSdf, slabMaskPlateauSdfAt(x, y, z, params));
+    const plateau = slabMaskPlateauSdfAt(x, y, z, params);
+    return applyStoneEmbossUnion(Math.min(letterSdf, plateau), x, y, z, params);
   }
 
-  return letterSdf;
+  return applyStoneEmbossUnion(letterSdf, x, y, z, params);
 }
 
 /** Union of rounded tube capsules along L3 stroke centerlines */
@@ -1122,6 +1127,17 @@ function engraveCutSdfAt(x, y, z, params) {
   return carveSdf;
 }
 
+/** Union emboss overlays + stroke tubes into slab SDF (fixes missing Q3 when name tubes present). */
+function applyStoneEmbossUnion(sdf, x, y, z, params) {
+  if (params.embossOverlays?.length) {
+    sdf = Math.min(sdf, embossUnionSdfAt(x, y, z, params));
+  }
+  if (params.embossSegments?.length) {
+    sdf = Math.min(sdf, embossTubeUnionSdfAt(x, y, z, params));
+  }
+  return sdf;
+}
+
 /** Raised bas-relief — smooth dome mound from mask distance (solid rounded letterforms). */
 function embossUnionSdfAt(x, y, z, params) {
   if (!params.embossOverlays?.length) return 1e6;
@@ -1139,7 +1155,13 @@ function embossUnionSdfAt(x, y, z, params) {
     const bevelW = ov.bevelWidth ?? roundR * 0.55;
     const maxIn = Math.max(bevelW * 1.4, ov.maxDistInScene * 0.92);
     const centerT = Math.min(1, din / Math.max(maxIn, 0.01));
-    const domeT = Math.sin(centerT * Math.PI * 0.5);
+    let domeT;
+    if (ov.plateau) {
+      const inner = Math.min(1, din / Math.max(maxIn * 0.38, 0.01));
+      domeT = inner < 1 ? 0.42 + 0.58 * inner * inner : 1;
+    } else {
+      domeT = Math.sin(centerT * Math.PI * 0.5);
+    }
     const edgeT = Math.min(1, din / Math.max(bevelW, 0.01));
     const edgeSmooth = edgeT * edgeT * (3 - 2 * edgeT);
     const hPeak = maxH + ov.height * domeT * edgeSmooth;
@@ -1189,6 +1211,10 @@ function stoneSdfAt(x, y, z, params) {
     hSurf += metalBedShoulderAt(x, y, params);
     hSurf -= effectiveEngraveDepthAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
+    const swell =
+      (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.085 +
+      (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.036;
+    hSurf += swell;
     const basePad = roundR * 0.5;
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
     let reliefSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
@@ -1197,7 +1223,7 @@ function stoneSdfAt(x, y, z, params) {
     } else if (params.metalPlateCradle) {
       reliefSdf = Math.min(reliefSdf, metalPlateCradleSdfAt(x, y, z, params));
     }
-    return reliefSdf;
+    return applyStoneEmbossUnion(reliefSdf, x, y, z, params);
   }
 
   let hSurf;
@@ -1210,6 +1236,10 @@ function stoneSdfAt(x, y, z, params) {
     hSurf -= metalBedDepthAt(x, y, params);
     hSurf += metalBedShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
+    const swell =
+      (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.085 +
+      (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.036;
+    hSurf += swell;
   } else {
     const t = Math.min(1, din / Math.max(maxDistInScene, 0.001));
     const domeT = Math.max(0, 1 - (1 - t) * (1 - t));
@@ -1226,7 +1256,7 @@ function stoneSdfAt(x, y, z, params) {
     slabSdf = Math.min(slabSdf, cradleSdf);
   }
 
-  return slabSdf;
+  return applyStoneEmbossUnion(slabSdf, x, y, z, params);
 }
 
 /**
@@ -1428,10 +1458,10 @@ function applySculptureVertexAO(geom, params) {
           : 0.5;
     }
 
-    const cavity = ao * (params.slabMode ? 0.42 : 0.28) + narrow * (params.slabMode ? 0.16 : 0.12);
+    const cavity = ao * (params.slabMode ? 0.36 : 0.28) + narrow * (params.slabMode ? 0.1 : 0.12);
     const cavityT = Math.min(1, cavity);
     let lit = params.slabMode
-      ? 0.5 + (1.0 - Math.pow(cavityT, 0.72) * 0.58) * 0.48
+      ? 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
       : 0.88 + 0.12 * (1 - cavityT);
     lit = applyMetalContactShadow(lit, x, y, z, params);
 
@@ -1443,7 +1473,7 @@ function applySculptureVertexAO(geom, params) {
     let grime = 0;
     if (carve > 0 && z < baseZ + carve * 0.15) {
       grime = Math.min(1, (baseZ + carve * 0.55 - z) / Math.max(carve * 0.72, 0.01));
-      lit *= 1 - grime * (params.slabMode ? 0.28 : 0.22);
+      lit *= 1 - grime * (params.slabMode ? 0.36 : 0.22);
     } else if (bed > 0 && z < baseZ + bed * 0.35) {
       grime = Math.min(1, (baseZ + bed * 0.42 - z) / Math.max(bed * 0.78, 0.01));
       lit *= 1 - grime * 0.22;
@@ -1691,13 +1721,13 @@ export function buildStoneSculptureMeshFromMask(
 
   let geom = mcResultToGeometry(mc);
   const tubeMode = !!segments?.length && !slabMode;
-  const smoothIter = slabMode ? (hasRelief ? 2 : 2) : tubeMode ? 4 : 6;
+  const smoothIter = slabMode ? 1 : tubeMode ? 4 : 6;
   const smoothLambda = slabMode
     ? hasStrokeRelief
-      ? 0.1
+      ? 0.06
       : hasOverlays
-        ? 0.11
-        : 0.16
+        ? 0.07
+        : 0.09
     : tubeMode
       ? 0.2
       : 0.24;
@@ -1707,9 +1737,8 @@ export function buildStoneSculptureMeshFromMask(
     laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
     geom.computeVertexNormals();
   }
-  // Slab stone: no vertex AO — mask-edge darkening looked like a silhouette outline and
-  // washed out procedural grain on flat plateaus. Sculptural shading comes from lights + maps.
-  if (!slabMode) applySculptureVertexAO(geom, params);
+  // Slab: mild vertex AO — crevice/engrave shadow without heavy silhouette rim.
+  applySculptureVertexAO(geom, params);
   addSculptureUvs(geom, maskOrigin);
   return geom;
 }
@@ -1869,13 +1898,13 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   await yieldToMainThread();
   let geom = mcResultToGeometry(mc);
   const tubeMode = !!segments?.length && !slabMode;
-  const smoothIter = slabMode ? (hasRelief ? 2 : 2) : tubeMode ? 4 : 6;
+  const smoothIter = slabMode ? 1 : tubeMode ? 4 : 6;
   const smoothLambda = slabMode
     ? hasStrokeRelief
-      ? 0.1
+      ? 0.06
       : hasOverlays
-        ? 0.11
-        : 0.16
+        ? 0.07
+        : 0.09
     : tubeMode
       ? 0.2
       : 0.24;
@@ -1885,7 +1914,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
     geom.computeVertexNormals();
   }
-  if (!slabMode) applySculptureVertexAO(geom, params);
+  applySculptureVertexAO(geom, params);
   addSculptureUvs(geom, maskOrigin);
   await yieldToMainThread();
   return geom;

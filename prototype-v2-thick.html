@@ -2192,13 +2192,36 @@
   let appReady = false;
   let lastComposeLetters = [];
   let lastComposedSvg = null;
+  let pbrRendered = false;
+  const PBR_MODULE_VER = '20250621-q5-frame30-material';
+
+  const Q5_CERAMIC_MAT_LABEL = {
+    hope: 'זכוכית·כתום',
+    excitement: 'זכוכית·ורוד',
+    fear: 'כרום·כסף',
+    confusion: 'כרום·אפור',
+    impatience: 'פולימר·אדום',
+    longing: 'זכוכית'
+  };
 
   document.querySelectorAll('.field[data-group]').forEach((field) => {
     field.querySelectorAll('.opt-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         field.querySelectorAll('.opt-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         readParams();
+        if (field.dataset.group === 'q5Feeling' && pbrRendered) {
+          try {
+            const { updateCeramicQ5Material } = await import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
+            if (updateCeramicQ5Material(params.q5Feeling)) {
+              const label = Q5_CERAMIC_MAT_LABEL[params.q5Feeling] || params.q5Feeling;
+              setStatus('Q5 קרמיקה+מסגרת · ' + label);
+              return;
+            }
+          } catch (err) {
+            console.warn('[q5] ceramic material update failed', err);
+          }
+        }
       });
     });
   });
@@ -3017,6 +3040,21 @@
       }
     }
 
+    const q1CeramicLetters = stoneQuestionnaire?.q1CeramicLetters || l3Letters.slice(0, MAX_Q1_CERAMIC_LETTERS);
+    let q1CeramicMarkup = layer3Markup;
+    if (q1CeramicLetters.length) {
+      const q1Style = { ...style3, maxLetters: MAX_Q1_CERAMIC_LETTERS };
+      const q1Layer = await buildLayerContent(q1CeramicLetters, q1Style, style3.intent);
+      if (q1Layer.content) {
+        if (layer2Markup) {
+          const q1Aligned = alignLayer3ToLayer2(layer2Markup, q1Layer.content, vb, defs);
+          q1CeramicMarkup = q1Aligned.layer3;
+        } else {
+          q1CeramicMarkup = q1Layer.content;
+        }
+      }
+    }
+
     const layer2Group = layer2Markup
       ? '<g class="amulet-layer layer-2" data-layer="name">' + layer2Markup + '</g>'
       : '';
@@ -3024,7 +3062,7 @@
     const layer3Group =
       '<g class="amulet-layer layer-3" data-layer="intent"' + l3DebugFilter + '>' + layer3Markup + '</g>';
     const q1CeramicGroup =
-      '<g class="amulet-layer layer-q1-ceramic" data-layer="q1-ceramic">' + layer3Markup + '</g>';
+      '<g class="amulet-layer layer-q1-ceramic" data-layer="q1-ceramic">' + q1CeramicMarkup + '</g>';
 
     const stoneTypoLayers =
       (q3EngraveMarkup
@@ -3083,6 +3121,7 @@
       style2,
       style3,
       l3Letters,
+      q1CeramicLetters,
       metalEmbossLetters,
       q3Letters,
       q7Letters,
@@ -3891,6 +3930,7 @@
       return;
     }
 
+    const q1CeramicLetters = params.q1Wish ? getQ1CeramicLetters(params.q1Wish) : [];
     const nameLetters = params.q2Name ? lettersFromName(params.q2Name) : [];
     const q3Letters = params.q3WhyNow ? getFirstWordFirstLetter(params.q3WhyNow) : [];
     const q4Letters = lettersFromBelief(params.q4Belief);
@@ -3917,6 +3957,7 @@
       updateRenderProgress(0.06, 'מצייר שכבות…');
       const result = await deferToNextTask(() =>
         buildDualLayerAmulet(metalLetters, nameLetters, {
+          q1CeramicLetters,
           q3Letters,
           q3Text: params.q3WhyNow,
           q7Letters,
@@ -3940,7 +3981,8 @@
         alignDy,
         centerDx,
         centerDy,
-        l3Letters: composedL3Letters
+        l3Letters: composedL3Letters,
+        q1CeramicLetters: composedQ1CeramicLetters
       } = result;
       lastComposedSvg = svg;
       setExportPngEnabled(true);
@@ -3986,7 +4028,6 @@
       const onProgress = (frac, label) => updateRenderProgress(0.12 + frac * 0.88, label);
       try {
         await yieldToBrowser();
-        const PBR_MODULE_VER = '20250621-q3-hole-wrap';
         const renderOpts = {
           svg,
           style2,
@@ -4042,6 +4083,7 @@
         support: 'תמיכה',
         doubt: 'ספק'
       };
+      const q1Display = (composedQ1CeramicLetters || q1CeramicLetters).join(' → ');
       const l3Display = (composedL3Letters || metalLetters).join(' → ');
       let msg = stoneOnly
         ? renderStats?.ok
@@ -4052,12 +4094,12 @@
           ? 'תצוגת מתכת · Q1 הטבעה: ' + l3Display + ' · Q4 אליפסה: ' + (Q4_LABELS[params.q4Belief] || params.q4Belief)
           : 'תצוגת מתכת · Q1: ' + l3Display
         : renderStats
-          ? 'PBR 3D · Q2 אבן | Q3 חריטה | Q1 קרמיקה: ' + l3Display
-          : 'SVG · Q1 קרמיקה: ' + l3Display + ' | מרכז: ' + anchor;
+          ? 'PBR 3D · Q2 אבן | Q3 הטבעה | Q1 קרמיקה: ' + q1Display
+          : 'SVG · Q1 קרמיקה: ' + q1Display + ' | מרכז: ' + anchor;
       if (renderFail) msg += ' | PBR נכשל: ' + renderFail;
       if (params.q1Wish) msg += ' · Q1: ' + params.q1Wish.slice(0, 20) + (params.q1Wish.length > 20 ? '…' : '');
       if (params.q2Name) msg += ' · Q2 צורת אבן: ' + params.q2Name;
-      if (params.q3WhyNow) msg += ' · Q3 חריטה: ' + params.q3WhyNow.slice(0, 18) + (params.q3WhyNow.length > 18 ? '…' : '');
+      if (params.q3WhyNow) msg += ' · Q3 הטבעה: ' + params.q3WhyNow.slice(0, 18) + (params.q3WhyNow.length > 18 ? '…' : '');
       if (questionnaire.fringeLetters?.length) {
         msg += ' · Q4 מאחור: ' + questionnaire.fringeLetters.join('');
       }
@@ -4071,7 +4113,7 @@
       }
       if (renderStats && !metalOnly) {
         msg += ' | L2=' + renderStats.tubesL2 + ' L3=' + renderStats.tubesL3;
-        if (renderStats.tubesQ3Threads) msg += ' Q3thr=' + renderStats.tubesQ3Threads;
+        if (renderStats.stoneQ3Emboss) msg += ' Q3emb=' + renderStats.stoneQ3Emboss;
         if (renderStats.tubesQ1Ceramic) msg += ' Q1cer=' + renderStats.tubesQ1Ceramic;
         if (renderStats.tubesMetalFringe != null) msg += ' fringe=' + renderStats.tubesMetalFringe;
         if (renderStats.tubesFrame != null) msg += ' frame=' + renderStats.tubesFrame;
@@ -4085,8 +4127,10 @@
         else if (renderStats.fringeCount != null) msg += ' fringe=' + renderStats.fringeCount;
       }
       if (metalOnly && renderStats?.ok) msg += ' | repoussé close-up';
-      msg += ' | spike Q6=' + (questionnaire.l3Spike * 100).toFixed(0) + '%';
-      if (questionnaire.ceramicHex) msg += ' | Q5cer=' + questionnaire.ceramicHex;
+      if (questionnaire.l3Spike != null) msg += ' | spike Q6=' + (questionnaire.l3Spike * 100).toFixed(0) + '%';
+      if (params.q5Feeling) {
+        msg += ' | Q5mat=' + (Q5_CERAMIC_MAT_LABEL[params.q5Feeling] || params.q5Feeling);
+      }
       if (style2) {
         msg +=
           ' | מסגרת Q4=' +
@@ -4100,6 +4144,7 @@
       if (skipped.length) msg += ' | L3 ללא חיבור: ' + skipped.join(' ');
       msg += ' | שאלון+slab';
       setStatus(msg);
+      pbrRendered = !!(renderStats && renderStats.pbr);
     } catch (err) {
       setStatus('שגיאה: ' + err.message);
       console.error(err);
