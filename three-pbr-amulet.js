@@ -1029,16 +1029,16 @@ function clampWarmStoneColor(c) {
 const STONE_PROC_GEN = 88;
 const BASALT_TEX_GEN = 6;
 
-/** Sage micro-roughness layered on basalt (concrete_actions feel). */
+/** Sage micro-roughness on basalt — same family as concrete_actions, scaled for dark stone. */
 const BASALT_SAGE_OVERLAY = {
-  heightFilm: 0.016,
-  heightSand: 0.013,
-  heightCombined: 0.009,
-  heightDrift: 0.007,
-  heightBlob: 0.005,
-  heightMineral: 0.004,
-  roughMicro: 5.5,
-  bumpScale: 0.58,
+  heightFilm: 0.010,
+  heightSand: 0.008,
+  heightCombined: 0.005,
+  heightDrift: 0.004,
+  heightBlob: 0.003,
+  heightMineral: 0.002,
+  roughMicro: 3.5,
+  bumpScale: 0.38,
 };
 
 function basaltSageHeightOverlay(sage) {
@@ -1049,9 +1049,10 @@ function basaltSageHeightOverlay(sage) {
     sage.drift * BASALT_SAGE_OVERLAY.heightDrift +
     sage.blob * BASALT_SAGE_OVERLAY.heightBlob +
     sage.mineral * BASALT_SAGE_OVERLAY.heightMineral +
-    Math.max(0, -sage.pits) * 0.003
+    Math.max(0, -sage.pits) * 0.002
   );
 }
+
 const TERRACOTTA_TEX_GEN = 2;
 
 function smoothstep(edge0, edge1, x) {
@@ -1097,7 +1098,7 @@ function hashSlabStoneInputs(opts, segmentCount = 0, questionnaire = null) {
       : questionnaire?.q4Belief === 'gut'
         ? 'seafoam-jade-gut-v4-q3metal'
         : questionnaire?.q4Belief === 'support'
-          ? 'basalt-pbr-v6'
+          ? 'basalt-pbr-v6-sage'
           : questionnaire?.q4Belief === 'doubt'
             ? 'handmade-terracotta-micro-v2'
             : 'sage-inlay-v2-q3metal',
@@ -1430,7 +1431,7 @@ function sampleBasaltNoise(u, v) {
 
 function paintBasaltTexels(s, edgeWear = 0) {
   const base = 18;
-  const greySpot = s.spot * 5.5 + s.mineral * 4.2 + s.grain * 2.8 + (s.sageGrain ?? 0) * 2.4;
+  const greySpot = s.spot * 5.5 + s.mineral * 4.2 + s.grain * 2.8 + (s.sageGrain ?? 0) * 2.2;
   const pitDark = s.vesicles * 24 + s.coolingCrack * 19 + s.micro * 2;
   const bumpLift = s.bumps * 6 + s.vesicleRim * 3.5;
   const wornLift = edgeWear * 4;
@@ -1442,7 +1443,7 @@ function paintBasaltTexels(s, edgeWear = 0) {
     s.coolingCrack * 8 +
     s.micro * 4 +
     s.grain * 3 +
-    (s.sageSand ?? 0) * 3.2 +
+    (s.sageSand ?? 0) * 2.8 +
     (s.sageRough ?? 0) * BASALT_SAGE_OVERLAY.roughMicro;
   return {
     r,
@@ -2669,9 +2670,9 @@ function buildBasaltStoneTextures() {
       const painted = paintBasaltTexels(
         {
           ...b,
-          sageGrain: sage.combined * 4.2 + sage.drift * 2.0 + sage.blob * 1.2,
-          sageSand: sage.sand * 3.4 + sage.film * 1.8,
-          sageRough: sage.film * 0.55 + sage.sand * 0.42 + sage.combined * 0.28 + sage.drift * 0.18,
+          sageGrain: sage.combined * 3.8 + sage.drift * 1.6 + sage.blob * 0.9,
+          sageSand: sage.sand * 2.8 + sage.film * 1.4,
+          sageRough: sage.film * 0.42 + sage.sand * 0.36 + sage.combined * 0.22 + sage.drift * 0.14,
         },
         edgeWear
       );
@@ -2722,12 +2723,12 @@ function buildBasaltStoneMaterial() {
     normalMap: basaltNormal,
     roughnessMap: basaltRoughness,
     displacementMap: basaltHeight,
-    displacementScale: spec.displacementScale ?? 0.25,
+    displacementScale: 0.25,
     bumpMap: sageProc.bumpMap,
     bumpScale: spec.bumpScale ?? BASALT_SAGE_OVERLAY.bumpScale,
-    roughness: spec.roughness ?? 0.85,
-    metalness: spec.metalness ?? 0.05,
-    color: new THREE.Color(spec.color ?? 0x1a1a1a),
+    roughness: 0.85,
+    metalness: 0.05,
+    color: 0x1a1a1a,
     clearcoat: 0.0,
     normalScale: new THREE.Vector2(spec.normalScale ?? 1.2, spec.normalScale ?? 1.2),
     flatShading: false,
@@ -7759,8 +7760,13 @@ async function renderPbrCore(svg, opts) {
     const q4Belief = opts.questionnaire?.q4Belief ?? 'concrete_actions';
     const stone = buildStoneMaterial(style2, q4Belief, active.envMap, opts.questionnaire);
     l3Mat = stone.material;
-    if (STONE_L3_SLAB_MODE) l3Mat.vertexColors = true;
     l3StoneTextured = stone.textured;
+    if (STONE_L3_SLAB_MODE) {
+      const pbrMapStone =
+        stone.preset === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE ||
+        stone.preset === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT;
+      if (!pbrMapStone) l3Mat.vertexColors = true;
+    }
   } else {
     l3Mat = buildOpalGlassMaterial(opalPalette);
   }

@@ -119,7 +119,7 @@ export const PREMIUM_MATERIAL_LIBRARY = {
     proceduralVariant: 'basalt',
     displacementScale: 0.25,
     normalScale: 1.2,
-    bumpScale: 0.58,
+    bumpScale: 0.38,
   },
   [PREMIUM_MATERIAL_IDS.POLISHED_JADE_MARBLE]: {
     label: 'Polished Jade Marble',
