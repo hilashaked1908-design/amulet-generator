@@ -4,6 +4,14 @@
  */
 import * as THREE from 'https://esm.sh/three@0.170.0';
 import { yieldToMainThread } from './render-yield.js';
+import {
+  PREMIUM_MATERIAL_IDS,
+  isAgedTerracottaPreset,
+  isErodedStonePreset,
+  isSharpReliefStonePreset,
+  softStoneGeometryTier,
+  normalizePremiumMaterialId,
+} from './amulet-material-presets.js';
 import { mergeVertices } from 'https://esm.sh/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
@@ -443,7 +451,7 @@ async function marchingCubesAsync(dims, potential, bounds, options = {}) {
       }
     }
     if (onProgress) onProgress((z + 1) / zSteps);
-    if (z % 2 === 0) await yieldToMainThread();
+    if (z % 8 === 0) await yieldToMainThread();
   }
   return { positions: vertices, cells: faces };
 }
@@ -681,16 +689,16 @@ function metalHaloWrapSdfAt(x, y, z, params) {
   let hSurf;
   if (distOut < 0.5) {
     const edgeT = Math.min(1, din / Math.max(wrapBand * 0.42, 0.02));
-    if (edgeT > 0.22) {
-      hSurf = maxH * 0.78 - seatDepth * (1 - edgeT * 0.3);
+    if (edgeT > 0.28) {
+      hSurf = maxH * 0.7 - seatDepth * (1.08 - edgeT * 0.38);
     } else {
-      const rimT = Math.sin((edgeT / 0.22) * Math.PI * 0.5);
-      hSurf = maxH * 0.58 + collarH * rimT;
+      const rimT = Math.sin((edgeT / 0.28) * Math.PI * 0.5);
+      hSurf = maxH * 0.5 + collarH * rimT * 1.14;
     }
   } else {
     const ringT = Math.min(1, dout / Math.max(wrapBand, 0.02));
     const rimT = Math.sin((1 - ringT) * Math.PI * 0.5);
-    hSurf = maxH * 0.54 + collarH * rimT * 0.9;
+    hSurf = maxH * 0.48 + collarH * rimT * 1.02;
   }
 
   const outerPhi = Math.max(0, dout - wrapBand);
@@ -730,11 +738,9 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
   const lobePeak = maxH * (0.92 + 0.08 * domeT);
   let hSurf = baseH + (lobePeak - baseH) * domeT;
   hSurf -= effectiveEngraveDepthAt(x, y, params);
+  hSurf += inlayGrooveShoulderAt(x, y, params);
   hSurf = Math.max(baseH * 0.94, hSurf);
-  const swell =
-    (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.09 +
-    (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.038;
-  hSurf += swell;
+  hSurf += slabSurfaceSwell(x, y, din, roundR, params);
   const basePad = roundR * 0.5;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   const phi2d = roundR - din;
@@ -742,44 +748,139 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
 }
 
 /** Slab + name-tube body: soft domed lobes on a plate — no vertical cliff at silhouette. */
+function softStoneRoundR(tubeRadius, slabMode, tier) {
+  if (slabMode) {
+    if (tier >= 2) return tubeRadius * 1.62;
+    if (tier >= 1) return tubeRadius * 1.55;
+    return tubeRadius * 1.4;
+  }
+  if (tier >= 2) return tubeRadius * 1.14;
+  if (tier >= 1) return tubeRadius * 1.1;
+  return tubeRadius * 1.02;
+}
+
+function softStoneRoundMul(tier, slabMode) {
+  if (tier >= 2) return slabMode ? 0.18 : 0.14;
+  if (tier >= 1) return slabMode ? 0.14 : 0.11;
+  return slabMode ? 0.08 : 0.1;
+}
+
+function slabTubeSoftFactors(tier) {
+  if (tier >= 2) {
+    return {
+      softRMul: 1.18,
+      domePow: 0.28,
+      crestPow: 0.42,
+      letterRound: 0.22,
+      valleyMul: 0.28,
+      coreR: 0.48,
+      valleyOuter: 2.85,
+    };
+  }
+  if (tier >= 1) {
+    return {
+      softRMul: 1.1,
+      domePow: 0.32,
+      crestPow: 0.48,
+      letterRound: 0.18,
+      valleyMul: 0.32,
+      coreR: 0.52,
+      valleyOuter: 2.72,
+    };
+  }
+  return {
+    softRMul: 1.06,
+    domePow: 0.36,
+    crestPow: 0.52,
+    letterRound: 0.16,
+    valleyMul: 0.36,
+    coreR: 0.55,
+    valleyOuter: 2.6,
+  };
+}
+
+function stoneSmoothSettings(
+  tier,
+  slabMode,
+  hasStrokeRelief,
+  hasOverlays,
+  tubeMode,
+  sharpRelief = false,
+  stoneRoughness = 0,
+  hasMachineCut = false,
+  hasHairlineEngrave = false,
+  hasChannelEngrave = false
+) {
+  if ((sharpRelief || hasMachineCut || hasHairlineEngrave || hasChannelEngrave) && slabMode) {
+    return { iter: 0, lambda: 0, pass2: null };
+  }
+  let settings;
+  if (tier >= 2 && slabMode) {
+    settings = { iter: 6, lambda: 0.22, pass2: { iter: 3, lambda: 0.12 } };
+  } else if (tier >= 1 && slabMode) {
+    settings = { iter: 5, lambda: 0.2, pass2: { iter: 3, lambda: 0.11 } };
+  } else if (slabMode) {
+    settings = {
+      iter: hasStrokeRelief || hasOverlays ? 2 : 1,
+      lambda: hasStrokeRelief ? 0.1 : hasOverlays ? 0.11 : 0.09,
+      pass2: hasStrokeRelief ? { iter: 1, lambda: 0.06 } : null,
+    };
+  } else {
+    settings = {
+      iter: tubeMode ? 4 : 6,
+      lambda: tubeMode ? 0.2 : 0.24,
+      pass2: { iter: 2, lambda: tubeMode ? 0.06 : 0.04 },
+    };
+  }
+  const keep = 1 - Math.min(1, stoneRoughness) * 0.92;
+  settings.iter = Math.max(0, Math.round(settings.iter * keep));
+  settings.lambda *= keep;
+  if (settings.pass2) {
+    settings.pass2.iter = Math.max(0, Math.round(settings.pass2.iter * keep));
+    settings.pass2.lambda *= keep;
+  }
+  return settings;
+}
+
 function slabTubeStoneSdfAt(x, y, z, params) {
   const pierce = pierceHoleSdfAt(x, y, params);
   if (pierce != null) return pierce;
 
   const { segments, segmentIndex, roundR, maxH } = params;
+  const tier = params.softStoneTier ?? 0;
+  const soft = slabTubeSoftFactors(tier);
   const dist2d = nearestTubeDist(x, y, segments, segmentIndex);
-  const softR = roundR * 1.04;
+  const softR = roundR * soft.softRMul;
   const phi2d = dist2d - softR;
   const crossT = Math.min(1, dist2d / Math.max(softR * 1.15, 0.001));
-  const domeT = Math.pow(Math.max(0, 1 - crossT), 0.38);
+  const domeT = Math.pow(Math.max(0, 1 - crossT), soft.domePow);
   const baseH = params.basePlateHeight ?? maxH * 0.3;
   const peakH = maxH * 1.04;
   let hSurf = baseH + (peakH - baseH) * domeT;
 
-  const crestT = Math.pow(Math.max(0, 1 - crossT * 1.05), 0.55);
+  const crestT = Math.pow(Math.max(0, 1 - crossT * 1.05), soft.crestPow);
   hSurf += (peakH - baseH) * 0.14 * crestT;
 
-  const coreR = roundR * 0.55;
-  const valleyOuter = roundR * 2.6;
-  const valleyMul = params.letterGapRelief ? 0.54 : 0.38;
+  const coreR = roundR * soft.coreR;
+  const valleyOuter = roundR * soft.valleyOuter;
+  const valleyMul = params.letterGapRelief ? soft.valleyMul + 0.16 : soft.valleyMul;
   if (!params.solidInterior && dist2d > coreR && dist2d < valleyOuter) {
     const t = (dist2d - coreR) / (valleyOuter - coreR);
     hSurf -= (peakH - baseH) * valleyMul * Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
     hSurf = Math.max(baseH * 0.88, hSurf);
   }
 
-  const swell =
-    (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.1 +
-    (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.04;
-  hSurf += swell;
+  const swellAmt = slabSurfaceSwell(x, y, dist2d, roundR, params);
+  hSurf += swellAmt;
 
   hSurf -= metalBedDepthAt(x, y, params);
   hSurf += metalBedShoulderAt(x, y, params);
   hSurf -= effectiveEngraveDepthAt(x, y, params);
+  hSurf += inlayGrooveShoulderAt(x, y, params);
 
   const basePad = roundR * 0.5;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
-  let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.14;
+  let letterSdf = Math.max(phi2d, sdfZ) - roundR * soft.letterRound;
 
   if (params.metalHaloWrap || params.glassHaloWrap) {
     letterSdf = Math.min(letterSdf, minHaloWrapSdfAt(x, y, z, params));
@@ -799,17 +900,21 @@ function slabTubeStoneSdfAt(x, y, z, params) {
 /** Union of rounded tube capsules along L3 stroke centerlines */
 function tubeStoneSdfAt(x, y, z, params) {
   const { segments, segmentIndex, roundR, maxH } = params;
+  const tier = params.softStoneTier ?? 0;
   const dist2d = nearestTubeDist(x, y, segments, segmentIndex);
-  const phi2d = dist2d - roundR;
-  const crossT = Math.min(1, dist2d / Math.max(roundR, 0.001));
+  const tubeSoftR = roundR * (tier >= 2 ? 1.12 : tier >= 1 ? 1.08 : 1);
+  const phi2d = dist2d - tubeSoftR;
+  const crossT = Math.min(1, dist2d / Math.max(tubeSoftR, 0.001));
+  const domePow = tier >= 2 ? 0.38 : tier >= 1 ? 0.42 : 0.46;
   const domeT = Math.max(0, 1 - crossT * crossT);
-  let hSurf = maxH * Math.pow(domeT, 0.46);
+  let hSurf = maxH * Math.pow(domeT, domePow);
 
-  const coreR = roundR * 0.76;
-  const valleyOuter = roundR * 2.2;
+  const coreR = roundR * (tier >= 2 ? 0.68 : tier >= 1 ? 0.72 : 0.76);
+  const valleyOuter = roundR * (tier >= 2 ? 2.45 : tier >= 1 ? 2.32 : 2.2);
   if (dist2d > coreR && dist2d < valleyOuter) {
     const t = (dist2d - coreR) / (valleyOuter - coreR);
-    hSurf -= maxH * 0.14 * Math.pow(Math.sin(t * Math.PI), 1.05);
+    const valleyDepth = tier >= 2 ? 0.1 : tier >= 1 ? 0.12 : 0.14;
+    hSurf -= maxH * valleyDepth * Math.pow(Math.sin(t * Math.PI), 1.05);
   }
 
   hSurf -= metalBedDepthAt(x, y, params);
@@ -817,7 +922,8 @@ function tubeStoneSdfAt(x, y, z, params) {
 
   const basePad = roundR * 0.22;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
-  let letterSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
+  const letterRound = tier >= 2 ? 0.12 : tier >= 1 ? 0.09 : 0.06;
+  let letterSdf = Math.max(phi2d, sdfZ) - roundR * letterRound;
 
   if (params.metalHaloWrap || params.glassHaloWrap) {
     letterSdf = Math.min(letterSdf, minHaloWrapSdfAt(x, y, z, params));
@@ -840,7 +946,7 @@ function heightFromStrokeUnion(
   ripple = 0
 ) {
   if (!segments?.length || peakH <= 0) return 0;
-  const limit = tubeR * 1.12;
+  const limit = tubeR * (profile === 'vline' || profile === 'channel' ? 1.02 : 1.12);
   let best = 0;
 
   const consider = (seg) => {
@@ -850,6 +956,12 @@ function heightFromStrokeUnion(
     let h;
     if (profile === 'groove') {
       h = peakH * Math.pow(Math.cos(crossT * Math.PI * 0.5), 0.82);
+    } else if (profile === 'vline') {
+      h = peakH * (1 - crossT);
+    } else if (profile === 'channel') {
+      h = channelGrooveDepth(crossT, peakH);
+    } else if (profile === 'inlay') {
+      h = peakH * Math.pow(Math.cos(crossT * Math.PI * 0.5), 0.55);
     } else {
       const domeT = Math.max(0, 1 - crossT * crossT);
       h = peakH * Math.pow(domeT, 0.58);
@@ -905,8 +1017,29 @@ function metalBedDepthAt(x, y, params) {
     params.metalBedSegmentIndex,
     tubeR,
     depth,
-    'groove'
+    'inlay'
   );
+}
+
+/** Raised stone lip around inlay channels — wax/ink sits below the shoulder rim. */
+function inlayGrooveShoulderAt(x, y, params) {
+  let shoulder = 0;
+  for (const ov of params.engraveOverlays || []) {
+    if (ov.machineCut) continue;
+    const px = (x - ov.maskOrigin.minX) * ov.maskScale;
+    const py = (ov.maskOrigin.maxY - y) * ov.maskScale;
+    const s = sampleMaskField(px, py, ov);
+    if (!s.inside) continue;
+    const din = s.distIn / ov.maskScale;
+    const edgeW = ov.edgeWidth ?? params.roundR * 0.32;
+    if (din > edgeW * 1.2) continue;
+    const t = Math.min(1, din / Math.max(edgeW * 0.82, 0.01));
+    const rimT = Math.sin(t * Math.PI * 0.5);
+    const depth = ov.depth ?? params.roundR * 0.4;
+    const shoulderMul = ov.thinChannel ? 0.02 : 0.42;
+    shoulder = Math.max(shoulder, depth * shoulderMul * rimT);
+  }
+  return shoulder;
 }
 
 /** Raised stone shoulder at groove walls — stamped pedestal the metal sits on. */
@@ -920,14 +1053,14 @@ function metalBedShoulderAt(x, y, params) {
     params.metalBedSegments,
     params.metalBedSegmentIndex
   );
-  const inner = tubeR * 0.62;
-  const outer = tubeR * 1.55;
+  const inner = tubeR * 0.56;
+  const outer = tubeR * 1.88;
   if (dist < inner || dist > outer) return 0;
   const t = (dist - inner) / Math.max(outer - inner, 0.001);
   const rimT = Math.sin(t * Math.PI * 0.5);
   const bed = metalBedDepthAt(x, y, params);
   if (bed < params.roundR * 0.04) return 0;
-  return shoulderH * rimT * Math.min(1, bed / Math.max(shoulderH, 0.001));
+  return shoulderH * rimT * 1.08 * Math.min(1, bed / Math.max(shoulderH, 0.001));
 }
 
 function insideEmbossFootprintAt(x, y, params) {
@@ -941,9 +1074,8 @@ function insideEmbossFootprintAt(x, y, params) {
   return !!fp.grid[my * fp.w + mx];
 }
 
-/** Engrave depth — sunk into stone, suppressed only under raised emboss. */
+/** Engrave depth — sunk into stone; skip only under raised Q7 emboss tubes. */
 function effectiveEngraveDepthAt(x, y, params) {
-  if (insideEmbossFootprintAt(x, y, params)) return 0;
   let depth = engraveDepthAt(x, y, params);
   if (depth <= 0) return 0;
 
@@ -962,34 +1094,120 @@ function effectiveEngraveDepthAt(x, y, params) {
       depth *= t * t * (3 - 2 * t);
     }
   }
+  if (params.erodedArtifact) depth *= 1.44;
   return depth;
+}
+
+/** CNC channel depth: flat floor at center, near-vertical walls, sharp lip at edge. */
+function channelGrooveDepth(crossT, peakH, innerFrac = 0.5) {
+  const centerT = 1 - Math.min(1, crossT);
+  if (centerT >= innerFrac) return peakH;
+  return peakH * Math.pow(centerT / Math.max(innerFrac, 0.001), 0.1);
+}
+
+function channelGrooveDepthFromDistIn(t, depth, innerFrac = 0.5) {
+  const u = Math.min(1, t);
+  if (u >= innerFrac) return depth;
+  return depth * Math.pow(u / Math.max(innerFrac, 0.001), 0.1);
+}
+
+function channelGrooveShadeAt(x, y, params) {
+  if (params.engraveProfile !== 'channel' || !params.engraveSegments?.length) return null;
+  const tubeR = params.engraveTubeR ?? params.roundR * 0.082;
+  const dist = nearestTubeDist(x, y, params.engraveSegments, params.engraveSegmentIndex);
+  if (dist > tubeR * 1.01) return null;
+  const crossT = dist / Math.max(tubeR, 0.001);
+  const centerT = 1 - crossT;
+  const inner = 0.5;
+  const onFloor = centerT >= inner;
+  const wallT = onFloor ? 0 : centerT / inner;
+  return { crossT, centerT, onFloor, wallT };
+}
+
+/** Half-width of mask stroke for machine engraving. */
+function machineGrooveHalfWidth(ov, roundR) {
+  if (ov.maxDistInScene != null) return ov.maxDistInScene * (ov.vHalfMul ?? 0.94);
+  return Math.max(ov.edgeWidth ?? roundR * 0.04, roundR * 0.02) * 2.8;
+}
+
+function insideMachineEngraveAt(x, y, params) {
+  if (params.engraveProfile === 'channel' && params.engraveSegments?.length) {
+    const tubeR = params.engraveTubeR ?? params.roundR * 0.082;
+    const dist = nearestTubeDist(x, y, params.engraveSegments, params.engraveSegmentIndex);
+    if (dist < tubeR * 1.02) return true;
+  }
+  if (params.engraveProfile === 'vline' && params.engraveSegments?.length) {
+    const tubeR = params.engraveTubeR ?? params.roundR * 0.065;
+    const dist = nearestTubeDist(x, y, params.engraveSegments, params.engraveSegmentIndex);
+    if (dist < tubeR * 1.05) return true;
+  }
+  for (const ov of params.engraveOverlays || []) {
+    if (!ov.machineCut) continue;
+    const px = (x - ov.maskOrigin.minX) * ov.maskScale;
+    const py = (ov.maskOrigin.maxY - y) * ov.maskScale;
+    const s = sampleMaskField(px, py, ov);
+    if (s.inside) return true;
+  }
+  return false;
+}
+
+function machineGrooveShadeAt(x, y, params) {
+  for (const ov of params.engraveOverlays || []) {
+    if (!ov.machineCut) continue;
+    const px = (x - ov.maskOrigin.minX) * ov.maskScale;
+    const py = (ov.maskOrigin.maxY - y) * ov.maskScale;
+    const s = sampleMaskField(px, py, ov);
+    if (!s.inside) continue;
+    const din = s.distIn / ov.maskScale;
+    const halfW = machineGrooveHalfWidth(ov, params.roundR);
+    const t = Math.min(1, din / Math.max(halfW, 0.003));
+    const depth = engraveOverlayDepthAt(din, ov, params.roundR);
+    const depthNorm = depth / Math.max(ov.depth ?? params.roundR * 0.48, 0.001);
+    return { t, depthNorm };
+  }
+  return null;
+}
+
+/** Depth profile for mask-based engrave overlays. */
+function engraveOverlayDepthAt(din, ov, roundR) {
+  const depth = ov.depth ?? roundR * 0.4;
+  if (ov.machineCut) {
+    const halfW = machineGrooveHalfWidth(ov, roundR);
+    const t = Math.min(1, din / Math.max(halfW, 0.002));
+    return channelGrooveDepthFromDistIn(t, depth);
+  }
+  const edgeW = ov.edgeWidth ?? roundR * 0.32;
+  const t = Math.min(1, din / Math.max(edgeW, 0.01));
+  return depth * Math.pow(Math.sin(t * Math.PI * 0.5), 0.72);
 }
 
 /** Max carve depth from engrave stroke tubes or typography overlays (slab mode). */
 function engraveDepthAt(x, y, params) {
+  let depth = 0;
   if (params.engraveSegments?.length) {
     const tubeR = params.engraveTubeR ?? params.roundR * 0.35;
-    const depth = params.engraveDepth ?? params.roundR * 0.5;
-    return heightFromStrokeUnion(
-      x,
-      y,
-      params.engraveSegments,
-      params.engraveSegmentIndex,
-      tubeR,
+    const peak = params.engraveDepth ?? params.roundR * 0.5;
+    depth = Math.max(
       depth,
-      'groove'
+      heightFromStrokeUnion(
+        x,
+        y,
+        params.engraveSegments,
+        params.engraveSegmentIndex,
+        tubeR,
+        peak,
+        params.engraveProfile ?? 'groove'
+      )
     );
   }
-  let depth = 0;
+  if (params.engraveProfile === 'channel') return depth;
   for (const ov of params.engraveOverlays || []) {
     const px = (x - ov.maskOrigin.minX) * ov.maskScale;
     const py = (ov.maskOrigin.maxY - y) * ov.maskScale;
     const s = sampleMaskField(px, py, ov);
     if (!s.inside) continue;
     const din = s.distIn / ov.maskScale;
-    const edgeW = ov.edgeWidth ?? params.roundR * 0.32;
-    const t = Math.min(1, din / Math.max(edgeW, 0.01));
-    depth = Math.max(depth, ov.depth * Math.sin(t * Math.PI * 0.5));
+    depth = Math.max(depth, engraveOverlayDepthAt(din, ov, params.roundR));
   }
   return depth;
 }
@@ -1065,21 +1283,43 @@ function engraveTubeCutSdfAt(x, y, z, params) {
 
   const tubeR = params.engraveTubeR ?? params.roundR * 0.35;
   const depth = params.engraveDepth ?? params.roundR * 0.5;
+  const profile = params.engraveProfile ?? 'groove';
   const { maxH, roundR } = params;
   const dist2d = nearestTubeDist(x, y, params.engraveSegments, params.engraveSegmentIndex);
-  if (dist2d > tubeR * 1.3) return -1e6;
+  if (dist2d > tubeR * 1.05) return -1e6;
 
   const crossT = Math.min(1, dist2d / Math.max(tubeR, 0.001));
-  const uDepth = depth * Math.cos(crossT * Math.PI * 0.5);
-  if (uDepth < roundR * 0.006) return -1e6;
+  const uDepth =
+    profile === 'channel'
+      ? channelGrooveDepth(crossT, depth)
+      : profile === 'vline'
+        ? depth * (1 - crossT)
+        : depth * Math.cos(crossT * Math.PI * 0.5);
+  if (uDepth < roundR * 0.004) return -1e6;
 
-  const lip = maxH + roundR * 0.012;
+  const lip = maxH + roundR * 0.01;
+  if (profile === 'channel') {
+    const floorZ = lip - depth;
+    const wallZ = lip - uDepth;
+    if (z > lip + roundR * 0.006) return -1e6;
+    const centerT = 1 - crossT;
+    if (centerT >= 0.5) {
+      const slot = Math.max(z - lip, floorZ - z);
+      if (slot < 0) return -slot;
+    } else {
+      const cut = z - wallZ;
+      if (cut < 0) return -cut;
+    }
+    return -1e6;
+  }
+
+  const lipRound = maxH + roundR * 0.012;
   const rx = Math.max(0, tubeR * 0.88 - dist2d);
-  const coreZ = lip - uDepth * 0.9;
+  const coreZ = lipRound - uDepth * 0.9;
   const rz = z - coreZ;
   const capR = uDepth * 0.44;
-  const capDist = Math.hypot(rx, rz) - capR;
-  if (z <= lip + roundR * 0.025 && capDist < 0) return -capDist;
+  const capDist = Math.hypot(Math.max(0, tubeR * 0.88 - dist2d), rz) - capR;
+  if (z <= lipRound + roundR * 0.025 && capDist < 0) return -capDist;
   return -1e6;
 }
 
@@ -1100,7 +1340,7 @@ function embossTubeUnionSdfAt(x, y, z, params) {
   return Math.max(phi2d, sdfZ) - roundR * 0.09;
 }
 
-/** Carved U-groove — rounded cross-section like hand-carved stone (reference). */
+/** Carved groove — rounded hand-cut or sharp machine-etched slot. */
 function engraveCutSdfAt(x, y, z, params) {
   if (!params.engraveOverlays?.length) return -1e6;
   if (insideEmbossOverlayAt(x, y, params)) return -1e6;
@@ -1113,10 +1353,20 @@ function engraveCutSdfAt(x, y, z, params) {
     const s = sampleMaskField(px, py, ov);
     if (!s.inside) continue;
     const din = s.distIn / ov.maskScale;
-    const halfW = ov.edgeWidth ?? roundR * 0.32;
-    const t = Math.min(1, din / Math.max(halfW, 0.01));
-    const uDepth = ov.depth * Math.sin(t * Math.PI * 0.5);
+    const uDepth = engraveOverlayDepthAt(din, ov, roundR);
     if (uDepth < roundR * 0.008) continue;
+    if (ov.machineCut) {
+      const halfW = machineGrooveHalfWidth(ov, roundR);
+      const t = Math.min(1, din / Math.max(halfW, 0.003));
+      const localDepth = (ov.depth ?? roundR * 0.4) * t;
+      const surfaceZ = lip - localDepth;
+      if (z <= lip + roundR * 0.01) {
+        const cut = z - surfaceZ;
+        if (cut < 0) carveSdf = Math.max(carveSdf, -cut);
+      }
+      continue;
+    }
+    const halfW = ov.edgeWidth ?? roundR * 0.32;
     const rx = Math.max(0, halfW * 0.92 - din);
     const grooveCore = lip - uDepth * 0.88;
     const rz = z - grooveCore;
@@ -1138,7 +1388,7 @@ function applyStoneEmbossUnion(sdf, x, y, z, params) {
   return sdf;
 }
 
-/** Raised bas-relief — smooth dome mound from mask distance (solid rounded letterforms). */
+/** Raised bas-relief — smooth dome or sharp cliff plateau (doubt / archaeological tile). */
 function embossUnionSdfAt(x, y, z, params) {
   if (!params.embossOverlays?.length) return 1e6;
   let best = 1e6;
@@ -1147,28 +1397,37 @@ function embossUnionSdfAt(x, y, z, params) {
     const px = (x - ov.maskOrigin.minX) * ov.maskScale;
     const py = (ov.maskOrigin.maxY - y) * ov.maskScale;
     const s = sampleMaskField(px, py, ov);
+    const sharp = ov.sharpRelief || params.sharpRelief;
     if (!s.inside) {
-      best = Math.min(best, s.distOut / ov.maskScale + roundR * 0.28);
+      best = Math.min(best, s.distOut / ov.maskScale + roundR * (sharp ? 0.14 : 0.28));
       continue;
     }
     const din = s.distIn / ov.maskScale;
-    const bevelW = ov.bevelWidth ?? roundR * 0.55;
+    const bevelW = ov.bevelWidth ?? roundR * (sharp ? 0.24 : 0.55);
     const maxIn = Math.max(bevelW * 1.4, ov.maxDistInScene * 0.92);
     const centerT = Math.min(1, din / Math.max(maxIn, 0.01));
     let domeT;
-    if (ov.plateau) {
+    if (sharp) {
+      const cliffT = Math.min(1, din / Math.max(bevelW * 0.92, 0.01));
+      const inner = Math.min(1, din / Math.max(maxIn * 0.32, 0.01));
+      domeT = inner < 1 ? 0.08 + 0.92 * inner * inner * inner : 1;
+      const edgeCliff = Math.pow(Math.max(0, 1 - cliffT), 0.22);
+      domeT *= 0.35 + 0.65 * edgeCliff;
+    } else if (ov.plateau) {
       const inner = Math.min(1, din / Math.max(maxIn * 0.38, 0.01));
       domeT = inner < 1 ? 0.42 + 0.58 * inner * inner : 1;
     } else {
       domeT = Math.sin(centerT * Math.PI * 0.5);
     }
     const edgeT = Math.min(1, din / Math.max(bevelW, 0.01));
-    const edgeSmooth = edgeT * edgeT * (3 - 2 * edgeT);
+    const edgeSmooth = sharp
+      ? Math.pow(edgeT, 0.28) * edgeT
+      : edgeT * edgeT * (3 - 2 * edgeT);
     const hPeak = maxH + ov.height * domeT * edgeSmooth;
-    const footZ = maxH - roundR * 0.1;
-    const phi2d = roundR * 0.16 - din * 0.12;
+    const footZ = maxH - roundR * (sharp ? 0.06 : 0.1);
+    const phi2d = roundR * (sharp ? 0.08 : 0.16) - din * (sharp ? 0.06 : 0.12);
     const sdfZ = Math.max(z - hPeak, -(z + footZ));
-    best = Math.min(best, Math.max(phi2d, sdfZ) - roundR * 0.06);
+    best = Math.min(best, Math.max(phi2d, sdfZ) - roundR * (sharp ? 0.015 : 0.06));
   }
   return best;
 }
@@ -1210,14 +1469,17 @@ function stoneSdfAt(x, y, z, params) {
     hSurf -= metalBedDepthAt(x, y, params);
     hSurf += metalBedShoulderAt(x, y, params);
     hSurf -= effectiveEngraveDepthAt(x, y, params);
+    hSurf += inlayGrooveShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
-    const swell =
-      (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.085 +
-      (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.036;
-    hSurf += swell;
+    hSurf += slabSurfaceSwell(x, y, din, roundR, params);
     const basePad = roundR * 0.5;
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
-    let reliefSdf = Math.max(phi2d, sdfZ) - roundR * 0.06;
+    const machineEngrave =
+      (params.engraveOverlays || []).some((ov) => ov.machineCut) ||
+      params.engraveProfile === 'vline' ||
+      params.engraveProfile === 'channel';
+    const roundMul = machineEngrave ? 0.012 : softStoneRoundMul(params.softStoneTier ?? 0, true);
+    let reliefSdf = Math.max(phi2d, sdfZ) - roundR * roundMul;
     if (params.metalHaloWrap || params.glassHaloWrap) {
       reliefSdf = Math.min(reliefSdf, minHaloWrapSdfAt(x, y, z, params));
     } else if (params.metalPlateCradle) {
@@ -1236,10 +1498,7 @@ function stoneSdfAt(x, y, z, params) {
     hSurf -= metalBedDepthAt(x, y, params);
     hSurf += metalBedShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
-    const swell =
-      (aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * 0.085 +
-      (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * 0.036;
-    hSurf += swell;
+    hSurf += slabSurfaceSwell(x, y, din, roundR, params);
   } else {
     const t = Math.min(1, din / Math.max(maxDistInScene, 0.001));
     const domeT = Math.max(0, 1 - (1 - t) * (1 - t));
@@ -1247,7 +1506,8 @@ function stoneSdfAt(x, y, z, params) {
   }
   const basePad = params.slabMode ? roundR * 0.5 : roundR * 0.32;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
-  let slabSdf = Math.max(phi2d, sdfZ) - roundR * (params.slabMode ? 0.06 : 0.1);
+  const roundMul = softStoneRoundMul(params.softStoneTier ?? 0, params.slabMode);
+  let slabSdf = Math.max(phi2d, sdfZ) - roundR * roundMul;
 
   if (params.metalHaloWrap || params.glassHaloWrap) {
     slabSdf = Math.min(slabSdf, minHaloWrapSdfAt(x, y, z, params));
@@ -1321,6 +1581,360 @@ function laplacianSmoothGeometry(geom, iterations = 5, lambda = 0.42) {
   return geom;
 }
 
+function maskDistInScene(x, y, params) {
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  if (!s.inside) return -1;
+  return s.distIn / params.maskScale;
+}
+
+function countEmptyNeighbors(grid, w, h, x, y) {
+  let empty = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= w || ny < 0 || ny >= h || !grid[ny * w + nx]) empty++;
+    }
+  }
+  return empty;
+}
+
+/** Irregular silhouette bites — fractured outline before SDF (signs/artifact only). */
+function chipMaskSilhouetteForArtifact(grid, w, h, distIn, maskScale, roundR, opts = {}) {
+  const aggressive = opts.aggressive ?? false;
+  const out = new Uint8Array(grid);
+  const edgePx = Math.max(3, Math.round(roundR * maskScale * (aggressive ? 0.42 : 0.34)));
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (!grid[i]) continue;
+      const din = distIn[i];
+      if (din > edgePx * 3.2 || din < 1) continue;
+      const edgeT = 1 - din / (edgePx * 3.2);
+      const emptyN = countEmptyNeighbors(grid, w, h, x, y);
+      const isCorner = emptyN >= 2;
+      const fracture = aoGrainHash(x * 13.7 + y * 19.3, x * 7.9 - y * 11.1);
+      const threshold = (isCorner ? (aggressive ? 0.2 : 0.28) : aggressive ? 0.36 : 0.46) - edgeT * 0.14;
+      if (fracture <= threshold) continue;
+      const deep = fracture > (aggressive ? 0.68 : 0.76);
+      const bite = deep
+        ? isCorner
+          ? Math.min(din, aggressive ? 8 : 5)
+          : Math.min(din, aggressive ? 5 : 3)
+        : 1;
+      if (din <= bite) out[i] = 0;
+    }
+  }
+  return out;
+}
+
+function artifactBoundaryCurvature(x, y, params) {
+  const eps = params.roundR * 0.07;
+  const din = maskDistInScene(x, y, params);
+  if (din < 0) return 0;
+  const dxp = maskDistInScene(x + eps, y, params);
+  const dxm = maskDistInScene(x - eps, y, params);
+  const dyp = maskDistInScene(x, y + eps, params);
+  const dym = maskDistInScene(x, y - eps, params);
+  if (dxp < 0 || dxm < 0 || dyp < 0 || dym < 0) return 0;
+  const lap = (dxp + dxm + dyp + dym) * 0.25 - din;
+  return Math.max(0, -lap);
+}
+
+/** SDF erosion — chipped silhouette bays and top-edge breaks (not uniform surface noise). */
+function artifactSilhouetteChipSdf(x, y, z, params) {
+  const din = maskDistInScene(x, y, params);
+  if (din < 0) return 0;
+  const { roundR, maxH } = params;
+  const edgeBand = roundR * 1.45;
+  if (din > edgeBand) return 0;
+
+  const edgeT = 1 - din / edgeBand;
+  const curv = artifactBoundaryCurvature(x, y, params);
+  const cornerBoost = 1 + Math.min(2.4, curv / Math.max(roundR * 0.05, 0.01));
+
+  const hx = x * 0.17 + y * 0.23;
+  const hy = y * 0.19 - x * 0.13;
+  const n1 = aoGrainHash(hx * 31.7, hy * 27.3);
+  const n2 = aoGrainHash(hx * 53.1 + 7.2, hy * 47.8 + 11.4);
+  const irregular = n1 * 0.62 + n2 * 0.38;
+  if (irregular < 0.4) return 0;
+
+  const fracture = Math.pow((irregular - 0.4) / 0.6, 1.35);
+  const terracottaMul = params.agedTerracottaArtifact ? 1.05 : 1;
+  const xyChip = roundR * 0.26 * edgeT * edgeT * cornerBoost * fracture * terracottaMul;
+
+  const zTop = maxH * 0.92;
+  const zBand = roundR * 0.62;
+  const zNearTop = z > zTop - zBand ? (z - (zTop - zBand)) / zBand : 0;
+  const topChip =
+    roundR * 0.17 * edgeT * zNearTop * (irregular > 0.55 ? 1 : 0.4) * terracottaMul;
+
+  return xyChip + topChip;
+}
+
+function slabSurfaceSwell(x, y, din, roundR, params) {
+  if (insideMachineEngraveAt(x, y, params)) return 0;
+  if (params.agedTerracottaArtifact) return 0;
+  if (params.erodedArtifact && din > roundR * 1.35) return 0;
+  const edgeOnly = params.erodedArtifact ? Math.max(0, 1 - din / (roundR * 1.35)) : 1;
+  const tier = params.softStoneTier ?? 0;
+  const amp = tier >= 2 ? 0.022 : tier >= 1 ? 0.034 : params.erodedArtifact ? 0.042 : 0.09;
+  const amp2 = tier >= 2 ? 0.008 : tier >= 1 ? 0.012 : params.erodedArtifact ? 0.018 : 0.038;
+  return (
+    ((aoGrainHash(x * 0.31 + 3.7, y * 0.29 + 2.1) - 0.5) * roundR * amp +
+      (aoGrainHash(x * 0.67 + 9.2, y * 0.61 + 6.4) - 0.5) * roundR * amp2) *
+    edgeOnly
+  );
+}
+
+/** Deterministic RNG for reproducible terracotta scrapes. */
+function terracottaRand(state) {
+  state.s = (state.s + 0x6d2b79f5) | 0;
+  let t = state.s;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function terracottaScrapeRng(params) {
+  const ox = params.maskOrigin?.minX ?? 0;
+  const oy = params.maskOrigin?.minY ?? 0;
+  return { s: (0x74ac7e31 ^ Math.imul(Math.round(ox * 17), 997)) + Math.round(oy * 31) | 0 };
+}
+
+/**
+ * Pick scrape centers — ported from gl-rock scrapeIndices loop.
+ * scrapeCount / scrapeMinDist spacing prevents spongy overlap.
+ */
+function pickTerracottaScrapeSites(geom, params, cfg) {
+  const pos = geom.attributes.position;
+  const roundR = params.roundR;
+  const scrapeCount = cfg.scrapeCount ?? 7;
+  const scrapeMinDist = cfg.scrapeMinDist ?? roundR * 3.0;
+  const rng = terracottaScrapeRng(params);
+  const sites = [];
+
+  for (let n = 0; n < scrapeCount; n++) {
+    let attempts = 0;
+    while (true) {
+      const pick = Math.floor(terracottaRand(rng) * pos.count);
+      attempts++;
+      const x = pos.getX(pick);
+      const y = pos.getY(pick);
+      const z = pos.getZ(pick);
+      const din = maskDistInScene(x, y, params);
+      if (din < 0 && attempts < 80) continue;
+
+      const corner = artifactBoundaryCurvature(x, y, params);
+      const edgeNear = din >= 0 && din < roundR * 1.55;
+      const cornerNear = corner > roundR * 0.015;
+      const flatTop = z > params.maxH * 0.52 && din > roundR * 1.1;
+      if (!edgeNear && !cornerNear && !flatTop && terracottaRand(rng) > 0.24 && attempts < 70) continue;
+
+      let tooClose = false;
+      for (const si of sites) {
+        const d = Math.hypot(x - pos.getX(si), y - pos.getY(si), z - pos.getZ(si));
+        if (d < scrapeMinDist) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose && attempts < 100) continue;
+      sites.push(pick);
+      break;
+    }
+  }
+  return sites;
+}
+
+/**
+ * Disk-plane scrape — ported from gl-rock scrape.scrape().
+ * Projects vertices within scrapeRadius onto a tilted cutting plane → flat broken facets.
+ */
+function applyTerracottaPlaneScrape(geom, seedIndex, params, cfg) {
+  const pos = geom.attributes.position;
+  const normal = geom.attributes.normal;
+  if (!normal) return;
+
+  const roundR = params.roundR;
+  const strength = cfg.scrapeStrength ?? roundR * 0.09;
+  const radius = cfg.scrapeRadius ?? roundR * 1.15;
+
+  const cx = pos.getX(seedIndex);
+  const cy = pos.getY(seedIndex);
+  const cz = pos.getZ(seedIndex);
+
+  let pnx = normal.getX(seedIndex);
+  let pny = normal.getY(seedIndex);
+  let pnz = normal.getZ(seedIndex);
+  const pnLen = Math.hypot(pnx, pny, pnz) || 1;
+  pnx /= pnLen;
+  pny /= pnLen;
+  pnz /= pnLen;
+
+  const tilt = 0.38 + aoGrainHash(seedIndex * 1.9, 4.7) * 0.28;
+  const rx = aoGrainHash(seedIndex * 2.7, 6.1) - 0.5;
+  const ry = aoGrainHash(seedIndex * 3.3, 8.4) - 0.5;
+  const rz = aoGrainHash(seedIndex * 4.1, 9.8) - 0.5;
+  let nx = pnx + rx * tilt;
+  let ny = pny + ry * tilt;
+  let nz = pnz + rz * tilt;
+  const nLen = Math.hypot(nx, ny, nz) || 1;
+  nx /= nLen;
+  ny /= nLen;
+  nz /= nLen;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const dx = x - cx;
+    const dy = y - cy;
+    const dz = z - cz;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist > radius) continue;
+
+    const diskW = Math.pow(1 - dist / radius, 1.65);
+    const side = dx * nx + dy * ny + dz * nz;
+    if (side > roundR * 0.04) continue;
+
+    const dot = side;
+    const projX = x - nx * dot;
+    const projY = y - ny * dot;
+    const projZ = z - nz * dot;
+    const blend = Math.min(1, (strength / roundR) * diskW * 2.1);
+    const deepen = strength * diskW * 0.72;
+
+    pos.setXYZ(
+      i,
+      projX * blend + x * (1 - blend) - nx * deepen,
+      projY * blend + y * (1 - blend) - ny * deepen,
+      projZ * blend + z * (1 - blend) - nz * deepen
+    );
+  }
+}
+
+function applyTerracottaScrapeErosion(geom, params) {
+  const cfg = {
+    scrapeCount: 7,
+    scrapeMinDist: params.roundR * 3.0,
+    scrapeStrength: params.roundR * 0.095,
+    scrapeRadius: params.roundR * 1.12,
+  };
+  geom.computeVertexNormals();
+  const sites = pickTerracottaScrapeSites(geom, params, cfg);
+  for (const seedIndex of sites) {
+    applyTerracottaPlaneScrape(geom, seedIndex, params, cfg);
+  }
+  geom.computeVertexNormals();
+}
+
+/** Post-MC vertex chips along silhouette gradient — physical edge damage. */
+function applyArtifactGeomErosion(geom, params) {
+  const pos = geom.attributes.position;
+  const roundR = params.roundR;
+  const edgeBand = roundR * 1.55;
+  const eps = roundR * 0.055;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const din = maskDistInScene(x, y, params);
+    if (din < 0 || din > edgeBand) continue;
+
+    const edgeT = 1 - din / edgeBand;
+    const dinXp = maskDistInScene(x + eps, y, params);
+    const dinXm = maskDistInScene(x - eps, y, params);
+    const dinYp = maskDistInScene(x, y + eps, params);
+    const dinYm = maskDistInScene(x, y - eps, params);
+    if (dinXp < 0 || dinXm < 0 || dinYp < 0 || dinYm < 0) continue;
+
+    let gx = (dinXp - dinXm) * 0.5;
+    let gy = (dinYp - dinYm) * 0.5;
+    const glen = Math.hypot(gx, gy) || 1;
+    gx /= glen;
+    gy /= glen;
+
+    const fracture = aoGrainHash(x * 23.1 + z * 3.7, y * 19.4 - z * 2.2);
+    if (fracture < 0.38) continue;
+
+    const corner = artifactBoundaryCurvature(x, y, params);
+    const cornerMul = 1 + Math.min(1.8, corner / Math.max(roundR * 0.05, 0.01));
+    const terracottaMul = params.agedTerracottaArtifact ? 1.35 : 1;
+    const chip =
+      roundR *
+      0.19 *
+      edgeT *
+      edgeT *
+      cornerMul *
+      Math.pow((fracture - 0.38) / 0.62, 1.15) *
+      terracottaMul;
+    pos.setXYZ(i, x + gx * chip, y + gy * chip, z);
+  }
+  pos.needsUpdate = true;
+}
+
+function laplacianSmoothGeometryWeighted(geom, iterations, lambda, weightAt) {
+  const pos = geom.attributes.position;
+  const index = geom.index;
+  if (!index) return geom;
+  const adj = buildAdjacency(index.array, pos.count);
+  const buf = new Float32Array(pos.count * 3);
+
+  for (let pass = 0; pass < iterations; pass++) {
+    for (let i = 0; i < pos.count; i++) {
+      const w = weightAt(i, pos);
+      const nbrs = adj[i];
+      if (!nbrs.size || w < 1e-4) {
+        buf[i * 3] = pos.getX(i);
+        buf[i * 3 + 1] = pos.getY(i);
+        buf[i * 3 + 2] = pos.getZ(i);
+        continue;
+      }
+      let sx = 0;
+      let sy = 0;
+      let sz = 0;
+      for (const j of nbrs) {
+        sx += pos.getX(j);
+        sy += pos.getY(j);
+        sz += pos.getZ(j);
+      }
+      const inv = 1 / nbrs.size;
+      const lam = lambda * w;
+      buf[i * 3] = pos.getX(i) + lam * (sx * inv - pos.getX(i));
+      buf[i * 3 + 1] = pos.getY(i) + lam * (sy * inv - pos.getY(i));
+      buf[i * 3 + 2] = pos.getZ(i) + lam * (sz * inv - pos.getZ(i));
+    }
+    pos.array.set(buf);
+    pos.needsUpdate = true;
+  }
+  return geom;
+}
+
+function finishArtifactGeometry(geom, params) {
+  if (params.agedTerracottaArtifact) {
+    applyTerracottaScrapeErosion(geom, params);
+  } else {
+    applyArtifactGeomErosion(geom, params);
+  }
+  const roundR = params.roundR;
+  const weightAt = (i, pos) => {
+    const din = maskDistInScene(pos.getX(i), pos.getY(i), params);
+    if (din < 0) return 0.12;
+    const edgeBand = roundR * 1.7;
+    if (din < edgeBand) return 0.06 + 0.14 * (din / edgeBand);
+    return 0.82;
+  };
+  laplacianSmoothGeometryWeighted(geom, 4, 0.38, weightAt);
+  laplacianSmoothGeometry(geom, 1, 0.05);
+  geom.computeVertexNormals();
+}
+
 function mcResultToGeometry(mcResult) {
   const positions = mcResult.positions;
   const cells = mcResult.cells;
@@ -1389,11 +2003,98 @@ function aoGrainHash(x, y) {
   return s - Math.floor(s);
 }
 
+function stoneVertexColorPalette(params) {
+  const preset = normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage');
+  if (preset === PREMIUM_MATERIAL_IDS.VOLCANIC_STONE) {
+    return {
+      hi: [0.27, 0.28, 0.28],
+      lo: [0.1, 0.1, 0.1],
+      grime: [0.07, 0.07, 0.07],
+      ridgeWear: true,
+      wearStyle: 'volcanic',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.DRY_TERRACOTTA) {
+    return {
+      hi: [0.9, 0.56, 0.34],
+      lo: [0.62, 0.34, 0.22],
+      grime: [0.5, 0.3, 0.2],
+      ridgeWear: true,
+      wearStyle: 'terracotta',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.ANCIENT_STONEWARE) {
+    return {
+      hi: [0.4, 0.46, 0.42],
+      lo: [0.08, 0.1, 0.09],
+      grime: [0.14, 0.17, 0.19],
+      ridgeWear: true,
+      wearStyle: 'stoneware',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.DEEP_STONEWARE) {
+    return {
+      hi: [0.78, 0.88, 0.8],
+      lo: [0.2, 0.34, 0.3],
+      grime: [0.16, 0.28, 0.26],
+      ridgeWear: true,
+      wearStyle: 'seafoam_jade',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT) {
+    return {
+      hi: [0.93, 0.91, 0.87],
+      lo: [0.7, 0.68, 0.64],
+      grime: [0.56, 0.54, 0.5],
+      ridgeWear: true,
+      wearStyle: 'warm_marble',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE) {
+    return {
+      hi: [0.28, 0.28, 0.3],
+      lo: [0.08, 0.08, 0.1],
+      grime: [0.04, 0.04, 0.05],
+      ridgeWear: true,
+      wearStyle: 'basalt',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.POLISHED_JADE_MARBLE) {
+    return {
+      hi: [0.58, 0.72, 0.62],
+      lo: [0.22, 0.38, 0.3],
+      grime: [0.16, 0.28, 0.22],
+      ridgeWear: true,
+      wearStyle: 'jade_marble',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.POLISHED_SLATE_MARBLE) {
+    return {
+      hi: [0.38, 0.46, 0.48],
+      lo: [0.14, 0.18, 0.2],
+      grime: [0.1, 0.13, 0.15],
+      ridgeWear: true,
+      wearStyle: 'slate_marble',
+    };
+  }
+  return {
+    hi: [0.98, 0.99, 0.97],
+    lo: [0.5, 0.52, 0.48],
+    grime: [0.7, 0.72, 0.66],
+    ridgeWear: false,
+    wearStyle: 'sage',
+  };
+}
+
 function applySculptureVertexAO(geom, params) {
   const pos = geom.attributes.position;
   const normal = geom.attributes.normal;
   const colors = new Float32Array(pos.count * 3);
   const { maskScale, roundR, maxDistInScene } = params;
+  const palette = stoneVertexColorPalette(params);
+  const archDoubt =
+    normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage') ===
+    PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT;
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -1458,10 +2159,14 @@ function applySculptureVertexAO(geom, params) {
           : 0.5;
     }
 
-    const cavity = ao * (params.slabMode ? 0.36 : 0.28) + narrow * (params.slabMode ? 0.1 : 0.12);
+    const cavity = ao * (params.slabMode ? (params.sharpRelief ? 0.58 : 0.36) : 0.28) + narrow * (params.slabMode ? 0.1 : 0.12);
     const cavityT = Math.min(1, cavity);
     let lit = params.slabMode
-      ? 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
+      ? params.sharpRelief && !archDoubt
+        ? 0.28 + (1.0 - Math.pow(cavityT, 0.48) * 0.72) * 0.56
+        : archDoubt
+          ? 0.48 + (1.0 - Math.pow(cavityT, 0.52) * 0.58) * 0.42
+          : 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
       : 0.88 + 0.12 * (1 - cavityT);
     lit = applyMetalContactShadow(lit, x, y, z, params);
 
@@ -1473,15 +2178,45 @@ function applySculptureVertexAO(geom, params) {
     let grime = 0;
     if (carve > 0 && z < baseZ + carve * 0.15) {
       grime = Math.min(1, (baseZ + carve * 0.55 - z) / Math.max(carve * 0.72, 0.01));
-      lit *= 1 - grime * (params.slabMode ? 0.36 : 0.22);
-    } else if (bed > 0 && z < baseZ + bed * 0.35) {
+      lit *= 1 - grime * (params.slabMode ? (archDoubt ? 0.62 : 0.48) : 0.22);
+    }
+    if (carve > roundR * 0.002) {
+      const carveShade = Math.min(1, carve / Math.max(roundR * 0.1, 0.001));
+      lit *= 1 - carveShade * (params.slabMode ? 0.5 : 0.18);
+    }
+    if (bed > 0 && z < baseZ + bed * 0.35) {
       grime = Math.min(1, (baseZ + bed * 0.42 - z) / Math.max(bed * 0.78, 0.01));
-      lit *= 1 - grime * 0.22;
+      lit *= 1 - grime * 0.34;
+    }
+
+    if (params.engraveOverlays?.length) {
+      for (const ov of params.engraveOverlays) {
+        const epx = (x - ov.maskOrigin.minX) * ov.maskScale;
+        const epy = (ov.maskOrigin.maxY - y) * ov.maskScale;
+        const es = sampleMaskField(epx, epy, ov);
+        if (!es.inside || ov.machineCut) continue;
+        const din = es.distIn / ov.maskScale;
+        const edgeW = ov.edgeWidth ?? roundR * 0.32;
+        const t = Math.min(1, din / Math.max(edgeW * 1.05, 0.01));
+        const grooveT = Math.pow(Math.sin(t * Math.PI * 0.5), 0.72);
+        const grooveDark = ov.thinChannel ? 0.76 : params.slabMode ? (archDoubt ? 0.58 : 0.38) : 0.24;
+        lit *= 1 - grooveT * grooveDark;
+        if (ov.thinChannel) {
+          const rimT = 1 - grooveT;
+          lit *= 1 - rimT * 0.32;
+          if (rimT > 0.4) lit *= 1 - (rimT - 0.4) * 0.52;
+        }
+        break;
+      }
     }
 
     const embossH = embossHeightAt(x, y, params);
     if (embossH > params.roundR * 0.08) {
-      lit = Math.min(1, lit + Math.min(1, embossH / Math.max(params.embossHeight ?? params.roundR * 2, 0.01)) * 0.06);
+      const embossBoost = archDoubt && params.sharpRelief ? 0.26 : 0.06;
+      lit = Math.min(
+        1,
+        lit + Math.min(1, embossH / Math.max(params.embossHeight ?? params.roundR * 2, 0.01)) * embossBoost
+      );
     }
 
     if (params.embossOverlays?.length) {
@@ -1492,32 +2227,131 @@ function applySculptureVertexAO(geom, params) {
         if (!s.inside) continue;
         const din = s.distIn / ov.maskScale;
         const t = Math.min(1, din / Math.max(ov.maxDistInScene * 0.7, 0.01));
-        lit = Math.min(1, lit + t * 0.12);
+        lit = Math.min(1, lit + t * (archDoubt ? 0.2 : 0.12));
         break;
       }
     }
 
-    const hiR = 0.98;
-    const hiG = 0.99;
-    const hiB = 0.97;
-    const loR = 0.5;
-    const loG = 0.52;
-    const loB = 0.48;
+    const hiR = palette.hi[0];
+    const hiG = palette.hi[1];
+    const hiB = palette.hi[2];
+    const loR = palette.lo[0];
+    const loG = palette.lo[1];
+    const loB = palette.lo[2];
     let r = loR + (hiR - loR) * lit;
     let g = loG + (hiG - loG) * lit;
     let b = loB + (hiB - loB) * lit;
-    const flatTop = params.slabMode && nz > 0.84 && cavityT < 0.28 && carve < roundR * 0.03;
+    const flatTop =
+      params.slabMode && nz > 0.84 && cavityT < 0.28 && carve < roundR * 0.03;
     if (flatTop) {
-      const grain = (aoGrainHash(x * 41.7, y * 37.2) - 0.5) * 0.035;
+      const preset = normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage');
+      const grainMul =
+        preset === PREMIUM_MATERIAL_IDS.VOLCANIC_STONE
+          ? 0.028
+          : preset === PREMIUM_MATERIAL_IDS.DRY_TERRACOTTA || preset === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE
+            ? 0.042
+            : preset === PREMIUM_MATERIAL_IDS.ANCIENT_STONEWARE
+              ? 0.022
+              : preset === PREMIUM_MATERIAL_IDS.DEEP_STONEWARE
+                ? 0.019
+                : preset === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT
+                  ? 0.008
+                  : 0.035;
+      const grain = (aoGrainHash(x * 41.7, y * 37.2) - 0.5) * grainMul;
       r = Math.max(0, Math.min(1, r + grain));
-      g = Math.max(0, Math.min(1, g + grain * 0.98));
+      g = Math.max(0, Math.min(1, g + grain));
       b = Math.max(0, Math.min(1, b + grain * 0.96));
     }
     if (grime > 0) {
-      const gmix = grime * 0.28;
-      r = r * (1 - gmix) + 0.7 * gmix;
-      g = g * (1 - gmix) + 0.72 * gmix;
-      b = b * (1 - gmix) + 0.66 * gmix;
+      const gmix = grime * (archDoubt ? 0.22 : 0.28);
+      r = r * (1 - gmix) + palette.grime[0] * gmix;
+      g = g * (1 - gmix) + palette.grime[1] * gmix;
+      b = b * (1 - gmix) + palette.grime[2] * gmix;
+    }
+    if (palette.ridgeWear && nz > 0.52 && carve < roundR * 0.008 && !flatTop) {
+      const style = palette.wearStyle ?? 'sage';
+      const wearBase =
+        style === 'volcanic'
+          ? 2.1
+          : style === 'terracotta'
+            ? 2.4
+            : style === 'archaeological_tile'
+              ? 2.55
+            : style === 'warm_marble'
+              ? 1.55
+            : style === 'jade_marble'
+              ? 1.5
+              : style === 'stoneware'
+                ? 1.55
+                : style === 'seafoam_jade'
+                  ? 1.65
+                  : style === 'moonstone_jade'
+                    ? 1.7
+                    : style === 'slate_marble'
+                  ? 1.45
+                  : 2.6;
+      const wearAmp =
+        style === 'volcanic'
+          ? 0.12
+          : style === 'terracotta'
+            ? 0.16
+            : style === 'archaeological_tile'
+              ? 0.17
+            : style === 'warm_marble'
+              ? 0.1
+            : style === 'jade_marble'
+              ? 0.14
+              : style === 'stoneware'
+                ? 0.1
+                : style === 'seafoam_jade'
+                  ? 0.12
+                  : style === 'moonstone_jade'
+                    ? 0.11
+                    : style === 'slate_marble'
+                  ? 0.12
+                  : 0.11;
+      const wear = Math.min(1, (nz - 0.52) * wearBase) * wearAmp;
+      if (style === 'volcanic') {
+        r = Math.min(1, r + wear * 0.08);
+        g = Math.min(1, g + wear * 0.08);
+        b = Math.min(1, b + wear * 0.08);
+      } else if (style === 'terracotta') {
+        r = Math.min(1, r + wear * 0.14);
+        g = Math.min(1, g + wear * 0.1);
+        b = Math.min(1, b + wear * 0.06);
+      } else if (style === 'archaeological_tile') {
+        r = Math.min(1, r + wear * 0.11);
+        g = Math.min(1, g + wear * 0.082);
+        b = Math.min(1, b + wear * 0.048);
+      } else if (style === 'warm_marble') {
+        r = Math.min(1, r + wear * 0.09);
+        g = Math.min(1, g + wear * 0.088);
+        b = Math.min(1, b + wear * 0.082);
+      } else if (style === 'stoneware') {
+        r = Math.min(1, r + wear * 0.06);
+        g = Math.min(1, g + wear * 0.07);
+        b = Math.min(1, b + wear * 0.06);
+      } else if (style === 'seafoam_jade') {
+        r = Math.min(1, r + wear * 0.07);
+        g = Math.min(1, g + wear * 0.09);
+        b = Math.min(1, b + wear * 0.07);
+      } else if (style === 'moonstone_jade') {
+        r = Math.min(1, r + wear * 0.08);
+        g = Math.min(1, g + wear * 0.08);
+        b = Math.min(1, b + wear * 0.07);
+      } else if (style === 'jade_marble') {
+        r = Math.min(1, r + wear * 0.07);
+        g = Math.min(1, g + wear * 0.09);
+        b = Math.min(1, b + wear * 0.07);
+      } else if (style === 'slate_marble') {
+        r = Math.min(1, r + wear * 0.06);
+        g = Math.min(1, g + wear * 0.07);
+        b = Math.min(1, b + wear * 0.08);
+      } else {
+        r = Math.min(1, r + wear * 0.12);
+        g = Math.min(1, g + wear * 0.06);
+        b = Math.min(1, b + wear * 0.03);
+      }
     }
     colors[i * 3] = r;
     colors[i * 3 + 1] = g;
@@ -1593,16 +2427,34 @@ export function buildStoneSculptureMeshFromMask(
     0;
   const hasOverlays =
     (options?.engraveOverlays?.length || 0) + (options?.embossOverlays?.length || 0) > 0;
+  const hasMachineCut = (options?.engraveOverlays || []).some((ov) => ov.machineCut);
+  const hasHairlineEngrave =
+    options?.engraveProfile === 'vline' && (options?.engraveSegments?.length || 0) > 0;
+  const hasChannelEngrave =
+    options?.engraveProfile === 'channel' && (options?.engraveSegments?.length || 0) > 0;
   const hasRelief = hasStrokeRelief || hasOverlays;
-  const distIn = distanceTransform(grid, w, h);
-  const distOut = distanceToMaskGrid(grid, w, h);
+  const erodedArtifact = isErodedStonePreset(options?.stoneMaterialPreset ?? 'sage');
+  const agedTerracottaArtifact = isAgedTerracottaPreset(options?.stoneMaterialPreset ?? 'sage');
+  const softStoneTier = softStoneGeometryTier(options?.stoneMaterialPreset ?? 'sage');
+  const sharpRelief =
+    !!options?.sharpRelief || isSharpReliefStonePreset(options?.stoneMaterialPreset ?? 'sage');
+  const roundR = softStoneRoundR(tubeRadius, slabMode, softStoneTier);
+
+  let buildGrid = grid;
+  let distIn = distanceTransform(buildGrid, w, h);
+  if (erodedArtifact) {
+    buildGrid = chipMaskSilhouetteForArtifact(grid, w, h, distIn, maskScale, roundR, {
+      aggressive: agedTerracottaArtifact,
+    });
+    distIn = distanceTransform(buildGrid, w, h);
+  }
+  const distOut = distanceToMaskGrid(buildGrid, w, h);
 
   let maxDistIn = 1;
-  for (let i = 0; i < grid.length; i++) {
-    if (grid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
+  for (let i = 0; i < buildGrid.length; i++) {
+    if (buildGrid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
   }
 
-  const roundR = slabMode ? tubeRadius * 1.35 : tubeRadius * 1.02;
   const maxH = slabMode
     ? tubeRadius * (hasRelief ? 1.22 : 1.02)
     : segments?.length
@@ -1630,17 +2482,22 @@ export function buildStoneSculptureMeshFromMask(
   const spanZ = maxZ - minZ;
   const maxSpan = Math.max(spanX, spanY, spanZ);
   const res = Math.min(
-    58,
-    Math.max(44, Math.round(maxSpan / (roundR * (hasStrokeRelief ? 0.34 : 0.36))))
+    erodedArtifact ? 64 : 58,
+    Math.max(
+      44,
+      Math.round(
+        maxSpan / (roundR * ((hasMachineCut || hasHairlineEngrave || hasChannelEngrave) ? 0.28 : hasStrokeRelief ? 0.34 : 0.36))
+      )
+    )
   );
 
   let nx = Math.max(28, Math.round(res * (spanX / maxSpan)));
   let ny = Math.max(28, Math.round(res * (spanY / maxSpan)));
   let nz = Math.max(
-    hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
+    hasMachineCut || hasHairlineEngrave || hasChannelEngrave ? 34 : hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
     Math.round(res * (spanZ / maxSpan))
   );
-  const maxVoxels = 65000;
+  const maxVoxels = erodedArtifact ? 84000 : 65000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -1650,7 +2507,7 @@ export function buildStoneSculptureMeshFromMask(
   }
 
   const params = {
-    grid,
+    grid: buildGrid,
     w,
     h,
     distIn,
@@ -1681,6 +2538,7 @@ export function buildStoneSculptureMeshFromMask(
         : null,
     engraveTubeR: options?.engraveTubeR ?? null,
     engraveDepth: options?.engraveDepth ?? null,
+    engraveProfile: options?.engraveProfile ?? 'groove',
     engraveEmbossGap: options?.engraveEmbossGap ?? null,
     embossTubeR: options?.embossTubeR ?? null,
     embossHeight: options?.embossHeight ?? null,
@@ -1707,9 +2565,19 @@ export function buildStoneSculptureMeshFromMask(
     solidInterior: !!options?.solidInterior,
     pierceHoleMask: options?.pierceHoleMask ?? null,
     letterGapRelief: !!options?.letterGapRelief,
+    stoneMaterialPreset: options?.stoneMaterialPreset ?? 'sage',
+    stoneRoughness: options?.stoneRoughness ?? 0,
+    erodedArtifact,
+    agedTerracottaArtifact,
+    softStoneTier,
+    sharpRelief,
   };
 
-  const potential = (x, y, z) => stoneSdfAt(x, y, z, params);
+  const potential = (x, y, z) => {
+    let sdf = stoneSdfAt(x, y, z, params);
+    if (params.erodedArtifact) sdf += artifactSilhouetteChipSdf(x, y, z, params);
+    return sdf;
+  };
   const mc = marchingCubes(
     [nx, ny, nz],
     potential,
@@ -1721,21 +2589,27 @@ export function buildStoneSculptureMeshFromMask(
 
   let geom = mcResultToGeometry(mc);
   const tubeMode = !!segments?.length && !slabMode;
-  const smoothIter = slabMode ? 1 : tubeMode ? 4 : 6;
-  const smoothLambda = slabMode
-    ? hasStrokeRelief
-      ? 0.06
-      : hasOverlays
-        ? 0.07
-        : 0.09
-    : tubeMode
-      ? 0.2
-      : 0.24;
-  if (smoothIter > 0) laplacianSmoothGeometry(geom, smoothIter, smoothLambda);
-  geom.computeVertexNormals();
-  if (!slabMode) {
-    laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
+  if (params.erodedArtifact) {
+    finishArtifactGeometry(geom, params);
+  } else {
+    const smooth = stoneSmoothSettings(
+      softStoneTier,
+      slabMode,
+      hasStrokeRelief,
+      hasOverlays,
+      tubeMode,
+      sharpRelief,
+      params.stoneRoughness ?? 0,
+      hasMachineCut,
+      hasHairlineEngrave,
+      hasChannelEngrave
+    );
+    if (smooth.iter > 0) laplacianSmoothGeometry(geom, smooth.iter, smooth.lambda);
     geom.computeVertexNormals();
+    if (smooth.pass2) {
+      laplacianSmoothGeometry(geom, smooth.pass2.iter, smooth.pass2.lambda);
+      geom.computeVertexNormals();
+    }
   }
   // Slab: mild vertex AO — crevice/engrave shadow without heavy silhouette rim.
   applySculptureVertexAO(geom, params);
@@ -1768,16 +2642,34 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     0;
   const hasOverlays =
     (options?.engraveOverlays?.length || 0) + (options?.embossOverlays?.length || 0) > 0;
+  const hasMachineCut = (options?.engraveOverlays || []).some((ov) => ov.machineCut);
+  const hasHairlineEngrave =
+    options?.engraveProfile === 'vline' && (options?.engraveSegments?.length || 0) > 0;
+  const hasChannelEngrave =
+    options?.engraveProfile === 'channel' && (options?.engraveSegments?.length || 0) > 0;
   const hasRelief = hasStrokeRelief || hasOverlays;
-  const distIn = distanceTransform(grid, w, h);
-  const distOut = distanceToMaskGrid(grid, w, h);
+  const erodedArtifact = isErodedStonePreset(options?.stoneMaterialPreset ?? 'sage');
+  const agedTerracottaArtifact = isAgedTerracottaPreset(options?.stoneMaterialPreset ?? 'sage');
+  const softStoneTier = softStoneGeometryTier(options?.stoneMaterialPreset ?? 'sage');
+  const sharpRelief =
+    !!options?.sharpRelief || isSharpReliefStonePreset(options?.stoneMaterialPreset ?? 'sage');
+  const roundR = softStoneRoundR(tubeRadius, slabMode, softStoneTier);
+
+  let buildGrid = grid;
+  let distIn = distanceTransform(buildGrid, w, h);
+  if (erodedArtifact) {
+    buildGrid = chipMaskSilhouetteForArtifact(grid, w, h, distIn, maskScale, roundR, {
+      aggressive: agedTerracottaArtifact,
+    });
+    distIn = distanceTransform(buildGrid, w, h);
+  }
+  const distOut = distanceToMaskGrid(buildGrid, w, h);
 
   let maxDistIn = 1;
-  for (let i = 0; i < grid.length; i++) {
-    if (grid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
+  for (let i = 0; i < buildGrid.length; i++) {
+    if (buildGrid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
   }
 
-  const roundR = slabMode ? tubeRadius * 1.35 : tubeRadius * 1.02;
   const maxH = slabMode
     ? tubeRadius * (hasRelief ? 1.22 : 1.02)
     : segments?.length
@@ -1805,17 +2697,22 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   const spanZ = maxZ - minZ;
   const maxSpan = Math.max(spanX, spanY, spanZ);
   const res = Math.min(
-    58,
-    Math.max(44, Math.round(maxSpan / (roundR * (hasStrokeRelief ? 0.34 : 0.36))))
+    erodedArtifact ? 64 : 58,
+    Math.max(
+      44,
+      Math.round(
+        maxSpan / (roundR * ((hasMachineCut || hasHairlineEngrave || hasChannelEngrave) ? 0.28 : hasStrokeRelief ? 0.34 : 0.36))
+      )
+    )
   );
 
   let nx = Math.max(28, Math.round(res * (spanX / maxSpan)));
   let ny = Math.max(28, Math.round(res * (spanY / maxSpan)));
   let nz = Math.max(
-    hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
+    hasMachineCut || hasHairlineEngrave || hasChannelEngrave ? 34 : hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
     Math.round(res * (spanZ / maxSpan))
   );
-  const maxVoxels = 65000;
+  const maxVoxels = erodedArtifact ? 84000 : 65000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -1825,7 +2722,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   }
 
   const params = {
-    grid,
+    grid: buildGrid,
     w,
     h,
     distIn,
@@ -1856,6 +2753,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
         : null,
     engraveTubeR: options?.engraveTubeR ?? null,
     engraveDepth: options?.engraveDepth ?? null,
+    engraveProfile: options?.engraveProfile ?? 'groove',
     engraveEmbossGap: options?.engraveEmbossGap ?? null,
     embossTubeR: options?.embossTubeR ?? null,
     embossHeight: options?.embossHeight ?? null,
@@ -1882,9 +2780,19 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     solidInterior: !!options?.solidInterior,
     pierceHoleMask: options?.pierceHoleMask ?? null,
     letterGapRelief: !!options?.letterGapRelief,
+    stoneMaterialPreset: options?.stoneMaterialPreset ?? 'sage',
+    stoneRoughness: options?.stoneRoughness ?? 0,
+    erodedArtifact,
+    agedTerracottaArtifact,
+    softStoneTier,
+    sharpRelief,
   };
 
-  const potential = (x, y, z) => stoneSdfAt(x, y, z, params);
+  const potential = (x, y, z) => {
+    let sdf = stoneSdfAt(x, y, z, params);
+    if (params.erodedArtifact) sdf += artifactSilhouetteChipSdf(x, y, z, params);
+    return sdf;
+  };
   const mc = await marchingCubesAsync(
     [nx, ny, nz],
     potential,
@@ -1898,21 +2806,27 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   await yieldToMainThread();
   let geom = mcResultToGeometry(mc);
   const tubeMode = !!segments?.length && !slabMode;
-  const smoothIter = slabMode ? 1 : tubeMode ? 4 : 6;
-  const smoothLambda = slabMode
-    ? hasStrokeRelief
-      ? 0.06
-      : hasOverlays
-        ? 0.07
-        : 0.09
-    : tubeMode
-      ? 0.2
-      : 0.24;
-  if (smoothIter > 0) laplacianSmoothGeometry(geom, smoothIter, smoothLambda);
-  geom.computeVertexNormals();
-  if (!slabMode) {
-    laplacianSmoothGeometry(geom, tubeMode ? 2 : 2, tubeMode ? 0.06 : 0.04);
+  if (params.erodedArtifact) {
+    finishArtifactGeometry(geom, params);
+  } else {
+    const smooth = stoneSmoothSettings(
+      softStoneTier,
+      slabMode,
+      hasStrokeRelief,
+      hasOverlays,
+      tubeMode,
+      sharpRelief,
+      params.stoneRoughness ?? 0,
+      hasMachineCut,
+      hasHairlineEngrave,
+      hasChannelEngrave
+    );
+    if (smooth.iter > 0) laplacianSmoothGeometry(geom, smooth.iter, smooth.lambda);
     geom.computeVertexNormals();
+    if (smooth.pass2) {
+      laplacianSmoothGeometry(geom, smooth.pass2.iter, smooth.pass2.lambda);
+      geom.computeVertexNormals();
+    }
   }
   applySculptureVertexAO(geom, params);
   addSculptureUvs(geom, maskOrigin);

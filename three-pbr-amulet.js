@@ -6,6 +6,14 @@ import * as THREE from 'https://esm.sh/three@0.170.0';
 import { RoomEnvironment } from 'https://esm.sh/three@0.170.0/examples/jsm/environments/RoomEnvironment.js';
 import { buildStoneSculptureMeshFromMaskAsync, prepareTextOverlayFromGrid } from './stone-sdf-mesh.js';
 import { yieldToMainThread } from './render-yield.js';
+import {
+  PREMIUM_MATERIAL_IDS,
+  PREMIUM_MATERIAL_LIBRARY,
+  getPremiumMaterialSpec,
+  normalizePremiumMaterialId,
+  isSharpReliefStonePreset,
+  stoneProceduralVariant,
+} from './amulet-material-presets.js';
 import { deriveAmuletShapeParams, METAL_ELLIPSE_BY_BELIEF } from './amulet-shape-from-text.js';
 import { REPOUSSE_FIELD_DEFAULTS } from './metal-repousse-mesh.js';
 const W = 680;
@@ -43,6 +51,8 @@ let active = {
   q5MaterialMeshes: null,
   ceramicQ1Material: null,
   ceramicQ5Feeling: null,
+  q5AccentLights: null,
+  stoneMesh: null,
 };
 let sharedEnvMap = null;
 let sharedStudioEnvMap = null;
@@ -60,27 +70,48 @@ function disposeSharedEnvMaps() {
   envMapRenderer = null;
 }
 
-function disposeActive() {
+function disposeActiveScene() {
   if (active.scene) {
     disposeScene(active.scene);
     active.scene = null;
     active.camera = null;
     active.ceramicMeshes = null;
     active.q5MaterialMeshes = null;
-    active.ceramicQ1Material = null;
+    if (active.ceramicQ1Material) {
+      active.ceramicQ1Material.dispose();
+      active.ceramicQ1Material = null;
+    }
     active.ceramicQ5Feeling = null;
+    active.stoneMesh = null;
+    active.q5AccentLights = null;
   }
+  active.envMap = null;
+}
+
+function disposeActive() {
+  disposeActiveScene();
   if (active.renderer) {
     active.renderer.dispose();
     active.renderer = null;
   }
   disposeSharedEnvMaps();
+  clearSlabStoneGeomCache();
   active.envMap = null;
+}
+
+function getOrCreateRenderer() {
+  if (active.renderer) return active.renderer;
+  active.renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    preserveDrawingBuffer: true,
+    alpha: true,
+  });
+  return active.renderer;
 }
 
 function disposeScene(scene) {
   scene.traverse((obj) => {
-    if (obj.geometry) obj.geometry.dispose();
+    if (obj.geometry && !isSlabStoneGeometryCached(obj.geometry)) obj.geometry.dispose();
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       mats.forEach((m) => m.dispose());
@@ -211,6 +242,16 @@ const OCCUPATION_SMOOTHNESS = {
   agriculture: 0.22,
   creation_spirit: 0
 };
+
+function resolveStoneRoughness(style2 = null, questionnaire = null) {
+  if (questionnaire?.stoneRoughness != null) {
+    return Math.max(0, Math.min(1, Number(questionnaire.stoneRoughness)));
+  }
+  if (questionnaire?.l3Spike != null) {
+    return Math.max(0, Math.min(1, Number(questionnaire.l3Spike)));
+  }
+  return 0;
+}
 
 function occupationRoughness(style2) {
   if (style2?.occupationSmoothness != null) {
@@ -612,40 +653,188 @@ function applyL3VertexColors(geom, maskOrigin, tubeRadius, distToL2 = null, mask
  * Q1 front layer — DragonDispersion glTF optical glass (Three.js r165+ `dispersion`).
  * RoomEnvironment PMREM (setupEnvironment) supplies internal reflections.
  */
-const DRAGON_GLASS_PRESET = {
-  transmission: 1.0,
-  roughness: 0.0,
-  metalness: 0.0,
-  ior: 1.75,
-  thickness: 2.27,
-  dispersion: 2.04,
-  attenuationDistance: 0.155,
-};
+const DRAGON_GLASS_PRESET = PREMIUM_MATERIAL_LIBRARY[PREMIUM_MATERIAL_IDS.DRAGON_GLASS].dragonGlass;
 
-const CHROME_METAL_PRESET = {
+const CHROME_METAL_PRESET = PREMIUM_MATERIAL_LIBRARY[PREMIUM_MATERIAL_IDS.CHROME_METAL];
+
+const MATTE_POLYMER_PRESET = PREMIUM_MATERIAL_LIBRARY[PREMIUM_MATERIAL_IDS.MATTE_POLYMER];
+
+const BRONZE_METAL_PRESET = {
+  color: 0x6b4428,
   metalness: 1.0,
-  roughness: 0.03,
-  clearcoat: 1.0,
-  clearcoatRoughness: 0.0,
-  envMapIntensity: 2.0,
+  roughness: 0.32,
+  envMapIntensity: 2.1,
+  clearcoat: 0.28,
+  clearcoatRoughness: 0.18,
 };
 
-const MATTE_POLYMER_PRESET = {
+/** FastHDR materials example — MeshStandardMaterial spheres (02–05). */
+const FASTHDR_MATTE_WHITE = {
+  color: 0xf5f5f5,
   metalness: 0.0,
-  roughness: 0.85,
-  clearcoat: 0.0,
-  transmission: 0.0,
+  roughness: 1.0,
+  envMapIntensity: 0.1,
 };
+const FASTHDR_MATTE_BLACK = {
+  color: 0x101012,
+  metalness: 0.0,
+  roughness: 1.0,
+  envMapIntensity: 0.1,
+};
+const FASTHDR_CHROME = {
+  color: 0xffffff,
+  metalness: 1.0,
+  roughness: 0.0,
+  envMapIntensity: 1.0,
+};
+const FASTHDR_BLACK_CHROME = {
+  color: 0x0a0a0c,
+  metalness: 1.0,
+  roughness: 0.0,
+  envMapIntensity: 1.0,
+};
+const FASTHDR_BRUSHED_METAL = {
+  color: 0x888888,
+  metalness: 1.0,
+  roughness: 0.5,
+  envMapIntensity: 1.0,
+};
+const FASTHDR_GLOSSY_POLYMER = {
+  color: 0x6ab440,
+  metalness: 0.0,
+  roughness: 0.0,
+  envMapIntensity: 1.0,
+};
+
+function buildFastHdrStandardMaterial(envMap, spec) {
+  const map = envMap ?? active?.envMap ?? null;
+  return new THREE.MeshStandardMaterial({
+    color: spec.color,
+    metalness: spec.metalness,
+    roughness: spec.roughness,
+    envMap: map,
+    envMapIntensity: spec.envMapIntensity,
+    side: THREE.DoubleSide,
+  });
+}
 
 /** Q5 → Q1 ceramic + slab frame material preset + tint. */
 const Q5_CERAMIC_MATERIAL = {
-  hope: { preset: 'dragon', attenuationColor: [0.98, 0.62, 0.32] },
-  excitement: { preset: 'dragon', attenuationColor: [0.94, 0.31, 0.52] },
-  fear: { preset: 'chrome', color: 0xeceff4 },
-  confusion: { preset: 'chrome', color: 0x3d434c },
-  impatience: { preset: 'matte', color: 0xc62828 },
+  hope: { preset: 'fasthdr_matte_white' },
+  excitement: { preset: 'chrome', color: 0xffffff },
+  fear: { preset: 'fasthdr_black_chrome' },
+  confusion: { preset: 'fasthdr_brushed_metal' },
+  impatience: { preset: 'fasthdr_matte_black' },
   longing: { preset: 'dragon', attenuationColor: [0.75, 0.8, 0.82] },
 };
+
+function q5CeramicPresetSpec(q5Feeling) {
+  return Q5_CERAMIC_MATERIAL[q5Feeling] ?? Q5_CERAMIC_MATERIAL.hope;
+}
+
+/** Stone slab lighting — fixed dark rig; never tied to Q5 ceramic preset. */
+const CERAMIC_LIGHT_LAYER = 1;
+const STONE_SCENE_EXPOSURE = 1.12;
+const STONE_SCENE_ENV_INTENSITY = 0.42;
+
+function tuneStoneSceneDark(renderer, scene) {
+  if (renderer) renderer.toneMappingExposure = STONE_SCENE_EXPOSURE;
+  if (scene && 'environmentIntensity' in scene) {
+    scene.environmentIntensity = STONE_SCENE_ENV_INTENSITY;
+  }
+}
+
+function tuneRendererExposureForQ5(renderer, q5Feeling) {
+  if (!renderer) return;
+  const preset = q5CeramicPresetSpec(q5Feeling).preset;
+  renderer.toneMappingExposure =
+    preset === 'chrome' || preset === 'fasthdr_chrome' || preset === 'fasthdr_black_chrome'
+      ? 1.35
+      : preset === 'bronze' || preset === 'fasthdr_brushed_metal'
+        ? 1.28
+        : preset === 'matte' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black'
+          ? 1.2
+          : preset === 'fasthdr_glossy_polymer'
+            ? 1.22
+            : 1.12;
+}
+
+function tuneSceneEnvironmentForQ5(scene, q5Feeling) {
+  if (!scene) return;
+  const preset = q5CeramicPresetSpec(q5Feeling).preset;
+  if ('environmentIntensity' in scene) {
+    scene.environmentIntensity =
+      preset === 'chrome' || preset === 'fasthdr_chrome' || preset === 'fasthdr_black_chrome'
+        ? 1.75
+        : preset === 'bronze' || preset === 'fasthdr_brushed_metal'
+          ? 1.5
+          : preset === 'matte' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black'
+            ? 0.42
+            : preset === 'fasthdr_glossy_polymer'
+              ? 1.35
+              : 1.0;
+  }
+}
+
+/** Extra rig so chrome reads mirror-polished, matte reads flat white. */
+function clearQ5CeramicAccentLights(scene) {
+  for (const light of active.q5AccentLights ?? []) scene.remove(light);
+  active.q5AccentLights = [];
+}
+
+function addQ5CeramicAccentLights(scene, q5Feeling) {
+  clearQ5CeramicAccentLights(scene);
+  const preset = q5CeramicPresetSpec(q5Feeling).preset;
+  const tagLayer = (light) => {
+    light.layers.set(CERAMIC_LIGHT_LAYER);
+    return light;
+  };
+  if (preset === 'chrome' || preset === 'fasthdr_black_chrome') {
+    const key = tagLayer(new THREE.DirectionalLight(0xffffff, 3.2));
+    key.position.set(1.4, 2.2, 3.8);
+    const rim = tagLayer(new THREE.DirectionalLight(0xd8e4ff, 2.0));
+    rim.position.set(-2.0, 1.2, 2.6);
+    scene.add(key, rim);
+    active.q5AccentLights = [key, rim];
+  } else if (preset === 'bronze') {
+    const key = tagLayer(new THREE.DirectionalLight(0xffe6cc, 2.9));
+    key.position.set(1.3, 2.1, 3.6);
+    const fill = tagLayer(new THREE.DirectionalLight(0xc49a6c, 1.5));
+    fill.position.set(-1.6, 0.9, 2.4);
+    scene.add(key, fill);
+    active.q5AccentLights = [key, fill];
+  } else if (preset === 'matte' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black') {
+    if (q5Feeling === 'impatience' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black') {
+      const amb = tagLayer(new THREE.AmbientLight(0xb8bab6, 0.12));
+      const key = tagLayer(new THREE.DirectionalLight(0xc8cac6, 2.35));
+      key.position.set(1.1, 2.5, 3.4);
+      const rim = tagLayer(new THREE.DirectionalLight(0x909498, 0.22));
+      rim.position.set(-2.2, 0.5, 2.0);
+      scene.add(amb, key, rim);
+      active.q5AccentLights = [amb, key, rim];
+    } else {
+      const amb = tagLayer(new THREE.AmbientLight(0xffffff, 0.42));
+      const soft = tagLayer(new THREE.DirectionalLight(0xf4f4f4, 1.1));
+      soft.position.set(0.6, 1.8, 2.4);
+      scene.add(amb, soft);
+      active.q5AccentLights = [amb, soft];
+    }
+  } else if (preset === 'fasthdr_brushed_metal') {
+    const key = tagLayer(new THREE.DirectionalLight(0xffffff, 2.4));
+    key.position.set(1.3, 2.0, 3.5);
+    const fill = tagLayer(new THREE.DirectionalLight(0xc8c8c8, 1.2));
+    fill.position.set(-1.5, 0.8, 2.2);
+    scene.add(key, fill);
+    active.q5AccentLights = [key, fill];
+  } else if (preset === 'fasthdr_glossy_polymer') {
+    const key = tagLayer(new THREE.DirectionalLight(0xffffff, 2.8));
+    key.position.set(1.2, 2.4, 3.6);
+    const rim = tagLayer(new THREE.DirectionalLight(0xe8ffe0, 1.4));
+    rim.position.set(-1.8, 1.0, 2.8);
+    scene.add(key, rim);
+    active.q5AccentLights = [key, rim];
+  }
+}
 
 function buildDragonGlassPresetMaterial(envMap, attenuationColor) {
   const map = envMap ?? active?.envMap ?? null;
@@ -667,19 +856,59 @@ function buildDragonGlassPresetMaterial(envMap, attenuationColor) {
   });
 }
 
-function buildChromeMetalPresetMaterial(envMap, color = 0xffffff) {
-  const map = envMap ?? getStudioEnvMap(active?.renderer);
+function buildChromeMetalPresetMaterial(envMap, color = CHROME_METAL_PRESET.color) {
+  const map = envMap ?? active?.envMap ?? null;
   return new THREE.MeshPhysicalMaterial({
     ...CHROME_METAL_PRESET,
     color,
+    metalness: 1.0,
+    roughness: 0.0,
+    transmission: 0,
+    transparent: false,
+    depthWrite: true,
     envMap: map,
+    envMapIntensity: CHROME_METAL_PRESET.envMapIntensity,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.0,
+    side: THREE.DoubleSide,
   });
 }
 
-function buildMattePolymerPresetMaterial(color = 0xffffff) {
+function buildMattePolymerPresetMaterial(
+  envMap,
+  color = MATTE_POLYMER_PRESET.color,
+  roughness,
+  envMapIntensity
+) {
+  const map = envMap ?? active?.envMap ?? null;
   return new THREE.MeshPhysicalMaterial({
     ...MATTE_POLYMER_PRESET,
     color,
+    roughness: roughness ?? MATTE_POLYMER_PRESET.roughness,
+    transmission: 0,
+    transparent: false,
+    depthWrite: true,
+    envMap: map,
+    envMapIntensity: envMapIntensity ?? MATTE_POLYMER_PRESET.envMapIntensity,
+    side: THREE.DoubleSide,
+  });
+}
+
+function buildBronzeMetalPresetMaterial(envMap, color = BRONZE_METAL_PRESET.color, roughness) {
+  const map = envMap ?? active?.envMap ?? null;
+  return new THREE.MeshPhysicalMaterial({
+    ...BRONZE_METAL_PRESET,
+    color,
+    metalness: 1.0,
+    roughness: roughness ?? BRONZE_METAL_PRESET.roughness,
+    transmission: 0,
+    transparent: false,
+    depthWrite: true,
+    envMap: map,
+    envMapIntensity: BRONZE_METAL_PRESET.envMapIntensity,
+    clearcoat: BRONZE_METAL_PRESET.clearcoat,
+    clearcoatRoughness: BRONZE_METAL_PRESET.clearcoatRoughness,
+    side: THREE.DoubleSide,
   });
 }
 
@@ -695,16 +924,40 @@ function buildDragonDispersionGlassMaterial(envMap) {
   });
 }
 
-/** Q1 ceramic material from Question 5 feeling — presets only, geometry unchanged. */
-function buildCeramicQ1MaterialFromQ5(q5Feeling, roomEnvMap, studioEnvMap) {
-  const spec = Q5_CERAMIC_MATERIAL[q5Feeling] ?? Q5_CERAMIC_MATERIAL.hope;
+/** Q1 ceramic + slab frame material from Question 5 — shared RoomEnvironment PMREM for all presets. */
+function buildCeramicQ1MaterialFromQ5(q5Feeling, envMap) {
+  const spec = q5CeramicPresetSpec(q5Feeling);
+  const map = envMap ?? active?.envMap ?? null;
+  let mat;
   if (spec.preset === 'chrome') {
-    return buildChromeMetalPresetMaterial(studioEnvMap, spec.color ?? 0xffffff);
+    mat = buildChromeMetalPresetMaterial(map, spec.color ?? CHROME_METAL_PRESET.color);
+  } else if (spec.preset === 'fasthdr_matte_white') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_MATTE_WHITE);
+  } else if (spec.preset === 'fasthdr_matte_black') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_MATTE_BLACK);
+  } else if (spec.preset === 'fasthdr_chrome') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_CHROME);
+  } else if (spec.preset === 'fasthdr_black_chrome') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_BLACK_CHROME);
+  } else if (spec.preset === 'fasthdr_brushed_metal') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_BRUSHED_METAL);
+  } else if (spec.preset === 'fasthdr_glossy_polymer') {
+    mat = buildFastHdrStandardMaterial(map, FASTHDR_GLOSSY_POLYMER);
+  } else if (spec.preset === 'bronze') {
+    mat = buildBronzeMetalPresetMaterial(map, spec.color ?? BRONZE_METAL_PRESET.color, spec.roughness);
+  } else if (spec.preset === 'matte') {
+    mat = buildMattePolymerPresetMaterial(
+      map,
+      spec.color ?? MATTE_POLYMER_PRESET.color,
+      spec.roughness,
+      spec.envMapIntensity
+    );
+  } else {
+    mat = buildDragonGlassPresetMaterial(map, spec.attenuationColor);
   }
-  if (spec.preset === 'matte') {
-    return buildMattePolymerPresetMaterial(spec.color ?? 0xffffff);
-  }
-  return buildDragonGlassPresetMaterial(roomEnvMap, spec.attenuationColor);
+  mat.userData.q5Preset = spec.preset;
+  mat.userData.q5Feeling = q5Feeling;
+  return mat;
 }
 
 /**
@@ -723,6 +976,16 @@ function buildCeramicMaterial(_hexColor, _style3, _ageNum, _l3Spike, envMap = nu
   return buildDragonDispersionGlassMaterial(envMap);
 }
 
+/** Q6 stone spikiness is vector geometry — full rebuild required (no live material swap). */
+export function updateStoneRoughnessFromQ6() {
+  return false;
+}
+
+/** @deprecated — stone uses perturbPolylinesForStoneShape */
+function perturbPolylinesForUpperLayers(polylines, style2, style3) {
+  return perturbPolylinesForStoneShape(polylines, style2, style3);
+}
+
 /**
  * Swap Q1 ceramic + slab frame material when Question 5 changes (no geometry rebuild).
  * @returns {boolean} true when live scene was updated and re-rendered
@@ -736,14 +999,12 @@ export function updateCeramicQ5Material(q5Feeling) {
   if (!meshes.length) return false;
 
   if (active.ceramicQ1Material) active.ceramicQ1Material.dispose();
-  const newMat = buildCeramicQ1MaterialFromQ5(
-    q5Feeling,
-    active.envMap,
-    sharedStudioEnvMap ?? getStudioEnvMap(active.renderer)
-  );
+  const newMat = buildCeramicQ1MaterialFromQ5(q5Feeling, active.envMap);
   for (const mesh of meshes) mesh.material = newMat;
   active.ceramicQ1Material = newMat;
   active.ceramicQ5Feeling = q5Feeling;
+  tuneStoneSceneDark(active.renderer, active.scene);
+  addQ5CeramicAccentLights(active.scene, q5Feeling);
   active.renderer.render(active.scene, active.camera);
   return true;
 }
@@ -765,11 +1026,119 @@ function clampWarmStoneColor(c) {
   c.b = Math.max(c.b, STONE_MIN_COLOR.b);
 }
 
-const STONE_PROC_GEN = 60;
+const STONE_PROC_GEN = 88;
+const BASALT_TEX_GEN = 6;
 
-let stoneProcTextures = null;
-let stoneProcGen = 0;
-let stoneProcWarm = false;
+/** Sage micro-roughness layered on basalt (concrete_actions feel). */
+const BASALT_SAGE_OVERLAY = {
+  heightFilm: 0.016,
+  heightSand: 0.013,
+  heightCombined: 0.009,
+  heightDrift: 0.007,
+  heightBlob: 0.005,
+  heightMineral: 0.004,
+  roughMicro: 5.5,
+  bumpScale: 0.58,
+};
+
+function basaltSageHeightOverlay(sage) {
+  return (
+    sage.film * BASALT_SAGE_OVERLAY.heightFilm +
+    sage.sand * BASALT_SAGE_OVERLAY.heightSand +
+    sage.combined * BASALT_SAGE_OVERLAY.heightCombined +
+    sage.drift * BASALT_SAGE_OVERLAY.heightDrift +
+    sage.blob * BASALT_SAGE_OVERLAY.heightBlob +
+    sage.mineral * BASALT_SAGE_OVERLAY.heightMineral +
+    Math.max(0, -sage.pits) * 0.003
+  );
+}
+const TERRACOTTA_TEX_GEN = 2;
+
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / Math.max(edge1 - edge0, 1e-6)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Worley F1 — distance to nearest cell feature (small = pore center). */
+function stoneWorleyF1(u, v, cellScale) {
+  return stoneVoronoiF2F1(u, v, cellScale).f1;
+}
+
+let slabStoneGeomCache = { key: '', geom: null };
+const SLAB_STONE_CACHE_UID = '__slabStoneCached';
+
+function markSlabStoneGeometryCached(geom) {
+  if (geom) geom.userData[SLAB_STONE_CACHE_UID] = true;
+}
+
+function isSlabStoneGeometryCached(geom) {
+  return !!geom?.userData?.[SLAB_STONE_CACHE_UID];
+}
+
+/** Text + relief opts only — grid is deterministic from the same questionnaire. */
+function hashSlabStoneInputs(opts, segmentCount = 0, questionnaire = null) {
+  let hash = 2166136261;
+  const textSig = [
+    questionnaire?.requesterName ?? '',
+    questionnaire?.timingReason ?? '',
+    questionnaire?.wishText ?? '',
+    questionnaire?.q4Belief ?? '',
+    questionnaire?.q7Change ?? '',
+    questionnaire?.q7Letters?.join('') ?? '',
+    questionnaire?.fringeLetters?.join('') ?? '',
+    questionnaire?.stoneShapeParams ? JSON.stringify(questionnaire.stoneShapeParams) : '',
+    questionnaire?.stoneEngravingPattern ? JSON.stringify(questionnaire.stoneEngravingPattern) : '',
+    questionnaire?.metalEmbossPattern ? JSON.stringify(questionnaire.metalEmbossPattern) : '',
+    questionnaire?.metalPlateParams ? JSON.stringify(questionnaire.metalPlateParams) : '',
+    Math.round((resolveStoneRoughness(null, questionnaire) || 0) * 100),
+    questionnaire?.occupationKey ?? '',
+    questionnaire?.q4Belief === 'signs'
+      ? 'soft-stoneware-signs-sediment-v1-darker'
+      : questionnaire?.q4Belief === 'gut'
+        ? 'seafoam-jade-gut-v4-q3metal'
+        : questionnaire?.q4Belief === 'support'
+          ? 'basalt-pbr-v6'
+          : questionnaire?.q4Belief === 'doubt'
+            ? 'handmade-terracotta-micro-v2'
+            : 'sage-inlay-v2-q3metal',
+  ].join('|');
+  for (let i = 0; i < textSig.length; i++) hash = Math.imul(hash ^ textSig.charCodeAt(i), 16777619);
+  const sig = [
+    segmentCount,
+    opts?.basePlateHeight ?? 0,
+    opts?.letterGapRelief ? 1 : 0,
+    opts?.engraveOverlays?.length ?? 0,
+    opts?.engraveSegments?.length ?? 0,
+    opts?.embossOverlays?.length ?? 0,
+    opts?.pierceHoleMask ? 1 : 0,
+    opts?.metalHaloWrap ? 1 : 0,
+    opts?.metalPlateCradle ? 1 : 0,
+  ].join('|');
+  for (let i = 0; i < sig.length; i++) hash = Math.imul(hash ^ sig.charCodeAt(i), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
+function takeCachedSlabStoneGeometry(key) {
+  if (slabStoneGeomCache.key === key && slabStoneGeomCache.geom) {
+    return slabStoneGeomCache.geom;
+  }
+  return null;
+}
+
+function storeCachedSlabStoneGeometry(key, geom) {
+  if (slabStoneGeomCache.geom && slabStoneGeomCache.key !== key) {
+    slabStoneGeomCache.geom.dispose();
+  }
+  markSlabStoneGeometryCached(geom);
+  slabStoneGeomCache.key = key;
+  slabStoneGeomCache.geom = geom;
+}
+
+function clearSlabStoneGeomCache() {
+  if (slabStoneGeomCache.geom) slabStoneGeomCache.geom.dispose();
+  slabStoneGeomCache = { key: '', geom: null };
+}
+let stoneProcCache = { key: '', textures: null };
 let stoneNoisePerm = null;
 
 function stoneHash(x, y) {
@@ -969,6 +1338,31 @@ function sampleSandPits(u, v) {
   return (p1 + p2 * 0.45 + p3 * 0.2) / 1.65 - 0.5;
 }
 
+/** Voronoi F2−F1 — mud-crack / cell boundaries for sedimentary stoneware. */
+function stoneVoronoiF2F1(u, v, cellScale = 12) {
+  const ix = Math.floor(u * cellScale);
+  const iy = Math.floor(v * cellScale);
+  let f1 = Infinity;
+  let f2 = Infinity;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cx = ix + dx;
+      const cy = iy + dy;
+      const seed = stoneHash(cx * 127.1 + cy * 311.7, cx * 269.5 + cy * 183.3);
+      const jx = cx + stoneHash(seed, cx) * 0.88 + 0.06;
+      const jy = cy + stoneHash(seed + 1.7, cy) * 0.88 + 0.06;
+      const du = u * cellScale - jx;
+      const dv = v * cellScale - jy;
+      const d = Math.hypot(du, dv);
+      if (d < f1) {
+        f2 = f1;
+        f1 = d;
+      } else if (d < f2) f2 = d;
+    }
+  }
+  return { f1, f2, gap: f2 - f1, edge: 1 - Math.min(1, f1 * 2.2) };
+}
+
 /** רעש אורגני + גרגר חולי מיקרו */
 function sampleOrganicStoneNoise(u, v) {
   const x = u * 6.71 + 0.317;
@@ -993,6 +1387,1056 @@ function sampleOrganicStoneNoise(u, v) {
     Math.max(0, -pits) * 0.05;
 
   return { combined, film, sand, drift, blob, pits, height };
+}
+
+function samplePowderGrain(u, v) {
+  const px = u * 940 + v * 520;
+  const py = v * 940 - u * 440;
+  const g1 = stoneHash(px, py);
+  const g2 = stoneHash(px * 1.85 + 29, py * 1.85 + 43);
+  const g3 = stoneHash(px * 3.7 + 71, py * 3.7 + 89);
+  return (g1 + g2 * 0.52 + g3 * 0.22) / 1.74 - 0.5;
+}
+
+/** Basalt — vesicles, columnar cooling cracks, dense grain, broken micro-bumps. */
+function sampleBasaltNoise(u, v) {
+  const grain = stoneFbm2(u * 32.0 + 4.6, v * 30.0 + 3.9, 3);
+  const micro = stoneFbm2(u * 58.0 + 13.2, v * 54.0 + 11.7, 2);
+  const mineral = stoneFbm2(u * 2.8 + 6.8, v * 2.5 + 5.4, 3);
+
+  const vesCell = stoneVoronoiF2F1(u * 19.4 + 0.31, v * 18.2 + 0.27, 24);
+  const vesicles = vesCell.gap < 0.044 ? Math.pow((0.044 - vesCell.gap) / 0.044, 0.74) : 0;
+  const vesicleRim = vesCell.edge * 0.38;
+
+  const flow = stoneFbm2(u * 0.42 + 1.8, v * 0.38 + 1.4, 2) * Math.PI * 0.5;
+  const su = u * Math.cos(flow) - v * Math.sin(flow);
+  const colCell = stoneVoronoiF2F1(su * 5.2 + 0.9, v * 2.4 + 0.6, 7);
+  const coolingCrack = colCell.gap < 0.052 ? Math.pow((0.052 - colCell.gap) / 0.052, 1.02) : 0;
+
+  const bumpRand = stoneHash(Math.floor(u * 48 + 7.3), Math.floor(v * 48 + 11.1));
+  const bumps = bumpRand > 0.982 ? (bumpRand - 0.982) * 42 : 0;
+
+  const spot = stoneFbm2(u * 1.8 + 9.4, v * 1.6 + 8.1, 2);
+
+  let height = 0.5;
+  height -= vesicles * 0.044 - vesicleRim * 0.009;
+  height -= coolingCrack * 0.058;
+  height += bumps * 0.017;
+  height += grain * 0.0045 + micro * 0.0022;
+  height -= mineral * 0.0012;
+
+  return { vesicles, vesicleRim, coolingCrack, grain, micro, mineral, bumps, spot, height };
+}
+
+function paintBasaltTexels(s, edgeWear = 0) {
+  const base = 18;
+  const greySpot = s.spot * 5.5 + s.mineral * 4.2 + s.grain * 2.8 + (s.sageGrain ?? 0) * 2.4;
+  const pitDark = s.vesicles * 24 + s.coolingCrack * 19 + s.micro * 2;
+  const bumpLift = s.bumps * 6 + s.vesicleRim * 3.5;
+  const wornLift = edgeWear * 4;
+  const r = Math.round(Math.max(6, Math.min(44, base + greySpot - pitDark + bumpLift * 0.82 + wornLift)));
+  const g = Math.round(Math.max(6, Math.min(44, base + greySpot * 0.98 - pitDark * 0.97 + bumpLift * 0.78 + wornLift * 0.96)));
+  const b = Math.round(Math.max(6, Math.min(42, base + greySpot * 0.94 - pitDark * 0.93 + bumpLift * 0.74 + wornLift * 0.92)));
+  const roughVar =
+    s.vesicles * 10 +
+    s.coolingCrack * 8 +
+    s.micro * 4 +
+    s.grain * 3 +
+    (s.sageSand ?? 0) * 3.2 +
+    (s.sageRough ?? 0) * BASALT_SAGE_OVERLAY.roughMicro;
+  return {
+    r,
+    g,
+    b,
+    heightV: 0,
+    roughV: Math.round(Math.max(208, Math.min(228, 217 + roughVar - edgeWear * 3))),
+    normalStrength: 13.6,
+  };
+}
+
+/** Handmade terracotta — dense micro-pores, clay grain, no rock features. */
+function sampleHandmadeTerracottaNoise(u, v) {
+  const p18 = stoneWorleyF1(u * 18.2 + 0.21, v * 17.6 + 0.17, 30);
+  const p24 = stoneWorleyF1(u * 24.8 + 3.4, v * 23.5 + 2.9, 34);
+  const p32 = stoneWorleyF1(u * 31.6 + 7.1, v * 30.2 + 6.4, 38);
+  const microPores =
+    (1 - smoothstep(0, 0.11, p18)) * 0.52 +
+    (1 - smoothstep(0, 0.095, p24)) * 0.38 +
+    (1 - smoothstep(0, 0.085, p32)) * 0.28;
+
+  const clayGrain = stoneFbm2(u * 8.6 + 4.4, v * 8.1 + 3.8, 2) * 0.5 + 0.5;
+  const clayNoise = stoneFbm2(u * 19.4 + 10.2, v * 18.1 + 9.4, 2) * 0.5 + 0.5;
+  const powderGrain = samplePowderGrain(u, v) * 0.5 + 0.5;
+
+  const fireSpeck = stoneHash(u * 760 + 14.2, v * 710 + 11.8);
+  const firingImperfection = fireSpeck > 0.965 ? (fireSpeck - 0.965) * 22 : 0;
+
+  const height =
+    0.5 -
+    microPores * 0.011 +
+    clayGrain * 0.0012 +
+    clayNoise * 0.0009 +
+    powderGrain * 0.0007 -
+    firingImperfection * 0.0014;
+
+  return { microPores, clayGrain, clayNoise, powderGrain, firingImperfection, height };
+}
+
+function paintHandmadeTerracottaTexels(s, edgeWear = 0) {
+  const clayR = 198;
+  const clayG = 93;
+  const clayB = 58;
+  const burntR = 212;
+  const burntG = 118;
+  const burntB = 68;
+  const dustyR = 220;
+  const dustyG = 168;
+  const dustyB = 138;
+
+  const burntMix = s.clayGrain * 0.35 + s.clayNoise * 0.25;
+  let r = clayR * (1 - burntMix) + burntR * burntMix;
+  let g = clayG * (1 - burntMix) + burntG * burntMix;
+  let b = clayB * (1 - burntMix) + burntB * burntMix;
+
+  const poreDark = s.microPores * 14 + s.firingImperfection * 8;
+  const grainLift = s.powderGrain * 5 + s.clayNoise * 3;
+  const dustVeil = s.clayGrain * 0.22;
+  const edgeChalk = edgeWear * 6;
+
+  r = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        r * (1 - dustVeil) +
+          dustyR * dustVeil * 0.12 -
+          poreDark * 0.55 +
+          grainLift * 0.28 +
+          edgeChalk * 0.18
+      )
+    )
+  );
+  g = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        g * (1 - dustVeil) +
+          dustyG * dustVeil * 0.1 -
+          poreDark * 0.5 +
+          grainLift * 0.24 +
+          edgeChalk * 0.15
+      )
+    )
+  );
+  b = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        b * (1 - dustVeil) +
+          dustyB * dustVeil * 0.08 -
+          poreDark * 0.42 +
+          grainLift * 0.18 +
+          edgeChalk * 0.12
+      )
+    )
+  );
+
+  const roughBase = 191;
+  const roughVar = s.microPores * 6 + s.powderGrain * 4 + edgeWear * 3;
+  return {
+    r,
+    g,
+    b,
+    roughV: Math.round(Math.max(178, Math.min(212, roughBase + roughVar))),
+    normalStrength: 7.6,
+  };
+}
+
+/** Volcanic stone — fine burnished basalt porosity and mineral grain. */
+function sampleVolcanicStoneNoise(u, v) {
+  const fine = samplePowderGrain(u, v);
+  const mineral = stoneFbm2(u * 13.8 + 19.4, v * 12.6 + 17.1, 2);
+  const pore = stoneFbm2(u * 26.2 + 34.8, v * 24.1 + 31.5, 3);
+  const burnish = stoneFbm2(u * 3.1 + 8.2, v * 2.7 + 10.4, 2);
+  const combined = fine * 0.26 + mineral * 0.34 + pore * 0.22 + burnish * 0.18;
+  const height =
+    0.5 + fine * 0.026 + Math.max(0, -pore) * 0.015 + mineral * 0.009 + burnish * 0.006;
+  return { combined, fine, mineral, pore, burnish, height };
+}
+
+/** Dry chalky pigmented clay — powder, weathering, no gloss. */
+function sampleDryTerracottaNoise(u, v) {
+  const powder = samplePowderGrain(u, v);
+  const chalk = stoneFbm2(u * 28.4 + 9.1, v * 25.8 + 11.6, 2);
+  const pigment = stoneFbm2(u * 4.8 + 18.2, v * 4.2 + 14.9, 3);
+  const pore = stoneFbm2(u * 22.6 + 31.4, v * 20.8 + 27.2, 3);
+  const weather = stoneFbm2(u * 1.2 + 7.4, v * 1.05 + 9.8, 2);
+  const combined = powder * 0.3 + chalk * 0.22 + pigment * 0.24 + pore * 0.14 + weather * 0.1;
+  const height =
+    0.5 + powder * 0.032 + Math.max(0, -pore) * 0.02 + chalk * 0.014 + pigment * 0.01;
+  return { combined, powder, chalk, pigment, pore, weather, height };
+}
+
+/** Aged fired terracotta — large localized wear patches, no uniform micro grain. */
+function sampleAgedFiredTerracottaNoise(u, v) {
+  const region = stoneFbm2(u * 0.82 + 2.3, v * 0.76 + 1.7, 3);
+  const regionNorm = region * 0.5 + 0.5;
+  const erosionMask = regionNorm > 0.4 ? Math.pow((regionNorm - 0.4) / 0.6, 0.72) : 0;
+
+  const erosionField = stoneFbm2(u * 1.35 + 8.1, v * 1.18 + 6.4, 2);
+  const wornRecess =
+    erosionMask * Math.pow(Math.max(0, 0.58 - erosionField * 0.5 - 0.22), 1.15) * 0.9;
+
+  const flowAngle = stoneFbm2(u * 0.2 + 14.2, v * 0.18 + 11.8, 2) * Math.PI;
+  const su = u * Math.cos(flowAngle) - v * Math.sin(flowAngle);
+  const streakField = stoneFbm2(su * 2.6 + 5.1, v * 1.45 + 3.2, 2);
+  const compressMask = erosionMask * (regionNorm > 0.32 ? 1 : 0);
+  const compression = compressMask * Math.pow(Math.max(0, streakField * 0.5 + 0.5), 2.1) * 0.52;
+  const compressedGroove =
+    compressMask * Math.pow(Math.max(0, 0.5 - streakField * 0.5), 2.4) * 0.38;
+
+  const crackV = stoneVoronoiF2F1(u * 1.75 + 3.4, v * 1.55 + 2.9, 4);
+  const crackSeed = stoneHash(Math.floor(u * 4.2), Math.floor(v * 4.2));
+  const crack =
+    crackSeed > 0.74 && crackV.gap < 0.085
+      ? Math.pow((0.085 - crackV.gap) / 0.085, 1.05) * erosionMask * 0.95
+      : 0;
+
+  const chipZone = stoneVoronoiF2F1(u * 2.1 + 21, v * 1.9 + 18, 5);
+  const chipped =
+    chipZone.f1 < 0.13 && stoneHash(chipZone.f2 * 97, chipZone.f1 * 83) > 0.84
+      ? Math.pow((0.13 - chipZone.f1) / 0.13, 0.88) * 0.68
+      : 0;
+
+  const mineralBlob = stoneFbm2(u * 0.46 + 16.4, v * 0.42 + 13.8, 3);
+  const mineralDeposit = mineralBlob > 0.36 ? Math.pow((mineralBlob - 0.36) / 0.64, 0.62) : 0;
+
+  const fireIdx = Math.floor(u * 5.5) + Math.floor(v * 5.5) * 17;
+  const fireHash = stoneHash(fireIdx * 0.41, fireIdx * 0.29);
+  const fireCell = stoneVoronoiF2F1(u * 2.9 + 7.2, v * 2.6 + 5.6, 5);
+  const fireBlemish =
+    fireHash > 0.8 && fireCell.gap > 0.22 ? (fireHash - 0.8) * 3.1 * (1 - crack * 0.45) : 0;
+
+  const combined =
+    wornRecess * 0.34 +
+    crack * 0.22 +
+    chipped * 0.16 +
+    compression * 0.12 +
+    mineralDeposit * 0.1 +
+    fireBlemish * 0.06;
+  const height =
+    0.5 -
+    wornRecess * 0.026 -
+    crack * 0.03 -
+    chipped * 0.024 -
+    compressedGroove * 0.011 +
+    compression * 0.007 -
+    fireBlemish * 0.008 +
+    mineralDeposit * 0.003;
+
+  return {
+    wornRecess,
+    compression,
+    compressedGroove,
+    crack,
+    chipped,
+    mineralDeposit,
+    fireBlemish,
+    erosionMask,
+    regionNorm,
+    combined,
+    height,
+  };
+}
+
+function paintAgedFiredTerracottaTexels(s, edgeWear) {
+  const burntR = 198;
+  const burntG = 104;
+  const burntB = 70;
+  const dustyR = 210;
+  const dustyG = 126;
+  const dustyB = 86;
+  const mineralR = 230;
+  const mineralG = 202;
+  const mineralB = 172;
+
+  const dustyMix = s.regionNorm * 0.28 + s.wornRecess * 0.42;
+  const mineralMix = s.mineralDeposit;
+  const bodyR = burntR * (1 - dustyMix) + dustyR * dustyMix;
+  const bodyG = burntG * (1 - dustyMix) + dustyG * dustyMix;
+  const bodyB = burntB * (1 - dustyMix) + dustyB * dustyMix;
+
+  let r = bodyR * (1 - mineralMix * 0.82) + mineralR * mineralMix * 0.82;
+  let g = bodyG * (1 - mineralMix * 0.82) + mineralG * mineralMix * 0.82;
+  let b = bodyB * (1 - mineralMix * 0.82) + mineralB * mineralMix * 0.82;
+
+  const featureShadow =
+    s.wornRecess * 16 + s.crack * 20 + s.chipped * 14 + s.compressedGroove * 9 + s.fireBlemish * 7;
+  const chalkLift = edgeWear * 22 + mineralMix * 9 + s.fireBlemish * 5;
+  const erosionFade = s.wornRecess * 11;
+
+  r = Math.round(
+    Math.max(0, Math.min(255, r + chalkLift * 0.4 - featureShadow * 0.5 + erosionFade * 0.12))
+  );
+  g = Math.round(
+    Math.max(0, Math.min(255, g + chalkLift * 0.34 - featureShadow * 0.44 + erosionFade * 0.1))
+  );
+  b = Math.round(
+    Math.max(0, Math.min(255, b + chalkLift * 0.24 - featureShadow * 0.38 + erosionFade * 0.07))
+  );
+
+  const bumpDev =
+    -(s.wornRecess + s.crack + s.chipped + s.compressedGroove) * 24 + s.compression * 8;
+  const roughBase = 232 + edgeWear * 4 + mineralMix * 3 - s.compression * 2;
+
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(Math.max(118, Math.min(138, 128 + bumpDev))),
+    roughV: Math.round(Math.max(224, Math.min(245, roughBase))),
+    normalStrength: 3.2,
+  };
+}
+
+/** Domain warp — flowing organic coordinates for marble / jade structure. */
+function stoneDomainWarp(u, v, seed = 0) {
+  const sx = u * 2.05 + seed * 1.31;
+  const sy = v * 1.88 + seed * 1.97;
+  const qx = stoneFbm2(sx, sy, 3);
+  const qy = stoneFbm2(sx + 4.17, sy + 2.63, 3);
+  const wx = u + qx * 0.38;
+  const wy = v + qy * 0.38;
+  const qx2 = stoneFbm2(wx * 1.55 + 1.08, wy * 1.42 + 0.74, 2);
+  const qy2 = stoneFbm2(wx * 1.55 + 3.21, wy * 1.42 + 5.06, 2);
+  return { x: wx + qx2 * 0.2, y: wy + qy2 * 0.2 };
+}
+
+/**
+ * Soft weathered stoneware — cloudy mottling, dusty patches, sparse fine speckle.
+ * No marble veins or glossy clearcoat look.
+ */
+function sampleSoftStonewareNoise(u, v, seed = 19.4) {
+  const cu = u * 1.22 + v * 0.41 + seed * 0.11;
+  const cv = v * 1.18 - u * 0.33 + seed * 0.19;
+  const cloud = stoneFbm2(cu * 0.72 + 3.1, cv * 0.68 + 2.4, 4);
+  const cloud2 = stoneFbm2(cu * 0.38 + 8.2, cv * 0.34 + 6.7, 3);
+  const mottle = stoneFbm2(cu * 1.05 + cloud * 0.18, cv * 0.98 + cloud2 * 0.14, 3);
+  const dust = stoneFbm2(cu * 0.52 + 14.1, cv * 0.48 + 11.3, 2);
+  const olive = stoneFbm2(cu * 0.62 + 5.4, cv * 0.58 + 4.1, 2);
+  const warm = stoneFbm2(cu * 0.88 + 12.3, cv * 0.82 + 9.7, 2);
+  const cool = stoneFbm2(cu * 0.74 + 16.8, cv * 0.7 + 13.2, 2);
+  const slate = stoneFbm2(cu * 0.55 + 18.2, cv * 0.51 + 15.4, 3);
+  const blueGrey = stoneFbm2(cu * 0.68 + 21.5, cv * 0.64 + 19.8, 2);
+  const ash = stoneFbm2(cu * 0.92 + 24.7, cv * 0.86 + 22.1, 2);
+  const speckPx = u * 680 + v * 390 + seed * 17;
+  const speckPy = v * 680 - u * 360 + seed * 23;
+  const speck = stoneHash(speckPx, speckPy);
+  const fineSpeck = speck > 0.8 ? (speck - 0.8) * 4.2 : 0;
+  const combined = cloud * 0.3 + cloud2 * 0.26 + mottle * 0.18 + dust * 0.1 + olive * 0.06 + slate * 0.1;
+  const height = 0.5 + cloud * 0.007 + mottle * 0.005 + fineSpeck * 0.003;
+  return { cloud, cloud2, mottle, dust, olive, warm, cool, slate, blueGrey, ash, fineSpeck, combined, height };
+}
+
+function sampleSoftStonewareSignsNoise(u, v) {
+  const dip = stoneFbm2(u * 0.42 + 2.1, v * 0.38 + 1.4, 2) * 0.18;
+  const layerU = u + dip;
+  const bandFreq = 18.5 + stoneFbm2(u * 1.8, v * 1.6, 2) * 4;
+  const phase = (layerU * bandFreq + v * 2.3) * Math.PI * 2;
+  const band = Math.pow(Math.abs(Math.sin(phase)), 0.55);
+  const layerVar = stoneFbm2(u * 2.4 + 8.2, v * 2.1 + 6.8, 3);
+  const silt = stoneFbm2(u * 9.2 + 14.1, v * 8.4 + 11.3, 2);
+  const mudCrack = stoneVoronoiF2F1(u * 2.8, v * 2.6, 9);
+  const crackLine = mudCrack.gap < 0.07 ? (0.07 - mudCrack.gap) * 8 : 0;
+  const combined = band * 0.38 + layerVar * 0.32 + silt * 0.18 - crackLine * 0.22;
+  const height = 0.5 + band * 0.012 + layerVar * 0.009 - crackLine * 0.018 + silt * 0.006;
+  return { band, layerVar, silt, crackLine, dip, combined, height };
+}
+
+function sampleArchaeologicalTileDoubtNoise(u, v) {
+  const body = stoneFbm2(u * 1.35 + 4.2, v * 1.22 + 3.6, 4);
+  const ochre = stoneFbm2(u * 2.2 + 12.4, v * 2.0 + 10.1, 3);
+  const redClay = stoneFbm2(u * 1.8 + 22.1, v * 1.6 + 19.3, 3);
+  const sandOchre = stoneFbm2(u * 2.4 + 31.2, v * 2.1 + 28.4, 3);
+  const mineralZone = stoneFbm2(u * 0.72 + 8.4, v * 0.68 + 6.7, 2);
+  const coarsePore = stoneFbm2(u * 5.8 + 36, v * 5.2 + 33, 3);
+  const pitCluster = stoneFbm2(u * 3.4 + 19.4, v * 3.1 + 17.2, 2);
+  const weather = stoneFbm2(u * 0.55 + 6.2, v * 0.5 + 5.4, 2);
+  const cellPx = Math.floor(u * 38) + Math.floor(v * 34) * 97;
+  const cellPy = Math.floor(v * 38) - Math.floor(u * 34);
+  const cell = stoneHash(cellPx * 0.31 + 17, cellPy * 0.27 + 23);
+  const cellLocal = stoneHash(
+    u * 38 - Math.floor(u * 38) + 0.11,
+    v * 34 - Math.floor(v * 34) + 0.09
+  );
+  const crater =
+    cell > 0.76 && cellLocal < 0.38
+      ? Math.pow((cell - 0.76) * 4.2, 0.62) * (0.45 + cellLocal * 0.9)
+      : 0;
+  const speckPx = u * 280 + v * 160 + 67.3;
+  const speckPy = v * 280 - u * 150 + 61.8;
+  const speck = stoneHash(speckPx, speckPy);
+  const darkPit = speck > 0.82 && speck < 0.94 ? Math.pow((speck - 0.82) * 5.5, 0.75) : 0;
+  const lightDust = speck > 0.52 && speck < 0.68 ? Math.pow((0.68 - speck) * 4.8, 0.9) : 0;
+  const irregularPit =
+    pitCluster < -0.28
+      ? Math.pow((-pitCluster - 0.28) * 1.8, 0.85)
+      : Math.max(0, -coarsePore) * 0.72 + crater * 1.1;
+  const combined =
+    body * 0.28 +
+    ochre * 0.18 +
+    mineralZone * 0.2 +
+    redClay * 0.14 +
+    sandOchre * 0.14 +
+    weather * 0.06;
+  const height =
+    0.5 +
+    body * 0.014 +
+    Math.max(0, -coarsePore) * 0.055 +
+    irregularPit * 0.068 +
+    crater * 0.052 +
+    darkPit * 0.042 -
+    lightDust * 0.022 -
+    Math.max(0, weather) * 0.008;
+  return {
+    body,
+    ochre,
+    redClay,
+    sandOchre,
+    sandBeige: sandOchre,
+    mineralZone,
+    mineralPatch: mineralZone,
+    coarsePore,
+    pitCluster,
+    grit: 0,
+    sand: 0,
+    darkPit,
+    lightDust,
+    irregularPit,
+    crater,
+    weather,
+    combined,
+    height,
+  };
+}
+
+function paintArchaeologicalTileDoubtTexels(s, edgeWear) {
+  const baseR = 184;
+  const baseG = 146;
+  const baseB = 106;
+  const peak = Math.min(1, Math.pow(edgeWear, 0.78) * 1.65);
+  const recess = Math.min(
+    1,
+    Math.pow(1 - edgeWear, 0.72) * 1.35 + Math.max(0, -s.combined) * 0.78
+  );
+  const recessMix = Math.min(
+    1,
+    recess * 0.95 + s.irregularPit * 0.72 + s.darkPit * 0.55 + (s.crater ?? 0) * 0.48
+  );
+  const dustMix = Math.min(
+    1,
+    peak * 0.95 + s.lightDust * 0.78 + Math.max(0, s.sandOchre ?? s.sandBeige) * 0.28
+  );
+  const zone = s.mineralZone ?? s.mineralPatch;
+  const redOrangeMix = Math.min(
+    1,
+    Math.max(0, s.redClay) * 0.85 * (0.35 + Math.max(0, zone) * 0.65)
+  );
+  const sandOchreMix = Math.min(
+    1,
+    Math.max(0, s.sandOchre ?? s.sandBeige) * 0.82 * (0.4 + Math.max(0, -zone) * 0.6)
+  );
+  const clayBody = s.body * 14 + s.ochre * 11;
+  const poreShadow =
+    Math.max(0, -s.coarsePore) * 22 + s.irregularPit * 20 + (s.crater ?? 0) * 18;
+  let r = baseR + clayBody * 0.28 + sandOchreMix * 22 + redOrangeMix * 28 - poreShadow * 0.48;
+  let g = baseG + clayBody * 0.32 + sandOchreMix * 20 + redOrangeMix * 8 - poreShadow * 0.54;
+  let b = baseB + clayBody * 0.22 + sandOchreMix * 8 + redOrangeMix * -2 - poreShadow * 0.58;
+  r = r * (1 - recessMix * 0.78) + 122 * recessMix * 0.78;
+  g = g * (1 - recessMix * 0.78) + 62 * recessMix * 0.78;
+  b = b * (1 - recessMix * 0.78) + 34 * recessMix * 0.78;
+  r = r * (1 - dustMix * 0.48) + 232 * dustMix * 0.48;
+  g = g * (1 - dustMix * 0.48) + 216 * dustMix * 0.48;
+  b = b * (1 - dustMix * 0.48) + 168 * dustMix * 0.48;
+  r = r * (1 - redOrangeMix * 0.42) + 196 * redOrangeMix * 0.42;
+  g = g * (1 - redOrangeMix * 0.42) + 120 * redOrangeMix * 0.42;
+  b = b * (1 - redOrangeMix * 0.42) + 58 * redOrangeMix * 0.42;
+  r = r * (1 - sandOchreMix * 0.36) + 212 * sandOchreMix * 0.36;
+  g = g * (1 - sandOchreMix * 0.36) + 188 * sandOchreMix * 0.36;
+  b = b * (1 - sandOchreMix * 0.36) + 120 * sandOchreMix * 0.36;
+  r = Math.round(Math.max(0, Math.min(255, r)));
+  g = Math.round(Math.max(0, Math.min(255, g)));
+  b = Math.round(Math.max(0, Math.min(255, b)));
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(
+      Math.max(
+        0,
+        Math.min(
+          255,
+          (0.34 +
+            s.body * 0.018 +
+            s.irregularPit * 0.062 +
+            (s.crater ?? 0) * 0.055 +
+            s.darkPit * 0.04 -
+            s.lightDust * 0.02) *
+            255
+        )
+      )
+    ),
+    roughV: 255,
+    normalStrength: 12.5,
+  };
+}
+
+function sampleSeafoamJadeGutNoise(u, v) {
+  const w = stoneDomainWarp(u * 1.28 + 0.18, v * 1.22 + 0.12, 31.7);
+  const cloud = stoneFbm2(w.x * 0.88 + 2.4, w.y * 0.8 + 1.9, 4);
+  const cloud2 = stoneFbm2(w.x * 0.46 + 6.8, w.y * 0.42 + 5.4, 3);
+  const matrix = stoneFbm2(w.x * 1.08 + cloud * 0.22, w.y * 0.98 + cloud2 * 0.16, 3);
+  const mint = stoneFbm2(w.x * 0.64 + 9.4, w.y * 0.6 + 7.8, 2);
+  const teal = stoneFbm2(w.x * 0.74 + 13.6, w.y * 0.68 + 11.8, 2);
+  const charcoal = stoneFbm2(w.x * 0.4 + 17.4, w.y * 0.36 + 15.1, 2);
+  const speckPx = u * 820 + v * 470 + 31.7;
+  const speckPy = v * 820 - u * 430 + 27.1;
+  const speck = stoneHash(speckPx, speckPy);
+  const darkSpeck = speck > 0.83 && speck < 0.93 ? (speck - 0.83) * 7.5 : 0;
+  const lightSpeck = speck > 0.72 && speck < 0.81 ? (0.81 - speck) * 5.5 : 0;
+  const combined = cloud * 0.28 + cloud2 * 0.24 + matrix * 0.22 + mint * 0.12 + teal * 0.14;
+  const height = 0.5 + cloud * 0.008 + matrix * 0.006 + darkSpeck * 0.004 + lightSpeck * 0.003;
+  return {
+    cloud,
+    cloud2,
+    matrix,
+    mint,
+    teal,
+    charcoal,
+    darkSpeck,
+    lightSpeck,
+    combined,
+    height,
+  };
+}
+
+function paintSeafoamJadeGutTexels(s, edgeWear) {
+  const baseR = 108;
+  const baseG = 158;
+  const baseB = 142;
+  const peak = Math.min(1, edgeWear * 1.12);
+  const recess = Math.min(1, (1 - edgeWear) * 0.85 + Math.max(0, -s.combined) * 0.35);
+  const cloudLift = s.cloud * 16 + s.cloud2 * 12;
+  const mintLift = Math.max(0, s.mint) * 18 + s.lightSpeck * 11;
+  const matrixDark = Math.max(0, -s.matrix) * 16 + s.darkSpeck * 13 + Math.max(0, -s.charcoal) * 9;
+  const forestPatch = Math.max(0, s.matrix) * 12;
+  const tealVar = s.teal * 11;
+  const shadowVar = Math.max(0, -s.combined) * 12;
+  const peakLift = peak * 20;
+  const recessSink = recess * 14;
+  const r = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        baseR +
+          cloudLift * 0.44 +
+          mintLift * 0.38 +
+          peakLift * 0.42 -
+          recessSink * 0.38 -
+          matrixDark * 0.52 +
+          forestPatch * 0.16 +
+          tealVar * 0.1 -
+          shadowVar * 0.26
+      )
+    )
+  );
+  const g = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        baseG +
+          cloudLift * 0.52 +
+          mintLift * 0.68 +
+          peakLift * 0.55 -
+          recessSink * 0.32 -
+          matrixDark * 0.38 +
+          forestPatch * 0.5 +
+          tealVar * 0.24 -
+          shadowVar * 0.2
+      )
+    )
+  );
+  const b = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        baseB +
+          cloudLift * 0.5 +
+          mintLift * 0.44 +
+          peakLift * 0.48 -
+          recessSink * 0.28 -
+          matrixDark * 0.34 +
+          forestPatch * 0.38 +
+          tealVar * 0.4 -
+          shadowVar * 0.18
+      )
+    )
+  );
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(
+      Math.max(0, Math.min(255, (0.47 + s.darkSpeck * 0.012 + s.lightSpeck * 0.008 + s.matrix * 0.005) * 255))
+    ),
+    roughV: Math.round(Math.max(168, Math.min(228, 192 + s.cloud * 4 + s.darkSpeck * 3 - peak * 28 + recess * 6))),
+    normalStrength: 4.2,
+  };
+}
+
+/**
+ * Warm moonstone jade — milky waxy interior, soft mineral depth (#B6AFA5).
+ * Carved jadeite translucency feel without green tint.
+ */
+function sampleWarmMoonstoneJadeNoise(u, v) {
+  const w = stoneDomainWarp(u * 1.18 + 0.14, v * 1.14 + 0.11, 44.2);
+  const cloud = stoneFbm2(w.x * 0.92 + 2.6, w.y * 0.84 + 2.1, 4);
+  const cloud2 = stoneFbm2(w.x * 0.48 + 7.2, w.y * 0.44 + 5.8, 3);
+  const milky = stoneFbm2(w.x * 0.72 + cloud * 0.24, w.y * 0.68 + cloud2 * 0.18, 3);
+  const waxy = stoneFbm2(w.x * 1.12 + 11.4, w.y * 1.02 + 9.6, 2);
+  const depth = stoneFbm2(w.x * 0.58 + 15.8, w.y * 0.52 + 13.2, 2);
+  const speckPx = u * 760 + v * 440 + 44.2;
+  const speckPy = v * 760 - u * 400 + 38.6;
+  const speck = stoneHash(speckPx, speckPy);
+  const lightSpeck = speck > 0.76 && speck < 0.86 ? (0.86 - speck) * 5 : 0;
+  const combined = cloud * 0.32 + cloud2 * 0.28 + milky * 0.24 + waxy * 0.16;
+  const height = 0.5 + cloud * 0.007 + milky * 0.005 + lightSpeck * 0.003;
+  return { cloud, cloud2, milky, waxy, depth, lightSpeck, combined, height };
+}
+
+function paintWarmMoonstoneJadeTexels(s, edgeWear) {
+  const baseR = 182;
+  const baseG = 175;
+  const baseB = 165;
+  const peak = Math.min(1, edgeWear * 1.05);
+  const recess = Math.min(1, (1 - edgeWear) * 0.82 + Math.max(0, -s.combined) * 0.28);
+  const interiorGlow = Math.max(0, s.milky) * 14 + s.cloud * 10 + s.cloud2 * 8 + s.lightSpeck * 9;
+  const waxyVar = s.waxy * 7;
+  const depthSink = Math.max(0, -s.depth) * 10 + recess * 12;
+  const r = Math.round(
+    Math.max(
+      0,
+      Math.min(255, baseR + interiorGlow * 0.38 + waxyVar * 0.32 + peak * 10 - depthSink * 0.42)
+    )
+  );
+  const g = Math.round(
+    Math.max(
+      0,
+      Math.min(255, baseG + interiorGlow * 0.36 + waxyVar * 0.3 + peak * 9 - depthSink * 0.38)
+    )
+  );
+  const b = Math.round(
+    Math.max(
+      0,
+      Math.min(255, baseB + interiorGlow * 0.34 + waxyVar * 0.28 + peak * 8 - depthSink * 0.35)
+    )
+  );
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(Math.max(0, Math.min(255, (0.49 + s.lightSpeck * 0.01 + s.milky * 0.006) * 255))),
+    roughV: Math.round(Math.max(178, Math.min(228, 198 + s.cloud * 3 - peak * 22 + recess * 5))),
+    normalStrength: 3.8,
+  };
+}
+
+/** Signs / sedimentary stoneware — darker base than default cloud mottle. */
+function paintSoftStonewareSignsTexels(s, edgeWear) {
+  const baseR = 30;
+  const baseG = 38;
+  const baseB = 34;
+  const bandLift = s.band * 18 + s.layerVar * 12;
+  const siltVar = s.silt * 9;
+  const crackShadow = s.crackLine * 22;
+  const r = Math.round(
+    Math.max(0, Math.min(255, baseR + bandLift * 0.38 + siltVar * 0.24 - crackShadow * 0.42 + edgeWear * 3))
+  );
+  const g = Math.round(
+    Math.max(0, Math.min(255, baseG + bandLift * 0.44 + siltVar * 0.28 - crackShadow * 0.44 + edgeWear * 3))
+  );
+  const b = Math.round(
+    Math.max(0, Math.min(255, baseB + bandLift * 0.36 + siltVar * 0.22 - crackShadow * 0.4 + edgeWear * 2.5))
+  );
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(Math.max(0, Math.min(255, (0.48 + s.crackLine * 0.018 + s.band * 0.01) * 255))),
+    roughV: Math.round(Math.max(198, Math.min(248, 214 + s.band * 5 + s.crackLine * 4 - edgeWear * 14))),
+    normalStrength: 4.0,
+  };
+}
+
+const SOFT_STONEWARE_PAINT = {
+  soft_stoneware_signs: {
+    base: [38, 48, 42],
+    cloudLift: 18,
+    mottleVar: 11,
+    dustLift: 13,
+    speckLift: 6,
+    shadowMul: 12,
+    oliveLift: 9,
+    warmLift: 7,
+    coolLift: 8,
+    slateLift: 10,
+    blueGreyLift: 12,
+    ashLift: 11,
+    dustRgb: [0.5, 0.48, 0.44],
+    shadowRgb: [0.34, 0.3, 0.26],
+    oliveRgb: [0.22, 0.52, 0.28],
+    warmRgb: [0.44, 0.36, 0.22],
+    coolRgb: [0.16, 0.3, 0.38],
+    slateRgb: [0.14, 0.22, 0.28],
+    blueGreyRgb: [0.12, 0.28, 0.42],
+    ashRgb: [0.46, 0.48, 0.5],
+  },
+};
+
+function paintSoftStonewareTexels(profile, s, edgeWear) {
+  const cloudVar = s.cloud * profile.cloudLift + s.cloud2 * profile.cloudLift * 0.68;
+  const mottleVar = s.mottle * profile.mottleVar;
+  const dustVar = Math.max(0, s.dust) * profile.dustLift;
+  const speckVar = s.fineSpeck * profile.speckLift;
+  const shadowVar = Math.max(0, -s.combined) * profile.shadowMul;
+  const oliveVar = Math.max(0, s.olive) * profile.oliveLift;
+  const warmVar = Math.max(0, s.warm) * profile.warmLift;
+  const coolVar = Math.max(0, -s.cool) * profile.coolLift;
+  const slateVar = Math.max(0, s.slate) * profile.slateLift + Math.max(0, -s.slate) * profile.slateLift * 0.55;
+  const blueGreyVar = Math.max(0, s.blueGrey) * profile.blueGreyLift;
+  const ashVar = Math.max(0, s.ash) * profile.ashLift;
+  const r = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[0] +
+          cloudVar * profile.dustRgb[0] +
+          mottleVar * 0.38 +
+          oliveVar * profile.oliveRgb[0] +
+          warmVar * profile.warmRgb[0] +
+          slateVar * profile.slateRgb[0] +
+          blueGreyVar * profile.blueGreyRgb[0] +
+          ashVar * profile.ashRgb[0] -
+          coolVar * profile.coolRgb[0] -
+          shadowVar * profile.shadowRgb[0] +
+          dustVar * profile.dustRgb[0] +
+          speckVar +
+          edgeWear * 4
+      )
+    )
+  );
+  const g = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[1] +
+          cloudVar * profile.dustRgb[1] +
+          mottleVar * 0.44 +
+          oliveVar * profile.oliveRgb[1] +
+          warmVar * profile.warmRgb[1] +
+          slateVar * profile.slateRgb[1] +
+          blueGreyVar * profile.blueGreyRgb[1] +
+          ashVar * profile.ashRgb[1] -
+          coolVar * profile.coolRgb[1] -
+          shadowVar * profile.shadowRgb[1] +
+          dustVar * profile.dustRgb[1] +
+          speckVar * 0.96 +
+          edgeWear * 4
+      )
+    )
+  );
+  const b = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[2] +
+          cloudVar * profile.dustRgb[2] +
+          mottleVar * 0.36 +
+          oliveVar * profile.oliveRgb[2] +
+          warmVar * profile.warmRgb[2] +
+          slateVar * profile.slateRgb[2] +
+          blueGreyVar * profile.blueGreyRgb[2] +
+          ashVar * profile.ashRgb[2] -
+          coolVar * profile.coolRgb[2] -
+          shadowVar * profile.shadowRgb[2] +
+          dustVar * profile.dustRgb[2] +
+          speckVar * 0.88 +
+          edgeWear * 3.5
+      )
+    )
+  );
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(Math.max(0, Math.min(255, (0.48 + s.fineSpeck * 0.012 + s.mottle * 0.008) * 255))),
+    roughV: Math.round(Math.max(198, Math.min(248, 218 + s.cloud * 5 + s.fineSpeck * 2 - edgeWear * 14))),
+    normalStrength: 4.0,
+  };
+}
+
+/**
+ * Shared polished marble field — large cloudy structure, soft veins, sparse inclusions.
+ * seed offsets pattern per stone variant.
+ */
+function samplePolishedMarbleNoise(u, v, seed = 12.8) {
+  const cu = u * 1.412 + v * 0.318 + seed * 0.17;
+  const cv = v * 1.286 - u * 0.241 + seed * 0.23;
+  const w = stoneDomainWarp(cu, cv, seed);
+  const cloud = stoneFbm2(w.x * 0.82 + 2.31, w.y * 0.74 + 1.87, 4);
+  const cloud2 = stoneFbm2(w.x * 0.44 + 7.14, w.y * 0.38 + 4.62, 3);
+  const marbleField = stoneFbm2(w.x * 1.55 + cloud * 0.28, w.y * 1.42 + cloud2 * 0.24, 4);
+  const veinPhase = w.x * 1.35 + marbleField * 0.72 + cloud * 0.32 + cloud2 * 0.14;
+  const veinWave = Math.sin(veinPhase * Math.PI * 1.85);
+  const softVein = Math.pow(Math.abs(veinWave), 0.92) * (veinWave >= 0 ? 0.55 : -0.42);
+  const inclusionField = stoneFbm2(w.x * 0.36 + 11.24, w.y * 0.32 + 8.73, 3);
+  const inclusion = inclusionField < -0.32 ? (-0.32 - inclusionField) * 1.65 : 0;
+  const translucent = Math.max(0, cloud * 0.48 + cloud2 * 0.34 + Math.max(0, marbleField) * 0.16);
+  const marbling = cloud * 0.42 + cloud2 * 0.34 + softVein * 0.12 + marbleField * 0.12;
+  const height = 0.5 + cloud * 0.009 + Math.abs(softVein) * 0.005 + inclusion * 0.004;
+  return { cloud, cloud2, marbleField, softVein, inclusion, translucent, marbling, height };
+}
+
+function samplePolishedJadeMarbleNoise(u, v) {
+  return samplePolishedMarbleNoise(u, v, 12.8);
+}
+
+function samplePolishedSlateMarbleNoise(u, v) {
+  return samplePolishedMarbleNoise(u, v, 27.3);
+}
+
+function samplePolishedWarmMarbleDoubtNoise(u, v) {
+  const s = samplePolishedMarbleNoise(u, v, 58.4);
+  const w2 = stoneDomainWarp(u * 0.94 + 3.1, v * 0.88 + 2.4, 58.4);
+  const veinField = stoneFbm2(w2.x * 2.05 + 4.2, w2.y * 1.88 + 3.6, 3);
+  const flowPhase = w2.x * 1.08 + w2.y * 0.92 + veinField * 0.52 + s.marbleField * 0.38;
+  const flowVein = Math.sin(flowPhase * Math.PI * 2.35);
+  const organicVein = Math.pow(Math.abs(flowVein), 0.82) * (flowVein >= 0 ? 0.78 : -0.62);
+  const warmDrift = stoneFbm2(w2.x * 0.62 + 9.8, w2.y * 0.58 + 8.1, 2);
+  return {
+    ...s,
+    softVein: s.softVein * 0.48 + organicVein * 0.52,
+    marbling: s.marbling * 0.62 + organicVein * 0.22 + veinField * 0.1 + warmDrift * 0.06,
+    translucent: s.translucent + Math.max(0, warmDrift) * 0.08,
+    height: s.height + Math.abs(organicVein) * 0.0045,
+  };
+}
+
+const MARBLE_PAINT_PROFILES = {
+  polished_warm_marble_doubt: {
+    base: [182, 175, 165],
+    milkyScale: 12,
+    veinLight: 7,
+    veinShadow: 8,
+    inclMul: 12,
+    marbleMul: 6,
+    edgeWear: 5,
+    milky: [0.84, 0.82, 0.78],
+    shadow: [0.4, 0.38, 0.34],
+    incl: [0.36, 0.34, 0.32],
+  },
+  polished_jade_marble: {
+    base: [68, 118, 96],
+    milkyScale: 8,
+    veinLight: 4,
+    veinShadow: 5,
+    inclMul: 20,
+    marbleMul: 4,
+    edgeWear: 3,
+    milky: [0.48, 0.54, 0.5],
+    shadow: [0.28, 0.26, 0.24],
+    incl: [0.72, 0.58, 0.48],
+  },
+  polished_slate_marble: {
+    base: [43, 56, 59],
+    milkyScale: 10,
+    veinLight: 5,
+    veinShadow: 4,
+    inclMul: 18,
+    marbleMul: 5,
+    edgeWear: 2,
+    milky: [0.4, 0.46, 0.5],
+    shadow: [0.26, 0.28, 0.3],
+    incl: [0.62, 0.68, 0.72],
+  },
+};
+
+function paintPolishedMarbleTexels(profile, s, edgeWear) {
+  const milkyLift = s.translucent * profile.milkyScale + Math.max(0, s.softVein) * profile.veinLight;
+  const veinShadow = Math.max(0, -s.softVein) * profile.veinShadow;
+  const inclDark = s.inclusion * profile.inclMul;
+  const marbleDepth = s.marbling * profile.marbleMul;
+  const r = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[0] +
+          milkyLift * profile.milky[0] -
+          veinShadow * profile.shadow[0] -
+          inclDark * profile.incl[0] +
+          marbleDepth * profile.milky[0] * 0.35 +
+          edgeWear * profile.edgeWear
+      )
+    )
+  );
+  const g = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[1] +
+          milkyLift * profile.milky[1] -
+          veinShadow * profile.shadow[1] -
+          inclDark * profile.incl[1] +
+          marbleDepth * profile.milky[1] * 0.4 +
+          edgeWear * profile.edgeWear
+      )
+    )
+  );
+  const b = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        255,
+        profile.base[2] +
+          milkyLift * profile.milky[2] -
+          veinShadow * profile.shadow[2] -
+          inclDark * profile.incl[2] +
+          marbleDepth * profile.milky[2] * 0.38 +
+          edgeWear * profile.edgeWear * 0.9
+      )
+    )
+  );
+  return {
+    r,
+    g,
+    b,
+    bumpV: Math.round(
+      Math.max(0, Math.min(255, (0.495 + Math.abs(s.softVein) * 0.008 + s.inclusion * 0.005) * 255))
+    ),
+    roughV: Math.round(Math.max(18, Math.min(38, 21 + s.inclusion * 10 + s.cloud * 2 - edgeWear * 3))),
+    normalStrength: 3.6,
+  };
+}
+
+function stoneProcSampler(variantKey) {
+  switch (variantKey) {
+    case 'volcanic':
+      return sampleVolcanicStoneNoise;
+    case 'basalt':
+      return sampleBasaltNoise;
+    case 'dry_terracotta':
+      return sampleDryTerracottaNoise;
+    case 'aged_fired_terracotta':
+      return sampleAgedFiredTerracottaNoise;
+    case 'soft_stoneware_signs':
+      return sampleSoftStonewareSignsNoise;
+    case 'archaeological_tile_doubt':
+      return sampleArchaeologicalTileDoubtNoise;
+    case 'polished_warm_marble_doubt':
+      return samplePolishedWarmMarbleDoubtNoise;
+    case 'seafoam_jade_gut':
+      return sampleSeafoamJadeGutNoise;
+    case 'soft_stoneware_gut':
+      return sampleSeafoamJadeGutNoise;
+    case 'warm_moonstone_jade':
+      return sampleWarmMoonstoneJadeNoise;
+    case 'polished_jade_marble':
+      return samplePolishedJadeMarbleNoise;
+    case 'polished_slate_marble':
+      return samplePolishedSlateMarbleNoise;
+    default:
+      return sampleOrganicStoneNoise;
+  }
+}
+
+function paintStoneProcTexels(variantKey, s, edgeWear) {
+  if (variantKey === 'basalt') {
+    return paintBasaltTexels(s);
+  }
+  if (variantKey === 'volcanic') {
+    const baseR = 35;
+    const baseG = 37;
+    const baseB = 37;
+    const mineralVar = s.mineral * 5.5 + s.burnish * 3.2;
+    const poreSink = Math.max(0, -s.pore) * 3.8;
+    const wornHighlight = edgeWear * 13 + Math.max(0, s.burnish) * 4;
+    return {
+      r: Math.round(Math.max(0, Math.min(255, baseR + mineralVar + wornHighlight - poreSink + s.fine * 2))),
+      g: Math.round(
+        Math.max(0, Math.min(255, baseG + mineralVar * 0.98 + wornHighlight * 0.97 - poreSink * 0.96 + s.fine * 1.9))
+      ),
+      b: Math.round(
+        Math.max(0, Math.min(255, baseB + mineralVar * 0.96 + wornHighlight * 0.95 - poreSink * 0.94 + s.fine * 1.8))
+      ),
+      bumpV: Math.round(Math.max(0, Math.min(255, (0.48 + s.fine * 0.04 + Math.max(0, -s.pore) * 0.035) * 255))),
+      roughV: Math.round(Math.max(215, Math.min(248, 224 + s.fine * 6 + s.mineral * 5 - edgeWear * 8))),
+      normalStrength: 6.2,
+    };
+  }
+  if (variantKey === 'dry_terracotta') {
+    const baseR = 212;
+    const baseG = 111;
+    const baseB = 66;
+    const chalkLift = s.chalk * 5 + s.powder * 4;
+    const weatherFade = Math.max(0, -s.weather) * 9;
+    const patina = Math.max(0, s.pigment - 0.1) * 7;
+    const dustEdge = edgeWear * 16;
+    return {
+      r: Math.round(Math.max(0, Math.min(255, baseR + chalkLift + patina + dustEdge - weatherFade))),
+      g: Math.round(Math.max(0, Math.min(255, baseG + chalkLift * 0.58 + patina * 0.5 + dustEdge * 0.7 - weatherFade * 0.55))),
+      b: Math.round(Math.max(0, Math.min(255, baseB + chalkLift * 0.38 + patina * 0.35 + dustEdge * 0.45 - weatherFade * 0.45))),
+      bumpV: Math.round(Math.max(0, Math.min(255, (0.44 + s.powder * 0.05 + Math.max(0, -s.pore) * 0.045) * 255))),
+      roughV: Math.round(Math.max(252, Math.min(255, 253 + s.powder * 1.2))),
+      normalStrength: 5.8,
+    };
+  }
+  if (variantKey === 'aged_fired_terracotta') {
+    return paintAgedFiredTerracottaTexels(s, edgeWear);
+  }
+  if (variantKey === 'warm_moonstone_jade') {
+    return paintWarmMoonstoneJadeTexels(s, edgeWear);
+  }
+  if (variantKey === 'archaeological_tile_doubt') {
+    return paintArchaeologicalTileDoubtTexels(s, edgeWear);
+  }
+  if (variantKey === 'seafoam_jade_gut' || variantKey === 'soft_stoneware_gut') {
+    return paintSeafoamJadeGutTexels(s, edgeWear);
+  }
+  if (variantKey === 'soft_stoneware_signs') {
+    return paintSoftStonewareSignsTexels(s, edgeWear);
+  }
+  if (variantKey === 'polished_jade_marble' || variantKey === 'polished_slate_marble' || variantKey === 'polished_warm_marble_doubt') {
+    return paintPolishedMarbleTexels(MARBLE_PAINT_PROFILES[variantKey], s, edgeWear);
+  }
+  const mott = 8.0;
+  return {
+    r: Math.round(Math.max(0, Math.min(255, 180 + s.combined * mott + s.drift * 3 + s.blob * 2))),
+    g: Math.round(Math.max(0, Math.min(255, 176 + s.combined * mott + s.drift * 3.2 + s.blob * 2.2))),
+    b: Math.round(Math.max(0, Math.min(255, 172 + s.combined * mott + s.drift * 2.8 + s.blob * 1.8))),
+    bumpV: Math.round(Math.max(0, Math.min(255, (0.34 + s.height * 0.58) * 255))),
+    roughV: Math.round(Math.max(210, Math.min(255, 232 + s.sand * 8 + s.combined * 12))),
+    normalStrength: 11.5,
+  };
 }
 
 function sampleHeightAt(heights, size, x, y) {
@@ -1026,11 +2470,11 @@ function buildNormalMapFromHeights(heights, size, strength = 18) {
   return normalImg;
 }
 
-function buildProceduralStoneTextures(warm = false) {
-  if (stoneProcTextures && stoneProcGen === STONE_PROC_GEN && stoneProcWarm === warm) return stoneProcTextures;
-  stoneProcGen = STONE_PROC_GEN;
-  stoneProcWarm = warm;
-  stoneProcTextures = null;
+function buildProceduralStoneTextures(variant = 'sage') {
+  const variantKey = stoneProceduralVariant(normalizePremiumMaterialId(variant === true || variant === false ? 'sage' : variant));
+  const cacheKey = `${STONE_PROC_GEN}:${variantKey}`;
+  if (stoneProcCache.key === cacheKey && stoneProcCache.textures) return stoneProcCache.textures;
+
   initStoneNoisePerm();
   const size = 512;
   const colorCanvas = document.createElement('canvas');
@@ -1047,60 +2491,80 @@ function buildProceduralStoneTextures(warm = false) {
   const bumpImg = bumpCtx.createImageData(size, size);
   const roughImg = roughCtx.createImageData(size, size);
   const heights = new Float32Array(size * size);
+  const sample = stoneProcSampler(variantKey);
+  let normalStrength = 11.5;
 
-  const baseR = warm ? 172 : 180;
-  const baseG = warm ? 170 : 176;
-  const baseB = warm ? 166 : 172;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      heights[y * size + x] = sample(u, v).height;
+    }
+  }
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
       const u = x / size;
       const v = y / size;
-      const s = sampleOrganicStoneNoise(u, v);
-      heights[y * size + x] = s.height;
-
-      const mott = warm ? 7.5 : 8.0;
-      const r = Math.round(
-        Math.max(0, Math.min(255, baseR + s.combined * mott + s.drift * 3 + s.blob * 2))
-      );
-      const g = Math.round(
-        Math.max(0, Math.min(255, baseG + s.combined * mott + s.drift * 3.2 + s.blob * 2.2))
-      );
-      const b = Math.round(
-        Math.max(0, Math.min(255, baseB + s.combined * mott + s.drift * 2.8 + s.blob * 1.8))
-      );
-      const bumpV = Math.round(
-        Math.max(0, Math.min(255, (0.34 + s.height * 0.58) * 255))
-      );
-      const roughV = Math.round(
-        Math.max(210, Math.min(255, 232 + s.sand * 8 + s.combined * 12))
-      );
-
-      colorImg.data[i] = r;
-      colorImg.data[i + 1] = g;
-      colorImg.data[i + 2] = b;
+      const s = sample(u, v);
+      const idx = y * size + x;
+      const hC = heights[idx];
+      const hL = x > 0 ? heights[idx - 1] : hC;
+      const hU = y > 0 ? heights[idx - size] : hC;
+      const grad = Math.hypot(hC - hL, hC - hU);
+      const edgeWear =
+        variantKey === 'volcanic' ||
+        variantKey === 'basalt' ||
+        variantKey === 'dry_terracotta' ||
+        variantKey === 'aged_fired_terracotta' ||
+        variantKey === 'soft_stoneware_signs' ||
+        variantKey === 'archaeological_tile_doubt' ||
+        variantKey === 'seafoam_jade_gut' ||
+        variantKey === 'soft_stoneware_gut' ||
+        variantKey === 'warm_moonstone_jade' ||
+        variantKey === 'polished_jade_marble' ||
+        variantKey === 'polished_slate_marble' ||
+        variantKey === 'polished_warm_marble_doubt'
+          ? Math.min(
+              1,
+              grad *
+                (variantKey === 'archaeological_tile_doubt'
+                  ? 5.6
+                  : variantKey.startsWith('soft_stoneware') ||
+                      variantKey.startsWith('seafoam_') ||
+                      variantKey.startsWith('archaeological_') ||
+                      variantKey.startsWith('warm_moonstone')
+                    ? 2.6
+                    : variantKey.startsWith('polished_')
+                      ? 3.4
+                      : 5.2)
+            )
+          : 0;
+      const painted = paintStoneProcTexels(variantKey, s, edgeWear);
+      normalStrength = painted.normalStrength;
+      colorImg.data[i] = painted.r;
+      colorImg.data[i + 1] = painted.g;
+      colorImg.data[i + 2] = painted.b;
       colorImg.data[i + 3] = 255;
-      bumpImg.data[i] = bumpImg.data[i + 1] = bumpImg.data[i + 2] = bumpV;
+      bumpImg.data[i] = bumpImg.data[i + 1] = bumpImg.data[i + 2] = painted.bumpV;
       bumpImg.data[i + 3] = 255;
-      roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = roughV;
+      roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = painted.roughV;
       roughImg.data[i + 3] = 255;
     }
   }
+
   colorCtx.putImageData(colorImg, 0, 0);
   bumpCtx.putImageData(bumpImg, 0, 0);
   roughCtx.putImageData(roughImg, 0, 0);
   normalCtx.putImageData(
-    new ImageData(buildNormalMapFromHeights(heights, size, warm ? 10.5 : 11.5), size, size),
+    new ImageData(buildNormalMapFromHeights(heights, size, normalStrength), size, size),
     0,
     0
   );
 
-  const texRepeat = warm ? 1.0 : 1.0;
-
   const map = new THREE.CanvasTexture(colorCanvas);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(texRepeat, texRepeat);
   map.colorSpace = THREE.SRGBColorSpace;
   map.generateMipmaps = false;
   map.minFilter = THREE.LinearFilter;
@@ -1108,7 +2572,6 @@ function buildProceduralStoneTextures(warm = false) {
 
   const bumpMap = new THREE.CanvasTexture(bumpCanvas);
   bumpMap.wrapS = bumpMap.wrapT = THREE.RepeatWrapping;
-  bumpMap.repeat.set(texRepeat, texRepeat);
   bumpMap.colorSpace = THREE.NoColorSpace;
   bumpMap.generateMipmaps = false;
   bumpMap.minFilter = THREE.LinearFilter;
@@ -1116,7 +2579,6 @@ function buildProceduralStoneTextures(warm = false) {
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
   normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-  normalMap.repeat.set(texRepeat, texRepeat);
   normalMap.colorSpace = THREE.NoColorSpace;
   normalMap.generateMipmaps = false;
   normalMap.minFilter = THREE.LinearFilter;
@@ -1124,44 +2586,356 @@ function buildProceduralStoneTextures(warm = false) {
 
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
   roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
-  roughnessMap.repeat.set(texRepeat, texRepeat);
   roughnessMap.colorSpace = THREE.NoColorSpace;
   roughnessMap.generateMipmaps = false;
   roughnessMap.minFilter = THREE.LinearFilter;
   roughnessMap.magFilter = THREE.LinearFilter;
 
-  stoneProcTextures = { map, bumpMap, normalMap, roughnessMap };
-  return stoneProcTextures;
+  const textures = { map, bumpMap, normalMap, roughnessMap };
+  stoneProcCache = { key: cacheKey, textures };
+  return textures;
 }
 
-function buildStoneMaterial(style2 = null) {
-  const proc = buildProceduralStoneTextures(false);
-  const rough = style2 ? occupationRoughness(style2) : 0.55;
-  const bumpScale = 0.98 + rough * 0.24;
-  const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0xb5b1a9),
-    map: proc.map,
-    bumpMap: proc.bumpMap,
-    bumpScale,
-    normalMap: proc.normalMap,
-    normalScale: new THREE.Vector2(0.64, 0.64),
-    roughnessMap: proc.roughnessMap,
-    roughness: 0.96,
-    metalness: 0,
+/** Q4 → stone material preset. Sage/doubt default; signs/gut/support → specialty stones. */
+const Q4_STONE_PRESET = {
+  concrete_actions: 'sage',
+  signs: 'stoneware',
+  gut: 'deep_stoneware',
+  support: 'moonstone',
+  doubt: 'archaeological_doubt',
+};
+
+function q4StonePreset(q4Belief) {
+  return Q4_STONE_PRESET[q4Belief] ?? 'sage';
+}
+
+function makeStoneCanvasTexture(canvas, srgb = false) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
+let basaltTexCache = { key: '', textures: null };
+
+/** Dedicated PBR maps for basalt — albedo / normal / roughness / height (displacement). */
+function buildBasaltStoneTextures() {
+  const cacheKey = String(BASALT_TEX_GEN);
+  if (basaltTexCache.key === cacheKey && basaltTexCache.textures) return basaltTexCache.textures;
+
+  initStoneNoisePerm();
+  const size = 512;
+  const colorCanvas = document.createElement('canvas');
+  const normalCanvas = document.createElement('canvas');
+  const roughCanvas = document.createElement('canvas');
+  const heightCanvas = document.createElement('canvas');
+  colorCanvas.width = normalCanvas.width = roughCanvas.width = heightCanvas.width = size;
+  colorCanvas.height = normalCanvas.height = roughCanvas.height = heightCanvas.height = size;
+  const colorCtx = colorCanvas.getContext('2d');
+  const normalCtx = normalCanvas.getContext('2d');
+  const roughCtx = roughCanvas.getContext('2d');
+  const heightCtx = heightCanvas.getContext('2d');
+  const colorImg = colorCtx.createImageData(size, size);
+  const roughImg = roughCtx.createImageData(size, size);
+  const heightImg = heightCtx.createImageData(size, size);
+  const heights = new Float32Array(size * size);
+  let normalStrength = 11.2;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      const b = sampleBasaltNoise(u, v);
+      const sage = sampleOrganicStoneNoise(u, v);
+      heights[y * size + x] = b.height + basaltSageHeightOverlay(sage);
+    }
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const u = x / size;
+      const v = y / size;
+      const idx = y * size + x;
+      const b = sampleBasaltNoise(u, v);
+      const sage = sampleOrganicStoneNoise(u, v);
+      const hC = heights[idx];
+      const hL = x > 0 ? heights[idx - 1] : hC;
+      const hU = y > 0 ? heights[idx - size] : hC;
+      const edgeWear = Math.min(1, Math.hypot(hC - hL, hC - hU) * 4.2);
+      const painted = paintBasaltTexels(
+        {
+          ...b,
+          sageGrain: sage.combined * 4.2 + sage.drift * 2.0 + sage.blob * 1.2,
+          sageSand: sage.sand * 3.4 + sage.film * 1.8,
+          sageRough: sage.film * 0.55 + sage.sand * 0.42 + sage.combined * 0.28 + sage.drift * 0.18,
+        },
+        edgeWear
+      );
+      normalStrength = painted.normalStrength;
+      colorImg.data[i] = painted.r;
+      colorImg.data[i + 1] = painted.g;
+      colorImg.data[i + 2] = painted.b;
+      colorImg.data[i + 3] = 255;
+      roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = painted.roughV;
+      roughImg.data[i + 3] = 255;
+      const hPx = Math.round(Math.max(0, Math.min(255, heights[idx] * 255)));
+      heightImg.data[i] = heightImg.data[i + 1] = heightImg.data[i + 2] = hPx;
+      heightImg.data[i + 3] = 255;
+    }
+  }
+
+  colorCtx.putImageData(colorImg, 0, 0);
+  roughCtx.putImageData(roughImg, 0, 0);
+  heightCtx.putImageData(heightImg, 0, 0);
+  normalCtx.putImageData(
+    new ImageData(buildNormalMapFromHeights(heights, size, normalStrength), size, size),
+    0,
+    0
+  );
+
+  const textures = {
+    basaltAlbedo: makeStoneCanvasTexture(colorCanvas, true),
+    basaltNormal: makeStoneCanvasTexture(normalCanvas),
+    basaltRoughness: makeStoneCanvasTexture(roughCanvas),
+    basaltHeight: makeStoneCanvasTexture(heightCanvas),
+  };
+  basaltTexCache = { key: cacheKey, textures };
+  return textures;
+}
+
+function buildBasaltStoneMaterial() {
+  const {
+    basaltAlbedo,
+    basaltNormal,
+    basaltRoughness,
+    basaltHeight,
+  } = buildBasaltStoneTextures();
+  const sageProc = buildProceduralStoneTextures('sage');
+  const spec = getPremiumMaterialSpec(PREMIUM_MATERIAL_IDS.WARM_MOONSTONE);
+
+  const material = new THREE.MeshPhysicalMaterial({
+    map: basaltAlbedo,
+    normalMap: basaltNormal,
+    roughnessMap: basaltRoughness,
+    displacementMap: basaltHeight,
+    displacementScale: spec.displacementScale ?? 0.25,
+    bumpMap: sageProc.bumpMap,
+    bumpScale: spec.bumpScale ?? BASALT_SAGE_OVERLAY.bumpScale,
+    roughness: spec.roughness ?? 0.85,
+    metalness: spec.metalness ?? 0.05,
+    color: new THREE.Color(spec.color ?? 0x1a1a1a),
+    clearcoat: 0.0,
+    normalScale: new THREE.Vector2(spec.normalScale ?? 1.2, spec.normalScale ?? 1.2),
     flatShading: false,
     vertexColors: false,
     side: THREE.FrontSide,
     depthWrite: true,
     envMap: null,
-    envMapIntensity: 0
+    envMapIntensity: 0,
   });
-  return { material, textured: true };
+  return { material, textured: true, preset: PREMIUM_MATERIAL_IDS.WARM_MOONSTONE };
 }
 
-/** Flat slab — same tuned sage maps as sculptural stone. */
-function buildSlabStoneMaterial(stoneTone) {
-  const { material } = buildStoneMaterial(typeof stoneTone === 'object' ? stoneTone : null);
-  return material;
+let terracottaTexCache = { key: '', textures: null };
+
+/** Dedicated PBR maps for handmade terracotta — albedo / normal / roughness / height. */
+function buildTerracottaStoneTextures() {
+  const cacheKey = String(TERRACOTTA_TEX_GEN);
+  if (terracottaTexCache.key === cacheKey && terracottaTexCache.textures) return terracottaTexCache.textures;
+
+  initStoneNoisePerm();
+  const size = 512;
+  const colorCanvas = document.createElement('canvas');
+  const normalCanvas = document.createElement('canvas');
+  const roughCanvas = document.createElement('canvas');
+  const heightCanvas = document.createElement('canvas');
+  colorCanvas.width = normalCanvas.width = roughCanvas.width = heightCanvas.width = size;
+  colorCanvas.height = normalCanvas.height = roughCanvas.height = heightCanvas.height = size;
+  const colorCtx = colorCanvas.getContext('2d');
+  const normalCtx = normalCanvas.getContext('2d');
+  const roughCtx = roughCanvas.getContext('2d');
+  const heightCtx = heightCanvas.getContext('2d');
+  const colorImg = colorCtx.createImageData(size, size);
+  const roughImg = roughCtx.createImageData(size, size);
+  const heightImg = heightCtx.createImageData(size, size);
+  const heights = new Float32Array(size * size);
+  let normalStrength = 5.8;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      heights[y * size + x] = sampleHandmadeTerracottaNoise(u, v).height;
+    }
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const u = x / size;
+      const v = y / size;
+      const idx = y * size + x;
+      const s = sampleHandmadeTerracottaNoise(u, v);
+      const hC = heights[idx];
+      const hL = x > 0 ? heights[idx - 1] : hC;
+      const hU = y > 0 ? heights[idx - size] : hC;
+      const edgeWear = Math.min(1, Math.hypot(hC - hL, hC - hU) * 4.8);
+      const painted = paintHandmadeTerracottaTexels(s, edgeWear);
+      normalStrength = painted.normalStrength;
+      colorImg.data[i] = painted.r;
+      colorImg.data[i + 1] = painted.g;
+      colorImg.data[i + 2] = painted.b;
+      colorImg.data[i + 3] = 255;
+      roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = painted.roughV;
+      roughImg.data[i + 3] = 255;
+      const hPx = Math.round(Math.max(0, Math.min(255, heights[idx] * 255)));
+      heightImg.data[i] = heightImg.data[i + 1] = heightImg.data[i + 2] = hPx;
+      heightImg.data[i + 3] = 255;
+    }
+  }
+
+  colorCtx.putImageData(colorImg, 0, 0);
+  roughCtx.putImageData(roughImg, 0, 0);
+  heightCtx.putImageData(heightImg, 0, 0);
+  normalCtx.putImageData(
+    new ImageData(buildNormalMapFromHeights(heights, size, normalStrength), size, size),
+    0,
+    0
+  );
+
+  const textures = {
+    terracottaAlbedo: makeStoneCanvasTexture(colorCanvas, true),
+    terracottaNormal: makeStoneCanvasTexture(normalCanvas),
+    terracottaRoughness: makeStoneCanvasTexture(roughCanvas),
+    terracottaHeight: makeStoneCanvasTexture(heightCanvas),
+  };
+  terracottaTexCache = { key: cacheKey, textures };
+  return textures;
+}
+
+function buildTerracottaStoneMaterial() {
+  const {
+    terracottaAlbedo,
+    terracottaNormal,
+    terracottaRoughness,
+    terracottaHeight,
+  } = buildTerracottaStoneTextures();
+
+  const material = new THREE.MeshPhysicalMaterial({
+    map: terracottaAlbedo,
+    normalMap: terracottaNormal,
+    roughnessMap: terracottaRoughness,
+    displacementMap: terracottaHeight,
+    displacementScale: 0.05,
+    roughness: 0.75,
+    metalness: 0.0,
+    color: 0xc65d3a,
+    clearcoat: 0.0,
+    normalScale: new THREE.Vector2(0.58, 0.58),
+    flatShading: false,
+    vertexColors: false,
+    side: THREE.FrontSide,
+    depthWrite: true,
+    envMap: null,
+    envMapIntensity: 0,
+  });
+  return { material, textured: true, preset: PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT };
+}
+
+function buildPremiumStoneMaterial(presetId, style2 = null, envMap = null, _stoneRoughness = null) {
+  const key = normalizePremiumMaterialId(presetId);
+  if (key === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE) {
+    return buildBasaltStoneMaterial();
+  }
+  if (key === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT) {
+    return buildTerracottaStoneMaterial();
+  }
+  const spec = getPremiumMaterialSpec(key);
+  const proc = buildProceduralStoneTextures(stoneProceduralVariant(key));
+  const ibl = envMap ?? active?.envMap ?? null;
+  const isSage = key === PREMIUM_MATERIAL_IDS.SAGE_STONE;
+  const bumpScale = spec.bumpScale ?? (isSage ? 0.98 : 0.64);
+  const normalScale = spec.normalScale ?? 0.5;
+  const MaterialClass = isSage ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
+  const material = new MaterialClass({
+    color: new THREE.Color(spec.color),
+    map: proc.map,
+    bumpMap: proc.bumpMap,
+    bumpScale,
+    normalMap: proc.normalMap,
+    normalScale: new THREE.Vector2(normalScale, normalScale),
+    roughnessMap: proc.roughnessMap,
+    roughness: spec.roughness ?? 0.92,
+    metalness: spec.metalness ?? 0,
+    flatShading: false,
+    vertexColors: !isSage,
+    side: THREE.FrontSide,
+    depthWrite: true,
+    envMap: isSage || !(spec.envMapIntensity ?? 0) ? null : ibl,
+    envMapIntensity: isSage || !(spec.envMapIntensity ?? 0) ? 0 : (spec.envMapIntensity ?? 0),
+  });
+  if (!isSage) {
+    material.clearcoat = spec.clearcoat ?? 0;
+    if (spec.clearcoatRoughness != null) material.clearcoatRoughness = spec.clearcoatRoughness;
+    if (spec.transmission != null && spec.transmission > 0) {
+      material.transmission = spec.transmission;
+      material.thickness = spec.thickness ?? 1.5;
+      material.ior = spec.ior ?? 1.54;
+      material.transparent = true;
+      const att = spec.attenuationColor;
+      material.attenuationColor = att
+        ? new THREE.Color(att[0], att[1], att[2])
+        : new THREE.Color(0.71, 0.69, 0.65);
+      material.attenuationDistance = spec.attenuationDistance ?? 1.0;
+    }
+  }
+  return { material, textured: true, preset: key };
+}
+
+function buildSageStoneMaterial(style2 = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.SAGE_STONE, style2);
+}
+
+function buildVolcanicStoneMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.VOLCANIC_STONE, style2, envMap);
+}
+
+function buildDryTerracottaStoneMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.DRY_TERRACOTTA, style2, envMap);
+}
+
+function buildAncientStonewareMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.ANCIENT_STONEWARE, style2, envMap);
+}
+
+function buildDeepStonewareMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.DEEP_STONEWARE, style2, envMap);
+}
+
+function buildPolishedSlateMarbleMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.POLISHED_SLATE_MARBLE, style2, envMap);
+}
+
+function buildPolishedJadeMarbleMaterial(style2 = null, envMap = null) {
+  return buildPremiumStoneMaterial(PREMIUM_MATERIAL_IDS.POLISHED_JADE_MARBLE, style2, envMap);
+}
+
+function buildJadeStoneMaterial(style2 = null, envMap = null) {
+  return buildAncientStonewareMaterial(style2, envMap);
+}
+
+function buildStoneMaterial(style2 = null, q4Belief = 'concrete_actions', envMap = null, questionnaire = null) {
+  const rough = resolveStoneRoughness(style2, questionnaire);
+  return buildPremiumStoneMaterial(q4StonePreset(q4Belief), style2, envMap, rough);
+}
+
+/** Flat slab — Q4-driven stone material. */
+function buildSlabStoneMaterial(q4Belief = 'concrete_actions', style2 = null) {
+  return buildStoneMaterial(style2, q4Belief).material;
 }
 
 /** גוון sage לפי גובה הכיפה — מכפיל בהירות עם נטייה ירקרקה */
@@ -1268,10 +3042,36 @@ function softenMetalStyle2(style2) {
   };
 }
 
+/** Stone slab frame — smooth arcs, sharp features only at tight corners. */
+const SLAB_FRAME_ORGANIC_SMOOTHNESS = 0.82;
+
+/** Frame follows Q6 stone roughness — tubes wrap spiky silhouette, not independent wobble. */
+function stoneMatchedFrameStyle2(style2) {
+  if (!style2) return { frameSmoothness: 1 };
+  const rough = stoneRoughnessFromStyle(style2);
+  const frameSmooth = Math.max(0, 1 - rough);
+  return {
+    ...style2,
+    frameSmoothness: frameSmooth,
+    occupationKey: style2.occupationKey ?? style2.occupation,
+    frameContour: {
+      wobbleMix: 0.18 + rough * 0.42,
+      curlMix: 0.14 + rough * 0.32,
+      ampScale: 0.22 + rough * 0.52,
+      freqBias: rough * 0.1,
+      phase: 0,
+    },
+  };
+}
+
+function organicSlabFrameStyle2(style2) {
+  if (!style2) return { frameSmoothness: SLAB_FRAME_ORGANIC_SMOOTHNESS };
+  return { ...style2, frameSmoothness: SLAB_FRAME_ORGANIC_SMOOTHNESS };
+}
+
 /** Stone slab frame — sharp corners, no Chaikin smoothing (follows silhouette indentations). */
 function sharpSlabFrameStyle2(style2) {
-  if (!style2) return { frameSmoothness: 0 };
-  return { ...style2, frameSmoothness: 0 };
+  return organicSlabFrameStyle2(style2);
 }
 const FRAME_CONTOUR_SUBSAMPLE = PATH_STEP * 0.82;
 const SLAB_FRAME_CONTOUR_SUBSAMPLE = PATH_STEP * 0.22;
@@ -1299,8 +3099,9 @@ const SLAB_METAL_EMBOSS_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.36,
 const SLAB_Q1_PLACEMENT = SLAB_METAL_EMBOSS_PLACEMENT;
 /** Q1 ceramic inset — unified glyph mass centered on stone (saved-roughness L3 look). */
 const SLAB_Q1_CERAMIC_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.506, heightFrac: 0.473, fit: 0.924 };
-/** Q3 metal threads — slightly larger than ceramic, smaller than stone slab. */
-const SLAB_Q3_METAL_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.51, heightFrac: 0.47, fit: 0.89 };
+/** Q3 metal threads — centered, stone-slab scale (first letter only in SVG). */
+const SLAB_Q3_METAL_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.9, heightFrac: 0.74, fit: 1.02 };
+const SLAB_Q3_METAL_THREAD_RADIUS_SCALE = 0.82;
 /** Stone groove placement — same vectors, slightly tighter fit inside metal tubes. */
 const SLAB_Q3_ENGRAVE_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.9, heightFrac: 0.74, fit: 1.02 };
 /** Q3 metal — above stone, below ceramic; clipped hole around Q1 + 20px gap. */
@@ -1322,10 +3123,13 @@ const SLAB_Q7_EMBOSS_STROKE_SCALE = 0.52;
 const SLAB_Q7_EMBOSS_HEIGHT_MUL = 1.05;
 const SLAB_Q7_EMBOSS_BEVEL_MUL = 0.48;
 const SLAB_Q7_EMBOSS_TUBE_MUL = 0.42;
-/** Q3 — raised bas-relief extrude on stone (solid plateau, not grooves). */
-const SLAB_Q3_EMBOSS_HEIGHT_MUL = 2.45;
-const SLAB_Q3_EMBOSS_BEVEL_MUL = 0.78;
-const SLAB_Q3_EMBOSS_SOLID_DILATE_SCENE = 10;
+const SLAB_Q3_ENGRAVE_WALL_MUL = 0.016;
+/** @deprecated — rounded tube engrave disabled for Q3 */
+const SLAB_Q3_ENGRAVE_BEVEL_MUL = SLAB_Q3_ENGRAVE_WALL_MUL;
+/** Q4 doubt — sharp raised bas-relief like ancient carved tile. */
+const SLAB_Q3_DOUBT_EMBOSS_HEIGHT_MUL = 3.2;
+const SLAB_Q3_DOUBT_EMBOSS_BEVEL_MUL = 0.24;
+const SLAB_Q3_DOUBT_EMBOSS_SOLID_DILATE_SCENE = 10;
 
 /** @deprecated alias */
 const SLAB_Q2_PLACEMENT = SLAB_Q3_ENGRAVE_PLACEMENT;
@@ -1651,10 +3455,66 @@ function collectSlabWrapLayerPack(el, kind, rootSvg, style2, style3, placementRe
   return pack;
 }
 
+/** Q6 occupation radial wobble — same family as unified frame contour. */
+function applyOccupationContourWobble(pts, style2, ampMul = 1) {
+  const stoneStyle = stoneVectorStyle2(style2) ?? style2;
+  const occupationKey = stoneStyle?.occupationKey ?? stoneStyle?.occupation;
+  if (!occupationKey || pts.length < 4) return pts;
+  const rough = stoneRoughnessFromStyle(stoneStyle);
+  if (rough < 0.08) return pts;
+
+  let cx = 0;
+  let cy = 0;
+  for (const p of pts) {
+    cx += p.x;
+    cy += p.y;
+  }
+  cx /= pts.length;
+  cy /= pts.length;
+
+  const amp = rough * (5 + rough * 3) * ampMul;
+  return pts.map((p) => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.001) return p.clone();
+    const ang = Math.atan2(dy, dx);
+    const wobble =
+      Math.sin(ang * (0.24 + rough * 0.2)) * 0.55 + Math.cos(ang * (0.43 - rough * 0.1)) * 0.45;
+    const curl = Math.sin(ang * 0.08 + rough * 1.5) * Math.cos(ang * (0.17 + rough * 0.13));
+    const dr = (wobble * 0.5 + curl * 0.32) * amp;
+    const scale = (dist + dr) / dist;
+    return new THREE.Vector3(cx + dx * scale, cy + dy * scale, p.z);
+  });
+}
+
+/** Q6 roughness for stone vector wrap (independent of smooth upper layers). */
+function stoneRoughnessFromStyle(style2) {
+  if (style2?.stoneRoughness != null) {
+    return Math.max(0, Math.min(1, Number(style2.stoneRoughness)));
+  }
+  const key = style2?.occupationKey ?? style2?.occupation;
+  if (key) return 1 - (OCCUPATION_SMOOTHNESS[key] ?? 0.5);
+  return 0;
+}
+
+function stoneVectorStyle2(style2) {
+  if (!style2) return null;
+  const rough = stoneRoughnessFromStyle(style2);
+  const key = style2?.occupationKey ?? style2?.occupation;
+  return { ...style2, occupationKey: key, occupation: key, stoneRoughness: rough };
+}
+
+/** Morph post-process — spiky vector paths keep more detail in stone slab fuse. */
+function stoneSlabMorphKeep(style2) {
+  const rough = stoneRoughnessFromStyle(style2);
+  return 1 - rough * 0.48;
+}
+
 /**
  * Organic stone slab silhouette from timingReason seed — deterministic lobed contour.
  */
-function buildOrganicStoneContour(stoneShapeParams, cx, cy) {
+function buildOrganicStoneContour(stoneShapeParams, cx, cy, style2 = null) {
   const { seed, lobeCount, wobbleAmp, aspectX, aspectY, baseRadius, pinch, noiseFreq } =
     stoneShapeParams;
   const pts = [];
@@ -1671,11 +3531,12 @@ function buildOrganicStoneContour(stoneShapeParams, cx, cy) {
       new THREE.Vector3(cx + Math.cos(ang) * r * aspectX, cy + Math.sin(ang) * r * aspectY, 0)
     );
   }
-  return pts;
+  return style2 ? applyOccupationContourWobble(pts, stoneVectorStyle2(style2)) : pts;
 }
 
-function rasterizeProceduralStoneMask(stoneShapeParams, style3) {
-  const pts = buildOrganicStoneContour(stoneShapeParams, CX, CY);
+function rasterizeProceduralStoneMask(stoneShapeParams, style3, style2 = null) {
+  const pts = buildOrganicStoneContour(stoneShapeParams, CX, CY, style2);
+  const morphKeep = stoneSlabMorphKeep(style2);
   const pad = stoneShapeParams.baseRadius * 0.35 + SLAB_WRAP_MARGIN_SCENE;
   const maskOrigin = maskBoundsFromPolylines([{ pts, closed: true }], pad);
   const wrapStroke = l3TubeRadius(style3) * SLAB_WRAP_STROKE_MUL * 2.4;
@@ -1685,16 +3546,18 @@ function rasterizeProceduralStoneMask(stoneShapeParams, style3) {
     maskOrigin
   );
 
-  const dilatePx =
-    L3_MORPH_DILATE_PX + STONE_L3_EXTRA_DILATE_PX + STONE_FUSE_DILATE_PX + SLAB_WRAP_EXTRA_DILATE_PX;
+  const dilatePx = Math.round(
+    (L3_MORPH_DILATE_PX + STONE_L3_EXTRA_DILATE_PX + STONE_FUSE_DILATE_PX + SLAB_WRAP_EXTRA_DILATE_PX) *
+      morphKeep
+  );
   let slabGrid = dilateMaskGrid(unionGrid, w, h, dilatePx);
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
-  const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE);
+  const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * morphKeep);
   slabGrid = closeStrokeMaskGrid(slabGrid, w, h, bridgePx, Math.max(1, bridgePx - 4));
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
   slabGrid = solidifyInsideOuterBoundary(slabGrid, w, h);
-  slabGrid = dilateMaskGrid(slabGrid, w, h, Math.round(5 * MASK_SCALE));
-  const spurCut = stoneShapeParams.baseRadius * 0.42;
+  slabGrid = dilateMaskGrid(slabGrid, w, h, Math.max(1, Math.round(5 * MASK_SCALE * morphKeep)));
+  const spurCut = stoneShapeParams.baseRadius * 0.42 * (0.55 + morphKeep * 0.45);
   slabGrid = pruneThinMaskSpurs(slabGrid, w, h, spurCut);
   return { grid: slabGrid, w, h, maskOrigin };
 }
@@ -1717,8 +3580,12 @@ function rasterizeNameLettersStoneMask(rootSvg, style2, style3) {
   }
   if (!polylines.length) return null;
 
+  const stoneStyle = stoneVectorStyle2(style2);
+  const stoneRough = stoneRoughnessFromStyle(stoneStyle);
+  polylines = perturbPolylinesForStoneShape(polylines, stoneStyle, style3);
   polylines = fitPolylinesToSceneExtent(polylines);
 
+  const morphKeep = stoneSlabMorphKeep(stoneStyle);
   const wrapPad = l3TubeRadius(style3) * 3.8 + SLAB_WRAP_MARGIN_SCENE;
   const maskOrigin = maskBoundsFromPolylines(polylines, wrapPad);
   if (!maskOrigin) return null;
@@ -1730,30 +3597,37 @@ function rasterizeNameLettersStoneMask(rootSvg, style2, style3) {
   for (let i = 0; i < unionGrid.length; i++) filled += unionGrid[i];
   if (filled < 40) return null;
 
-  const extraFuse = Math.round(36 * MASK_SCALE * STONE_NAME_FUSE_DILATE_MUL);
-  const dilatePx =
-    L3_MORPH_DILATE_PX +
-    STONE_L3_EXTRA_DILATE_PX +
-    STONE_FUSE_DILATE_PX +
-    SLAB_WRAP_EXTRA_DILATE_PX +
-    extraFuse;
+  const extraFuse = Math.round(36 * MASK_SCALE * STONE_NAME_FUSE_DILATE_MUL * morphKeep);
+  const dilatePx = Math.round(
+    (L3_MORPH_DILATE_PX +
+      STONE_L3_EXTRA_DILATE_PX +
+      STONE_FUSE_DILATE_PX +
+      SLAB_WRAP_EXTRA_DILATE_PX +
+      extraFuse) *
+      morphKeep
+  );
   let slabGrid = dilateMaskGrid(unionGrid, w, h, dilatePx);
   const beforeHoleFill = new Uint8Array(slabGrid);
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
   const pierceHoleMask = extractFilledHolesMask(beforeHoleFill, slabGrid, w, h);
   if (pierceHoleMask) pierceHoleMask.maskOrigin = maskOrigin;
-  const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * 2.85 * STONE_NAME_GAP_BRIDGE_MUL);
+  const bridgePx = Math.round(
+    SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * 2.85 * STONE_NAME_GAP_BRIDGE_MUL * morphKeep
+  );
   slabGrid = closeStrokeMaskGrid(slabGrid, w, h, bridgePx, Math.max(1, bridgePx - 8));
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
   slabGrid = solidifyInsideOuterBoundary(slabGrid, w, h);
   slabGrid = mergeMaskToSingleComponent(slabGrid, w, h);
-  if (countMaskComponents(slabGrid, w, h) > 1) {
+  if (countMaskComponents(slabGrid, w, h) > 1 && stoneRough < 0.38) {
     slabGrid = convexHullFillFromMask(slabGrid, w, h);
   }
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
-  slabGrid = dilateMaskGridBlur(slabGrid, w, h, 16);
-  slabGrid = erodeMaskGrid(slabGrid, w, h, 3);
-  slabGrid = pruneThinMaskSpurs(slabGrid, w, h, l3TubeRadius(style3) * 2.6);
+  const blurPx = Math.max(0, Math.round(16 * morphKeep));
+  if (blurPx > 0) slabGrid = dilateMaskGridBlur(slabGrid, w, h, blurPx);
+  const erodePx = Math.max(0, Math.round(3 * morphKeep));
+  if (erodePx > 0) slabGrid = erodeMaskGrid(slabGrid, w, h, erodePx);
+  const spurCut = l3TubeRadius(style3) * 2.6 * (0.5 + morphKeep * 0.5);
+  slabGrid = pruneThinMaskSpurs(slabGrid, w, h, spurCut);
   return { grid: slabGrid, w, h, maskOrigin, pierceHoleMask };
 }
 
@@ -1770,7 +3644,8 @@ function buildNameTubeStoneGeometry(layer2El, rootSvg, style2, style3) {
   }
   if (!polylines.length) return null;
 
-  polylines = perturbPolylinesForL2Shadow(polylines, style2, style3);
+  const stoneStyle = stoneVectorStyle2(style2);
+  polylines = perturbPolylinesForStoneShape(polylines, stoneStyle, style3);
   polylines = fitPolylinesToSceneExtent(polylines);
 
   const tubeR = l3TubeRadius(style3) * STONE_L3_NAME_TUBE_THICKNESS;
@@ -2171,33 +4046,37 @@ function rasterizeSlabWrapMask(rootSvg, style2, style3, stoneShapeParams = null)
   const nameMask = rasterizeNameLettersStoneMask(rootSvg, style2, style3);
   if (nameMask) return nameMask;
   if (stoneShapeParams) {
-    return rasterizeProceduralStoneMask(stoneShapeParams, style3);
+    return rasterizeProceduralStoneMask(stoneShapeParams, style3, style2);
   }
   const l3El = rootSvg.querySelector('.layer-3');
   if (!l3El) return rasterizeFrameInteriorMask(rootSvg, style3);
 
   const l3Pack = collectLayer3Polylines(l3El, rootSvg, style3);
+  const l3Polys = perturbPolylinesForStoneShape(l3Pack.polylines, style2, style3);
+  const morphKeep = stoneSlabMorphKeep(style2);
   const wrapPad = l3TubeRadius(style3) * 3.8 + SLAB_WRAP_MARGIN_SCENE;
-  const maskOrigin = maskBoundsFromPolylines(l3Pack.polylines, wrapPad);
+  const maskOrigin = maskBoundsFromPolylines(l3Polys, wrapPad);
   if (!maskOrigin) return rasterizeFrameInteriorMask(rootSvg, style3);
 
   const wrapStroke = l3Pack.strokeScene * SLAB_WRAP_STROKE_MUL;
-  const { grid: unionGrid, w, h } = rasterizePolylinesToGrid(l3Pack.polylines, wrapStroke, maskOrigin);
+  const { grid: unionGrid, w, h } = rasterizePolylinesToGrid(l3Polys, wrapStroke, maskOrigin);
 
   let filled = 0;
   for (let i = 0; i < unionGrid.length; i++) filled += unionGrid[i];
   if (filled < 40) return rasterizeFrameInteriorMask(rootSvg, style3);
 
-  const dilatePx =
-    L3_MORPH_DILATE_PX + STONE_L3_EXTRA_DILATE_PX + STONE_FUSE_DILATE_PX + SLAB_WRAP_EXTRA_DILATE_PX;
+  const dilatePx = Math.round(
+    (L3_MORPH_DILATE_PX + STONE_L3_EXTRA_DILATE_PX + STONE_FUSE_DILATE_PX + SLAB_WRAP_EXTRA_DILATE_PX) *
+      morphKeep
+  );
   let slabGrid = dilateMaskGrid(unionGrid, w, h, dilatePx);
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
 
-  const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE);
+  const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * morphKeep);
   slabGrid = closeStrokeMaskGrid(slabGrid, w, h, bridgePx, Math.max(1, bridgePx - 4));
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
   slabGrid = solidifyInsideOuterBoundary(slabGrid, w, h);
-  slabGrid = dilateMaskGrid(slabGrid, w, h, Math.round(5 * MASK_SCALE));
+  slabGrid = dilateMaskGrid(slabGrid, w, h, Math.max(1, Math.round(5 * MASK_SCALE * morphKeep)));
 
   return { grid: slabGrid, w, h, maskOrigin };
 }
@@ -2329,7 +4208,16 @@ function metalRadialSegs(style2, style3, isFrame = false) {
   return 22;
 }
 
-function buildStrokeCurve(pts, style3, straight, occupationKey, isFrame = false, frameRoughOverride = null, closedCurve = false) {
+function buildStrokeCurve(
+  pts,
+  style3,
+  straight,
+  occupationKey,
+  isFrame = false,
+  frameRoughOverride = null,
+  closedCurve = false,
+  curveAmpMul = 1
+) {
   if (pts.length < 2) return null;
   const unique = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
@@ -2337,7 +4225,9 @@ function buildStrokeCurve(pts, style3, straight, occupationKey, isFrame = false,
   }
   if (unique.length < 2) return null;
 
-  const sharpFrame = isFrame && frameRoughOverride != null && frameRoughOverride >= 0.85;
+  const ampMul = Math.max(1, curveAmpMul);
+  const sharpFrame =
+    isFrame && frameRoughOverride != null && frameRoughOverride >= 0.85 && ampMul <= 1.05;
 
   if (straight || sharpFrame) {
     return new THREE.CatmullRomCurve3(unique, closedCurve, 'centripetal', 0.02);
@@ -2349,11 +4239,12 @@ function buildStrokeCurve(pts, style3, straight, occupationKey, isFrame = false,
       : occupationKey != null
         ? 1 - (OCCUPATION_SMOOTHNESS[occupationKey] ?? 0.5)
         : 0;
+  const effectiveRough = ampMul > 1.05 ? Math.min(1, rough * 0.75 + (ampMul - 1) * 0.22) : rough;
   const smoothPasses = isFrame
-    ? rough > 0.08
-      ? Math.max(0, Math.round(2 - rough * 2))
-      : FRAME_CURVE_CHAIKIN_PASSES + (rough <= 0.06 ? 2 : 1)
-    : Math.max(1, Math.round(6 - rough * 5));
+    ? effectiveRough > 0.08
+      ? Math.max(0, Math.round((2 - effectiveRough * 2) / ampMul))
+      : FRAME_CURVE_CHAIKIN_PASSES + (effectiveRough <= 0.06 ? 2 : 1)
+    : Math.max(0, Math.round((6 - effectiveRough * 5) / ampMul));
   let s = unique;
   for (let pass = 0; pass < smoothPasses; pass++) {
     const next = [s[0]];
@@ -2373,7 +4264,11 @@ function buildStrokeCurve(pts, style3, straight, occupationKey, isFrame = false,
   const baseAmp = gender === 'female' ? 2.5 : gender === 'male' ? 1.2 : 1.8;
   const nPts = s.length;
   const pathAmp =
-    !isFrame && occupationKey != null ? baseAmp * (0.08 + rough * 0.55) : !isFrame ? baseAmp * 0.5 : 0;
+    !isFrame && occupationKey != null
+      ? baseAmp * (0.08 + effectiveRough * 0.55) * ampMul
+      : !isFrame
+        ? baseAmp * 0.5 * ampMul
+        : 0;
   for (let i = 1; i < nPts - 1; i++) {
     const t = i / (nPts - 1);
     const x = s[i].x;
@@ -2382,27 +4277,31 @@ function buildStrokeCurve(pts, style3, straight, occupationKey, isFrame = false,
     let dy = 0;
     if (!isFrame) {
       const n = Math.sin(x * 0.08 + y * 0.13) * Math.cos(y * 0.11 - x * 0.07);
-      dx = n * pathAmp;
-      dy = n * pathAmp * 0.8;
-    } else if (rough > 0.08) {
-      const twistAmp = baseAmp * (0.04 + rough * 0.12);
+      const n2 = Math.sin(x * 0.21 - y * 0.17) * 0.45;
+      dx = (n + n2) * pathAmp;
+      dy = (n * 0.8 + n2 * 0.55) * pathAmp;
+    } else if (effectiveRough > 0.08) {
+      const twistAmp = baseAmp * (0.04 + effectiveRough * 0.12) * ampMul * 1.75;
       const curl =
-        Math.sin(t * Math.PI * 2 * (0.9 + rough * 1.1)) *
-        Math.cos(t * Math.PI * (1.8 + rough * 1.8) + rough * 1.1);
-      dx = curl * twistAmp;
-      dy = Math.sin(t * Math.PI * 2.5 + rough * 0.6) * twistAmp * 0.48;
+        Math.sin(t * Math.PI * 2 * (0.9 + effectiveRough * 1.1)) *
+        Math.cos(t * Math.PI * (1.8 + effectiveRough * 1.8) + effectiveRough * 1.1);
+      const spike = Math.sin(t * Math.PI * (4.2 + effectiveRough * 3.5) + effectiveRough) * 0.32;
+      dx = (curl + spike) * twistAmp;
+      dy = (Math.sin(t * Math.PI * 2.5 + effectiveRough * 0.6) * 0.48 + spike * 0.22) * twistAmp;
     }
     s[i].x += dx;
     s[i].y += dy;
   }
-  if (isFrame && rough <= 0.08) {
-    const cent = FRAME_CURVE_CENTRIPETAL + (1 - rough) * 0.14;
-    return new THREE.CatmullRomCurve3(s, false, 'centripetal', cent);
+  if (isFrame && effectiveRough <= 0.35 && ampMul <= 1.05) {
+    const cent = FRAME_CURVE_CENTRIPETAL + (1 - effectiveRough) * 0.22;
+    return new THREE.CatmullRomCurve3(s, closedCurve, 'centripetal', cent);
   }
   const tension = isFrame
-    ? 0.28
+    ? ampMul > 1.05
+      ? 0.08 + effectiveRough * 0.38
+      : 0.28
     : occupationKey != null
-      ? 0.02 + rough * 0.46
+      ? 0.02 + effectiveRough * 0.46
       : 0.5;
   return new THREE.CatmullRomCurve3(s, false, 'catmullrom', tension);
 }
@@ -2411,6 +4310,75 @@ function polylineLength(pts) {
   let len = 0;
   for (let i = 1; i < pts.length; i++) len += pts[i].distanceTo(pts[i - 1]);
   return len;
+}
+
+/** Smooth gentle arcs on a closed contour while pinning sharp corner vertices. */
+function smoothClosedContourOrganic(pts, cornerAngleRad = 0.48, passes = 2, blend = 0.58) {
+  if (pts.length < 4) return pts;
+  const n = pts.length;
+  const sharp = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const cur = pts[i];
+    const next = pts[(i + 1) % n];
+    sharp[i] = contourTurnAngleRad(prev, cur, next) >= cornerAngleRad;
+  }
+  let s = pts.map((p) => p.clone());
+  for (let pass = 0; pass < passes; pass++) {
+    const next = s.map((p) => p.clone());
+    for (let i = 0; i < n; i++) {
+      if (sharp[i]) continue;
+      const prev = s[(i - 1 + n) % n];
+      const cur = s[i];
+      const follow = s[(i + 1) % n];
+      const ax = (prev.x + cur.x * 2 + follow.x) / 4;
+      const ay = (prev.y + cur.y * 2 + follow.y) / 4;
+      next[i].x = cur.x + (ax - cur.x) * blend;
+      next[i].y = cur.y + (ay - cur.y) * blend;
+    }
+    s = next;
+  }
+  return s;
+}
+
+/**
+ * Taper open tube ends to a fine point (tail) or a rounded dome cap.
+ * @param {'tail'|'round'} mode
+ */
+function applyTubeEndStyle(geom, curve, tubularSegs, radialSegs, closed, mode = 'tail', endFrac = 0.22) {
+  if (closed || !mode || mode === 'none') return;
+  const pos = geom.attributes.position;
+  const rings = tubularSegs + 1;
+  const vertsPerRing = radialSegs + 1;
+  const taperLen = Math.max(0.08, Math.min(0.34, endFrac));
+  const centerAt = (ring) => {
+    const p = curve.getPointAt(ring / tubularSegs);
+    return new THREE.Vector3(p.x, p.y, p.z);
+  };
+  const scaleAt = (t) => {
+    if (t >= taperLen && t <= 1 - taperLen) return 1;
+    const u = t < taperLen ? t / taperLen : (1 - t) / taperLen;
+    const ease = u * u * (3 - 2 * u);
+    if (mode === 'round') return Math.sin(ease * Math.PI * 0.5);
+    return ease;
+  };
+  for (let ring = 0; ring < rings; ring++) {
+    const scale = scaleAt(ring / tubularSegs);
+    if (scale >= 0.999) continue;
+    const center = centerAt(ring);
+    for (let j = 0; j < vertsPerRing; j++) {
+      const idx = ring * vertsPerRing + j;
+      pos.setXYZ(
+        idx,
+        center.x + (pos.getX(idx) - center.x) * scale,
+        center.y + (pos.getY(idx) - center.y) * scale,
+        center.z + (pos.getZ(idx) - center.z) * scale
+      );
+    }
+  }
+  pos.needsUpdate = true;
+  geom.computeVertexNormals();
+  geom.computeBoundingSphere();
 }
 
 function applyMassivePillDisplacement(geom, style3, ageNum, domeRadius) {
@@ -2456,12 +4424,13 @@ function applyOrganicDisplacement(
   surfaceScale,
   isFrame = false,
   frameRoughOverride = null,
-  frameAmpMul = 1
+  frameAmpMul = 1,
+  spikyUpperLayer = false
 ) {
   const pos = geom.attributes.position;
   const normal = geom.attributes.normal;
   if (!occupationKey && metalLayer && !isFrame) return;
-  if (occupationKey === 'tech_finance' && !isFrame) return;
+  if (occupationKey === 'tech_finance' && !isFrame && !spikyUpperLayer) return;
 
   const rough =
     isFrame && frameRoughOverride != null
@@ -2469,7 +4438,7 @@ function applyOrganicDisplacement(
       : isFrame
         ? frameRoughnessFromStyle2({ frameSmoothness: 1 - (frameRoughOverride ?? 0.5) })
         : 1 - (OCCUPATION_SMOOTHNESS[occupationKey] ?? 0.5);
-  if (!isFrame && rough < 0.02) return;
+  if (!isFrame && rough < 0.02 && !spikyUpperLayer) return;
   const age = Math.max(1, Math.min(120, Number(ageNum) || 25));
   const ageAmp = 0.1 + (age / 120) * 4.0;
   let amp;
@@ -2477,16 +4446,24 @@ function applyOrganicDisplacement(
 
   if (isFrame) {
     const frameRough = frameRoughOverride ?? rough;
-    const ampScale = 0.55 + Math.min(1, frameAmpMul) * 0.75;
+    const spikeScale = spikyUpperLayer ? rough * rough : 1;
+    const ampScale = (0.55 + Math.min(1, frameAmpMul) * 0.75) * (spikyUpperLayer ? 0.85 + spikeScale * 1.15 : 1);
     amp = tubeRadius * (frameRough * 0.55 + 0.1) * ampScale;
     freq = 0.016 + frameRough * 0.16;
+    if (spikyUpperLayer) {
+      freq *= 1 + spikeScale * 0.45;
+      amp *= 0.75 + spikeScale * 0.85;
+    }
   } else if (metalLayer) {
-    const occMul = rough * 2.8;
+    const spikeScale = spikyUpperLayer ? rough * rough : 1;
+    const occMul = rough * (spikyUpperLayer ? 1.8 + spikeScale * 1.55 : 2.8);
     amp =
       (gender === 'female' ? tubeRadius * 0.3 : gender === 'male' ? tubeRadius * 0.2 : tubeRadius * 0.25) *
       ageAmp *
       occMul;
+    if (spikyUpperLayer) amp *= 0.65 + spikeScale * 0.75;
     freq = 0.015 + rough * 0.2 + (age / 120) * 0.08;
+    if (spikyUpperLayer) freq *= 1 + spikeScale * 0.35;
   } else {
     const ageFactor =
       surfaceScale != null && surfaceScale > 0 ? Math.min(1, surfaceScale / 22) : l3AgeFactor(null, ageNum);
@@ -2565,6 +4542,75 @@ function mergeConnectedPolylines(polylines, snapScene = 14) {
   return [...closed, ...open];
 }
 
+/** Round sharp bends with a quadratic fillet before tube extrusion. */
+function appendFilletArc(out, prev, cur, next, filletR, angle) {
+  const v1x = cur.x - prev.x;
+  const v1y = cur.y - prev.y;
+  const v2x = next.x - cur.x;
+  const v2y = next.y - cur.y;
+  const l1 = Math.hypot(v1x, v1y) || 1;
+  const l2 = Math.hypot(v2x, v2y) || 1;
+  const u1x = v1x / l1;
+  const u1y = v1y / l1;
+  const u2x = v2x / l2;
+  const u2y = v2y / l2;
+  const half = Math.max(0.08, angle / 2);
+  let d = filletR / Math.tan(half);
+  d = Math.min(d, l1 * 0.44, l2 * 0.44);
+  const p1 = new THREE.Vector3(cur.x - u1x * d, cur.y - u1y * d, cur.z ?? 0);
+  const p2 = new THREE.Vector3(cur.x + u2x * d, cur.y + u2y * d, cur.z ?? 0);
+  if (!out.length || out[out.length - 1].distanceTo(p1) > 0.05) out.push(p1);
+  const steps = Math.max(4, Math.ceil(angle * 5));
+  for (let s = 1; s < steps; s++) {
+    const t = s / steps;
+    const mt = 1 - t;
+    out.push(
+      new THREE.Vector3(
+        mt * mt * p1.x + 2 * mt * t * cur.x + t * t * p2.x,
+        mt * mt * p1.y + 2 * mt * t * cur.y + t * t * p2.y,
+        mt * mt * (p1.z ?? 0) + 2 * mt * t * (cur.z ?? 0) + t * t * (p2.z ?? 0)
+      )
+    );
+  }
+  out.push(p2);
+}
+
+function filletPolylineCorners(pts, closed, filletR, maxAngle = 2.35) {
+  const n = pts.length;
+  if (n < 3 || filletR <= 0) return pts.map((p) => p.clone());
+  const out = [];
+  if (closed) {
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const cur = pts[i];
+      const next = pts[(i + 1) % n];
+      const angle = contourTurnAngleRad(prev, cur, next);
+      if (angle < maxAngle) appendFilletArc(out, prev, cur, next, filletR, angle);
+      else out.push(cur.clone());
+    }
+    return out.length >= 3 ? out : pts.map((p) => p.clone());
+  }
+  out.push(pts[0].clone());
+  for (let i = 1; i < n - 1; i++) {
+    const prev = pts[i - 1];
+    const cur = pts[i];
+    const next = pts[i + 1];
+    const angle = contourTurnAngleRad(prev, cur, next);
+    if (angle < maxAngle) appendFilletArc(out, prev, cur, next, filletR, angle);
+    else out.push(cur.clone());
+  }
+  out.push(pts[n - 1].clone());
+  return out;
+}
+
+function roundCeramicTubePolylines(polylines, tubeRadius) {
+  const filletR = tubeRadius * 0.55;
+  return polylines.map(({ pts, closed }) => ({
+    closed,
+    pts: filletPolylineCorners(pts, closed, filletR, 2.45),
+  }));
+}
+
 function downsamplePoints(pts, maxPts) {
   if (pts.length <= maxPts) return pts;
   const step = pts.length / maxPts;
@@ -2587,28 +4633,39 @@ function addTubeFromPoints(
   isFrame = false,
   xyScale = 1,
   tagQ1Ceramic = false,
-  tagQ5Material = false
+  tagQ5Material = false,
+  skipOrganicDisplacement = false,
+  straightTubes = false,
+  tubeEndStyle = 'none',
+  radialSegsOverride = null,
+  tubeEndFrac = null
 ) {
   if (pts.length < 2) return false;
-  const occupationKey = style2?.occupationKey ?? null;
-  const isL2Metal = !!style2 && !isFrame;
-  const polishedL2 = isL2Metal && occupationKey === 'tech_finance';
-  const frameRough = isFrame ? frameRoughnessFromStyle2(style2) : null;
-  const sharpFrame = isFrame && frameRough != null && frameRough >= 0.85;
+  const upperRough = style2?.__upperLayerRough ?? occupationRoughness(style2);
+  const spikyUpper = style2?.__spikyUpperLayer === true && upperRough >= 0.14;
+  const occupationKey = style2?.occupationKey ?? style2?.occupation ?? null;
+  const upperCeramic = tagQ1Ceramic || tagQ5Material;
+  const useStraight = upperCeramic && upperRough < 0.1;
+  const curveIsFrame = isFrame && !spikyUpper;
+  const isL2Metal = !!style2 && !curveIsFrame;
+  const polishedL2 = isL2Metal && occupationKey === 'tech_finance' && !spikyUpper;
+  const frameRough = curveIsFrame || spikyUpper ? frameRoughnessFromStyle2(style2) : null;
+  const curveAmpMul = spikyUpper ? 1 + upperRough * 0.82 : 1;
   const curve = buildStrokeCurve(
     pts,
     style3,
-    polishedL2,
-    occupationKey,
-    isFrame,
+    polishedL2 || straightTubes || useStraight,
+    straightTubes || useStraight ? null : occupationKey,
+    curveIsFrame,
     frameRough,
-    closed
+    closed,
+    curveAmpMul
   );
   if (!curve) return false;
   if (closed) curve.closed = true;
   const pathLen = polylineLength(pts);
-  const tubularSegs = isFrame
-    ? Math.min(520, Math.max(72, Math.ceil(pathLen / 1.15)))
+  const tubularSegs = curveIsFrame || spikyUpper
+    ? Math.min(520, Math.max(72, Math.ceil(pathLen / (spikyUpper ? 0.95 : 1.15))))
     : Math.min(400, Math.max(48, Math.ceil(pathLen / 2)));
   const gender = style3?.gender || 'female';
   const base = isFrame
@@ -2619,40 +4676,61 @@ function addTubeFromPoints(
         ? TUBE_RADIUS * 1.4
         : TUBE_RADIUS * 0.7;
   const radius = base * radiusScale;
-  const radialSegs = style2
-    ? metalRadialSegs(style2, style3, isFrame)
-    : polishedL2
-      ? 40
-      : isFrame
-        ? gender === 'nonbinary'
-          ? 10
-          : gender === 'male'
-            ? 4
-            : 26
-        : gender === 'nonbinary'
-          ? 4
-          : gender === 'male'
+  const radialSegs =
+    radialSegsOverride ??
+    (style2
+      ? metalRadialSegs(style2, style3, curveIsFrame)
+      : polishedL2
+        ? 40
+        : curveIsFrame
+          ? gender === 'nonbinary'
             ? 10
-            : 26;
+            : gender === 'male'
+              ? 4
+              : 26
+          : gender === 'nonbinary'
+            ? 4
+            : gender === 'male'
+              ? 10
+              : 26);
   const geom = new THREE.TubeGeometry(curve, tubularSegs, radius, radialSegs, closed);
-  const frameAmpMul = isFrame ? style2?.frameContour?.wobbleMix ?? 1 : 1;
-  const smooth = isFrame
+  const endStyle =
+    tubeEndStyle !== 'none'
+      ? tubeEndStyle
+      : !closed && (tagQ5Material || tagQ1Ceramic)
+        ? 'tail'
+        : 'none';
+  if (endStyle !== 'none') {
+    const endFrac = tubeEndFrac ?? (endStyle === 'round' ? 0.3 : 0.22);
+    applyTubeEndStyle(geom, curve, tubularSegs, radialSegs, closed, endStyle, endFrac);
+  }
+  const frameAmpMul = curveIsFrame ? style2?.frameContour?.wobbleMix ?? 1 : 1;
+  const smooth = curveIsFrame
     ? frameSmoothnessFromStyle2(style2)
     : style2?.occupationSmoothness ??
       (occupationKey ? OCCUPATION_SMOOTHNESS[occupationKey] ?? 0.5 : 0.5);
-  const skipDisp = polishedL2 || (isFrame ? smooth >= 0.98 || sharpFrame : smooth >= 0.95);
-  if (!skipDisp && (occupationKey || isFrame)) {
+  const skipDisp =
+    polishedL2 ||
+    straightTubes ||
+    useStraight ||
+    skipOrganicDisplacement ||
+    smooth >= 0.92 ||
+    (spikyUpper && upperRough < 0.14);
+  const dispIsFrame = curveIsFrame && !spikyUpper;
+  const dispMetalLayer = (spikyUpper && upperRough >= 0.14) || isL2Metal || dispIsFrame;
+  if (!skipDisp && (occupationKey || dispIsFrame || (spikyUpper && upperRough >= 0.14))) {
     applyOrganicDisplacement(
       geom,
       gender,
       radius,
       ageNum,
       occupationKey,
-      isL2Metal || isFrame,
+      dispMetalLayer,
       style3?.surfaceScale,
-      isFrame,
+      dispIsFrame,
       frameRough,
-      frameAmpMul
+      frameAmpMul,
+      spikyUpper && upperRough >= 0.14
     );
   }
   const mesh = new THREE.Mesh(geom, material);
@@ -2660,6 +4738,7 @@ function addTubeFromPoints(
   if (xyScale !== 1) mesh.scale.set(xyScale, xyScale, 1);
   mesh.renderOrder = renderOrder;
   if (tagQ1Ceramic || tagQ5Material) {
+    mesh.layers.enable(CERAMIC_LIGHT_LAYER);
     mesh.userData.q5Material = true;
     if (!active.q5MaterialMeshes) active.q5MaterialMeshes = [];
     active.q5MaterialMeshes.push(mesh);
@@ -2869,7 +4948,7 @@ function addCeramicMetalFrame(
   slabMask,
   material,
   scene,
-  ceramicMesh,
+  stoneMesh,
   renderOrder,
   style3,
   ageNum,
@@ -2877,12 +4956,15 @@ function addCeramicMetalFrame(
   questionnaire = null
 ) {
   const pts = buildCeramicQ3FrameContour(rootSvg, slabMask, style3, style2, questionnaire);
-  if (pts.length < 8 || !ceramicMesh) return 0;
-  ceramicMesh.geometry.computeBoundingBox();
-  const zTop =
-    ceramicMesh.position.z + ceramicMesh.geometry.boundingBox.max.z * (ceramicMesh.scale.z || 1);
-  const z = zTop + 0.06;
-  const reduced = downsamplePoints(pts, FRAME_TUBE_MAX_PTS);
+  if (pts.length < 8 || !stoneMesh) return 0;
+  const stoneTubeR = l3TubeRadius(style3) * STONE_L3_THICKNESS;
+  const tubeR =
+    frameTubeBaseRadius(style3) *
+    SLAB_FRAME_TUBE_RADIUS_SCALE *
+    frameRadiusScaleFromStyle2(style2);
+  const z = ceramicQ1TubeZ(stoneMesh, style3, style2, stoneTubeR) + tubeR * 0.92;
+  const frameStyle2 = organicSlabFrameStyle2(style2);
+  const reduced = downsamplePoints(pts, SLAB_FRAME_TUBE_MAX_PTS);
   return addTubeFromPoints(
     reduced,
     material,
@@ -2892,15 +4974,21 @@ function addCeramicMetalFrame(
     style3,
     ageNum,
     true,
-    UNIFIED_FRAME_TUBE_RADIUS_SCALE * frameRadiusScaleFromStyle2(style2),
-    style2,
-    true
+    SLAB_FRAME_TUBE_RADIUS_SCALE * frameRadiusScaleFromStyle2(style2),
+    frameStyle2,
+    true,
+    1,
+    true,
+    true,
+    true,
+    false,
+    'none'
   )
     ? 1
     : 0;
 }
 
-/** Closed metal loop — equal 20px gap outside rendered stone silhouette. */
+/** Closed metal loop — equal gap outside stone silhouette (follows Q6 vector spikes). */
 function addStoneSlabMetalFrame(
   slabMask,
   material,
@@ -2914,15 +5002,24 @@ function addStoneSlabMetalFrame(
   rootSvg = null,
   questionnaire = null
 ) {
-  const sharpStyle2 = sharpSlabFrameStyle2(style2);
-  const pts =
-    stoneMesh?.geometry?.attributes?.position?.count > 0
-      ? buildStoneMeshFrameContour(stoneMesh, style3, sharpStyle2, slabMask)
-      : rootSvg
-        ? buildSlabEqualGapFrameContour(rootSvg, slabMask, style3, sharpStyle2, questionnaire)
-        : buildSlabStoneFrameContour(slabMask, style3, sharpStyle2);
+  const stoneRough = stoneRoughnessFromStyle(style2);
+  const frameStyle2 = stoneMatchedFrameStyle2(style2);
+  let pts = [];
+  if (stoneMesh?.geometry?.attributes?.position?.count > 0) {
+    pts = buildStoneMeshFrameContour(stoneMesh, style3, frameStyle2, slabMask);
+  } else if (slabMask?.grid?.some((v) => v)) {
+    pts = buildSlabStoneFrameContour(slabMask, style3, frameStyle2);
+  } else if (rootSvg) {
+    pts = buildSlabEqualGapFrameContour(rootSvg, slabMask, style3, frameStyle2, questionnaire);
+  }
+  if (pts.length < 8 && slabMask?.grid?.some((v) => v)) {
+    pts = buildSlabStoneFrameContour(slabMask, style3, frameStyle2);
+  }
   if (pts.length < 8) return 0;
-  const reduced = downsamplePoints(pts, SLAB_FRAME_TUBE_MAX_PTS);
+  const contour =
+    stoneRough > 0.28 ? pts : smoothClosedContourOrganic(pts, 0.34, 1, 0.48);
+  const reduced = downsamplePoints(contour, SLAB_FRAME_TUBE_MAX_PTS);
+  const skipDisp = stoneRough < 0.12;
 
   return addTubeFromPoints(
     reduced,
@@ -2934,10 +5031,14 @@ function addStoneSlabMetalFrame(
     ageNum,
     true,
     SLAB_FRAME_TUBE_RADIUS_SCALE * frameRadiusScaleFromStyle2(style2),
-    sharpStyle2,
+    frameStyle2,
     true,
     1,
-    true
+    true,
+    true,
+    skipDisp,
+    false,
+    'none'
   )
     ? 1
     : 0;
@@ -3004,6 +5105,11 @@ function addTubesFromPolylines(polylines, material, scene, z, renderOrder, style
   const isFrame = opts.isFrame ?? false;
   const tagQ1Ceramic = opts.tagQ1Ceramic ?? false;
   const tagQ5Material = opts.tagQ5Material ?? tagQ1Ceramic;
+  const skipOrganicDisplacement = opts.skipOrganicDisplacement ?? false;
+  const straightTubes = opts.straightTubes ?? false;
+  const tubeEndStyle = opts.tubeEndStyle ?? 'none';
+  const radialSegsOverride = opts.radialSegs ?? null;
+  const tubeEndFrac = opts.tubeEndFrac ?? null;
   let count = 0;
   for (const { pts, closed } of polylines) {
     if (pts.length < 2) continue;
@@ -3022,7 +5128,12 @@ function addTubesFromPolylines(polylines, material, scene, z, renderOrder, style
         isFrame,
         xyScale,
         tagQ1Ceramic,
-        tagQ5Material
+        tagQ5Material,
+        skipOrganicDisplacement,
+        straightTubes,
+        tubeEndStyle,
+        radialSegsOverride,
+        tubeEndFrac
       )
     ) {
       count++;
@@ -3079,7 +5190,7 @@ function buildStoneSlabMaskForMetal(rootSvg, style2, style3, questionnaire) {
   }
   const stoneShapeParams = questionnaire?.stoneShapeParams ?? null;
   if (!stoneShapeParams) return null;
-  return rasterizeProceduralStoneMask(stoneShapeParams, style3);
+  return rasterizeProceduralStoneMask(stoneShapeParams, style3, style2);
 }
 
 /** Contact-shadow field from metal ellipse plate onto stone beneath. */
@@ -3144,8 +5255,8 @@ function addCeramicQ1CenterLayer(
   return { count };
 }
 
-function collectQ3LayerPolylines(rootSvg, slabMask, style3, questionnaire, placement) {
-  const q3El = rootSvg.querySelector('.layer-q3-engrave');
+function collectQ3LayerPolylines(rootSvg, slabMask, style3, questionnaire, placement, layerClass = '.layer-q3-thread') {
+  const q3El = rootSvg.querySelector(layerClass);
   if (!q3El || !slabMask?.maskOrigin) return [];
   let { polylines } = collectGlyphLayerPolylines(q3El, rootSvg, style3);
   if (!polylines.length) return [];
@@ -3210,14 +5321,25 @@ function appendQ3FrameBridgePolylines(polylines, slabMask, style3) {
 }
 
 function collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire = null) {
-  let polylines = collectQ3LayerPolylines(
+  return collectQ3LayerPolylines(
     rootSvg,
     slabMask,
     style3,
     questionnaire,
     SLAB_Q3_METAL_PLACEMENT
   );
-  return appendQ3FrameBridgePolylines(polylines, slabMask, style3);
+}
+
+/** Q3 answer — glyph paths for stone slab engraving (`.layer-q3-stone-engrave`). */
+function collectQ3StoneEngravePolylines(rootSvg, slabMaskOrigin, style3, questionnaire = null) {
+  return collectQ3LayerPolylines(
+    rootSvg,
+    { maskOrigin: slabMaskOrigin },
+    style3,
+    questionnaire,
+    SLAB_Q3_ENGRAVE_PLACEMENT,
+    '.layer-q3-stone-engrave'
+  );
 }
 
 function scenePointInMaskGrid(x, y, mask) {
@@ -3275,7 +5397,7 @@ function q3MetalThreadZ(stoneMesh) {
   return stoneMesh.position.z + stoneTop + Q3_THREAD_ABOVE_STONE_Z;
 }
 
-/** Q3 metal — above stone, below ceramic; punched hole around Q1 + 20px gap. */
+/** Q3 metal — above stone, below ceramic; full paths visible under ceramic (no hole clip). */
 function addQ3MetalThreadLayer(
   scene,
   rootSvg,
@@ -3284,25 +5406,23 @@ function addQ3MetalThreadLayer(
   style2,
   style3,
   ageNum,
-  metalMat,
+  ceramicMat,
   questionnaire = null
 ) {
-  if (!stoneMesh || !slabMask?.maskOrigin || !metalMat) return 0;
-  let polylines = collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire);
+  if (!stoneMesh || !slabMask?.maskOrigin || !ceramicMat) return 0;
+  const polylines = collectQ3MetalThreadPolylines(rootSvg, slabMask, style3, questionnaire);
   if (!polylines.length) return 0;
-  const q3TubeR =
-    frameTubeBaseRadius(style3) *
-    SLAB_STONE_FRAME_RADIUS_SCALE *
-    frameRadiusScaleFromStyle2(style2) *
-    SLAB_STONE_XY_SCALE;
-  const holeMask = buildCeramicQ3HoleMask(rootSvg, slabMask, style3, style2, q3TubeR);
-  if (holeMask) polylines = clipPolylinesOutsideMask(polylines, holeMask);
-  if (!polylines.length) return 0;
+  const stoneTubeR = l3TubeRadius(style3) * STONE_L3_THICKNESS;
   const z = q3MetalThreadZ(stoneMesh);
-  return addTubesFromPolylines(polylines, metalMat, scene, z, Q3_THREAD_RENDER_ORDER, style3, ageNum, style2, {
+  return addTubesFromPolylines(polylines, ceramicMat, scene, z, Q3_THREAD_RENDER_ORDER, style3, ageNum, style2, {
     xyScale: SLAB_STONE_XY_SCALE,
-    radiusScale: SLAB_STONE_FRAME_RADIUS_SCALE * frameRadiusScaleFromStyle2(style2),
+    radiusScale: SLAB_Q3_METAL_THREAD_RADIUS_SCALE * frameRadiusScaleFromStyle2(style2),
     isFrame: true,
+    tagQ5Material: true,
+    skipOrganicDisplacement: true,
+    straightTubes: true,
+    tubeEndStyle: 'round',
+    tubeEndFrac: 0.28,
   });
 }
 
@@ -3811,23 +5931,24 @@ function buildExactGapFrameContourFromGrid(grid, w, h, maskOrigin, style3, style
   return subsampleContourPtsPreserveCorners(pts, SLAB_FRAME_CONTOUR_SUBSAMPLE);
 }
 
-/** Frame loop from rendered stone mesh — true silhouette + equal gap offset. */
+/** Frame loop — rendered stone mesh silhouette first (exact wrap), mask fallback. */
 function buildStoneMeshFrameContour(stoneMesh, style3, style2, slabMask = null) {
-  let pack = rasterizeStoneMeshSilhouette(stoneMesh);
-  if (!pack?.grid?.some((v) => v) && slabMask?.grid) {
-    pack = { grid: slabMask.grid, w: slabMask.w, h: slabMask.h, maskOrigin: slabMask.maskOrigin };
+  const pack = rasterizeStoneMeshSilhouette(stoneMesh);
+  if (pack?.grid) {
+    return buildExactGapFrameContourFromGrid(pack.grid, pack.w, pack.h, pack.maskOrigin, style3, style2, 1);
+  }
+  if (slabMask?.grid?.some((v) => v)) {
     return buildExactGapFrameContourFromGrid(
-      pack.grid,
-      pack.w,
-      pack.h,
-      pack.maskOrigin,
+      slabMask.grid,
+      slabMask.w,
+      slabMask.h,
+      slabMask.maskOrigin,
       style3,
       style2,
       SLAB_STONE_XY_SCALE
     );
   }
-  if (!pack?.grid) return [];
-  return buildExactGapFrameContourFromGrid(pack.grid, pack.w, pack.h, pack.maskOrigin, style3, style2, 1);
+  return [];
 }
 
 /** Mask-based frame fallback — same exact distance-field offset as mesh silhouette. */
@@ -4325,17 +6446,42 @@ function collectLayer2PathPolylines(layer2El, rootSvg) {
   return polylines;
 }
 
+/**
+ * Q6 — stone wraps perturbed name-vector silhouette (clay-over-mold).
+ */
+function perturbPolylinesForStoneShape(polylines, style2, style3) {
+  const stoneStyle = stoneVectorStyle2(style2) ?? style2;
+  const rough = stoneRoughnessFromStyle(stoneStyle);
+  if (rough < 0.08) return polylines;
+  const occupationKey = stoneStyle?.occupationKey ?? stoneStyle?.occupation;
+  if (!occupationKey) return polylines;
+  const ampMul = 1.1 + rough * 1.55;
+  return perturbPolylinesForL2Shadow(
+    polylines,
+    {
+      ...stoneStyle,
+      occupationKey,
+      __pathAmpMul: ampMul,
+      __fewerSmoothPasses: rough > 0.38,
+    },
+    style3
+  );
+}
+
 /** עיקול 2D של מסלולי L2 — תואם ל-buildStrokeCurve כדי שצל המגע ב-L3 יעקוב אחרי הקוצניות */
 function perturbPolylinesForL2Shadow(polylines, style2, style3) {
-  const occupationKey = style2?.occupationKey;
+  const occupationKey = style2?.occupationKey ?? style2?.occupation;
   if (!occupationKey) return polylines;
   const rough = 1 - (OCCUPATION_SMOOTHNESS[occupationKey] ?? 0.5);
   if (rough < 0.08) return polylines;
 
   const gender = style3?.gender || style2?.gender || 'female';
   const baseAmp = gender === 'female' ? 2.5 : gender === 'male' ? 1.2 : 1.8;
-  const pathAmp = baseAmp * (0.08 + rough * 0.55);
-  const smoothPasses = Math.max(1, Math.round(6 - rough * 5));
+  const ampMul = style2?.__pathAmpMul ?? 1;
+  const pathAmp = baseAmp * (0.08 + rough * 0.55) * ampMul;
+  const smoothPasses = style2?.__fewerSmoothPasses
+    ? Math.max(0, Math.round((6 - rough * 5) * 0.52))
+    : Math.max(1, Math.round(6 - rough * 5));
 
   return polylines.map(({ pts, closed }) => {
     if (pts.length < 2) return { pts, closed };
@@ -4509,7 +6655,15 @@ function collectGlyphLayerPolylines(layerEl, rootSvg, style3) {
  * Glyph layer → binary mask on slab using L3 rasterizeLayerMaskCanvas pipeline
  * (discs + round stroke on glyph SVG paths, not canvas font / hebrew-text-mask).
  */
-function rasterizeGlyphLayerMaskCanvas(layerEl, rootSvg, style3, slabMaskOrigin, placement, strokeScale = 1) {
+function rasterizeGlyphLayerMaskCanvas(
+  layerEl,
+  rootSvg,
+  style3,
+  slabMaskOrigin,
+  placement,
+  strokeScale = 1,
+  strokeOpts = null
+) {
   let { polylines, strokeScene } = collectGlyphLayerPolylines(layerEl, rootSvg, style3);
   if (!polylines.length) return null;
 
@@ -4528,8 +6682,14 @@ function rasterizeGlyphLayerMaskCanvas(layerEl, rootSvg, style3, slabMaskOrigin,
   ctx.strokeStyle = '#ffffff';
   ctx.fillStyle = '#ffffff';
   ctx.lineWidth = strokeW;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  if (strokeOpts?.machineStroke) {
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 6;
+  } else {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
   drawPolylinesMask(ctx, polylines, slabMaskOrigin, strokeW);
 
   const { grid } = readMaskGrid(canvas);
@@ -4681,13 +6841,45 @@ function buildSlabQ7EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, 
   return overlays;
 }
 
-/** Q3 sigil — domed emboss mass on stone (mask only, no stroke grooves). */
-function buildSlabQ3EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, questionnaire = null) {
+/** Q3 answer — thin vector hairline carved in stone. */
+function buildSlabQ3EngraveOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, questionnaire = null) {
   const roundR = stoneTubeR * 1.25;
   const engravePat = questionnaire?.stoneEngravingPattern;
   const scaleMul = engravePat?.decorativeScale ?? 1;
   const overlays = [];
-  const q3El = rootSvg.querySelector('.layer-q3-engrave');
+  const q3El = rootSvg.querySelector('.layer-q3-stone-engrave');
+  if (!q3El || !slabMaskOrigin) return overlays;
+
+  const mask = rasterizeGlyphLayerMaskCanvas(
+    q3El,
+    rootSvg,
+    style3,
+    slabMaskOrigin,
+    SLAB_Q3_ENGRAVE_PLACEMENT,
+    SLAB_Q3_ENGRAVE_STROKE_SCALE * scaleMul,
+    { machineStroke: true }
+  );
+  if (mask) {
+    const fused = prepareTextOverlayFromGrid(mask.grid, mask.w, mask.h, slabMaskOrigin, MASK_SCALE);
+    overlays.push({
+      ...fused,
+      machineCut: true,
+      thinChannel: true,
+      vectorHairline: true,
+      vHalfMul: 0.98,
+      depth: roundR * SLAB_Q3_ENGRAVE_DEPTH_MUL * scaleMul,
+    });
+  }
+  return overlays;
+}
+
+/** Q4 doubt — sharp cliff bas-relief plateau (reference tile horse/rider relief). */
+function buildSlabQ3SharpEmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, questionnaire = null) {
+  const roundR = stoneTubeR * 1.25;
+  const engravePat = questionnaire?.stoneEngravingPattern;
+  const scaleMul = engravePat?.decorativeScale ?? 1;
+  const overlays = [];
+  const q3El = rootSvg.querySelector('.layer-q3-stone-engrave');
   if (!q3El || !slabMaskOrigin) return overlays;
 
   const mask = rasterizeGlyphLayerMaskCanvas(
@@ -4700,7 +6892,7 @@ function buildSlabQ3EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, 
   );
   if (mask) {
     let grid = mask.grid.slice();
-    const dilatePx = Math.max(2, Math.round(SLAB_Q3_EMBOSS_SOLID_DILATE_SCENE * MASK_SCALE));
+    const dilatePx = Math.max(2, Math.round(SLAB_Q3_DOUBT_EMBOSS_SOLID_DILATE_SCENE * MASK_SCALE));
     grid = dilateMaskGrid(grid, mask.w, mask.h, dilatePx);
     grid = fillMaskInteriorHoles(grid, mask.w, mask.h);
     grid = closeStrokeMaskGrid(grid, mask.w, mask.h, dilatePx, Math.max(1, dilatePx - 2));
@@ -4708,9 +6900,10 @@ function buildSlabQ3EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, 
     const fused = prepareTextOverlayFromGrid(grid, mask.w, mask.h, slabMaskOrigin, MASK_SCALE);
     overlays.push({
       ...fused,
-      height: roundR * SLAB_Q3_EMBOSS_HEIGHT_MUL * scaleMul,
-      bevelWidth: roundR * SLAB_Q3_EMBOSS_BEVEL_MUL,
+      height: roundR * SLAB_Q3_DOUBT_EMBOSS_HEIGHT_MUL * scaleMul,
+      bevelWidth: roundR * SLAB_Q3_DOUBT_EMBOSS_BEVEL_MUL,
       plateau: true,
+      sharpRelief: true,
     });
   }
   return overlays;
@@ -4830,11 +7023,11 @@ function buildSlabMetalIntegration(rootSvg, maskOrigin, w, h, style2, style3, st
 }
 
 /**
- * Stone relief on slab — Q3 raised emboss, Q7 emboss rings; no Q3 engrave grooves.
+ * Stone relief on slab — Q7 ring emboss only (Q3 engraving is a 2D canvas overlay).
  */
 function buildSlabStoneEngraveRelief(rootSvg, slabMaskOrigin, style2, style3, stoneTubeR, questionnaire = null) {
   const roundR = stoneTubeR * 1.25;
-  const domeR = l3TubeRadius(style3);
+  const isDoubt = questionnaire?.q4Belief === 'doubt';
 
   const q7Polylines = collectQ7EmbossPolylines(
     rootSvg,
@@ -4842,15 +7035,12 @@ function buildSlabStoneEngraveRelief(rootSvg, slabMaskOrigin, style2, style3, st
     style3,
     questionnaire
   );
-  let embossOverlays = buildSlabQ7EmbossOverlays(
+  const embossOverlays = buildSlabQ7EmbossOverlays(
     rootSvg,
     slabMaskOrigin,
     style3,
     stoneTubeR,
     questionnaire
-  );
-  embossOverlays = embossOverlays.concat(
-    buildSlabQ3EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, questionnaire)
   );
   const embossSegments = q7Polylines.length ? buildStrokeSegments(q7Polylines, 80) : null;
 
@@ -4866,11 +7056,8 @@ function buildSlabStoneEngraveRelief(rootSvg, slabMaskOrigin, style2, style3, st
     embossSegments,
     embossTubeR: roundR * SLAB_Q7_EMBOSS_TUBE_MUL,
     embossHeight,
-    engraveTubeR: domeR * 1.22,
-    engraveDepth: roundR * 0.06,
-    maxEngraveSink: roundR * 0.12,
-    maxEngraveSinkFrac: 0.45,
     basePlateHeight: roundR * 0.4,
+    sharpRelief: isDoubt,
   };
 }
 
@@ -5008,14 +7195,11 @@ async function buildUnifiedLayer3Geometry(
         stoneTubeR,
         questionnaire
       );
-      const stoneQ3Emboss = glyphRelief.embossOverlays?.length ?? 0;
-      if (stoneQ3Emboss) reportProgress(onProgress, 0.1, 'Q3 הטבעה באבן…');
-      const distToMetal = ceramicWrap?.distToMetal ?? (metalPlateMask ? metalSheetContactDist(metalPlateMask) : null);
+      const distToMetal = metalPlateMask ? metalSheetContactDist(metalPlateMask) : null;
       const metalHaloWrap =
-        ceramicWrap?.metalHaloWrap ??
-        (metalPlateMask?.fromEmboss && !skipMetal
+        metalPlateMask?.fromEmboss && !skipMetal
           ? buildMetalHaloWrapParams(metalPlateMask, stoneTubeR)
-          : null);
+          : null;
       const plateCradle =
         metalPlateMask && !skipMetal && !metalPlateMask.fromEmboss
           ? buildMetalPlateCradleParams(metalPlateMask, questionnaire?.metalPlateParams, stoneTubeR)
@@ -5028,27 +7212,28 @@ async function buildUnifiedLayer3Geometry(
 
       const stoneMetalOpts = {
         slabMode: true,
+        stoneMaterialPreset: q4StonePreset(questionnaire?.q4Belief),
+        stoneRoughness: resolveStoneRoughness(style2, questionnaire),
         basePlateHeight: stoneTubeR * 1.35 * 0.36,
         metalPlateCradle: plateCradle,
         metalHaloWrap,
-        embossFootprintMask: metalPlateMask,
+        embossFootprintMask: null,
         pierceHoleMask: pierceHoleMask ?? null,
         letterGapRelief: !!nameTube?.segments?.length,
-        ...(ceramicWrap
-          ? {
-              metalBedSegments: ceramicWrap.metalBedSegments,
-              metalBedTubeR: ceramicWrap.metalBedTubeR,
-              metalBedDepth: ceramicWrap.metalBedDepth,
-              metalBedShoulder: ceramicWrap.metalBedShoulder,
-            }
-          : {}),
         ...glyphRelief,
       };
       reportProgress(onProgress, 0.12, 'מסכת אבן…');
       await yieldToMainThread();
       const stoneProgress = (f) => reportProgress(onProgress, 0.12 + f * 0.58, 'גיבוש אבן…');
-      let geom;
-      if (nameTube) {
+      const stoneCacheKey = hashSlabStoneInputs(
+        stoneMetalOpts,
+        nameTube?.segments?.length ?? 0,
+        questionnaire
+      );
+      let geom = takeCachedSlabStoneGeometry(stoneCacheKey);
+      if (geom) {
+        reportProgress(onProgress, 0.72, 'אבן מטמון…');
+      } else if (nameTube) {
         geom = await buildStoneSculptureMeshFromMaskAsync(
           slabGrid,
           w,
@@ -5061,6 +7246,7 @@ async function buildUnifiedLayer3Geometry(
           stoneMetalOpts,
           { onProgress: stoneProgress }
         );
+        storeCachedSlabStoneGeometry(stoneCacheKey, geom);
       } else {
         geom = await buildStoneSculptureMeshFromMaskAsync(
           slabGrid,
@@ -5074,15 +7260,14 @@ async function buildUnifiedLayer3Geometry(
           stoneMetalOpts,
           { onProgress: stoneProgress }
         );
+        storeCachedSlabStoneGeometry(stoneCacheKey, geom);
       }
-      reportProgress(onProgress, 0.72, 'אבן מוכנה');
       await yieldToMainThread();
       return {
         geom,
         maskOrigin,
         slabMask: { grid: slabGrid, w, h, maskOrigin },
         metalPack,
-        stoneQ3Emboss,
       };
     }
 
@@ -5307,7 +7492,7 @@ async function addUnifiedSolidFromLayer(
   renderOpts = null
 ) {
   if (l3MaterialMode === 'stone') {
-    const { geom, slabMask, metalPack, stoneQ3Emboss = 0 } = await buildUnifiedLayer3Geometry(
+    const { geom, slabMask, metalPack } = await buildUnifiedLayer3Geometry(
       layerEl,
       rootSvg,
       style3,
@@ -5326,6 +7511,7 @@ async function addUnifiedSolidFromLayer(
     const zFront = geom.boundingBox.max.z;
     stoneMesh.position.z = L2_SURFACE_Z - zFront - L3_STONE_BACK_GAP;
     stoneMesh.scale.set(SLAB_STONE_XY_SCALE, SLAB_STONE_XY_SCALE, 1);
+    stoneMesh.layers.set(0);
     stoneMesh.renderOrder = renderOrder + 12;
     scene.add(stoneMesh);
     return {
@@ -5333,7 +7519,6 @@ async function addUnifiedSolidFromLayer(
       stoneMesh,
       slabMask: slabMask ?? null,
       metalPack: metalPack ?? null,
-      stoneQ3Emboss,
     };
   }
 
@@ -5512,16 +7697,13 @@ async function renderPbrCore(svg, opts) {
   const layer2 = mount.querySelector('.layer-2');
   const vb = parseViewBox(mount);
 
-  disposeActive();
+  if (opts?.container) opts.container.innerHTML = '';
+  disposeActiveScene();
 
   active.q5MaterialMeshes = [];
   active.ceramicMeshes = active.q5MaterialMeshes;
 
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    preserveDrawingBuffer: true,
-    alpha: true
-  });
+  const renderer = getOrCreateRenderer();
   const l3MaterialMode = opts.l3MaterialMode === 'stone' ? 'stone' : 'opal';
   renderer.setClearColor(0x000000, 0);
   renderer.setSize(W, H);
@@ -5544,14 +7726,21 @@ async function renderPbrCore(svg, opts) {
   const ceramicQ5 = opts.questionnaire?.q5Feeling ?? 'hope';
   const ceramicQ1Mat =
     l3MaterialMode === 'stone'
-      ? buildCeramicQ1MaterialFromQ5(ceramicQ5, active.envMap, metalEnvMap)
+      ? buildCeramicQ1MaterialFromQ5(ceramicQ5, active.envMap)
       : null;
   active.ceramicQ1Material = ceramicQ1Mat;
   active.ceramicQ5Feeling = ceramicQ5;
   const slabFrameMetalMat = ceramicQ1Mat;
   if (l3MaterialMode === 'stone') {
+    tuneStoneSceneDark(renderer, scene);
+  } else {
+    tuneRendererExposureForQ5(renderer, ceramicQ5);
+    tuneSceneEnvironmentForQ5(scene, ceramicQ5);
+  }
+  if (l3MaterialMode === 'stone') {
     addStoneSculptureLights(scene);
     addUnifiedMetalPreviewLights(scene);
+    addQ5CeramicAccentLights(scene, ceramicQ5);
   } else {
     addLights(scene, 0);
   }
@@ -5567,7 +7756,8 @@ async function renderPbrCore(svg, opts) {
   let l3Mat;
   let l3StoneTextured = false;
   if (l3MaterialMode === 'stone') {
-    const stone = buildStoneMaterial(style2);
+    const q4Belief = opts.questionnaire?.q4Belief ?? 'concrete_actions';
+    const stone = buildStoneMaterial(style2, q4Belief, active.envMap, opts.questionnaire);
     l3Mat = stone.material;
     if (STONE_L3_SLAB_MODE) l3Mat.vertexColors = true;
     l3StoneTextured = stone.textured;
@@ -5594,9 +7784,9 @@ async function renderPbrCore(svg, opts) {
   );
   const tubesL3 = l3Solid?.count ?? l3Solid ?? 0;
   const stoneMesh = l3Solid?.stoneMesh ?? null;
+  active.stoneMesh = stoneMesh;
   const slabMask = l3Solid?.slabMask ?? null;
   const metalPack = l3Solid?.metalPack ?? null;
-  const stoneQ3Emboss = l3Solid?.stoneQ3Emboss ?? 0;
   if (!tubesL3) throw new Error('no L3 paths');
 
   let tubesMetalFringe = 0;
@@ -5615,8 +7805,22 @@ async function renderPbrCore(svg, opts) {
   let tubesL3Metal = 0;
   let tubesMetalEmboss = 0;
   let tubesQ1Ceramic = 0;
+  let tubesQ3Threads = 0;
 
   if (l3MaterialMode === 'stone' && STONE_L3_SLAB_MODE && stoneMesh && slabMask) {
+    reportProgress(opts.onProgress, 0.66, 'חוטי Q3…');
+    await yieldToMainThread();
+    tubesQ3Threads = addQ3MetalThreadLayer(
+      scene,
+      mount,
+      stoneMesh,
+      slabMask,
+      style2,
+      style3,
+      opts.ageNum,
+      ceramicQ1Mat,
+      opts.questionnaire
+    );
     reportProgress(opts.onProgress, 0.7, 'קרמיקה Q1…');
     await yieldToMainThread();
     const ceramicResult = addCeramicQ1CenterLayer(
@@ -5726,13 +7930,13 @@ async function renderPbrCore(svg, opts) {
     renderer,
     scene,
     tubesL2,
-    tubesL3: tubesL3 + tubesL3Metal + tubesMetalEmboss + tubesMetalFringe + tubesQ1Ceramic,
+    tubesL3: tubesL3 + tubesL3Metal + tubesMetalEmboss + tubesMetalFringe + tubesQ1Ceramic + tubesQ3Threads,
     tubesL3Slab: tubesL3,
     tubesL3Metal,
     tubesMetalEmboss,
     tubesMetalFringe,
     tubesQ1Ceramic,
-    stoneQ3Emboss,
+    tubesQ3Threads,
     tubesFrame,
     metalRough,
     l3Rough: l3Mat.roughness,
@@ -5750,10 +7954,10 @@ export async function renderThreePbrAmulet(opts) {
   console.log('ageNum:', opts.ageNum, 'domainHex:', opts.domainHex);
   let mount = null;
   try {
+    if (opts?.container) opts.container.innerHTML = '';
     const core = await renderPbrCore(opts.svg, opts);
     mount = core.mount;
 
-    opts.container.innerHTML = '';
     const canvas = core.renderer.domElement;
     canvas.style.display = 'block';
     canvas.style.width = '100%';
@@ -5766,6 +7970,7 @@ export async function renderThreePbrAmulet(opts) {
       tubesL3: core.tubesL3,
       tubesMetalFringe: core.tubesMetalFringe,
       tubesQ1Ceramic: core.tubesQ1Ceramic,
+      tubesQ3Threads: core.tubesQ3Threads,
       tubesFrame: core.tubesFrame,
       metalRough: core.metalRough,
       l3Rough: core.l3Rough,
@@ -5925,7 +8130,12 @@ export async function renderStoneLayerPreview(opts) {
   scene.environment = null;
   addStoneSculptureLights(scene);
 
-  const mat = buildStoneMaterial(style2).material;
+  const mat = buildStoneMaterial(
+    style2,
+    opts.questionnaire?.q4Belief ?? 'concrete_actions',
+    active.envMap,
+    opts.questionnaire
+  ).material;
   const mesh = new THREE.Mesh(geom, mat);
   mesh.scale.set(SLAB_STONE_XY_SCALE, SLAB_STONE_XY_SCALE, 1);
   geom.computeBoundingBox();
@@ -6027,4 +8237,23 @@ export async function renderMetalLayerPreview(opts) {
   return { ok: true, span, fringeCount: 0 };
 }
 
-export { buildStoneMaterial, addStoneLights, addStoneRefLights, addStoneSculptureLights, buildProceduralStoneTextures, deriveAmuletShapeParams, METAL_ELLIPSE_BY_BELIEF, buildCeramicQ1MaterialFromQ5, Q5_CERAMIC_MATERIAL };
+export {
+  buildStoneMaterial,
+  buildPremiumStoneMaterial,
+  buildAncientStonewareMaterial,
+  buildDeepStonewareMaterial,
+  buildPolishedJadeMarbleMaterial,
+  buildPolishedSlateMarbleMaterial,
+  q4StonePreset,
+  Q4_STONE_PRESET,
+  PREMIUM_MATERIAL_IDS,
+  PREMIUM_MATERIAL_LIBRARY,
+  addStoneLights,
+  addStoneRefLights,
+  addStoneSculptureLights,
+  buildProceduralStoneTextures,
+  deriveAmuletShapeParams,
+  METAL_ELLIPSE_BY_BELIEF,
+  buildCeramicQ1MaterialFromQ5,
+  Q5_CERAMIC_MATERIAL,
+};
