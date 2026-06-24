@@ -570,15 +570,15 @@
   }
 
   /**
-   * Q4 → עובי מסגרת מתכת בלבד (דק→עבה).
+   * Q4 — frame thickness is uniform (no belief-based scaling).
    * Q6 → מרקם/קוצניות מתכת (ערכי unified לפי סדר התשובות).
    */
   const Q4_BELIEF_FRAME_RADIUS_SCALE = {
     concrete_actions: 1.0,
-    support: 1.22,
-    signs: 1.48,
-    gut: 1.78,
-    doubt: 2.35
+    support: 1.0,
+    signs: 1.0,
+    gut: 1.0,
+    doubt: 1.0
   };
 
   const FRAME_CONTOUR_SMOOTH = { wobbleMix: 0, curlMix: 0, ampScale: 0, freqBias: 0, phase: 0 };
@@ -662,8 +662,8 @@
    * Q5 → גווני אפור-שחור (זמני) — אותה מיפוי תחום, ללא צבעים רוויים.
    */
   const Q5_CERAMIC_GRAY = {
-    hope: '#505058',
-    fear: '#101012',
+    hope: '#d2d2d8',
+    fear: '#505058',
     longing: '#3a342e',
     excitement: '#443030',
     impatience: '#3a3c36',
@@ -2230,7 +2230,7 @@
   let lastComposeCacheKey = '';
   let lastComposeResult = null;
   let pbrRendered = false;
-  const PBR_MODULE_VER = '20250623-basalt-support-v6-sage';
+  const PBR_MODULE_VER = '20250623-basalt-support-v6-micro';
   const pbrModulePromise = import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
   const shapeModulePromise = import('./amulet-shape-from-text.js');
 

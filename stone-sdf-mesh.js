@@ -11,8 +11,230 @@ import {
   isSharpReliefStonePreset,
   softStoneGeometryTier,
   normalizePremiumMaterialId,
+  getPremiumMaterialSpec,
 } from './amulet-material-presets.js';
 import { mergeVertices } from 'https://esm.sh/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js';
+
+function isMeteoriteStonePreset(params) {
+  return (
+    normalizePremiumMaterialId(params.stoneMaterialPreset ?? '') ===
+    PREMIUM_MATERIAL_IDS.METEORITE_STONE
+  );
+}
+
+function meteoriteSlabHeights(maxH, domeT, params) {
+  if (!isMeteoriteStonePreset(params)) {
+    return {
+      baseH: params.basePlateHeight ?? maxH * 0.4,
+      lobePeak: maxH * (0.92 + 0.08 * domeT),
+    };
+  }
+  return {
+    baseH: params.basePlateHeight ?? maxH * 0.3,
+    lobePeak: maxH * (1.0 + 0.2 * domeT),
+  };
+}
+
+function meteoriteCraterHash2(a, b) {
+  const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** Impact crater cross-section — recessed bowl, raised rim, smooth falloff. */
+function meteoriteCraterProfile(t, depth, rim) {
+  if (t >= 1) return 0;
+  const bowlT = Math.pow(Math.max(0, 1 - t / 0.76), 1.62);
+  const sink = -depth * bowlT;
+  const bowlFade = t < 0.56 ? 1 : Math.max(0, 1 - (t - 0.56) / 0.24);
+  const rimCenter = 0.79;
+  const rimHalf = 0.17;
+  const rimDist = Math.abs(t - rimCenter) / rimHalf;
+  let rimLift = 0;
+  if (rimDist < 1) {
+    rimLift = rim * Math.pow(Math.cos(rimDist * Math.PI * 0.5), 1.28);
+  } else if (t > rimCenter + rimHalf && t < 1) {
+    const fall = (1 - t) / Math.max(1 - (rimCenter + rimHalf), 0.001);
+    rimLift = rim * 0.12 * fall;
+  }
+  return sink * bowlFade + rimLift;
+}
+
+function meteoriteCombineRelief(acc, h) {
+  if (Math.abs(h) < 1e-6) return acc;
+  if (Math.abs(acc) < 1e-6) return h;
+  if (h < 0 && acc < 0) return Math.min(acc, h);
+  if (h < 0) return acc + h * 0.84;
+  return acc + h * 0.7;
+}
+
+/** Precompute crater sites — 4 depth layers beneath existing texture detail. */
+function buildMeteoriteCraterCatalog(params) {
+  const minX = params.maskOrigin.minX;
+  const maxX = params.maskOrigin.maxX;
+  const minY = params.maskOrigin.minY;
+  const maxY = params.maskOrigin.maxY;
+  const ox = (minX + maxX) * 0.5;
+  const oy = (minY + maxY) * 0.5;
+  const span = Math.max(maxX - minX, maxY - minY, params.roundR * 4);
+  const { maxH } = params;
+  const layers = [
+    {
+      cols: 2,
+      rows: 2,
+      coverage: 0.88,
+      radius: span * 0.26,
+      depth: maxH * 0.44,
+      rim: maxH * 0.132,
+      seed: 0x4d31,
+      jitter: 0.62,
+    },
+    {
+      cols: 5,
+      rows: 4,
+      coverage: 0.52,
+      radius: span * 0.068,
+      depth: maxH * 0.198,
+      rim: maxH * 0.062,
+      seed: 0x7a92,
+      jitter: 0.78,
+    },
+    {
+      cols: 9,
+      rows: 8,
+      coverage: 0.48,
+      radius: span * 0.028,
+      depth: maxH * 0.078,
+      rim: maxH * 0.025,
+      seed: 0x5c41,
+      jitter: 0.86,
+    },
+    {
+      cols: 16,
+      rows: 14,
+      coverage: 0.58,
+      radius: span * 0.009,
+      depth: maxH * 0.025,
+      rim: maxH * 0.0085,
+      seed: 0x2f18,
+      jitter: 0.92,
+    },
+  ];
+  const craters = [];
+  for (const layer of layers) {
+    const cellX = span / layer.cols;
+    const cellY = span / layer.rows;
+    for (let iy = 0; iy < layer.rows; iy++) {
+      for (let ix = 0; ix < layer.cols; ix++) {
+        const h0 = meteoriteCraterHash2(layer.seed + ix * 3.17, iy * 7.83 + layer.seed);
+        const h1 = meteoriteCraterHash2(ix * 11.1 + layer.seed, iy * 5.9 + layer.seed * 0.7);
+        const h2 = meteoriteCraterHash2(ix * 19.7 + iy, layer.seed * 1.3 + iy);
+        if (h0 > layer.coverage) continue;
+        const cx =
+          ox + (ix - (layer.cols - 1) * 0.5) * cellX + (h1 - 0.5) * cellX * layer.jitter;
+        const cy =
+          oy + (iy - (layer.rows - 1) * 0.5) * cellY + (h2 - 0.5) * cellY * layer.jitter;
+        craters.push({
+          cx,
+          cy,
+          radius: layer.radius * (0.82 + h1 * 0.36),
+          depth: layer.depth * (0.74 + h2 * 0.52),
+          rim: layer.rim * (0.76 + h0 * 0.48),
+          layer: layer.seed,
+        });
+      }
+    }
+  }
+  return { craters, span, ox, oy };
+}
+
+/** Large-scale mass undulation — 20–30% of object span, beneath crater layers. */
+function meteoriteMacroReliefAt(x, y, params) {
+  const catalog = params.meteoriteCraterCatalog;
+  const span = catalog?.span ?? Math.max(params.roundR * 8, 1);
+  const ox = catalog?.ox ?? params.maskOrigin.minX;
+  const oy = catalog?.oy ?? params.maskOrigin.minY;
+  const nx = (x - ox) / span;
+  const ny = (y - oy) / span;
+  const { maxH } = params;
+  const lobeA =
+    Math.sin(nx * Math.PI * 1.35 + 0.55) * Math.cos(ny * Math.PI * 1.08 - 0.35);
+  const lobeB =
+    Math.cos(nx * Math.PI * 2.05 - 1.2) * Math.sin(ny * Math.PI * 1.62 + 0.85);
+  const lobeC = Math.sin((nx * nx + ny * ny) * Math.PI * 2.35 + 0.4) * 0.38;
+  return (lobeA * 0.4 + lobeB * 0.36 + lobeC * 0.24) * maxH * 0.42;
+}
+
+/** Angular mass at silhouette — irregular dimensional read at distance. */
+function meteoriteSilhouetteMassAt(x, y, din, roundR, params) {
+  if (!isMeteoriteStonePreset(params)) return 0;
+  const catalog = params.meteoriteCraterCatalog;
+  const ox = catalog?.ox ?? (params.maskOrigin.minX + params.maskOrigin.maxX) * 0.5;
+  const oy = catalog?.oy ?? (params.maskOrigin.minY + params.maskOrigin.maxY) * 0.5;
+  const angle = Math.atan2(y - oy, x - ox);
+  const edgeProx = 1 - Math.min(1, din / Math.max(roundR * 1.08, 0.001));
+  const wobble =
+    Math.sin(angle * 2.8 + 0.65) * 0.52 + Math.sin(angle * 4.6 - 1.4) * 0.32;
+  return wobble * Math.pow(edgeProx, 0.68) * params.maxH * 0.28;
+}
+
+function meteoriteReliefEdgeFade(x, y, params) {
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  if (!s.inside) return 0;
+  const din = s.distIn / params.maskScale;
+  return Math.max(0.22, Math.min(1, din / Math.max(params.roundR * 0.22, 0.001)));
+}
+
+function meteoriteSlabSurfaceRelief(x, y, params) {
+  const catalog = params.meteoriteCraterCatalog;
+  if (!catalog) return 0;
+  const fade = meteoriteReliefEdgeFade(x, y, params);
+  if (fade <= 0) return 0;
+  let relief = meteoriteMacroReliefAt(x, y, params);
+  for (const c of catalog.craters ?? []) {
+    const dist = Math.hypot(x - c.cx, y - c.cy);
+    if (dist > c.radius * 1.04) continue;
+    const h = meteoriteCraterProfile(dist / c.radius, c.depth, c.rim);
+    relief = meteoriteCombineRelief(relief, h);
+  }
+  const cap = params.maxH * 0.55;
+  relief = Math.max(-cap, Math.min(params.maxH * 0.2, relief));
+  return relief * fade;
+}
+
+function attachMeteoriteCraterCatalog(params, slabMode) {
+  if (isMeteoriteStonePreset(params) && slabMode) {
+    params.meteoriteCraterCatalog = buildMeteoriteCraterCatalog(params);
+  }
+  return params;
+}
+
+function isMeteoriteStoneOptions(options, slabMode) {
+  return (
+    slabMode &&
+    normalizePremiumMaterialId(options?.stoneMaterialPreset ?? '') ===
+      PREMIUM_MATERIAL_IDS.METEORITE_STONE
+  );
+}
+
+function addSlabSurfaceRelief(hSurf, x, y, edgeDist, roundR, params) {
+  if (isMeteoriteStonePreset(params)) {
+    hSurf += meteoriteSilhouetteMassAt(x, y, edgeDist, roundR, params);
+  }
+  const delta = slabSurfaceReliefAt(x, y, edgeDist, roundR, params);
+  if (!isMeteoriteStonePreset(params)) return hSurf + delta;
+  const baseH = params.basePlateHeight ?? params.maxH * 0.4;
+  return Math.max(baseH * 0.58, hSurf + delta);
+}
+
+function slabSurfaceReliefAt(x, y, edgeDist, roundR, params) {
+  if (isMeteoriteStonePreset(params) && insideMachineEngraveAt(x, y, params)) return 0;
+  if (isMeteoriteStonePreset(params)) {
+    return meteoriteSlabSurfaceRelief(x, y, params);
+  }
+  return slabSurfaceSwell(x, y, edgeDist, roundR, params);
+}
 
 /**
  * Javascript Marching Cubes
@@ -734,13 +956,15 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
   const din = s.distIn / maskScale;
   const edgeT = Math.min(1, din / Math.max(roundR * 1.1, 0.01));
   const domeT = Math.sin(edgeT * Math.PI * 0.5);
-  const baseH = params.basePlateHeight ?? maxH * 0.4;
-  const lobePeak = maxH * (0.92 + 0.08 * domeT);
+  const { baseH, lobePeak } = meteoriteSlabHeights(maxH, domeT, params);
   let hSurf = baseH + (lobePeak - baseH) * domeT;
+  if (isMeteoriteStonePreset(params)) {
+    hSurf += maxH * 0.11 * Math.pow(domeT, 1.12);
+  }
   hSurf -= effectiveEngraveDepthAt(x, y, params);
   hSurf += inlayGrooveShoulderAt(x, y, params);
   hSurf = Math.max(baseH * 0.94, hSurf);
-  hSurf += slabSurfaceSwell(x, y, din, roundR, params);
+  hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
   const basePad = roundR * 0.5;
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   const phi2d = roundR - din;
@@ -855,23 +1079,27 @@ function slabTubeStoneSdfAt(x, y, z, params) {
   const crossT = Math.min(1, dist2d / Math.max(softR * 1.15, 0.001));
   const domeT = Math.pow(Math.max(0, 1 - crossT), soft.domePow);
   const baseH = params.basePlateHeight ?? maxH * 0.3;
-  const peakH = maxH * 1.04;
+  const peakH = maxH * (isMeteoriteStonePreset(params) ? 1.16 : 1.04);
   let hSurf = baseH + (peakH - baseH) * domeT;
 
   const crestT = Math.pow(Math.max(0, 1 - crossT * 1.05), soft.crestPow);
-  hSurf += (peakH - baseH) * 0.14 * crestT;
+  hSurf += (peakH - baseH) * (isMeteoriteStonePreset(params) ? 0.24 : 0.14) * crestT;
 
   const coreR = roundR * soft.coreR;
   const valleyOuter = roundR * soft.valleyOuter;
   const valleyMul = params.letterGapRelief ? soft.valleyMul + 0.16 : soft.valleyMul;
+  const valleyBoost = isMeteoriteStonePreset(params) ? 1.58 : 1;
   if (!params.solidInterior && dist2d > coreR && dist2d < valleyOuter) {
     const t = (dist2d - coreR) / (valleyOuter - coreR);
-    hSurf -= (peakH - baseH) * valleyMul * Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
-    hSurf = Math.max(baseH * 0.88, hSurf);
+    hSurf -=
+      (peakH - baseH) *
+      valleyMul *
+      valleyBoost *
+      Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
+    hSurf = Math.max(baseH * (isMeteoriteStonePreset(params) ? 0.78 : 0.88), hSurf);
   }
 
-  const swellAmt = slabSurfaceSwell(x, y, dist2d, roundR, params);
-  hSurf += swellAmt;
+  hSurf = addSlabSurfaceRelief(hSurf, x, y, dist2d, roundR, params);
 
   hSurf -= metalBedDepthAt(x, y, params);
   hSurf += metalBedShoulderAt(x, y, params);
@@ -1461,9 +1689,11 @@ function stoneSdfAt(x, y, z, params) {
   if (params.slabMode && (hasStrokeRelief || hasOverlayRelief)) {
     const edgeT = Math.min(1, din / Math.max(roundR * 1.1, 0.01));
     const domeT = Math.sin(edgeT * Math.PI * 0.5);
-    const baseH = params.basePlateHeight ?? maxH * 0.4;
-    const lobePeak = maxH * (0.88 + 0.12 * domeT);
+    const { baseH, lobePeak } = meteoriteSlabHeights(maxH, domeT, params);
     let hSurf = baseH + (lobePeak - baseH) * domeT;
+    if (isMeteoriteStonePreset(params)) {
+      hSurf += maxH * 0.11 * Math.pow(domeT, 1.12);
+    }
     const embossH = embossHeightAt(x, y, params);
     if (embossH > roundR * 0.02) hSurf += embossH;
     hSurf -= metalBedDepthAt(x, y, params);
@@ -1471,7 +1701,7 @@ function stoneSdfAt(x, y, z, params) {
     hSurf -= effectiveEngraveDepthAt(x, y, params);
     hSurf += inlayGrooveShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
-    hSurf += slabSurfaceSwell(x, y, din, roundR, params);
+    hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
     const basePad = roundR * 0.5;
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
     const machineEngrave =
@@ -1492,13 +1722,15 @@ function stoneSdfAt(x, y, z, params) {
   if (params.slabMode) {
     const edgeT = Math.min(1, din / Math.max(roundR * 1.1, 0.01));
     const domeT = Math.sin(edgeT * Math.PI * 0.5);
-    const baseH = params.basePlateHeight ?? maxH * 0.4;
-    const lobePeak = maxH * (0.92 + 0.08 * domeT);
+    const { baseH, lobePeak } = meteoriteSlabHeights(maxH, domeT, params);
     hSurf = baseH + (lobePeak - baseH) * domeT;
+    if (isMeteoriteStonePreset(params)) {
+      hSurf += maxH * 0.11 * Math.pow(domeT, 1.12);
+    }
     hSurf -= metalBedDepthAt(x, y, params);
     hSurf += metalBedShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
-    hSurf += slabSurfaceSwell(x, y, din, roundR, params);
+    hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
   } else {
     const t = Math.min(1, din / Math.max(maxDistInScene, 0.001));
     const domeT = Math.max(0, 1 - (1 - t) * (1 - t));
@@ -2050,6 +2282,24 @@ function stoneVertexColorPalette(params) {
       wearStyle: 'warm_marble',
     };
   }
+  if (preset === PREMIUM_MATERIAL_IDS.METEORITE_STONE) {
+    return {
+      hi: [1.0, 0.98, 0.94],
+      lo: [0.09, 0.08, 0.07],
+      grime: [0.06, 0.055, 0.05],
+      ridgeWear: true,
+      wearStyle: 'meteorite',
+    };
+  }
+  if (preset === PREMIUM_MATERIAL_IDS.GRAVEL_STONE) {
+    return {
+      hi: [0.62, 0.58, 0.54],
+      lo: [0.18, 0.16, 0.14],
+      grime: [0.1, 0.09, 0.08],
+      ridgeWear: true,
+      wearStyle: 'gravel',
+    };
+  }
   if (preset === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE) {
     return {
       hi: [0.28, 0.28, 0.3],
@@ -2095,6 +2345,13 @@ function applySculptureVertexAO(geom, params) {
   const archDoubt =
     normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage') ===
     PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT;
+  const meteoriteStone = isMeteoriteStonePreset(params);
+  const meteoriteSpec = meteoriteStone
+    ? getPremiumMaterialSpec(PREMIUM_MATERIAL_IDS.METEORITE_STONE)
+    : null;
+  const meteoriteAoK =
+    meteoriteSpec?.aoMapIntensity ?? meteoriteSpec?.aoIntensity ?? 2.5;
+  const aoStepCount = meteoriteStone ? 6 : 4;
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -2110,10 +2367,10 @@ function applySculptureVertexAO(geom, params) {
       const dot = nx * d[0] + ny * d[1] + nz * d[2];
       if (dot < 0.08) continue;
       weight += dot;
-      for (let step = 1; step <= 4; step++) {
-        const t = step * roundR * 0.11;
+      for (let step = 1; step <= aoStepCount; step++) {
+        const t = step * roundR * (meteoriteStone ? 0.095 : 0.11);
         const sdf = stoneSdfAt(x + d[0] * t, y + d[1] * t, z + d[2] * t, params);
-        if (sdf > -roundR * 0.04) {
+        if (sdf > -roundR * (meteoriteStone ? 0.028 : 0.04)) {
           occ += dot / step;
           break;
         }
@@ -2130,7 +2387,9 @@ function applySculptureVertexAO(geom, params) {
       const valleyR = params.roundR * 2.15;
       if (tubeDist > coreR && tubeDist < valleyR) {
         const valleyT = (tubeDist - coreR) / Math.max(valleyR - coreR, 0.001);
-        narrow = 0.12 + valleyT * 0.62;
+        narrow = meteoriteStone
+          ? 0.05 + valleyT * 0.82
+          : 0.12 + valleyT * 0.62;
       } else {
         narrow = Math.min(1, tubeDist / Math.max(params.roundR, 0.001));
       }
@@ -2159,16 +2418,62 @@ function applySculptureVertexAO(geom, params) {
           : 0.5;
     }
 
-    const cavity = ao * (params.slabMode ? (params.sharpRelief ? 0.58 : 0.36) : 0.28) + narrow * (params.slabMode ? 0.1 : 0.12);
-    const cavityT = Math.min(1, cavity);
+    let cavity =
+      ao *
+        (params.slabMode
+          ? meteoriteStone
+            ? 0.62 * meteoriteAoK * 0.22
+            : params.sharpRelief
+              ? 0.58
+              : 0.36
+          : 0.28) +
+      narrow * (params.slabMode ? (meteoriteStone ? 0.34 : 0.1) : 0.12);
+    let meteoriteCraterRelief = 0;
+    if (meteoriteStone && params.slabMode) {
+      meteoriteCraterRelief = meteoriteSlabSurfaceRelief(x, y, params);
+      if (meteoriteCraterRelief < 0) {
+        cavity +=
+          Math.min(1, (-meteoriteCraterRelief) / Math.max(params.maxH * 0.11, 0.001)) *
+          0.58 *
+          meteoriteAoK *
+          0.22;
+      }
+    }
+    const cavityT = Math.min(1, Math.pow(cavity, meteoriteStone ? 0.68 : 1));
     let lit = params.slabMode
-      ? params.sharpRelief && !archDoubt
-        ? 0.28 + (1.0 - Math.pow(cavityT, 0.48) * 0.72) * 0.56
-        : archDoubt
-          ? 0.48 + (1.0 - Math.pow(cavityT, 0.52) * 0.58) * 0.42
-          : 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
+      ? meteoriteStone
+        ? 0.05 + (1.0 - Math.pow(cavityT, 0.2) * 0.94) * 0.9
+        : params.sharpRelief && !archDoubt
+          ? 0.28 + (1.0 - Math.pow(cavityT, 0.48) * 0.72) * 0.56
+          : archDoubt
+            ? 0.48 + (1.0 - Math.pow(cavityT, 0.52) * 0.58) * 0.42
+            : 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
       : 0.88 + 0.12 * (1 - cavityT);
+    if (meteoriteStone) {
+      const spatial = meteoriteShadeSpatialFactors(x, y, params);
+      const crest = Math.max(0, nz - 0.32);
+      lit = Math.min(1, lit + crest * (0.48 + spatial.rightTopT * 0.22));
+      const trough = Math.max(0, 0.62 - nz);
+      lit = Math.max(0.03, lit - trough * 0.56 * spatial.bottomSoft);
+      lit = applyMeteoriteCurvatureShade(lit, nx, ny, nz, x, y, params);
+      lit = applyMeteoriteCenterFeatureShade(lit, x, y, z, nx, ny, nz, narrow, params);
+      lit = applyMeteoriteInteriorReliefShade(lit, x, y, z, params);
+      lit = applyMeteoriteRightProfileShade(lit, nx, ny, nz, x, y, params);
+    }
+    if (meteoriteCraterRelief > 0) {
+      lit = Math.min(1, lit + (meteoriteCraterRelief / Math.max(params.maxH * 0.07, 0.001)) * 0.44);
+    }
+    if (meteoriteStone) {
+      const spatial = meteoriteShadeSpatialFactors(x, y, params);
+      let contrast = 0.48 + meteoriteAoK * 0.28;
+      contrast *= spatial.bottomSoft;
+      contrast *= 1 + spatial.rightT * 0.28;
+      contrast *= 1 + spatial.centerT * 0.22;
+      lit = 0.5 + (lit - 0.5) * contrast;
+      lit = Math.max(0.03, Math.min(0.98, lit));
+    }
     lit = applyMetalContactShadow(lit, x, y, z, params);
+    lit = applyMeteoriteFrameContactShadow(lit, x, y, nx, ny, nz, params);
 
     const carve = effectiveEngraveDepthAt(x, y, params);
     const bed = metalBedDepthAt(x, y, params);
@@ -2182,11 +2487,11 @@ function applySculptureVertexAO(geom, params) {
     }
     if (carve > roundR * 0.002) {
       const carveShade = Math.min(1, carve / Math.max(roundR * 0.1, 0.001));
-      lit *= 1 - carveShade * (params.slabMode ? 0.5 : 0.18);
+      lit *= 1 - carveShade * (params.slabMode ? (meteoriteStone ? 0.72 : 0.5) : 0.18);
     }
     if (bed > 0 && z < baseZ + bed * 0.35) {
       grime = Math.min(1, (baseZ + bed * 0.42 - z) / Math.max(bed * 0.78, 0.01));
-      lit *= 1 - grime * 0.34;
+      lit *= 1 - grime * (meteoriteStone && params.slabMode ? 0.48 : 0.34);
     }
 
     if (params.engraveOverlays?.length) {
@@ -2199,7 +2504,15 @@ function applySculptureVertexAO(geom, params) {
         const edgeW = ov.edgeWidth ?? roundR * 0.32;
         const t = Math.min(1, din / Math.max(edgeW * 1.05, 0.01));
         const grooveT = Math.pow(Math.sin(t * Math.PI * 0.5), 0.72);
-        const grooveDark = ov.thinChannel ? 0.76 : params.slabMode ? (archDoubt ? 0.58 : 0.38) : 0.24;
+        const grooveDark = ov.thinChannel
+          ? 0.76
+          : params.slabMode
+            ? meteoriteStone
+              ? 0.68
+              : archDoubt
+                ? 0.58
+                : 0.38
+            : 0.24;
         lit *= 1 - grooveT * grooveDark;
         if (ov.thinChannel) {
           const rimT = 1 - grooveT;
@@ -2212,7 +2525,12 @@ function applySculptureVertexAO(geom, params) {
 
     const embossH = embossHeightAt(x, y, params);
     if (embossH > params.roundR * 0.08) {
-      const embossBoost = archDoubt && params.sharpRelief ? 0.26 : 0.06;
+      const embossBoost =
+        meteoriteStone && params.slabMode
+          ? 0.14
+          : archDoubt && params.sharpRelief
+            ? 0.26
+            : 0.06;
       lit = Math.min(
         1,
         lit + Math.min(1, embossH / Math.max(params.embossHeight ?? params.roundR * 2, 0.01)) * embossBoost
@@ -2248,6 +2566,10 @@ function applySculptureVertexAO(geom, params) {
       const grainMul =
         preset === PREMIUM_MATERIAL_IDS.VOLCANIC_STONE
           ? 0.028
+          : preset === PREMIUM_MATERIAL_IDS.METEORITE_STONE
+            ? 0.044
+          : preset === PREMIUM_MATERIAL_IDS.GRAVEL_STONE
+            ? 0.048
           : preset === PREMIUM_MATERIAL_IDS.DRY_TERRACOTTA || preset === PREMIUM_MATERIAL_IDS.WARM_MOONSTONE
             ? 0.042
             : preset === PREMIUM_MATERIAL_IDS.ANCIENT_STONEWARE
@@ -2273,6 +2595,10 @@ function applySculptureVertexAO(geom, params) {
       const wearBase =
         style === 'volcanic'
           ? 2.1
+          : style === 'gravel'
+            ? 2.35
+          : style === 'meteorite'
+            ? 2.75
           : style === 'terracotta'
             ? 2.4
             : style === 'archaeological_tile'
@@ -2293,6 +2619,10 @@ function applySculptureVertexAO(geom, params) {
       const wearAmp =
         style === 'volcanic'
           ? 0.12
+          : style === 'gravel'
+            ? 0.13
+          : style === 'meteorite'
+            ? 0.18
           : style === 'terracotta'
             ? 0.16
             : style === 'archaeological_tile'
@@ -2315,6 +2645,14 @@ function applySculptureVertexAO(geom, params) {
         r = Math.min(1, r + wear * 0.08);
         g = Math.min(1, g + wear * 0.08);
         b = Math.min(1, b + wear * 0.08);
+      } else if (style === 'gravel') {
+        r = Math.min(1, r + wear * 0.09);
+        g = Math.min(1, g + wear * 0.085);
+        b = Math.min(1, b + wear * 0.08);
+      } else if (style === 'meteorite') {
+        r = Math.min(1, r + wear * 0.11);
+        g = Math.min(1, g + wear * 0.105);
+        b = Math.min(1, b + wear * 0.098);
       } else if (style === 'terracotta') {
         r = Math.min(1, r + wear * 0.14);
         g = Math.min(1, g + wear * 0.1);
@@ -2361,6 +2699,238 @@ function applySculptureVertexAO(geom, params) {
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
+function meteoriteShadeSmoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / Math.max(edge1 - edge0, 0.001)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Top/bottom + left/right weights for regional meteorite sculptural read. */
+function meteoriteShadeSpatialFactors(x, y, params) {
+  const ox = params.maskOrigin;
+  const spanX = Math.max(ox.maxX - ox.minX, 0.001);
+  const spanY = Math.max(ox.maxY - ox.minY, 0.001);
+  const topT = Math.max(0, Math.min(1, (ox.maxY - y) / spanY));
+  const bottomT = 1 - topT;
+  const rightNorm = (x - (ox.minX + ox.maxX) * 0.5) / (spanX * 0.5);
+  const rightT = Math.max(0, Math.min(1, rightNorm * 0.5 + 0.5));
+  const bottomSoft = 1 - bottomT * 0.42;
+  const rightTopT = rightT * meteoriteShadeSmoothstep(0.32, 0.82, topT);
+  const cx = (ox.minX + ox.maxX) * 0.5;
+  const cy = (ox.minY + ox.maxY) * 0.5;
+  const dist = Math.hypot((x - cx) / (spanX * 0.36), (y - cy) / (spanY * 0.36));
+  const centerT = Math.max(0, 1 - dist);
+  return { topT, bottomT, rightT, rightNorm, bottomSoft, rightTopT, centerT };
+}
+
+/** Expected slab sculpt height at XY — mirrors tube/valley/crater geometry for vertex relief shade. */
+function meteoriteSculptHeightAt(x, y, params) {
+  const { roundR, maxH } = params;
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  if (!s.inside) return params.basePlateHeight ?? maxH * 0.4;
+  const din = s.distIn / params.maskScale;
+
+  let hSurf;
+  if (params.segments?.length) {
+    const tier = params.softStoneTier ?? 0;
+    const soft = slabTubeSoftFactors(tier);
+    const dist2d = nearestTubeDist(x, y, params.segments, params.segmentIndex);
+    const softR = roundR * soft.softRMul;
+    const crossT = Math.min(1, dist2d / Math.max(softR * 1.15, 0.001));
+    const domeT = Math.pow(Math.max(0, 1 - crossT), soft.domePow);
+    const baseH = params.basePlateHeight ?? maxH * 0.3;
+    const peakH = maxH * 1.16;
+    hSurf = baseH + (peakH - baseH) * domeT;
+    const crestT = Math.pow(Math.max(0, 1 - crossT * 1.05), soft.crestPow);
+    hSurf += (peakH - baseH) * 0.24 * crestT;
+    const coreR = roundR * soft.coreR;
+    const valleyOuter = roundR * soft.valleyOuter;
+    const valleyMul = params.letterGapRelief ? soft.valleyMul + 0.16 : soft.valleyMul;
+    if (!params.solidInterior && dist2d > coreR && dist2d < valleyOuter) {
+      const t = (dist2d - coreR) / Math.max(valleyOuter - coreR, 0.001);
+      hSurf -=
+        (peakH - baseH) *
+        valleyMul *
+        1.58 *
+        Math.pow(Math.sin(t * Math.PI * 0.5), 1.05);
+      hSurf = Math.max(baseH * 0.78, hSurf);
+    }
+  } else {
+    const edgeT = Math.min(1, din / Math.max(roundR * 1.1, 0.01));
+    const domeT = Math.sin(edgeT * Math.PI * 0.5);
+    const { baseH, lobePeak } = meteoriteSlabHeights(maxH, domeT, params);
+    hSurf = baseH + (lobePeak - baseH) * domeT;
+    hSurf += maxH * 0.11 * Math.pow(domeT, 1.12);
+    hSurf = Math.max(baseH * 0.94, hSurf);
+  }
+
+  hSurf -= metalBedDepthAt(x, y, params);
+  hSurf += metalBedShoulderAt(x, y, params);
+  hSurf -= effectiveEngraveDepthAt(x, y, params);
+  hSurf += inlayGrooveShoulderAt(x, y, params);
+  hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
+  hSurf += embossHeightAt(x, y, params);
+  return hSurf;
+}
+
+/** Laplacian on sculpt height — reveals interior craters, valleys, emboss the texture hides. */
+function applyMeteoriteInteriorReliefShade(lit, x, y, z, params) {
+  if (!isMeteoriteStonePreset(params) || !params.slabMode) return lit;
+  const eps = params.roundR * 0.1;
+  const hC = meteoriteSculptHeightAt(x, y, params);
+  const hL = meteoriteSculptHeightAt(x - eps, y, params);
+  const hR = meteoriteSculptHeightAt(x + eps, y, params);
+  const hD = meteoriteSculptHeightAt(x, y - eps, params);
+  const hU = meteoriteSculptHeightAt(x, y + eps, params);
+  const lap = (hL + hR + hD + hU) * 0.25 - hC;
+  const lapScale = Math.max(params.maxH * 0.038, 0.001);
+  const lapT = Math.min(1, Math.abs(lap) / lapScale);
+
+  if (lap > 0) {
+    lit = Math.max(0.02, lit - lapT * 0.62);
+  } else if (lap < 0) {
+    lit = Math.min(1, lit + lapT * 0.46);
+  }
+
+  const gradX = (hR - hL) / Math.max(eps * 2, 0.001);
+  const gradY = (hU - hD) / Math.max(eps * 2, 0.001);
+  const slope = Math.min(1, Math.hypot(gradX, gradY) / Math.max(params.maxH * 0.14, 0.001));
+  lit = Math.max(0.02, lit - slope * 0.18);
+  lit = Math.min(1, lit + slope * 0.14 * Math.max(0, 1 - Math.abs(gradX) / (Math.abs(gradX) + Math.abs(gradY) + 0.001)));
+
+  const relief = meteoriteSlabSurfaceRelief(x, y, params);
+  if (relief < -params.maxH * 0.012) {
+    const depthT = Math.min(1, (-relief) / Math.max(params.maxH * 0.1, 0.001));
+    lit = Math.max(0.02, lit - depthT * 0.38);
+  } else if (relief > params.maxH * 0.008) {
+    const rimT = Math.min(1, relief / Math.max(params.maxH * 0.07, 0.001));
+    lit = Math.min(1, lit + rimT * 0.32);
+  }
+
+  const dz = hC - z;
+  if (Math.abs(dz) > params.maxH * 0.006) {
+    const dzT = Math.min(1, Math.abs(dz) / Math.max(params.maxH * 0.05, 0.001));
+    if (dz > 0) lit = Math.max(0.02, lit - dzT * 0.24);
+    else lit = Math.min(1, lit + dzT * 0.2);
+  }
+
+  return lit;
+}
+
+/** Extra shadow on right profile and right-side silhouette band. */
+function applyMeteoriteRightProfileShade(lit, nx, ny, nz, x, y, params) {
+  if (!isMeteoriteStonePreset(params) || !params.slabMode) return lit;
+  const spatial = meteoriteShadeSpatialFactors(x, y, params);
+  if (spatial.rightNorm < 0.01) return lit;
+  const rightW = meteoriteShadeSmoothstep(0.0, 0.78, spatial.rightNorm);
+
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  const din = s.inside ? s.distIn / params.maskScale : 0;
+  const edgeProx = 1 - Math.min(1, din / Math.max(params.roundR * 0.72, 0.001));
+
+  const sideTilt = Math.sqrt(nx * nx + ny * ny);
+  const faceRight = Math.max(0, nx) * sideTilt;
+  lit = Math.max(0.02, lit - faceRight * rightW * (0.44 + edgeProx * 0.34));
+
+  const pocket = Math.max(0, -nx * 0.62 + sideTilt * 0.28) * rightW;
+  lit = Math.max(0.02, lit - pocket * 0.42 * (1.05 - nz * 0.35));
+
+  if (din < params.roundR * 0.62) {
+    const t = 1 - din / Math.max(params.roundR * 0.62, 0.001);
+    const edgeDark = t * t * 0.62 * rightW * spatial.bottomSoft;
+    lit = Math.max(0.02, lit * (1 - edgeDark) - t * sideTilt * 0.22 * rightW);
+  }
+
+  return lit;
+}
+
+/** Boost tube crests/valleys and emboss in the amulet center field. */
+function applyMeteoriteCenterFeatureShade(lit, x, y, z, nx, ny, nz, narrow, params) {
+  if (!isMeteoriteStonePreset(params) || !params.slabMode) return lit;
+  const spatial = meteoriteShadeSpatialFactors(x, y, params);
+  const centerW = 0.5 + spatial.centerT * 0.5;
+  let boost = 0;
+
+  if (params.segments?.length) {
+    const tubeDist = nearestTubeDist(x, y, params.segments, params.segmentIndex);
+    const coreR = params.roundR * 0.82;
+    const valleyR = params.roundR * 2.35;
+    if (tubeDist < valleyR) {
+      const tubeT = 1 - Math.min(1, tubeDist / valleyR);
+      if (tubeDist < coreR * 0.95) {
+        boost += tubeT * centerW * 0.38 * Math.max(0, nz - 0.18);
+      } else if (tubeDist > coreR) {
+        const valleyT = (tubeDist - coreR) / Math.max(valleyR - coreR, 0.001);
+        lit = Math.max(
+          0.02,
+          lit - tubeT * centerW * 0.36 * Math.pow(Math.sin(valleyT * Math.PI * 0.5), 0.82)
+        );
+      }
+    }
+  }
+
+  const embossH = embossHeightAt(x, y, params);
+  if (embossH > params.roundR * 0.05) {
+    const eT = Math.min(1, embossH / Math.max(params.embossHeight ?? params.roundR * 2, 0.01));
+    boost += eT * centerW * (0.34 + nz * 0.24);
+  }
+
+  if (params.letterGapRelief && narrow > 0.28) {
+    lit = Math.max(0.02, lit - (narrow - 0.28) * centerW * 0.42);
+  }
+
+  const carve = effectiveEngraveDepthAt(x, y, params);
+  if (carve > params.roundR * 0.012) {
+    const carveT = Math.min(1, carve / Math.max(params.roundR * 0.085, 0.001));
+    lit = Math.max(0.02, lit - carveT * centerW * 0.32 * (1 - nz * 0.22));
+  }
+
+  return Math.min(1, lit + boost);
+}
+
+/** Contact shadow at stone silhouette — symmetric left/right edge thickness read. */
+function applyMeteoriteFrameContactShadow(lit, x, y, nx, ny, nz, params) {
+  if (!isMeteoriteStonePreset(params) || !params.slabMode) return lit;
+  const spatial = meteoriteShadeSpatialFactors(x, y, params);
+  const px = (x - params.maskOrigin.minX) * params.maskScale;
+  const py = (params.maskOrigin.maxY - y) * params.maskScale;
+  const s = sampleMaskField(px, py, params);
+  if (!s.inside) return lit;
+  const din = s.distIn / params.maskScale;
+  const edgeBand = params.roundR * 0.46;
+  if (din >= edgeBand) return lit;
+  const t = 1 - din / Math.max(edgeBand, 0.001);
+  let edgeDark = t * t * 0.54 * spatial.bottomSoft;
+  if (spatial.rightT > 0.12) {
+    edgeDark *= 1 + spatial.rightT * 0.58;
+  }
+  const sideTilt = Math.min(1, Math.sqrt(nx * nx + ny * ny) * 1.22);
+  let lipDark = t * sideTilt * 0.26 * (1.08 - nz * 0.42) * spatial.bottomSoft;
+  if (spatial.rightT > 0.12) {
+    lipDark *= 1 + spatial.rightT * 0.65;
+  } else if (spatial.bottomT > 0.42) {
+    lipDark *= 0.58;
+  }
+  return Math.max(0.03, lit * (1 - edgeDark) - lipDark);
+}
+
+/** Darken concave twists / side-facing curves — sculptural read without geometry change. */
+function applyMeteoriteCurvatureShade(lit, nx, ny, nz, x, y, params) {
+  if (!isMeteoriteStonePreset(params) || !params.slabMode) return lit;
+  const spatial = meteoriteShadeSpatialFactors(x, y, params);
+  const sideTilt = Math.sqrt(nx * nx + ny * ny);
+  const concave = Math.pow(Math.min(1, sideTilt * 1.42), 1.05);
+  lit = Math.max(0.03, lit - concave * 0.42 * spatial.bottomSoft * (1.05 - nz * 0.55));
+  if (nz > 0.4) {
+    const crestAmt = 0.38 + spatial.rightTopT * 0.24;
+    lit = Math.min(1, lit + (nz - 0.4) * crestAmt);
+  }
+  return lit;
+}
+
 /** Soft contact shadow from L2 metal tubes onto stone beneath — geometry stays intact */
 function applyMetalContactShadow(lit, x, y, z, params) {
   const { distToL2, maskScale, maskOrigin, maxH, w, h } = params;
@@ -2371,10 +2941,11 @@ function applyMetalContactShadow(lit, x, y, z, params) {
   if (mx < 0 || mx >= w || my < 0 || my >= h) return lit;
 
   const distToMetal = distToL2[my * w + mx];
-  const contact = Math.exp(-distToMetal / 18);
+  const contact = Math.exp(-distToMetal / (isMeteoriteStonePreset(params) ? 14 : 18));
   const topWeight = Math.min(1, z / Math.max(maxH, 0.01));
-  const shadowAmt = contact * (0.48 + 0.58 * topWeight);
-  return lit * (1 - shadowAmt * 0.52);
+  const meteorite = isMeteoriteStonePreset(params);
+  const shadowAmt = contact * (meteorite ? 0.72 + 0.38 * topWeight : 0.48 + 0.58 * topWeight);
+  return lit * (1 - shadowAmt * (meteorite ? 0.58 : 0.52));
 }
 
 /** Slab mode — metal contact shadow only (no full cavity AO), for vertexColors on stone material. */
@@ -2455,8 +3026,11 @@ export function buildStoneSculptureMeshFromMask(
     if (buildGrid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
   }
 
+  const meteoriteGeom = isMeteoriteStoneOptions(options, slabMode);
   const maxH = slabMode
-    ? tubeRadius * (hasRelief ? 1.22 : 1.02)
+    ? meteoriteGeom
+      ? tubeRadius * (hasRelief ? 1.72 : 1.52)
+      : tubeRadius * (hasRelief ? 1.22 : 1.02)
     : segments?.length
       ? tubeRadius * 1.28
       : tubeRadius * 1.08;
@@ -2497,7 +3071,10 @@ export function buildStoneSculptureMeshFromMask(
     hasMachineCut || hasHairlineEngrave || hasChannelEngrave ? 34 : hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
     Math.round(res * (spanZ / maxSpan))
   );
-  const maxVoxels = erodedArtifact ? 84000 : 65000;
+  if (meteoriteGeom) {
+    nz = Math.max(36, Math.round(nz * 1.58));
+  }
+  const maxVoxels = meteoriteGeom ? 94000 : erodedArtifact ? 84000 : 65000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -2572,6 +3149,7 @@ export function buildStoneSculptureMeshFromMask(
     softStoneTier,
     sharpRelief,
   };
+  attachMeteoriteCraterCatalog(params, slabMode);
 
   const potential = (x, y, z) => {
     let sdf = stoneSdfAt(x, y, z, params);
@@ -2670,8 +3248,11 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     if (buildGrid[i] && distIn[i] < 1e6) maxDistIn = Math.max(maxDistIn, distIn[i]);
   }
 
+  const meteoriteGeom = isMeteoriteStoneOptions(options, slabMode);
   const maxH = slabMode
-    ? tubeRadius * (hasRelief ? 1.22 : 1.02)
+    ? meteoriteGeom
+      ? tubeRadius * (hasRelief ? 1.72 : 1.52)
+      : tubeRadius * (hasRelief ? 1.22 : 1.02)
     : segments?.length
       ? tubeRadius * 1.28
       : tubeRadius * 1.08;
@@ -2712,7 +3293,10 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     hasMachineCut || hasHairlineEngrave || hasChannelEngrave ? 34 : hasStrokeRelief ? 28 : hasRelief ? 22 : 18,
     Math.round(res * (spanZ / maxSpan))
   );
-  const maxVoxels = erodedArtifact ? 84000 : 65000;
+  if (meteoriteGeom) {
+    nz = Math.max(36, Math.round(nz * 1.58));
+  }
+  const maxVoxels = meteoriteGeom ? 94000 : erodedArtifact ? 84000 : 65000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -2787,6 +3371,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     softStoneTier,
     sharpRelief,
   };
+  attachMeteoriteCraterCatalog(params, slabMode);
 
   const potential = (x, y, z) => {
     let sdf = stoneSdfAt(x, y, z, params);
