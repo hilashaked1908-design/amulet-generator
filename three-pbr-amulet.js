@@ -57,6 +57,16 @@ let active = {
   ceramicQ5Feeling: null,
   q5AccentLights: null,
   stoneMesh: null,
+  interactive: null,
+};
+
+const loaderPark = {
+  scene: null,
+  camera: null,
+  renderer: null,
+  interactive: null,
+  baseRotY: 0,
+  isDemo: false,
 };
 let sharedEnvMap = null;
 let sharedStudioEnvMap = null;
@@ -72,6 +82,13 @@ function disposeSharedEnvMaps() {
     sharedStudioEnvMap = null;
   }
   envMapRenderer = null;
+}
+
+function disposeInteractive() {
+  if (active.interactive) {
+    active.interactive.dispose();
+    active.interactive = null;
+  }
 }
 
 function disposeActiveScene() {
@@ -93,6 +110,7 @@ function disposeActiveScene() {
 }
 
 function disposeActive() {
+  disposeInteractive();
   disposeActiveScene();
   if (active.renderer) {
     active.renderer.dispose();
@@ -289,6 +307,34 @@ function resolveStoneRoughness(style2 = null, questionnaire = null) {
     return Math.max(0, Math.min(1, Number(questionnaire.l3Spike)));
   }
   return 0;
+}
+
+/** Q6 difficulty → slab thorn intensity (0 = smooth, 1 = spiky) — matches prototype L3_SPIKE_BY_DIFFICULTY. */
+const Q6_SLAB_THORN_BY_DIFFICULTY = {
+  uncertainty: 0.08,
+  waiting: 0.28,
+  letting_go: 0.48,
+  failure: 0.62,
+  no_control: 0.78,
+  decision: 0.92,
+};
+
+function resolveSlabThornIntensity(questionnaire = null) {
+  if (questionnaire?.l3Spike != null) {
+    return Math.max(0, Math.min(1, Number(questionnaire.l3Spike)));
+  }
+  const q6 = questionnaire?.q6Difficulty;
+  if (q6 && Q6_SLAB_THORN_BY_DIFFICULTY[q6] != null) {
+    return Q6_SLAB_THORN_BY_DIFFICULTY[q6];
+  }
+  return Q6_SLAB_THORN_BY_DIFFICULTY.uncertainty;
+}
+
+function slabThornSeedFromQ6(q6Key) {
+  let h = 0x9e3779b9;
+  const s = String(q6Key || 'uncertainty');
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x85ebca6b);
+  return h >>> 0;
 }
 
 function occupationRoughness(style2) {
@@ -748,8 +794,8 @@ function buildFastHdrStandardMaterial(envMap, spec) {
 
 /** Q5 → Q1 ceramic + slab frame material preset + tint. */
 const Q5_CERAMIC_MATERIAL = {
-  hope: { preset: 'fasthdr_matte_white', color: 0xd2d2d8 },
-  excitement: { preset: 'chrome', color: 0xffffff },
+  hope: { preset: 'fasthdr_matte_white', color: 0xaeaeb4, roughness: 1.0, envMapIntensity: 0.05 },
+  excitement: { preset: 'chrome', color: 0xd0d0d6, roughness: 0.05, envMapIntensity: 2.05 },
   fear: { preset: 'fasthdr_black_chrome', color: 0x505058, roughness: 0.07 },
   confusion: { preset: 'fasthdr_brushed_metal' },
   impatience: { preset: 'fasthdr_matte_black' },
@@ -781,6 +827,14 @@ function tuneMeteoriteStoneScene(renderer, scene) {
 
 function tuneRendererExposureForQ5(renderer, q5Feeling) {
   if (!renderer) return;
+  if (q5Feeling === 'hope') {
+    renderer.toneMappingExposure = 1.08;
+    return;
+  }
+  if (q5Feeling === 'excitement') {
+    renderer.toneMappingExposure = 1.28;
+    return;
+  }
   const preset = q5CeramicPresetSpec(q5Feeling).preset;
   renderer.toneMappingExposure =
     preset === 'chrome' || preset === 'fasthdr_chrome' || preset === 'fasthdr_black_chrome'
@@ -796,6 +850,16 @@ function tuneRendererExposureForQ5(renderer, q5Feeling) {
 
 function tuneSceneEnvironmentForQ5(scene, q5Feeling) {
   if (!scene) return;
+  if ('environmentIntensity' in scene) {
+    if (q5Feeling === 'hope') {
+      scene.environmentIntensity = 0.28;
+      return;
+    }
+    if (q5Feeling === 'excitement') {
+      scene.environmentIntensity = 1.55;
+      return;
+    }
+  }
   const preset = q5CeramicPresetSpec(q5Feeling).preset;
   if ('environmentIntensity' in scene) {
     scene.environmentIntensity =
@@ -809,6 +873,267 @@ function tuneSceneEnvironmentForQ5(scene, q5Feeling) {
               ? 1.35
               : 1.0;
   }
+}
+
+/** Darker crevice read — lighting only; materials unchanged. */
+function deepenSceneShadows(scene, renderer) {
+  if (scene) {
+    scene.traverse((obj) => {
+      if (!obj.isLight) return;
+      if (obj.isAmbientLight || obj.isHemisphereLight) {
+        obj.intensity *= 0.48;
+      } else if (obj.isDirectionalLight && obj.intensity < 3.5) {
+        obj.intensity *= 0.62;
+      }
+    });
+    if ('environmentIntensity' in scene) {
+      scene.environmentIntensity *= 0.72;
+    }
+  }
+  if (renderer) {
+    renderer.toneMappingExposure *= 0.93;
+  }
+}
+
+const ORBIT_ROTATE_SPEED = 0.0055;
+const ORBIT_TILT_LIMIT = 0.82;
+const AUTO_ROTATE_SPEED = 0.0042;
+
+function disposeLoaderInteractive() {
+  if (loaderPark.interactive) {
+    loaderPark.interactive.dispose();
+    loaderPark.interactive = null;
+  }
+}
+
+export function disposeLoaderPark() {
+  disposeLoaderInteractive();
+  if (loaderPark.scene) {
+    disposeScene(loaderPark.scene);
+    loaderPark.scene = null;
+    loaderPark.camera = null;
+  }
+  if (loaderPark.renderer) {
+    loaderPark.renderer.dispose();
+    loaderPark.renderer = null;
+  }
+  loaderPark.baseRotY = 0;
+  loaderPark.isDemo = false;
+  const slot = document.getElementById('loaderAmuletSlot');
+  if (slot) slot.innerHTML = '';
+}
+
+function mountParkedCanvas(container) {
+  if (!loaderPark.renderer || !container) return;
+  const canvas = loaderPark.renderer.domElement;
+  container.innerHTML = '';
+  container.appendChild(canvas);
+  canvas.style.display = 'block';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.maxWidth = '100%';
+  canvas.style.maxHeight = '100%';
+  canvas.style.touchAction = 'none';
+}
+
+function createOrbitControls(canvas, { scene, camera, renderer, baseRotY, autoRotate = false }) {
+  let userRotX = autoRotate ? 0.24 : 0;
+  let userRotY = 0;
+  let dragging = false;
+  let pointerId = null;
+  let lastX = 0;
+  let lastY = 0;
+  let autoRotating = Boolean(autoRotate);
+  let rafId = 0;
+
+  function applyRotation() {
+    scene.rotation.x = userRotX;
+    scene.rotation.y = baseRotY + userRotY;
+    scene.updateMatrixWorld(true);
+  }
+
+  function renderFrame() {
+    renderer.render(scene, camera);
+  }
+
+  function tick() {
+    if (autoRotating && !dragging) {
+      userRotY += AUTO_ROTATE_SPEED;
+      applyRotation();
+      renderFrame();
+    }
+    rafId = window.requestAnimationFrame(tick);
+  }
+
+  function setAutoRotate(enabled) {
+    autoRotating = Boolean(enabled);
+    if (autoRotating) {
+      userRotX = 0.24;
+      applyRotation();
+      renderFrame();
+    }
+    if (autoRotating && !rafId) {
+      rafId = window.requestAnimationFrame(tick);
+    } else if (!autoRotating) {
+      stopLoop();
+    }
+  }
+
+  function stopLoop() {
+    if (rafId) {
+      window.cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  function onPointerDown(e) {
+    dragging = true;
+    pointerId = e.pointerId;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.setPointerCapture(pointerId);
+    canvas.style.cursor = 'grabbing';
+  }
+
+  function onPointerMove(e) {
+    if (!dragging || e.pointerId !== pointerId) return;
+    userRotY += (e.clientX - lastX) * ORBIT_ROTATE_SPEED;
+    userRotX += (e.clientY - lastY) * ORBIT_ROTATE_SPEED;
+    userRotX = Math.max(-ORBIT_TILT_LIMIT, Math.min(ORBIT_TILT_LIMIT, userRotX));
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyRotation();
+    renderFrame();
+  }
+
+  function endDrag(e) {
+    if (e.pointerId !== pointerId) return;
+    dragging = false;
+    pointerId = null;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    canvas.style.cursor = autoRotating ? 'default' : 'grab';
+  }
+
+  canvas.style.cursor = autoRotating ? 'default' : 'grab';
+  canvas.style.touchAction = 'none';
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
+
+  applyRotation();
+  renderFrame();
+  if (autoRotating) {
+    rafId = window.requestAnimationFrame(tick);
+  }
+
+  return {
+    reset() {
+      userRotX = autoRotating ? 0.24 : 0;
+      userRotY = 0;
+      applyRotation();
+      renderFrame();
+    },
+    setAutoRotate,
+    dispose() {
+      stopLoop();
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', endDrag);
+      canvas.removeEventListener('pointercancel', endDrag);
+      canvas.removeEventListener('lostpointercapture', endDrag);
+      canvas.style.cursor = '';
+      canvas.style.touchAction = '';
+    },
+  };
+}
+
+/** Move the current finished amulet into the loader slot (previous step preview). */
+export function parkCurrentAmuletForLoader(container) {
+  if (!active.scene || !active.renderer || !active.camera || !container) return false;
+
+  disposeLoaderPark();
+  disposeInteractive();
+
+  const canvas = active.renderer.domElement;
+  loaderPark.scene = active.scene;
+  loaderPark.camera = active.camera;
+  loaderPark.renderer = active.renderer;
+  loaderPark.baseRotY = active.scene.rotation.y;
+  loaderPark.isDemo = false;
+
+  active.scene = null;
+  active.camera = null;
+  active.renderer = null;
+  active.interactive = null;
+  active.ceramicMeshes = null;
+  active.q5MaterialMeshes = null;
+  active.ceramicQ1Material = null;
+  active.ceramicQ5Feeling = null;
+  active.stoneMesh = null;
+  active.q5AccentLights = null;
+
+  mountParkedCanvas(container);
+  loaderPark.interactive = createOrbitControls(canvas, {
+    scene: loaderPark.scene,
+    camera: loaderPark.camera,
+    renderer: loaderPark.renderer,
+    baseRotY: loaderPark.baseRotY,
+    autoRotate: true,
+  });
+
+  return true;
+}
+
+export function resumeLoaderParkSpin(container) {
+  if (!loaderPark.scene || !loaderPark.renderer || !container) return false;
+  mountParkedCanvas(container);
+  if (!loaderPark.interactive) {
+    loaderPark.interactive = createOrbitControls(loaderPark.renderer.domElement, {
+      scene: loaderPark.scene,
+      camera: loaderPark.camera,
+      renderer: loaderPark.renderer,
+      baseRotY: loaderPark.baseRotY,
+      autoRotate: true,
+    });
+  } else {
+    loaderPark.interactive.setAutoRotate(true);
+  }
+  return true;
+}
+
+export function pauseLoaderParkSpin() {
+  loaderPark.interactive?.setAutoRotate?.(false);
+}
+
+export function markLoaderParkAsDemo() {
+  loaderPark.isDemo = true;
+}
+
+export function loaderParkIsReady() {
+  return Boolean(loaderPark.scene && loaderPark.renderer);
+}
+
+function attachAmuletOrbitControls(canvas, { scene, camera, renderer, baseRotY, autoRotate = false }) {
+  disposeInteractive();
+  const handle = createOrbitControls(canvas, {
+    scene,
+    camera,
+    renderer,
+    baseRotY,
+    autoRotate,
+  });
+  active.interactive = handle;
+  return handle;
+}
+
+export function setAmuletAutoRotate(enabled) {
+  active.interactive?.setAutoRotate?.(Boolean(enabled));
 }
 
 /** Extra rig so chrome reads mirror-polished, matte reads flat white. */
@@ -825,9 +1150,11 @@ function addQ5CeramicAccentLights(scene, q5Feeling) {
     return light;
   };
   if (preset === 'chrome' || preset === 'fasthdr_black_chrome') {
-    const key = tagLayer(new THREE.DirectionalLight(0xffffff, 3.2));
+    const keyStr = q5Feeling === 'excitement' ? 2.5 : 3.2;
+    const rimStr = q5Feeling === 'excitement' ? 1.45 : 2.0;
+    const key = tagLayer(new THREE.DirectionalLight(q5Feeling === 'excitement' ? 0xe6e6ea : 0xffffff, keyStr));
     key.position.set(1.4, 2.2, 3.8);
-    const rim = tagLayer(new THREE.DirectionalLight(0xd8e4ff, 2.0));
+    const rim = tagLayer(new THREE.DirectionalLight(0xd8e4ff, rimStr));
     rim.position.set(-2.0, 1.2, 2.6);
     scene.add(key, rim);
     active.q5AccentLights = [key, rim];
@@ -839,7 +1166,17 @@ function addQ5CeramicAccentLights(scene, q5Feeling) {
     scene.add(key, fill);
     active.q5AccentLights = [key, fill];
   } else if (preset === 'matte' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black') {
-    if (q5Feeling === 'impatience' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black') {
+    if (q5Feeling === 'hope') {
+      const amb = tagLayer(new THREE.AmbientLight(0x8e9094, 0.07));
+      const key = tagLayer(new THREE.DirectionalLight(0xb4b6b8, 1.85));
+      key.position.set(1.15, 2.6, 3.2);
+      const fill = tagLayer(new THREE.DirectionalLight(0x62646a, 0.42));
+      fill.position.set(-1.0, 0.35, 2.4);
+      const rim = tagLayer(new THREE.DirectionalLight(0x70747a, 0.12));
+      rim.position.set(-2.1, 0.45, 1.8);
+      scene.add(amb, key, fill, rim);
+      active.q5AccentLights = [amb, key, fill, rim];
+    } else if (q5Feeling === 'impatience' || preset === 'fasthdr_matte_white' || preset === 'fasthdr_matte_black') {
       const amb = tagLayer(new THREE.AmbientLight(0xb8bab6, 0.12));
       const key = tagLayer(new THREE.DirectionalLight(0xc8cac6, 2.35));
       key.position.set(1.1, 2.5, 3.4);
@@ -891,20 +1228,25 @@ function buildDragonGlassPresetMaterial(envMap, attenuationColor) {
   });
 }
 
-function buildChromeMetalPresetMaterial(envMap, color = CHROME_METAL_PRESET.color) {
+function buildChromeMetalPresetMaterial(
+  envMap,
+  color = CHROME_METAL_PRESET.color,
+  roughness,
+  envMapIntensity
+) {
   const map = envMap ?? active?.envMap ?? null;
   return new THREE.MeshPhysicalMaterial({
     ...CHROME_METAL_PRESET,
     color,
     metalness: 1.0,
-    roughness: 0.0,
+    roughness: roughness ?? 0.0,
     transmission: 0,
     transparent: false,
     depthWrite: true,
     envMap: map,
-    envMapIntensity: CHROME_METAL_PRESET.envMapIntensity,
+    envMapIntensity: envMapIntensity ?? CHROME_METAL_PRESET.envMapIntensity,
     clearcoat: 1.0,
-    clearcoatRoughness: 0.0,
+    clearcoatRoughness: roughness != null ? Math.min(0.12, roughness * 2) : 0.0,
     side: THREE.DoubleSide,
   });
 }
@@ -975,7 +1317,12 @@ function buildCeramicQ1MaterialFromQ5(q5Feeling, envMap) {
   const map = envMap ?? active?.envMap ?? null;
   let mat;
   if (spec.preset === 'chrome') {
-    mat = buildChromeMetalPresetMaterial(map, spec.color ?? CHROME_METAL_PRESET.color);
+    mat = buildChromeMetalPresetMaterial(
+      map,
+      spec.color ?? CHROME_METAL_PRESET.color,
+      spec.roughness,
+      spec.envMapIntensity
+    );
   } else if (spec.preset === 'fasthdr_matte_white') {
     mat = buildFastHdrStandardMaterial(map, fastHdrMaterialSpec(FASTHDR_MATTE_WHITE, spec));
   } else if (spec.preset === 'fasthdr_matte_black') {
@@ -1071,7 +1418,7 @@ function clampWarmStoneColor(c) {
   c.b = Math.max(c.b, STONE_MIN_COLOR.b);
 }
 
-const STONE_PROC_GEN = 88;
+const STONE_PROC_GEN = 90;
 const BASALT_TEX_GEN = 13;
 
 /** Sage-stone grain on basalt — veils macro basalt texture slightly. */
@@ -1083,7 +1430,7 @@ const BASALT_SAGE_GRAIN = {
   macroSoften: 0.38,
 };
 
-const TERRACOTTA_TEX_GEN = 11;
+const TERRACOTTA_TEX_GEN = 13;
 const GRAVEL_TEX_GEN = 2;
 const METEORITE_TEX_GEN = 7;
 
@@ -1124,6 +1471,8 @@ function hashSlabStoneInputs(opts, segmentCount = 0, questionnaire = null) {
     questionnaire?.metalEmbossPattern ? JSON.stringify(questionnaire.metalEmbossPattern) : '',
     questionnaire?.metalPlateParams ? JSON.stringify(questionnaire.metalPlateParams) : '',
     Math.round((resolveStoneRoughness(null, questionnaire) || 0) * 100),
+    Math.round((resolveSlabThornIntensity(questionnaire) || 0) * 100),
+    questionnaire?.q6Difficulty ?? '',
     questionnaire?.occupationKey ?? '',
     questionnaire?.q4Belief === 'signs'
       ? 'meteorite-shade-v16-interior'
@@ -1786,48 +2135,48 @@ function sampleMarbleNoise(u, v) {
 }
 
 function paintMarbleTexels(s, edgeWear = 0) {
-  let r = 186;
-  let g = 179;
-  let b = 169;
+  let r = 150;
+  let g = 140;
+  let b = 128;
 
   const c1 = (s.cloud1 ?? 0.5) - 0.5;
   const c2 = (s.cloud2 ?? 0.5) - 0.5;
-  r += c1 * 10 + c2 * 6 - Math.abs(c1 + c2) * 4;
-  g += c1 * 9 + c2 * 5 - Math.abs(c1 + c2) * 3.5;
-  b += c1 * 8 + c2 * 4.5 - Math.abs(c1 + c2) * 3;
+  r += c1 * 7 + c2 * 4.5 - Math.abs(c1 + c2) * 3.2;
+  g += c1 * 6.2 + c2 * 3.8 - Math.abs(c1 + c2) * 2.8;
+  b += c1 * 5.2 + c2 * 3.2 - Math.abs(c1 + c2) * 2.2;
 
   const veinBody = Math.max(s.veins ?? 0, (s.medVeins ?? 0) * 0.72);
   const veinMix = Math.min(1, veinBody * 0.78);
-  const veinR = 118;
-  const veinG = 112;
-  const veinB = 104;
+  const veinR = 92;
+  const veinG = 84;
+  const veinB = 74;
   r = r * (1 - veinMix) + veinR * veinMix;
   g = g * (1 - veinMix) + veinG * veinMix;
   b = b * (1 - veinMix) + veinB * veinMix;
 
   const microMix = Math.min(1, (s.microVeins ?? 0) * 0.34);
-  r = r * (1 - microMix) + 102 * microMix;
-  g = g * (1 - microMix) + 98 * microMix;
-  b = b * (1 - microMix) + 92 * microMix;
+  r = r * (1 - microMix) + 80 * microMix;
+  g = g * (1 - microMix) + 72 * microMix;
+  b = b * (1 - microMix) + 62 * microMix;
 
-  const translucency = Math.max(0, (s.marble ?? 0) * 0.22 - veinMix * 0.14);
-  r += translucency * 5;
-  g += translucency * 4.5;
-  b += translucency * 3.5;
+  const translucency = Math.max(0, (s.marble ?? 0) * 0.14 - veinMix * 0.1);
+  r += translucency * 2.8;
+  g += translucency * 2.4;
+  b += translucency * 1.9;
 
-  const crystal = (s.crystalline ?? 0) * 0.4;
-  r += crystal * 7;
-  g += crystal * 6.5;
-  b += crystal * 5.5;
+  const crystal = (s.crystalline ?? 0) * 0.28;
+  r += crystal * 4.2;
+  g += crystal * 3.8;
+  b += crystal * 3.2;
 
-  const polish = edgeWear * 2.2;
-  r = Math.round(Math.min(218, r + polish));
-  g = Math.round(Math.min(214, g + polish * 0.98));
-  b = Math.round(Math.min(206, b + polish * 0.94));
+  const polish = edgeWear * 1.6;
+  r = Math.round(Math.min(184, r + polish));
+  g = Math.round(Math.min(178, g + polish * 0.96));
+  b = Math.round(Math.min(168, b + polish * 0.9));
 
-  r = Math.round(Math.max(148, Math.min(218, r)));
-  g = Math.round(Math.max(142, Math.min(214, g)));
-  b = Math.round(Math.max(134, Math.min(206, b)));
+  r = Math.round(Math.max(104, Math.min(184, r)));
+  g = Math.round(Math.max(98, Math.min(178, g)));
+  b = Math.round(Math.max(88, Math.min(168, b)));
 
   const cloudVar = Math.abs(c1) + Math.abs(c2) * 0.7;
   const roughV = Math.round(Math.max(58, Math.min(98, 72 + cloudVar * 18 - veinMix * 12 + polish * 2)));
@@ -2310,70 +2659,32 @@ function sampleSeafoamJadeGutNoise(u, v) {
 }
 
 function paintSeafoamJadeGutTexels(s, edgeWear) {
-  const baseR = 108;
-  const baseG = 158;
-  const baseB = 142;
-  const peak = Math.min(1, edgeWear * 1.12);
-  const recess = Math.min(1, (1 - edgeWear) * 0.85 + Math.max(0, -s.combined) * 0.35);
-  const cloudLift = s.cloud * 16 + s.cloud2 * 12;
-  const mintLift = Math.max(0, s.mint) * 18 + s.lightSpeck * 11;
-  const matrixDark = Math.max(0, -s.matrix) * 16 + s.darkSpeck * 13 + Math.max(0, -s.charcoal) * 9;
-  const forestPatch = Math.max(0, s.matrix) * 12;
-  const tealVar = s.teal * 11;
-  const shadowVar = Math.max(0, -s.combined) * 12;
-  const peakLift = peak * 20;
-  const recessSink = recess * 14;
-  const r = Math.round(
-    Math.max(
-      0,
-      Math.min(
-        255,
-        baseR +
-          cloudLift * 0.44 +
-          mintLift * 0.38 +
-          peakLift * 0.42 -
-          recessSink * 0.38 -
-          matrixDark * 0.52 +
-          forestPatch * 0.16 +
-          tealVar * 0.1 -
-          shadowVar * 0.26
-      )
-    )
+  const baseR = 216;
+  const baseG = 172;
+  const baseB = 137;
+  const tintR = 226;
+  const tintG = 200;
+  const tintB = 179;
+
+  const cloudMix = Math.min(1, s.cloud * 0.52 + s.cloud2 * 0.38 + s.lightSpeck * 0.32);
+  const warmVar = Math.max(0, s.mint) * 0.14 + Math.max(0, s.matrix) * 0.1 + s.teal * 0.06;
+  const darkMix = Math.min(
+    1,
+    s.darkSpeck * 0.42 + Math.max(0, -s.combined) * 0.22 + Math.max(0, -s.matrix) * 0.14
   );
-  const g = Math.round(
-    Math.max(
-      0,
-      Math.min(
-        255,
-        baseG +
-          cloudLift * 0.52 +
-          mintLift * 0.68 +
-          peakLift * 0.55 -
-          recessSink * 0.32 -
-          matrixDark * 0.38 +
-          forestPatch * 0.5 +
-          tealVar * 0.24 -
-          shadowVar * 0.2
-      )
-    )
-  );
-  const b = Math.round(
-    Math.max(
-      0,
-      Math.min(
-        255,
-        baseB +
-          cloudLift * 0.5 +
-          mintLift * 0.44 +
-          peakLift * 0.48 -
-          recessSink * 0.28 -
-          matrixDark * 0.34 +
-          forestPatch * 0.38 +
-          tealVar * 0.4 -
-          shadowVar * 0.18
-      )
-    )
-  );
+  const peak = Math.min(1, edgeWear * 1.1);
+  const tintMix = Math.min(1, cloudMix * 0.7 + peak * 0.38 + warmVar);
+
+  let r = baseR + (tintR - baseR) * tintMix;
+  let g = baseG + (tintG - baseG) * tintMix;
+  let b = baseB + (tintB - baseB) * tintMix;
+  r -= darkMix * 26;
+  g -= darkMix * 22;
+  b -= darkMix * 18;
+
+  r = Math.round(Math.max(178, Math.min(232, r)));
+  g = Math.round(Math.max(148, Math.min(208, g)));
+  b = Math.round(Math.max(118, Math.min(188, b)));
   return {
     r,
     g,
@@ -2381,7 +2692,7 @@ function paintSeafoamJadeGutTexels(s, edgeWear) {
     bumpV: Math.round(
       Math.max(0, Math.min(255, (0.47 + s.darkSpeck * 0.012 + s.lightSpeck * 0.008 + s.matrix * 0.005) * 255))
     ),
-    roughV: Math.round(Math.max(168, Math.min(228, 192 + s.cloud * 4 + s.darkSpeck * 3 - peak * 28 + recess * 6))),
+    roughV: Math.round(Math.max(168, Math.min(228, 192 + s.cloud * 4 + s.darkSpeck * 3 - peak * 28 + darkMix * 6))),
     normalStrength: 4.2,
   };
 }
@@ -2814,6 +3125,18 @@ function paintStoneProcTexels(variantKey, s, edgeWear) {
   }
   if (variantKey === 'polished_jade_marble' || variantKey === 'polished_slate_marble' || variantKey === 'polished_warm_marble_doubt') {
     return paintPolishedMarbleTexels(MARBLE_PAINT_PROFILES[variantKey], s, edgeWear);
+  }
+  if (variantKey === 'sage') {
+    const mott = 8.0;
+    const shadow = Math.max(0, -s.combined) * 14 + Math.max(0, -s.pits) * 9 + (1 - edgeWear) * 3.5;
+    return {
+      r: Math.round(Math.max(0, Math.min(255, 180 + s.combined * mott + s.drift * 3 + s.blob * 2 - shadow))),
+      g: Math.round(Math.max(0, Math.min(255, 176 + s.combined * mott + s.drift * 3.2 + s.blob * 2.2 - shadow * 0.96))),
+      b: Math.round(Math.max(0, Math.min(255, 172 + s.combined * mott + s.drift * 2.8 + s.blob * 1.8 - shadow * 0.9))),
+      bumpV: Math.round(Math.max(0, Math.min(255, (0.34 + s.height * 0.58) * 255))),
+      roughV: Math.round(Math.max(210, Math.min(255, 232 + s.sand * 8 + s.combined * 12))),
+      normalStrength: 11.5,
+    };
   }
   const mott = 8.0;
   return {
@@ -3744,13 +4067,13 @@ const METAL_FRINGE_RADIUS_SCALE = 1.38;
 const METAL_FRINGE_Z_BEHIND = 0.75;
 const METAL_FRINGE_RENDER_ORDER = 6;
 /** Q1 metal wrap — outer shape over stone (derived from wish text). */
-const SLAB_METAL_WRAP_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.92, heightFrac: 0.92, fit: 0.94 };
+const SLAB_METAL_WRAP_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.88, heightFrac: 0.88, fit: 0.88 };
 /** Q1 metal emboss — small centered plate on stone. */
 const SLAB_METAL_EMBOSS_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.36, heightFrac: 0.32, fit: 0.72 };
 /** @deprecated alias — kept for any cached references */
 const SLAB_Q1_PLACEMENT = SLAB_METAL_EMBOSS_PLACEMENT;
 /** Q1 ceramic inset — unified glyph mass centered on stone (saved-roughness L3 look). */
-const SLAB_Q1_CERAMIC_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.506, heightFrac: 0.473, fit: 0.924 };
+const SLAB_Q1_CERAMIC_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.48, heightFrac: 0.45, fit: 0.86 };
 /** Q3 metal threads — centered, stone-slab scale (first letter only in SVG). */
 const SLAB_Q3_METAL_PLACEMENT = { cxFrac: 0.5, cyFrac: 0.5, widthFrac: 0.9, heightFrac: 0.74, fit: 1.02 };
 const SLAB_Q3_METAL_THREAD_RADIUS_SCALE = 0.82;
@@ -3779,11 +4102,11 @@ const Q1_CERAMIC_RENDER_ORDER = 40;
 const Q1_CERAMIC_ABOVE_STONE_Z = 0.1;
 /** Q2 name glyphs — preserve editor connection layout; gentle scale only if oversized. */
 const SLAB_NAME_SHAPE_MAX_RADIUS = 268;
-const SLAB_NAME_SHAPE_FIT = 0.97;
+const SLAB_NAME_SHAPE_FIT = 0.91;
 /** Q7 — raised letter ring on stone slab (scattered circle, no connections). */
 const SLAB_Q7_EMBOSS_STROKE_SCALE = 0.52;
 const SLAB_Q7_EMBOSS_HEIGHT_MUL = 1.05;
-const SLAB_Q7_EMBOSS_BEVEL_MUL = 0.48;
+const SLAB_Q7_EMBOSS_BEVEL_MUL = 0.62;
 const SLAB_Q7_EMBOSS_TUBE_MUL = 0.42;
 const SLAB_Q3_ENGRAVE_WALL_MUL = 0.016;
 /** @deprecated — rounded tube engrave disabled for Q3 */
@@ -7401,7 +7724,7 @@ function placeQ7LetterPolylines(polylines, tx, ty, targetSize) {
 }
 
 /** Q7 first-letter ring — polylines placed on stone slab in scene space. */
-function collectQ7EmbossPolylines(rootSvg, slabMaskOrigin, style3, questionnaire) {
+function collectQ7EmbossLetterGroups(rootSvg, slabMaskOrigin, style3, questionnaire) {
   const letters = questionnaire?.q7Letters || [];
   const layerEl = rootSvg.querySelector('.layer-q7-emboss');
   if (!letters.length || !layerEl || !slabMaskOrigin) return [];
@@ -7415,8 +7738,8 @@ function collectQ7EmbossPolylines(rootSvg, slabMaskOrigin, style3, questionnaire
   const R = span * 0.36;
   const letterSize = span * 0.1;
   const seed = letters.join('');
-  const pad = l3TubeRadius(style3) * 0.38;
-  const out = [];
+  const pad = l3TubeRadius(style3) * 0.28;
+  const groups = [];
 
   for (let i = 0; i < letters.length; i++) {
     const letter = letters[i];
@@ -7432,14 +7755,19 @@ function collectQ7EmbossPolylines(rootSvg, slabMaskOrigin, style3, questionnaire
     const tx = cx + Math.cos(ang) * r;
     const ty = cy + Math.sin(ang) * r;
     const placed = placeQ7LetterPolylines(raw, tx, ty, letterSize);
-    for (const { pts, closed } of placed) {
-      out.push({
-        closed,
-        pts: closed ? pts : extendOpenPathCaps(pts, pad),
-      });
-    }
+    const polylines = placed.map(({ pts, closed }) => ({
+      closed,
+      pts: closed ? pts : extendOpenPathCaps(pts, pad),
+    }));
+    if (polylines.length) groups.push({ letter, polylines });
   }
-  return out;
+  return groups;
+}
+
+function collectQ7EmbossPolylines(rootSvg, slabMaskOrigin, style3, questionnaire) {
+  return collectQ7EmbossLetterGroups(rootSvg, slabMaskOrigin, style3, questionnaire).flatMap(
+    (g) => g.polylines
+  );
 }
 
 function rasterizePolylinesOverlay(polylines, strokeScene, maskOrigin) {
@@ -7500,20 +7828,22 @@ function rasterizeGlyphWorldMaskCanvas(glyphEl, rootSvg, style3, strokeScale = 1
 function buildSlabQ7EmbossOverlays(rootSvg, slabMaskOrigin, style3, stoneTubeR, questionnaire = null) {
   const roundR = stoneTubeR * 1.25;
   const overlays = [];
-  const polylines = collectQ7EmbossPolylines(rootSvg, slabMaskOrigin, style3, questionnaire);
-  if (!polylines.length) return overlays;
+  const letterGroups = collectQ7EmbossLetterGroups(rootSvg, slabMaskOrigin, style3, questionnaire);
+  if (!letterGroups.length) return overlays;
 
   const strokeScene = effectiveL3StrokeWidth(style3) * SLAB_Q7_EMBOSS_STROKE_SCALE;
-  for (let i = 0; i < polylines.length; i++) {
-    const { pts, closed } = polylines[i];
-    const bounds = maskBoundsFromPolylines([{ pts, closed }], strokeScene);
+  const bevelW = roundR * SLAB_Q7_EMBOSS_BEVEL_MUL;
+  for (const { polylines } of letterGroups) {
+    const bounds = maskBoundsFromPolylines(polylines, strokeScene);
     if (!bounds) continue;
-    const mask = rasterizePolylinesOverlay([{ pts, closed }], strokeScene, bounds);
+    const mask = rasterizePolylinesOverlay(polylines, strokeScene, bounds);
     if (!mask) continue;
+    const smoothed = smoothEmbossOverlayMask(mask);
     overlays.push({
-      ...prepareTextOverlayFromGrid(mask.grid, mask.w, mask.h, mask.maskOrigin, mask.maskScale),
+      ...smoothed,
       height: roundR * SLAB_Q7_EMBOSS_HEIGHT_MUL,
-      bevelWidth: roundR * SLAB_Q7_EMBOSS_BEVEL_MUL,
+      bevelWidth: bevelW,
+      sharpRelief: false,
     });
   }
   return overlays;
@@ -7705,7 +8035,6 @@ function buildSlabMetalIntegration(rootSvg, maskOrigin, w, h, style2, style3, st
  */
 function buildSlabStoneEngraveRelief(rootSvg, slabMaskOrigin, style2, style3, stoneTubeR, questionnaire = null) {
   const roundR = stoneTubeR * 1.25;
-  const isDoubt = questionnaire?.q4Belief === 'doubt';
 
   const q7Polylines = collectQ7EmbossPolylines(
     rootSvg,
@@ -7735,7 +8064,7 @@ function buildSlabStoneEngraveRelief(rootSvg, slabMaskOrigin, style2, style3, st
     embossTubeR: roundR * SLAB_Q7_EMBOSS_TUBE_MUL,
     embossHeight,
     basePlateHeight: roundR * 0.4,
-    sharpRelief: isDoubt,
+    sharpRelief: false,
   };
 }
 
@@ -7902,6 +8231,8 @@ async function buildUnifiedLayer3Geometry(
         slabMode: true,
         stoneMaterialPreset: q4StonePreset(questionnaire?.q4Belief),
         stoneRoughness: resolveStoneRoughness(style2, questionnaire),
+        slabThornIntensity: resolveSlabThornIntensity(questionnaire),
+        slabThornSeed: slabThornSeedFromQ6(questionnaire?.q6Difficulty),
         basePlateHeight: stoneTubeR * 1.35 * 0.36,
         metalPlateCradle: plateCradle,
         metalHaloWrap,
@@ -8256,7 +8587,7 @@ function sceneExtentHalf(scene) {
 }
 
 /** מרווח מהמסגרת (פנימה) ומהקנבס (חוצה) */
-const FRAME_INSET_PX = 20;
+const FRAME_INSET_PX = 25;
 
 function frameTubeBaseRadius(style3) {
   const gender = style3?.gender || 'female';
@@ -8641,6 +8972,9 @@ async function renderPbrCore(svg, opts) {
   const rotationY = ((age - 1) / 119) * 0.25 - 0.125;
   scene.rotation.y = rotationY;
   scene.updateMatrixWorld(true);
+  if (opts.darkerShadows) {
+    deepenSceneShadows(scene, renderer);
+  }
   const cameraHalf = fitSceneInsideFrame(scene, mount, style2, style3);
   const camera = makeCanvasCamera(cameraHalf);
   renderer.render(scene, camera);
@@ -8652,6 +8986,8 @@ async function renderPbrCore(svg, opts) {
     mount,
     renderer,
     scene,
+    camera,
+    baseRotY: rotationY,
     tubesL2,
     tubesL3: tubesL3 + tubesL3Metal + tubesMetalEmboss + tubesMetalFringe + tubesQ1Ceramic + tubesQ3Threads,
     tubesL3Slab: tubesL3,
@@ -8708,6 +9044,147 @@ export async function renderThreePbrAmulet(opts) {
   }
 }
 
+export async function renderThreePbrAmuletInteractive(opts) {
+  let mount = null;
+  try {
+    if (opts?.container) opts.container.innerHTML = '';
+    const core = await renderPbrCore(opts.svg, { ...opts, darkerShadows: true });
+    mount = core.mount;
+
+    const canvas = core.renderer.domElement;
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    opts.container.appendChild(canvas);
+    opts.onProgress?.(1, 'הושלם');
+
+    const orbit = attachAmuletOrbitControls(canvas, {
+      scene: core.scene,
+      camera: core.camera,
+      renderer: core.renderer,
+      baseRotY: core.baseRotY,
+    });
+
+    return {
+      tubesL2: core.tubesL2,
+      tubesL3: core.tubesL3,
+      tubesFrame: core.tubesFrame,
+      metalRough: core.metalRough,
+      l3Rough: core.l3Rough,
+      l3MaterialMode: core.l3MaterialMode,
+      pbr: true,
+      interactive: true,
+      resetView: () => orbit.reset(),
+    };
+  } finally {
+    if (mount?.parentNode) mount.parentNode.removeChild(mount);
+  }
+}
+
+/**
+ * Fast tube-only preview for early questionnaire steps (no stone slab / textures).
+ * @param {1|2|3} vectorStage — 1: wish L3 · 2: + name L2 · 3: + Q3 layers
+ */
+export async function renderVectorPreviewInteractive(opts) {
+  const {
+    svg,
+    style2,
+    style3,
+    container,
+    vectorStage = 1,
+    ageNum = 25,
+    onProgress,
+    autoRotate = false,
+  } = opts;
+  let mount = null;
+
+  try {
+    reportProgress(onProgress, 0.08, 'מצייר וקטורים…');
+    mount = mountSvg(svg);
+    await yieldToMainThread();
+
+    if (container) container.innerHTML = '';
+    disposeActiveScene();
+
+    const layer3 = mount.querySelector('.layer-3');
+    if (!layer3) throw new Error('layer 3 missing');
+    const layer2 = mount.querySelector('.layer-2');
+
+    const renderer = getOrCreateRenderer();
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    active.renderer = renderer;
+
+    const scene = new THREE.Scene();
+    const matWish = new THREE.MeshBasicMaterial({ color: 0xc8c0b2 });
+    const matName = new THREE.MeshBasicMaterial({ color: 0x9da3ab });
+    const matQ3 = new THREE.MeshBasicMaterial({ color: 0x6f737a });
+
+    const zName = L2_SURFACE_Z - 4;
+    const zQ3 = L2_SURFACE_Z;
+    const zWish = L2_SURFACE_Z + 4;
+
+    let tubes = 0;
+    const age = Math.max(1, Math.min(120, Number(ageNum) || 25));
+
+    if (vectorStage >= 2 && layer2) {
+      tubes += addTubesFromLayer(layer2, mount, matName, scene, zName, 18, style3, age, style2);
+    }
+
+    if (vectorStage >= 3) {
+      for (const sel of ['.layer-q3-thread', '.layer-q3-stone-engrave']) {
+        const el = mount.querySelector(sel);
+        if (el) {
+          tubes += addTubesFromLayer(el, mount, matQ3, scene, zQ3, 22, style3, age, style2);
+        }
+      }
+    }
+
+    tubes += addTubesFromLayer(layer3, mount, matWish, scene, zWish, 28, style3, age, style2);
+    if (!tubes) throw new Error('no vector paths');
+
+    reportProgress(onProgress, 0.82, 'מסדר תצוגה…');
+    await yieldToMainThread();
+
+    const rotationY = ((age - 1) / 119) * 0.25 - 0.125;
+    scene.rotation.y = rotationY;
+    scene.updateMatrixWorld(true);
+
+    const cameraHalf = fitSceneInsideFrame(scene, mount, style2, style3);
+    const camera = makeCanvasCamera(cameraHalf);
+    renderer.render(scene, camera);
+    active.scene = scene;
+    active.camera = camera;
+
+    const canvas = renderer.domElement;
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    container.appendChild(canvas);
+    opts.onProgress?.(1, 'הושלם');
+
+    const orbit = attachAmuletOrbitControls(canvas, {
+      scene,
+      camera,
+      renderer,
+      baseRotY: rotationY,
+      autoRotate,
+    });
+
+    return {
+      tubes,
+      vectorStage,
+      pbr: false,
+      vector: true,
+      interactive: true,
+      resetView: () => orbit.reset(),
+    };
+  } finally {
+    if (mount?.parentNode) mount.parentNode.removeChild(mount);
+  }
+}
+
 /** רינדור PBR חד-פעמי לייצוא PNG עם רקע שקוף */
 export async function exportPbrAmuletPng(opts) {
   let mount = null;
@@ -8726,6 +9203,145 @@ export async function exportPbrAmuletPng(opts) {
 
 export function disposeThreePbr() {
   disposeActive();
+}
+
+/** Current interactive PBR scene (meshes + current rotation) for GLB export */
+export function getActivePbrScene() {
+  return active.scene ?? null;
+}
+
+export function getActivePbrRenderer() {
+  return active.renderer ?? null;
+}
+
+export function getActivePbrCamera() {
+  return active.camera ?? null;
+}
+
+export function captureLiveAmuletSnapshot() {
+  const renderer = active.renderer;
+  const scene = active.scene;
+  const camera = active.camera;
+  if (!renderer || !scene || !camera) return null;
+
+  renderer.render(scene, camera);
+
+  const dom = renderer.domElement;
+  const w = dom.width;
+  const h = dom.height;
+  if (!w || !h) return null;
+
+  const snap = document.createElement('canvas');
+  snap.width = w;
+  snap.height = h;
+  const ctx = snap.getContext('2d', { alpha: true });
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(dom, 0, 0);
+  return snap;
+}
+
+export function captureHighResSnapshot(targetPx) {
+  const renderer = active.renderer;
+  const scene = active.scene;
+  const camera = active.camera;
+  if (!renderer || !scene || !camera) return captureLiveAmuletSnapshot();
+  targetPx = targetPx || 4096;
+
+  const dom = renderer.domElement;
+  const origDPR = renderer.getPixelRatio();
+  const origBufferW = dom.width;
+  const origBufferH = dom.height;
+  const cssW = dom.clientWidth || origBufferW / Math.max(origDPR, 1);
+  const cssH = dom.clientHeight || origBufferH / Math.max(origDPR, 1);
+
+  renderer.setPixelRatio(1);
+  renderer.setSize(targetPx, targetPx, false);
+  renderer.setClearColor(0x000000, 0);
+  renderer.render(scene, camera);
+
+  const snap = document.createElement('canvas');
+  snap.width = targetPx;
+  snap.height = targetPx;
+  snap.getContext('2d', { alpha: true }).drawImage(dom, 0, 0);
+
+  renderer.setPixelRatio(origDPR);
+  renderer.setSize(cssW, cssH, false);
+  renderer.setClearColor(0x000000, 0);
+  renderer.render(scene, camera);
+  return snap;
+}
+
+/**
+ * Garden snapshot — copy the live frame (never resize the active renderer).
+ */
+export function captureAmuletSnapshotForGarden() {
+  return captureLiveAmuletSnapshot();
+}
+
+/** Clone the live PBR scene for garden 3D spin (user amulet 008 only). */
+export function cloneActivePbrSceneForGarden() {
+  const src = active.scene;
+  if (!src) return null;
+  const clone = src.clone(true);
+  clone.rotation.copy(src.rotation);
+  return clone;
+}
+
+/** Build a detached PBR scene clone (e.g. after page reload from stored answers). */
+export async function buildPbrSceneCloneForGarden(opts) {
+  const core = await renderPbrCore(opts.svg, opts);
+  const mount = core.mount;
+  const clone = core.scene.clone(true);
+  clone.rotation.copy(core.scene.rotation);
+  core.renderer.dispose();
+  disposeScene(core.scene);
+  if (mount?.parentNode) mount.parentNode.removeChild(mount);
+  active.scene = null;
+  active.camera = null;
+  active.renderer = null;
+  active.interactive = null;
+  active.ceramicMeshes = null;
+  active.q5MaterialMeshes = null;
+  active.ceramicQ1Material = null;
+  active.ceramicQ5Feeling = null;
+  active.stoneMesh = null;
+  active.q5AccentLights = null;
+  return clone;
+}
+
+/** Lighter vector-tube scene for garden spin — avoids full PBR freeze on reload. */
+export async function buildVectorSceneCloneForGarden(opts) {
+  const container = document.createElement('div');
+  container.hidden = true;
+  container.style.cssText =
+    'position:fixed;left:-10000px;top:0;width:680px;height:680px;opacity:0;pointer-events:none';
+  document.body.appendChild(container);
+  try {
+    await renderVectorPreviewInteractive({
+      svg: opts.svg,
+      style2: opts.style2,
+      style3: opts.style3,
+      container,
+      vectorStage: 3,
+      ageNum: opts.ageNum ?? 25,
+      autoRotate: false,
+    });
+    const src = active.scene;
+    if (!src) throw new Error('vector scene missing');
+    const clone = src.clone(true);
+    clone.rotation.copy(src.rotation);
+    disposeInteractive();
+    if (active.renderer) {
+      active.renderer.dispose();
+      active.renderer = null;
+    }
+    disposeScene(src);
+    active.scene = null;
+    active.camera = null;
+    return clone;
+  } finally {
+    container.remove();
+  }
 }
 
 /** Same rig as prototype-v2-unified.html addMetalLights — side key + rim on tube metal. */

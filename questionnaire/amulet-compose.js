@@ -1,0 +1,3722 @@
+/**
+ * Amulet SVG compose — extracted for questionnaire (prototype-v2-thick.html untouched).
+ */
+'use strict';
+
+import { deriveAmuletShapeParams } from '../amulet-shape-from-text.js';
+
+export const L3_MASS_SCALE = 0.37;
+
+let currentAnswers = {};
+let lastApplyPartial = false;
+
+function cc() {
+  if (!window.ConnectionCore) throw new Error('connection-core.js לא נטען');
+  return window.ConnectionCore;
+}
+function requireConnectionCore() { return cc(); }
+
+function applyAnswers(answers, options = {}) {
+  if (options.partial !== undefined) {
+    lastApplyPartial = options.partial === true;
+  }
+  const partial = options.partial !== undefined ? options.partial === true : lastApplyPartial;
+  currentAnswers = answers || {};
+  params.q1Wish = (currentAnswers.q1Wish || '').trim();
+  params.q2Name = (currentAnswers.q2Name || '').trim();
+  params.q3WhyNow = (currentAnswers.q3WhyNow || '').trim();
+  params.q7Change = (currentAnswers.q7Change || '').trim();
+
+  if (partial) {
+    params.q4Belief = currentAnswers.q4Belief || '';
+    params.q5Feeling = currentAnswers.q5Feeling || '';
+    params.q6Difficulty = currentAnswers.q6Difficulty || '';
+  } else {
+    params.q4Belief = currentAnswers.q4Belief || 'concrete_actions';
+    params.q5Feeling = currentAnswers.q5Feeling || 'hope';
+    params.q6Difficulty = currentAnswers.q6Difficulty || 'uncertainty';
+  }
+  return params;
+}
+
+function readParams() {
+  return applyAnswers(currentAnswers, { partial: lastApplyPartial });
+}
+
+
+  /* --- Canvas --- */
+  const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
+  const W = 680;
+  const H = 680;
+  const CX = 340;
+  const CY = 340;
+  const GLYPHS_DIR = '../glyphs';
+  /** מקסימום אותיות בשכבת שם */
+  const MAX_LETTERS = 3;
+  /** מקסימום אותיות בשרשרת חיבורים (Q1/Q2/L3) — כרגע 3 להפחתת עומס */
+  const MAX_LETTERS_LAYER3 = 3;
+  /** שכבת Q1 (קרמיקה) — שתי אותיות מחוברות */
+  const MAX_Q1_CERAMIC_LETTERS = 2;
+  /** מקסימום אותיות בשכבת Q4 (מתכת מאחורי האבן) */
+  const MAX_FRINGE_LETTERS = 3;
+  /** כוונת חיבורים לפריסת אותיות — לפי סוג הקמע (הגנה / זימון) */
+  function amuletPlacementIntent(amuletType) {
+    return amuletType === 'summoning' ? 'summoning' : 'protection';
+  }
+  const HUB_OVERLAP_DIST = 80;
+  const DEFAULT_GLYPH_SIZE = 150;
+
+  const AMULET_BG = '#ffffff';
+  const VIEWBOX_PAD = 45;
+  const FILTER_ID_COMBINED = 'combined';
+  const FILTER_ID_LAYER2 = 'metal';
+  const FILTER_ID_FRAME = 'frameMetal';
+  const FILTER_ID_LAYER3 = 'combined-layer3';
+
+  function isSvgDebugMode() {
+    return new URLSearchParams(location.search).get('debug') === '1';
+  }
+  /** שכבה 2 (שם) */
+  const LAYER2_SCALE = 1.25;
+  /** שכבה 3 (כוונה) — שכבה קדמית */
+  const LAYER3_SCALE = 1.2;
+  const FRAME_PAD = 40;
+  const SUMMONING_FRAME_PAD = 30;
+  /** מרווח מסגרת מחוץ לצורת אבן (תואם ל-SLAB_STONE_FRAME_MARGIN ב-PBR) */
+  const STONE_FRAME_PAD = 16;
+  const FRAME_MASK_SCALE = 2;
+  const FRAME_STROKE = 3;
+
+  /** גיל → bump — זהה ל-prototype.html */
+  const AGE_BUMP_SCALE = {
+    under18: 4,
+    '18-24': 7,
+    '25-34': 10,
+    '35-44': 13,
+    '45-59': 16,
+    '60-70': 18,
+    '70plus': 20
+  };
+
+  function ageBucketFromNumber(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    if (a < 18) return 'under18';
+    if (a < 25) return '18-24';
+    if (a < 35) return '25-34';
+    if (a < 45) return '35-44';
+    if (a < 60) return '45-59';
+    if (a < 70) return '60-70';
+    return '70plus';
+  }
+
+  function surfaceScaleFromAge(age) {
+    return AGE_BUMP_SCALE[ageBucketFromNumber(age)] ?? 4;
+  }
+
+  /** תחום → צבע מעבר Pass 2 */
+  const DOMAINS = {
+    love: { stroke: '#EF4F85' },
+    livelihood: { stroke: '#000000' },
+    health: { stroke: '#585127' },
+    family: { stroke: '#6C3711' },
+    selfConfidence: { stroke: '#362514' },
+    meaning: { stroke: '#738DEB' },
+    housing: { stroke: '#8B2020' }
+  };
+
+  const GENDER_SCALE_FEMALE = 1.08;
+  const GENDER_SCALE_MALE = 1.0;
+  const GENDER_SCALE_NONBINARY = 1.03;
+
+  const GENDER_VISUAL = {
+    female: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      scale: GENDER_SCALE_FEMALE
+    },
+    nonbinary: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      scale: GENDER_SCALE_NONBINARY
+    },
+    male: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 1,
+      scale: GENDER_SCALE_MALE
+    }
+  };
+
+  /* --- Spacing (distance from center; dramatic range) --- */
+  const URGENCY_SPACING = {
+    far: 1.8,
+    year: 1.45,
+    month: 1.15,
+    now: 0.5
+  };
+
+  /**
+   * שכבה 2 — מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז).
+   * טווח קיצוני כמו דחיפות: נשוי≈עכשיו (0.5) · רווק≈רחוק (2.0).
+   * סדר: רווק → גרוש → אלמן → זוגיות → נשוי.
+   */
+  const STATUS_SPACING = {
+    single: 2.0,
+    divorced: 1.55,
+    widowed: 1.15,
+    couple: 0.8,
+    married: 0.5
+  };
+
+  /**
+   * שכבה 2 — חלקות לפי עיסוק: 1 = חלק, 0 = קוצני.
+   * טכנולוגיה ופיננסים → ממשל וביטחון → ידע והוראה → טיפול ובריאות → חקלאות → יצירה ורוח.
+   */
+  const OCCUPATION_SMOOTHNESS = {
+    tech_finance: 1,
+    governance_security: 0.82,
+    knowledge_teaching: 0.62,
+    care_health: 0.42,
+    agriculture: 0.22,
+    creation_spirit: 0
+  };
+
+  /** שכבה 2 — סגנון קו ומרקם לפי תחום עיסוק */
+  const OCCUPATION_VISUAL = {
+    care_health: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.08', numOctaves: 3 }
+    },
+    knowledge_teaching: {
+      linecap: 'round',
+      linejoin: 'miter',
+      miterlimit: 4,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.09', numOctaves: 2 }
+    },
+    tech_finance: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 1,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.14', numOctaves: 1 }
+    },
+    creation_spirit: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'turbulence', baseFrequency: '0.05', numOctaves: 5 }
+    },
+    governance_security: {
+      linecap: 'square',
+      linejoin: 'miter',
+      miterlimit: 1,
+      customBump: { type: 'fractalNoise', baseFrequency: '0.12', numOctaves: 2 }
+    },
+    agriculture: {
+      linecap: 'round',
+      linejoin: 'round',
+      miterlimit: null,
+      customBump: { type: 'turbulence', baseFrequency: '0.07', numOctaves: 4 }
+    }
+  };
+
+  /* --- Intent keys (match connections.json) --- */
+  const INTENT_TYPES = ['protection', 'summoning', 'grounding'];
+
+  const BUILTIN_SYMBOLS = {
+    circle: { viewBox: '0 0 100 100' },
+    triangle: { viewBox: '0 0 100 100' },
+    arc: { viewBox: '0 0 100 100' },
+    dot: { viewBox: '0 0 100 100' }
+  };
+
+  let glyphLetters = [];
+  const glyphSvgCache = {};
+  const parsedGlyphCache = {};
+  let connections = [];
+
+  const params = {
+    q1Wish: '',
+    q2Name: '',
+    q3WhyNow: '',
+    q4Belief: 'concrete_actions',
+    q5Feeling: 'hope',
+    q6Difficulty: 'uncertainty',
+    q7Change: ''
+  };
+
+  /**
+   * Q6 → תחום עיסוק (prototype-v2-unified.html), מהכי חלק לקוצני ביותר.
+   * uncertainty      → tech_finance       (1.00)
+   * waiting          → governance_security (0.82)
+   * letting_go       → knowledge_teaching  (0.62)
+   * failure          → care_health         (0.42)
+   * no_control       → agriculture         (0.22)
+   * decision         → creation_spirit     (0.00)
+   */
+  const Q6_METAL_OCCUPATION = {
+    uncertainty: 'tech_finance',
+    waiting: 'governance_security',
+    letting_go: 'knowledge_teaching',
+    failure: 'care_health',
+    no_control: 'agriculture',
+    decision: 'creation_spirit'
+  };
+
+  /** Q6 → spike משטח L3 קרמיקה (0=חלק, 1=קוצני) */
+  const L3_SPIKE_BY_DIFFICULTY = {
+    uncertainty: 0.08,
+    waiting: 0.28,
+    letting_go: 0.48,
+    failure: 0.62,
+    no_control: 0.78,
+    decision: 0.92
+  };
+
+  const Q6_OCCUPATION_LABEL = {
+    tech_finance: 'טכנולוגיה ופיננסים',
+    governance_security: 'ממשל וביטחון',
+    knowledge_teaching: 'ידע והוראה',
+    care_health: 'טיפול ובריאות',
+    agriculture: 'חקלאות',
+    creation_spirit: 'יצירה ורוח'
+  };
+
+  function occupationFromQ6(q6) {
+    return Q6_METAL_OCCUPATION[q6] ?? 'tech_finance';
+  }
+
+  function occupationSmoothnessFromQ6(q6) {
+    return OCCUPATION_SMOOTHNESS[occupationFromQ6(q6)] ?? 0.5;
+  }
+
+  function occupationRoughnessFromQ6(q6) {
+    return 1 - occupationSmoothnessFromQ6(q6);
+  }
+
+  /** @deprecated — upper layers no longer use Q6 wobble */
+  function frameContourFromQ6(_q6) {
+    return FRAME_CONTOUR_SMOOTH;
+  }
+
+  /**
+   * Q4 — frame thickness is uniform (no belief-based scaling).
+   * Q6 → מרקם/קוצניות מתכת (ערכי unified לפי סדר התשובות).
+   */
+  const Q4_BELIEF_FRAME_RADIUS_SCALE = {
+    concrete_actions: 1.0,
+    support: 1.0,
+    signs: 1.0,
+    gut: 1.0,
+    doubt: 1.0
+  };
+
+  const FRAME_CONTOUR_SMOOTH = { wobbleMix: 0, curlMix: 0, ampScale: 0, freqBias: 0, phase: 0 };
+  const FRAME_TEXTURE_SMOOTH = {
+    type: 'fractalNoise',
+    baseFrequency: '0.14',
+    numOctaves: 1,
+    scaleMul: 0,
+    scaleLin: 0
+  };
+  const FRAME_VISUAL_SMOOTH = { linecap: 'round', linejoin: 'round', miterlimit: null };
+
+  /** ברירות מחדל פנימיות לסגנון SVG (שדות ישנים הוסרו מהטופס) */
+  const INTERNAL_STYLE_DEFAULTS = {
+    amuletType: 'protection',
+    domain: 'love',
+    age: 25,
+    gender: 'female',
+    urgency: 'now',
+    familyStatus: 'single',
+    occupation: 'care_health'
+  };
+
+  function frameSmoothnessFromStyle(style2) {
+    return style2?.frameSmoothness ?? 1.0;
+  }
+
+  function questionnaireStyleBase(p) {
+    const q6 = p.q6Difficulty || 'uncertainty';
+    const l3Spike = L3_SPIKE_BY_DIFFICULTY[q6] ?? 0.5;
+    const occupation = Q6_METAL_OCCUPATION[q6] ?? 'care_health';
+    const metalSmoothness = OCCUPATION_SMOOTHNESS[occupation] ?? 0.5;
+    const stoneRoughness = occupationRoughnessFromQ6(q6);
+    const q4 = p.q4Belief || 'concrete_actions';
+    const q5 = p.q5Feeling || 'hope';
+    return {
+      ...INTERNAL_STYLE_DEFAULTS,
+      occupation,
+      occupationSmoothness: metalSmoothness,
+      frameSmoothness: metalSmoothness,
+      stoneRoughness,
+      q4Belief: q4,
+      q5Feeling: q5,
+      frameRadiusScale: Q4_BELIEF_FRAME_RADIUS_SCALE[q4] ?? 1.0,
+      l3Spike
+    };
+  }
+
+  /**
+   * Q5 → תחום (פלטת prototype-v2-saved-roughness.html) → צבע L3/קרמיקה.
+   * hope=ורוד · fear=שחור · longing=חום משפחה · excitement=אדום · impatience=זית · confusion=כחול
+   */
+  const Q5_FEELING_TO_DOMAIN = {
+    hope: 'love',
+    fear: 'livelihood',
+    longing: 'family',
+    excitement: 'housing',
+    impatience: 'health',
+    confusion: 'meaning'
+  };
+
+  /** domainStrokeHex — זהה ל-prototype-v2-saved-roughness.html */
+  function domainStrokeHex(style3OrDomainKey) {
+    const map = {
+      love: '#EF4F85',
+      livelihood: '#000000',
+      health: '#585127',
+      family: '#6C3711',
+      selfConfidence: '#362514',
+      meaning: '#0022CC',
+      housing: '#8B2020'
+    };
+    const key =
+      typeof style3OrDomainKey === 'string'
+        ? style3OrDomainKey
+        : style3OrDomainKey?.domainKey;
+    return map[key] || map.love;
+  }
+
+  /**
+   * Q5 → גווני אפור-שחור (זמני) — אותה מיפוי תחום, ללא צבעים רוויים.
+   */
+  const Q5_CERAMIC_GRAY = {
+    hope: '#aeaeb4',
+    fear: '#505058',
+    excitement: '#d0d0d6',
+    longing: '#3a342e',
+    excitement: '#443030',
+    impatience: '#3a3c36',
+    confusion: '#2e2e3a'
+  };
+
+  function ceramicHexFromQ5(q5Feeling) {
+    return Q5_CERAMIC_GRAY[q5Feeling] || Q5_CERAMIC_GRAY.hope;
+  }
+
+  function clampNum(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function letterHashSeed(str) {
+    if (!str) return null;
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+    return (h >>> 0) / 4294967296;
+  }
+
+  function getStatusSpacing(familyStatus) {
+    const key = familyStatus || 'single';
+    return STATUS_SPACING[key] != null ? STATUS_SPACING[key] : STATUS_SPACING.single;
+  }
+
+  /** שכבה 2 — א נסתרת רק אם יש חיבור א↔אות בשם (לא תמיד) */
+  function nameLettersNeedHiddenAleph(letters, intent) {
+    const CC = requireConnectionCore();
+    return letters.some(
+      (ch) => ch !== 'א' && CC.findConnectionBetween(connections, 'א', ch, intent)
+    );
+  }
+
+  /** סיכום איך גורמי שכבה 2 משולבים */
+  function layer2FactorSummary(style2, layer2) {
+    const frameBump = frameBumpProfile(style2);
+    const lines = [
+      'צורה ← שם + חיבורי ' + style2.intent + ' (סוג קמע)',
+      layer2?.hiddenHub
+        ? 'עוגן נסתר: א — יש חיבור א↔אות בשם, לא מוצגת'
+        : layer2?.anchor
+          ? 'עוגן: ' + layer2.anchor + ' (הכי הרבה חיבורים בשם)'
+          : 'עוגן: —',
+      'מרחק ← סטטוס ' + style2.familyStatus + ' → spacing×' + style2.spacing.toFixed(2),
+      'שם ← SVG bump=' +
+        layer2LetterBumpProfile(style2).scale +
+        ' · מסגרת ← Q4 ' +
+        (style2.q4Belief || 'concrete_actions') +
+        ' עובי×' +
+        (style2.frameRadiusScale ?? 1).toFixed(2),
+      'גודל ← מגדר ' + style2.gender + ' → scale×' + style2.amuletScale.toFixed(2),
+      'שילוב: מרחק×' +
+        style2.spacing.toFixed(2) +
+        ' + מסגרת Q4 עובי×' +
+        (style2.frameRadiusScale ?? 1).toFixed(2) +
+        ' + גודל×' +
+        style2.amuletScale.toFixed(2)
+    ];
+    return lines;
+  }
+
+  function shiftHex(hex, degrees) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d) {
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h = h * 60;
+    }
+    const s = max ? d / max : 0;
+    const v = max;
+    h = ((h + degrees) % 360 + 360) % 360;
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r2;
+    let g2;
+    let b2;
+    if (h < 60) {
+      r2 = c;
+      g2 = x;
+      b2 = 0;
+    } else if (h < 120) {
+      r2 = x;
+      g2 = c;
+      b2 = 0;
+    } else if (h < 180) {
+      r2 = 0;
+      g2 = c;
+      b2 = x;
+    } else if (h < 240) {
+      r2 = 0;
+      g2 = x;
+      b2 = c;
+    } else if (h < 300) {
+      r2 = x;
+      g2 = 0;
+      b2 = c;
+    } else {
+      r2 = c;
+      g2 = 0;
+      b2 = x;
+    }
+    const toHex = (n) =>
+      Math.round((n + m) * 255)
+        .toString(16)
+        .padStart(2, '0');
+    return '#' + toHex(r2) + toHex(g2) + toHex(b2);
+  }
+
+  function visualStyleLayer3(p, seedOverride) {
+    const styleP = questionnaireStyleBase(p);
+    const strokeByDomain = {
+      love: '#EF4F85',
+      livelihood: '#000000',
+      health: '#585127',
+      family: '#6C3711',
+      selfConfidence: '#362514',
+      meaning: '#738DEB',
+      housing: '#8B2020'
+    };
+    const spacing = URGENCY_SPACING[styleP.urgency] ?? 1.0;
+    const gender = GENDER_VISUAL[styleP.gender] || GENDER_VISUAL.female;
+    const seed = seedOverride;
+    const hueShift = seed != null ? seed * 40 - 20 : 0;
+    const connectionTwist = 0;
+    const densityMult = 1;
+    const frameIntent = styleP.amuletType === 'summoning' ? 'summoning' : 'protection';
+    const ageBucket = ageBucketFromNumber(styleP.age);
+    const surfaceScale = surfaceScaleFromAge(styleP.age);
+    const baseColor = strokeByDomain[styleP.domain] || strokeByDomain.love;
+    const strokeColor = shiftHex(baseColor, hueShift);
+    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
+
+    return {
+      layer: 3,
+      amuletType: styleP.amuletType,
+      domainKey: styleP.domain,
+      intent: frameIntent,
+      frameIntent,
+      strokeColor,
+      spacing,
+      amuletScale: gender.scale * LAYER3_SCALE,
+      linecap: gender.linecap,
+      linejoin: gender.linejoin,
+      miterlimit: gender.miterlimit,
+      ageTexture,
+      surfaceScale,
+      age: ageBucket,
+      gender: styleP.gender,
+      filterId: FILTER_ID_LAYER3,
+      connectionTwist,
+      densityMult,
+      composeSeed: seed,
+      l3Spike: styleP.l3Spike
+    };
+  }
+
+  /** style2 — תמיד מחושב (מסגרת/מרקם), גם כשאין אותיות L2 */
+  function visualStyleLayer2(p, seedOverride) {
+    const styleP = questionnaireStyleBase(p);
+    const gender = GENDER_VISUAL[styleP.gender] || GENDER_VISUAL.female;
+    const occ = OCCUPATION_VISUAL[styleP.occupation] || OCCUPATION_VISUAL.care_health;
+    const statusSpacing = getStatusSpacing(styleP.familyStatus);
+    const smoothness = styleP.occupationSmoothness ?? 0.5;
+    const frameSmoothness = styleP.frameSmoothness ?? 0.5;
+    const stoneRoughness = styleP.stoneRoughness ?? 0;
+    const ageTexture =
+      smoothness >= 0.95 ? 'gloss' : smoothness < 0.45 ? 'gloss+rough' : 'gloss+bump';
+    const seed = seedOverride ?? letterHashSeed(p.q2Name);
+    const connectionTwist = null;
+
+    return {
+      layer: 2,
+      familyStatus: styleP.familyStatus,
+      occupationKey: styleP.occupation,
+      occupationSmoothness: smoothness,
+      frameSmoothness,
+      stoneRoughness,
+      q4Belief: styleP.q4Belief,
+      frameRadiusScale: styleP.frameRadiusScale,
+      frameContour: styleP.frameContour,
+      frameTexture: styleP.frameTexture,
+      frameVisual: styleP.frameVisual,
+      intent: amuletPlacementIntent(styleP.amuletType),
+      strokeColor: '#B8B8B8',
+      spacing: statusSpacing,
+      amuletScale: gender.scale * LAYER2_SCALE,
+      linecap: occ.linecap,
+      linejoin: occ.linejoin,
+      miterlimit: occ.miterlimit,
+      ageTexture,
+      surfaceScale: 0,
+      gender: styleP.gender,
+      filterId: FILTER_ID_LAYER2,
+      composeSeed: seed,
+      connectionTwist,
+      q5Feeling: styleP.q5Feeling
+    };
+  }
+
+  /** זכר: פרופיל לפי גיל — זהה ל-prototype.html */
+  function maleBumpProfile(age, surfaceScale) {
+    const s = surfaceScale;
+    if (s <= 0) {
+      return { scale: 0, baseFrequency: '0.10', numOctaves: 2 };
+    }
+    if (s <= 9) {
+      return {
+        scale: s,
+        baseFrequency: Math.max(0.08, 0.115 - s * 0.002).toFixed(3),
+        numOctaves: s < 6 ? 2 : 3
+      };
+    }
+    if (age === '70plus') {
+      return { scale: 12, baseFrequency: '0.128', numOctaves: 2 };
+    }
+    if (age === '60-70') {
+      return { scale: 9, baseFrequency: '0.108', numOctaves: 2 };
+    }
+    return {
+      scale: Math.min(10, Math.round(8 + (s - 9) * 0.28)),
+      baseFrequency: '0.10',
+      numOctaves: 2
+    };
+  }
+
+  /** שכבה 2 — אותיות: חספוס לפי עיסוק */
+  function layer2LetterBumpProfile(style) {
+    const key = style.occupationKey || 'care_health';
+    const occ = OCCUPATION_VISUAL[key] || OCCUPATION_VISUAL.care_health;
+    const custom = occ.customBump;
+    const smooth = OCCUPATION_SMOOTHNESS[key] ?? 0.5;
+    const rough = 1 - smooth;
+    const scale = Math.round(rough * rough * 6 + rough * 2);
+    return {
+      type: custom.type,
+      baseFrequency: custom.baseFrequency,
+      numOctaves: custom.numOctaves,
+      scale: smooth >= 0.995 ? 0 : Math.max(rough > 0.05 ? 2 : 0, scale)
+    };
+  }
+
+  /** מסגרת — טקסטורה חלקה קבועה (Q4 משפיע רק על עובי) */
+  function frameBumpProfile(style) {
+    const preset = FRAME_TEXTURE_SMOOTH;
+    return {
+      type: preset.type,
+      baseFrequency: preset.baseFrequency,
+      numOctaves: preset.numOctaves,
+      scale: 0
+    };
+  }
+
+  function layer2BumpProfile(style) {
+    return layer2LetterBumpProfile(style);
+  }
+
+  /** גיל = עוצמת חספוס — זהה ל-prototype.html (שכבה 3) */
+  function ageBumpByGender(style) {
+    const s = style.surfaceScale;
+    const g = style.gender || 'female';
+    if (g === 'male') {
+      const profile = maleBumpProfile(style.age, s);
+      return {
+        type: 'turbulence',
+        baseFrequency: profile.baseFrequency,
+        numOctaves: profile.numOctaves,
+        scale: profile.scale
+      };
+    }
+    if (g === 'nonbinary') {
+      return {
+        type: 'fractalNoise',
+        baseFrequency: '0.07',
+        numOctaves: 3,
+        scale: Math.round(s * 1.35)
+      };
+    }
+    return {
+      type: 'fractalNoise',
+      baseFrequency: '0.09',
+      numOctaves: 2,
+      scale: s
+    };
+  }
+
+  function filterRegionAttrs(surfaceScale, bumpScale) {
+    const s = bumpScale != null ? bumpScale : surfaceScale || 0;
+    if (s <= 0) return ' x="-15%" y="-15%" width="130%" height="130%"';
+    if (s > 6) {
+      return (
+        ' filterUnits="userSpaceOnUse" x="-80" y="-80" width="' +
+        (W + 160) +
+        '" height="' +
+        (H + 160) +
+        '"'
+      );
+    }
+    if (s > 3) return ' x="-55%" y="-55%" width="210%" height="210%"';
+    return ' x="-40%" y="-40%" width="180%" height="180%"';
+  }
+
+  function bumpProfileForStyle(style) {
+    if (style.layer === 'frame') return frameBumpProfile(style);
+    return style.layer === 2 ? layer2LetterBumpProfile(style) : ageBumpByGender(style);
+  }
+
+  /** פילטר משולב — עותק מדויק מ-prototype.html */
+  function buildCombinedFilter(filterId, style) {
+    const bump = bumpProfileForStyle(style);
+    return (
+      '<filter id="' +
+      filterId +
+      '"' +
+      filterRegionAttrs(style.surfaceScale, bump.scale) +
+      ' color-interpolation-filters="sRGB">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+      '<feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.2" specularExponent="50" lighting-color="white" result="gloss">' +
+      '<fePointLight x="300" y="150" z="200"/>' +
+      '</feSpecularLighting>' +
+      '<feComposite in="gloss" in2="SourceGraphic" operator="in" result="glossClip"/>' +
+      '<feMerge result="glossed">' +
+      '<feMergeNode in="SourceGraphic"/>' +
+      '<feMergeNode in="glossClip"/>' +
+      '</feMerge>' +
+      '<feTurbulence type="' +
+      bump.type +
+      '" baseFrequency="' +
+      bump.baseFrequency +
+      '" numOctaves="' +
+      bump.numOctaves +
+      '" seed="2" result="noise"/>' +
+      '<feDisplacementMap in="glossed" in2="noise" scale="' +
+      bump.scale +
+      '" xChannelSelector="R" yChannelSelector="G"/>' +
+      '</filter>'
+    );
+  }
+
+  function buildSvgDefs(style2, style3) {
+    let defs = '<defs>';
+    if (style2) {
+      console.log('[layer2] name bump + frame Q4 · belief:', style2.q4Belief);
+      defs += buildCombinedFilter(FILTER_ID_LAYER2, { ...style2, layer: 2 });
+      defs += buildCombinedFilter(FILTER_ID_FRAME, { ...style2, layer: 'frame' });
+    }
+    console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
+    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
+    defs +=
+      '<filter id="inflate3d" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feMorphology operator="dilate" radius="14" result="expanded"/>' +
+      '<feGaussianBlur in="expanded" stdDeviation="8" result="softEdge"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" seed="7" result="grain"/>' +
+      '<feComposite in="grain" in2="softEdge" operator="arithmetic" k1="0" k2="0.15" k3="0.85" k4="0" result="heightMap"/>' +
+      '<feComposite in="softEdge" in2="expanded" operator="over" result="body"/>' +
+      '<feDiffuseLighting in="heightMap" surfaceScale="5" diffuseConstant="0.95" lighting-color="#F5E8D0" result="volume">' +
+      '<fePointLight x="260" y="130" z="220"/>' +
+      '</feDiffuseLighting>' +
+      '<feComposite in="volume" in2="expanded" operator="in" result="volumeClip"/>' +
+      '<feBlend in="body" in2="volumeClip" mode="soft-light" result="shaded"/>' +
+      '<feSpecularLighting in="heightMap" surfaceScale="5" specularConstant="0.7" specularExponent="14" lighting-color="#ffffff" result="shine">' +
+      '<fePointLight x="250" y="150" z="300"/>' +
+      '</feSpecularLighting>' +
+      '<feComposite in="shine" in2="expanded" operator="in" result="shineClip"/>' +
+      '<feBlend in="shaded" in2="shineClip" mode="screen" result="final"/>' +
+      '<feComposite in="final" in2="SourceGraphic" operator="over"/>' +
+      '</filter>';
+    if (isSvgDebugMode()) {
+      defs +=
+        '<filter id="inflate3d-debug" x="-30%" y="-30%" width="160%" height="160%">' +
+        '<feMorphology operator="dilate" radius="14" result="expanded"/>' +
+        '<feGaussianBlur in="expanded" stdDeviation="8" result="softEdge"/>' +
+        '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" seed="7" result="grain"/>' +
+        '<feComposite in="grain" in2="softEdge" operator="arithmetic" k1="0" k2="0.4" k3="0.6" k4="0" result="heightMap"/>' +
+        '<feDiffuseLighting in="heightMap" surfaceScale="12" diffuseConstant="0.95" lighting-color="#F5E8D0" result="volume">' +
+        '<fePointLight x="260" y="130" z="220"/>' +
+        '</feDiffuseLighting>' +
+        '<feComposite in="volume" in2="expanded" operator="in"/>' +
+        '</filter>';
+    }
+    defs += '</defs>';
+    return defs;
+  }
+
+  function assembleAmuletSvg(vb, defs, content) {
+    return (
+      '<svg id="amuletSvg" xmlns="http://www.w3.org/2000/svg" width="' +
+      W +
+      '" height="' +
+      H +
+      '" viewBox="' +
+      vb.x +
+      ' ' +
+      vb.y +
+      ' ' +
+      vb.w +
+      ' ' +
+      vb.h +
+      '" preserveAspectRatio="xMidYMid meet">' +
+      defs +
+      '<rect x="' +
+      vb.x +
+      '" y="' +
+      vb.y +
+      '" width="' +
+      vb.w +
+      '" height="' +
+      vb.h +
+      '" fill="' +
+      AMULET_BG +
+      '"/>' +
+      content +
+      '</svg>'
+    );
+  }
+
+  function effectLabel(style) {
+    if (style.layer === 2) {
+      const bump = layer2LetterBumpProfile(style);
+      return (
+        'combined · ' +
+        style.occupationKey +
+        ' · ' +
+        (style.ageTexture || 'gloss') +
+        ' · ' +
+        bump.type +
+        '@' +
+        bump.baseFrequency +
+        '×' +
+        bump.scale +
+        ' · מסגרת+עיקולים'
+      );
+    }
+    if (style.layer === 'frame') {
+      const bump = frameBumpProfile(style);
+      return (
+        'frame · Q4 ' +
+        (style.q4Belief || 'doubt') +
+        ' · ' +
+        bump.type +
+        '@' +
+        bump.baseFrequency +
+        '×' +
+        bump.scale
+      );
+    }
+    const tex = style.ageTexture !== 'none' ? style.ageTexture : 'neutral';
+    const bump = ageBumpByGender(style);
+    let fx =
+      bump.type +
+      '@' +
+      bump.baseFrequency +
+      '×' +
+      bump.scale;
+    if (style.gender === 'male') {
+      fx += ' spiky-bump';
+    }
+    return style.amuletType + '/' + style.domainKey + ' · ' + tex + ' · ' + fx + ' · ' + style.linecap;
+  }
+
+  /**
+   * Remove per-path stroke/fill so the stroke pass controls rendering.
+   */
+  function sanitizePathsInner(html) {
+    if (!html) return '';
+    try {
+      const doc = new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg"><g id="root">' + html + '</g></svg>',
+        'image/svg+xml'
+      );
+      if (doc.querySelector('parsererror')) return html;
+      doc.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
+        el.setAttribute('fill', 'none');
+        el.removeAttribute('stroke');
+        el.removeAttribute('stroke-width');
+        el.removeAttribute('stroke-linecap');
+        el.removeAttribute('stroke-linejoin');
+        el.removeAttribute('stroke-opacity');
+        if (el.hasAttribute('style')) {
+          const s = el
+            .getAttribute('style')
+            .replace(/fill\s*:\s*[^;]+;?/gi, 'fill:none;')
+            .replace(/stroke\s*:\s*[^;]+;?/gi, '')
+            .replace(/stroke-width\s*:\s*[^;]+;?/gi, '');
+          el.setAttribute('style', s);
+        }
+      });
+      const root = doc.getElementById('root');
+      return root ? root.innerHTML : html;
+    } catch (_) {
+      return html
+        .replace(/\sstroke\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/\sstroke-width\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/fill\s*=\s*["'](?!none)[^"']*["']/gi, 'fill="none"');
+    }
+  }
+
+  function strokeAttrs(style, width, filterId) {
+    let attrs =
+      'fill="none" stroke="' +
+      style.strokeColor +
+      '" stroke-width="' +
+      width +
+      '" stroke-linecap="' +
+      style.linecap +
+      '" stroke-linejoin="' +
+      style.linejoin +
+      '"';
+    if (style.miterlimit != null) {
+      attrs += ' stroke-miterlimit="' + style.miterlimit + '"';
+    }
+    if (filterId) {
+      attrs += ' filter="url(#' + filterId + ')"';
+    }
+    return attrs;
+  }
+
+  /** הקטנת מסת L3 ~65% מבסיס — קו דק כמו חוט/שריטה, רווחים דומיננטיים */
+  const L3_STROKE_BASE = 45;
+  const PATH_MAIN_W = L3_STROKE_BASE * L3_MASS_SCALE;
+
+  function pathLayers(pathMarkup, style, filterId) {
+    const clean = sanitizePathsInner(pathMarkup);
+    const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
+    return (
+      '<g class="path-layers"><g class="path-main" ' +
+      strokeAttrs(style, PATH_MAIN_W, mainFid) +
+      '>' +
+      clean +
+      '</g></g>'
+    );
+  }
+
+  /** Bounding box for mirrored symmetric layout (includes stroke padding). */
+  function viewBoxForPlacements(placements, surfaceScale) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const extraPad = Math.min((surfaceScale || 0) * 2.5, 60);
+    const bump = (x, y) => {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    };
+    for (const p of placements) {
+      const s = p.amuletScale || 1;
+      const r = (p.sz / 2 + VIEWBOX_PAD + extraPad) * s;
+      const sx = CX + (p.x - CX) * s;
+      const sy = CY + (p.y - CY) * s;
+      bump(sx - r, sy - r);
+      bump(sx + r, sy + r);
+      const mx = CX + (W - p.x - CX) * s;
+      bump(mx - r, sy - r);
+      bump(mx + r, sy + r);
+    }
+    if (!isFinite(minX)) {
+      return { x: 0, y: 0, w: W, h: H };
+    }
+    const bw = maxX - minX;
+    const bh = maxY - minY;
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(bw, 120),
+      h: Math.max(bh, 120)
+    };
+  }
+
+  function wrapAmuletScale(content, style) {
+    if (style.amuletScale === 1) return content;
+    return (
+      '<g transform="translate(' +
+      CX +
+      ',' +
+      CY +
+      ') scale(' +
+      style.amuletScale +
+      ') translate(' +
+      -CX +
+      ',' +
+      -CY +
+      ')">' +
+      content +
+      '</g>'
+    );
+  }
+
+  function measureSvgContentBBox(content, vb, defsHtml) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="' +
+        vb.x +
+        ' ' +
+        vb.y +
+        ' ' +
+        vb.w +
+        ' ' +
+        vb.h +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        content +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) {
+      return { x: CX, y: CY, width: 0, height: 0, halfW: 24, halfH: 24, cx: CX, cy: CY };
+    }
+    const svg = doc.documentElement;
+    svg.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(svg);
+    const root = svg.querySelector('#measure-root');
+    let bb;
+    try {
+      bb = root ? root.getBBox() : { x: CX, y: CY, width: 0, height: 0 };
+    } catch (_) {
+      bb = { x: CX, y: CY, width: 0, height: 0 };
+    }
+    document.body.removeChild(svg);
+    const halfW = Math.max(bb.width / 2, 24);
+    const halfH = Math.max(bb.height / 2, 24);
+    return {
+      x: bb.x,
+      y: bb.y,
+      width: bb.width,
+      height: bb.height,
+      halfW,
+      halfH,
+      cx: bb.x + bb.width / 2,
+      cy: bb.y + bb.height / 2
+    };
+  }
+
+  /** מודד מרכז ויזואלי של שכבה (getBBox) */
+  function measureContentBBox(content, vb, defsHtml) {
+    const bb = measureSvgContentBBox(content, vb, defsHtml);
+    return { cx: bb.cx, cy: bb.cy };
+  }
+
+  const FULL_CANVAS_VB = { x: 0, y: 0, w: W, h: H };
+
+  /** מזיז את כל השכבות כך שמרכז התוכן יושב בדיוק על (CX, CY) */
+  function centerLayersOnCanvas(layersMarkup, defsHtml) {
+    const bb = measureSvgContentBBox(layersMarkup, FULL_CANVAS_VB, defsHtml);
+    const dx = CX - bb.cx;
+    const dy = CY - bb.cy;
+    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
+      return { content: layersMarkup, dx: 0, dy: 0, vb: FULL_CANVAS_VB };
+    }
+    return {
+      content:
+        '<g class="amulet-canvas-center" transform="translate(' +
+        dx.toFixed(2) +
+        ',' +
+        dy.toFixed(2) +
+        ')">' +
+        layersMarkup +
+        '</g>',
+      dx,
+      dy,
+      vb: FULL_CANVAS_VB
+    };
+  }
+
+  function unionViewBox(vb, bounds) {
+    const minX = Math.min(vb.x, bounds.minX);
+    const minY = Math.min(vb.y, bounds.minY);
+    const maxX = Math.max(vb.x + vb.w, bounds.maxX);
+    const maxY = Math.max(vb.y + vb.h, bounds.maxY);
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+
+  function frameStrokeAttrs(strokeColor, style2) {
+    const visual = style2?.frameVisual || FRAME_VISUAL_SMOOTH;
+    let attrs =
+      'fill="none" stroke="' +
+      strokeColor +
+      '" stroke-width="' +
+      FRAME_STROKE +
+      '" stroke-linecap="' +
+      visual.linecap +
+      '" stroke-linejoin="' +
+      visual.linejoin +
+      '"';
+    if (visual.miterlimit != null) attrs += ' stroke-miterlimit="' + visual.miterlimit + '"';
+    attrs += ' filter="url(#' + FILTER_ID_FRAME + ')"';
+    return attrs;
+  }
+
+  function frameBounds(cx, cy, rx, ry) {
+    const half = FRAME_STROKE / 2;
+    return {
+      minX: cx - rx - half,
+      minY: cy - ry - half,
+      maxX: cx + rx + half,
+      maxY: cy + ry + half
+    };
+  }
+
+  function subsampleContour(points, minDist) {
+    if (points.length < 3) return points;
+    const out = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      const last = out[out.length - 1];
+      if (Math.hypot(points[i].x - last.x, points[i].y - last.y) >= minDist) {
+        out.push(points[i]);
+      }
+    }
+    return out.length >= 3 ? out : points;
+  }
+
+  function dilateCircularGrid(grid, bw, bh, radius) {
+    const out = new Uint8Array(bw * bh);
+    const r2 = radius * radius;
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        if (!grid[y * bw + x]) continue;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > r2) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < bw && ny >= 0 && ny < bh) out[ny * bw + nx] = 1;
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  function isBoundaryPixel(grid, bw, bh, x, y) {
+    if (!grid[y * bw + x]) return false;
+    if (x === 0 || y === 0 || x === bw - 1 || y === bh - 1) return true;
+    return (
+      !grid[y * bw + (x - 1)] ||
+      !grid[y * bw + (x + 1)] ||
+      !grid[(y - 1) * bw + x] ||
+      !grid[(y + 1) * bw + x]
+    );
+  }
+
+  function traceBoundaryLoop(grid, bw, bh, sx, sy, x0, y0) {
+    const dx = [1, 1, 0, -1, -1, -1, 0, 1];
+    const dy = [0, 1, 1, 1, 0, -1, -1, -1];
+    let x = sx;
+    let y = sy;
+    let dir = 6;
+    const contour = [];
+    let guard = 0;
+    const maxGuard = Math.min(bw + bh, 8000) * 4;
+
+    do {
+      contour.push({ x: x + x0 + 0.5, y: y + y0 + 0.5 });
+      let found = false;
+      for (let i = 0; i < 8; i++) {
+        const nd = (dir + i) % 8;
+        const nx = x + dx[nd];
+        const ny = y + dy[nd];
+        if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue;
+        if (grid[ny * bw + nx] && isBoundaryPixel(grid, bw, bh, nx, ny)) {
+          x = nx;
+          y = ny;
+          dir = (nd + 5) % 8;
+          found = true;
+          break;
+        }
+      }
+      if (!found) break;
+      guard++;
+    } while ((x !== sx || y !== sy || contour.length < 3) && guard < maxGuard);
+
+    return contour;
+  }
+
+  /** לולאת השוליים הארוכה ביותר — מוגבל לכמה רכיבים כדי לא לתקוע */
+  function traceLargestBoundary(grid, bw, bh, x0, y0) {
+    const visited = new Uint8Array(bw * bh);
+    let best = [];
+    let components = 0;
+    outer: for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        if (!isBoundaryPixel(grid, bw, bh, x, y) || visited[y * bw + x]) continue;
+        components++;
+        if (components > 12) break outer;
+        const contour = traceBoundaryLoop(grid, bw, bh, x, y, x0, y0);
+        for (const p of contour) {
+          const px = Math.floor(p.x - x0);
+          const py = Math.floor(p.y - y0);
+          if (px >= 0 && px < bw && py >= 0 && py < bh) visited[py * bw + px] = 1;
+        }
+        if (contour.length > best.length) best = contour;
+      }
+    }
+    return subsampleContour(best, 2);
+  }
+
+  const PBR_TUBE_RADIUS = 6;
+
+  /** רוחב מסכת אבן — תואם ל-rasterizeNameLettersStoneMask ב-PBR */
+  function stoneSlabMaskStroke(style2, style3) {
+    const scale = style3?.amuletScale || 1;
+    const strokeW = PATH_MAIN_W * scale;
+    const gender = style3?.gender || style2?.gender || 'female';
+    const tubeR =
+      gender === 'nonbinary' ? strokeW * 0.52 : gender === 'male' ? strokeW * 0.42 : strokeW * 0.5;
+    return tubeR * 1.48 * 3.45 * 2;
+  }
+
+  function applyFrameQ5Wobble(contourPts, style2) {
+    const smooth = frameSmoothnessFromStyle(style2);
+    const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
+    if (rough < 0.18 || !contourPts.length) return contourPts;
+    let cx = 0;
+    let cy = 0;
+    for (const p of contourPts) {
+      cx += p.x;
+      cy += p.y;
+    }
+    cx /= contourPts.length;
+    cy /= contourPts.length;
+    return contourPts.map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const dist = Math.hypot(dx, dy) || 1;
+      const amp = rough * 4.5 * (preset.ampScale || 1);
+      const phase = preset.phase || 0;
+      const wobble =
+        Math.sin(ang * (0.28 + rough * 0.14 + (preset.freqBias || 0) * 0.12)) * (preset.wobbleMix ?? 1) +
+        Math.cos(ang * (0.51 - rough * 0.09)) * 0.33 * (preset.wobbleMix ?? 1);
+      const curl =
+        Math.sin(ang * 0.07 + rough * 1.2 + phase) *
+        Math.cos(ang * (0.18 + rough * 0.11)) *
+        (preset.curlMix ?? 1);
+      const delta = (wobble * 0.55 + curl * 0.28) * amp;
+      return { x: p.x + (dx / dist) * delta, y: p.y + (dy / dist) * delta };
+    });
+  }
+
+  /** קונטור מסגרת — מסכת L2 ממוזגת (צורת האבן), dilation + offset */
+  async function buildStoneSlabFrameContour(layersHtml, defsHtml, pad, style2, style3) {
+    const mount = mountLayersRoot(layersHtml, defsHtml);
+    if (!mount) return { points: [] };
+    const scale = FRAME_MASK_SCALE;
+    try {
+      const l2 = mount.root.querySelector('.layer-2');
+      if (!l2) return { points: [] };
+      const stroke = stoneSlabMaskStroke(style2, style3);
+      let grid = await rasterGridFromMaskMarkup(layerElToMaskMarkup(l2, stroke), scale);
+      if (countGridFilled(grid) < 40) return { points: [] };
+      const bw = W * scale;
+      const bh = H * scale;
+      for (const r of [28, 20, 14, 8]) {
+        grid = dilateCircularGrid(grid, bw, bh, Math.round(r * scale * 0.45));
+      }
+      const points = contourFromGrid(grid, bw, bh, pad, scale);
+      return points.length >= 8 ? { points } : { points: [] };
+    } finally {
+      if (mount.svg.parentNode) mount.svg.parentNode.removeChild(mount.svg);
+    }
+  }
+
+  /** רוחב מסכה ל-L2 — תואם לצינורות דקים ב-3D + organic */
+  function pbrL2MaskStroke(style2) {
+    const gender = style2?.gender || 'female';
+    const tubeR =
+      gender === 'nonbinary'
+        ? PBR_TUBE_RADIUS * 2.2
+        : gender === 'male'
+          ? PBR_TUBE_RADIUS * 1.4
+          : PBR_TUBE_RADIUS * 0.7;
+    const bump2 = style2 ? layer2LetterBumpProfile(style2).scale || 0 : 0;
+    const rough = style2 ? 1 - (style2.occupationSmoothness ?? 0.5) : 0;
+    const organic = 10 + bump2 * 0.85 + rough * 14;
+    return 2 * (tubeR * 1.2 + organic) * (style2?.amuletScale || 1);
+  }
+
+  /** רוחב מסכה ל-L3 — תואם לceramic מנופח */
+  function pbrL3MaskStroke(style3) {
+    const scale = style3?.amuletScale || 1;
+    const domePad = 14;
+    return PATH_MAIN_W * scale + domePad * 2;
+  }
+
+  /** מרחק מסגרת — מרווח שווה מחוץ למסכה המשולבת */
+  function computeFrameContourPad(style2, style3) {
+    const rough = style2 ? 1 - frameSmoothnessFromStyle(style2) : 0;
+    const bump3 = ageBumpByGender(style3).scale || 0;
+    const frameExtra = rough > 0.12 ? Math.ceil(rough * 16) : 0;
+    return FRAME_PAD + Math.ceil(bump3 * 2) + 10 + frameExtra;
+  }
+
+  function gridFromImageData(data, bw, bh) {
+    const grid = new Uint8Array(bw * bh);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const i = (y * bw + x) * 4;
+        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        if (lum < 248) grid[y * bw + x] = 1;
+      }
+    }
+    return grid;
+  }
+
+  function mountLayersRoot(layersHtml, defsHtml) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="0 0 ' +
+        W +
+        ' ' +
+        H +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        layersHtml +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return null;
+    const svg = doc.documentElement;
+    svg.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(svg);
+    return { svg, root: svg.querySelector('#measure-root') };
+  }
+
+  function applyMaskStroke(layerClone, strokeWidth) {
+    const sw = String(strokeWidth);
+    layerClone.querySelectorAll('[filter]').forEach((el) => el.removeAttribute('filter'));
+    layerClone.querySelectorAll('.path-main').forEach((g) => {
+      g.setAttribute('stroke', '#000000');
+      g.setAttribute('stroke-width', sw);
+      g.setAttribute('stroke-opacity', '1');
+      g.setAttribute('fill', 'none');
+      g.removeAttribute('filter');
+    });
+    layerClone.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((p) => {
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', '#000000');
+      p.setAttribute('stroke-width', sw);
+      p.setAttribute('stroke-linecap', 'round');
+      p.setAttribute('stroke-linejoin', 'round');
+    });
+  }
+
+  function layerElToMaskMarkup(layerEl, strokeWidth) {
+    const clone = layerEl.cloneNode(true);
+    applyMaskStroke(clone, strokeWidth);
+    return (
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+      W +
+      ' ' +
+      H +
+      '" width="' +
+      W +
+      '" height="' +
+      H +
+      '">' +
+      '<rect width="' +
+      W +
+      '" height="' +
+      H +
+      '" fill="#ffffff"/>' +
+      clone.outerHTML +
+      '</svg>'
+    );
+  }
+
+  function unionGrids(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const out = new Uint8Array(a.length);
+    for (let i = 0; i < a.length; i++) out[i] = a[i] | b[i];
+    return out;
+  }
+
+  function layerExtentFromMount(mount, selector) {
+    const el = mount.root.querySelector(selector);
+    if (!el) return null;
+    try {
+      const b = el.getBBox();
+      return { minX: b.x, minY: b.y, maxX: b.x + b.width, maxY: b.y + b.height };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function expandedLayerExtents(mount, style2, style3) {
+    const out = [];
+    const l2 = layerExtentFromMount(mount, '.layer-2');
+    if (l2 && style2) {
+      const m = pbrL2MaskStroke(style2) / 2 + 6;
+      out.push({ minX: l2.minX - m, minY: l2.minY - m, maxX: l2.maxX + m, maxY: l2.maxY + m });
+    }
+    const l3 = layerExtentFromMount(mount, '.layer-3');
+    if (l3 && style3) {
+      const m = pbrL3MaskStroke(style3) / 2 + 6;
+      out.push({ minX: l3.minX - m, minY: l3.minY - m, maxX: l3.maxX + m, maxY: l3.maxY + m });
+    }
+    return out;
+  }
+
+  function contourBounds(contourPts) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of contourPts) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, minY, maxX, maxY };
+  }
+
+  function contourEnclosesExtents(contourPts, extents, margin) {
+    if (!contourPts.length || !extents.length) return false;
+    const c = contourBounds(contourPts);
+    for (const e of extents) {
+      if (!e) continue;
+      if (c.minX > e.minX - margin || c.maxX < e.maxX + margin) return false;
+      if (c.minY > e.minY - margin || c.maxY < e.maxY + margin) return false;
+    }
+    return true;
+  }
+
+  async function loadSvgMarkupAsImage(svgMarkup) {
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('SVG rasterize failed'));
+      img.src = url;
+    });
+  }
+
+  function rasterGridFromMaskMarkup(svgMarkup, scale) {
+    return loadSvgMarkupAsImage(svgMarkup).then((img) => {
+      const bw = W * scale;
+      const bh = H * scale;
+      const canvas = document.createElement('canvas');
+      canvas.width = bw;
+      canvas.height = bh;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, bw, bh);
+      ctx.drawImage(img, 0, 0, bw, bh);
+      return gridFromImageData(ctx.getImageData(0, 0, bw, bh).data, bw, bh);
+    });
+  }
+
+  async function rasterGridFromMountedSvg(mount, scale) {
+    const svg = mount.svg.cloneNode(true);
+    svg.querySelectorAll('.layer-frame').forEach((el) => el.remove());
+    svg.querySelectorAll('[filter]').forEach((el) => el.removeAttribute('filter'));
+    svg.querySelectorAll('.path-main').forEach((g) => {
+      const sw = g.getAttribute('stroke-width') || PATH_MAIN_W;
+      g.setAttribute('stroke', '#000000');
+      g.setAttribute('stroke-width', sw);
+      g.setAttribute('fill', 'none');
+    });
+    svg.querySelectorAll('path').forEach((p) => {
+      p.setAttribute('stroke', '#000000');
+      p.setAttribute('fill', 'none');
+      if (!p.getAttribute('stroke-width')) p.setAttribute('stroke-width', String(PATH_MAIN_W));
+    });
+    const bg = svg.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('width', String(W));
+    bg.setAttribute('height', String(H));
+    bg.setAttribute('fill', '#ffffff');
+    svg.insertBefore(bg, svg.firstChild);
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    const markup = '<?xml version="1.0" encoding="UTF-8"?>' + new XMLSerializer().serializeToString(svg);
+    return rasterGridFromMaskMarkup(markup, scale);
+  }
+
+  function countGridFilled(grid) {
+    let n = 0;
+    for (let i = 0; i < grid.length; i++) n += grid[i];
+    return n;
+  }
+
+  function contourFromGrid(grid, bw, bh, pad, scale) {
+    const dilated = dilateCircularGrid(grid, bw, bh, Math.round(pad * scale));
+    const raw = traceLargestBoundary(dilated, bw, bh, 0, 0);
+    return raw.map((p) => ({ x: p.x / scale, y: p.y / scale }));
+  }
+
+  async function rasterCombinedLayersMask(mount, style2, style3, scale) {
+    const bw = W * scale;
+    const bh = H * scale;
+    const canvas = document.createElement('canvas');
+    canvas.width = bw;
+    canvas.height = bh;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, bw, bh);
+    const l2 = mount.root.querySelector('.layer-2');
+    const l3 = mount.root.querySelector('.layer-3');
+    if (l2) {
+      const img2 = await loadSvgMarkupAsImage(layerElToMaskMarkup(l2, pbrL2MaskStroke(style2)));
+      ctx.drawImage(img2, 0, 0, bw, bh);
+    }
+    if (l3) {
+      const img3 = await loadSvgMarkupAsImage(layerElToMaskMarkup(l3, pbrL3MaskStroke(style3)));
+      ctx.drawImage(img3, 0, 0, bw, bh);
+    }
+    return gridFromImageData(ctx.getImageData(0, 0, bw, bh).data, bw, bh);
+  }
+
+  /** קונטור offset — union L2+L3, dilation מעגלית (מרחק שווה), מעקב שוליים */
+  async function buildCombinedLayersFrameContour(layersHtml, defsHtml, pad, style2, style3) {
+    const mount = mountLayersRoot(layersHtml, defsHtml);
+    if (!mount) return { points: [] };
+    const scale = FRAME_MASK_SCALE;
+    const extents = expandedLayerExtents(mount, style2, style3);
+    try {
+      const grid = await rasterCombinedLayersMask(mount, style2, style3, scale);
+      if (countGridFilled(grid) < 40) {
+        console.warn('[frame] mask empty');
+        return { points: [] };
+      }
+      const bw = W * scale;
+      const bh = H * scale;
+      let tryPad = pad;
+      let points = [];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        points = contourFromGrid(grid, bw, bh, tryPad, scale);
+        if (points.length >= 8 && contourEnclosesExtents(points, extents, tryPad * 0.5)) {
+          return { points };
+        }
+        tryPad += 12;
+      }
+      return points.length >= 8 ? { points } : { points: [] };
+    } finally {
+      if (mount.svg.parentNode) mount.svg.parentNode.removeChild(mount.svg);
+    }
+  }
+
+  function closedFramePath(points) {
+    const n = points.length;
+    if (n < 3) return '';
+    let d = 'M ' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2);
+    for (let i = 1; i < n; i++) {
+      d += ' L ' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2);
+    }
+    return d + ' Z';
+  }
+
+  function closedCatmullRomPath(points) {
+    const n = points.length;
+    if (n < 3) return '';
+    let d = 'M ' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2);
+    for (let i = 0; i < n; i++) {
+      const p0 = points[(i - 1 + n) % n];
+      const p1 = points[i];
+      const p2 = points[(i + 1) % n];
+      const p3 = points[(i + 2) % n];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d +=
+        ' C ' +
+        cp1x.toFixed(2) +
+        ' ' +
+        cp1y.toFixed(2) +
+        ' ' +
+        cp2x.toFixed(2) +
+        ' ' +
+        cp2y.toFixed(2) +
+        ' ' +
+        p2.x.toFixed(2) +
+        ' ' +
+        p2.y.toFixed(2);
+    }
+    return d + ' Z';
+  }
+
+  function boundsFromContour(points) {
+    const half = FRAME_STROKE / 2;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of points) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX: minX - half, minY: minY - half, maxX: maxX + half, maxY: maxY + half };
+  }
+
+  function centerContourOn(contourPts, targetCx, targetCy) {
+    if (!contourPts.length) return contourPts;
+    let cx = 0;
+    let cy = 0;
+    for (const p of contourPts) {
+      cx += p.x;
+      cy += p.y;
+    }
+    cx /= contourPts.length;
+    cy /= contourPts.length;
+    const dx = targetCx - cx;
+    const dy = targetCy - cy;
+    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return contourPts;
+    return contourPts.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+  }
+
+  function pathPointInRoot(rootSvg, pathEl, x, y) {
+    const pt = rootSvg.createSVGPoint();
+    pt.x = x;
+    pt.y = y;
+    if (typeof pathEl.getTransformToElement === 'function') {
+      try {
+        const g = pt.matrixTransform(pathEl.getTransformToElement(rootSvg));
+        return { x: g.x, y: g.y };
+      } catch (_) {}
+    }
+    const scrCtm = pathEl.getScreenCTM();
+    const rootCtm = rootSvg.getScreenCTM();
+    if (scrCtm && rootCtm) {
+      const scr = pt.matrixTransform(scrCtm);
+      const g = scr.matrixTransform(rootCtm.inverse());
+      return { x: g.x, y: g.y };
+    }
+    return { x, y };
+  }
+
+  /** דגימת נקודות מ-L2 בלבד — צורת האבן נגזרת מהשם (Q2) */
+  function sampleStoneShapePathPoints(layersHtml, defsHtml, style2, centerDx, centerDy) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="0 0 ' +
+        W +
+        ' ' +
+        H +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        layersHtml +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return [];
+    const svg = doc.documentElement;
+    svg.style.cssText =
+      'position:fixed;left:0;top:0;width:' +
+      W +
+      'px;height:' +
+      H +
+      'px;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(svg);
+    const root = svg.querySelector('#measure-root');
+    const dx = centerDx || 0;
+    const dy = centerDy || 0;
+    const samples = [];
+    const step = 2;
+    const stoneOutset = style2 ? pbrL2MaskStroke(style2) * 0.68 + 22 : PATH_MAIN_W;
+    if (root) {
+      root.querySelectorAll('.layer-2 path').forEach((pathEl) => {
+        const len = pathEl.getTotalLength();
+        if (!isFinite(len) || len < 2) return;
+        const steps = Math.max(2, Math.ceil(len / step));
+        for (let i = 0; i < steps; i++) {
+          const t = steps <= 1 ? 0 : i / (steps - 1);
+          const p = pathEl.getPointAtLength(len * t);
+          const pt = pathPointInRoot(svg, pathEl, p.x, p.y);
+          samples.push({ x: pt.x + dx, y: pt.y + dy, outset: stoneOutset });
+        }
+      });
+    }
+    document.body.removeChild(svg);
+    return samples;
+  }
+
+  /** דגימת נקודות מ-paths של L2+L3 — עם outset לפי סוג שכבה */
+  function sampleAmuletPathPoints(layersHtml, defsHtml, style2) {
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        W +
+        '" height="' +
+        H +
+        '" viewBox="0 0 ' +
+        W +
+        ' ' +
+        H +
+        '">' +
+        defsHtml +
+        '<g id="measure-root">' +
+        layersHtml +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return [];
+    const svg = doc.documentElement;
+    svg.style.cssText =
+      'position:fixed;left:0;top:0;width:' +
+      W +
+      'px;height:' +
+      H +
+      'px;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(svg);
+    const root = svg.querySelector('#measure-root');
+    const samples = [];
+    const step = 2;
+    const l3Outset = PATH_MAIN_W / 2;
+    const l2Outset = style2 ? pbrL2MaskStroke(style2) / 2 : l3Outset;
+    if (root) {
+      root.querySelectorAll('.layer-2 path').forEach((pathEl) => {
+        const len = pathEl.getTotalLength();
+        if (!isFinite(len) || len < 2) return;
+        const steps = Math.max(2, Math.ceil(len / step));
+        for (let i = 0; i < steps; i++) {
+          const t = steps <= 1 ? 0 : i / (steps - 1);
+          const p = pathEl.getPointAtLength(len * t);
+          const pt = pathPointInRoot(svg, pathEl, p.x, p.y);
+          samples.push({ x: pt.x, y: pt.y, outset: l2Outset });
+        }
+      });
+      root.querySelectorAll('.layer-3 path').forEach((pathEl) => {
+        const len = pathEl.getTotalLength();
+        if (!isFinite(len) || len < 2) return;
+        const steps = Math.max(2, Math.ceil(len / step));
+        for (let i = 0; i < steps; i++) {
+          const t = steps <= 1 ? 0 : i / (steps - 1);
+          const p = pathEl.getPointAtLength(len * t);
+          const pt = pathPointInRoot(svg, pathEl, p.x, p.y);
+          samples.push({ x: pt.x, y: pt.y, outset: l3Outset });
+        }
+      });
+    }
+    document.body.removeChild(svg);
+    return samples;
+  }
+
+  function fillEmptyBins(maxR) {
+    const n = maxR.length;
+    const filled = maxR.slice();
+    for (let i = 0; i < n; i++) {
+      if (filled[i] > 0) continue;
+      let prev = -1;
+      let next = -1;
+      for (let d = 1; d < n; d++) {
+        if (prev < 0 && filled[(i - d + n) % n] > 0) prev = filled[(i - d + n) % n];
+        if (next < 0 && filled[(i + d) % n] > 0) next = filled[(i + d) % n];
+        if (prev >= 0 && next >= 0) break;
+      }
+      filled[i] = prev >= 0 && next >= 0 ? (prev + next) / 2 : prev >= 0 ? prev : next >= 0 ? next : 0;
+    }
+    return filled;
+  }
+
+  function smoothCircularRadii(maxR, passes) {
+    const n = maxR.length;
+    let cur = maxR.slice();
+    for (let pass = 0; pass < passes; pass++) {
+      const next = cur.slice();
+      for (let i = 0; i < n; i++) {
+        const prev = cur[(i - 1 + n) % n];
+        const following = cur[(i + 1) % n];
+        next[i] = (prev + cur[i] * 2 + following) / 4;
+      }
+      cur = next;
+    }
+    return cur;
+  }
+
+  /** מעגל הגנה — עיקולים לפי Q4 (במקום עיגול מושלם) */
+  function buildCircularFrameContour(cx, cy, r, style2) {
+    const smooth = frameSmoothnessFromStyle(style2);
+    const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
+    const points = [];
+    for (let a = 0; a < 360; a++) {
+      const rad = (a * Math.PI) / 180;
+      let radius = r;
+      if (rough > 0.18) {
+        const amp = rough * (2.5 + r * 0.018) * (preset.ampScale || 1);
+        const freqA = 0.28 + rough * 0.14 + (preset.freqBias || 0) * 0.12;
+        const freqB = 0.51 - rough * 0.09;
+        const phase = preset.phase || 0;
+        const wobble =
+          Math.sin(a * freqA) * 0.42 * (preset.wobbleMix ?? 1) +
+          Math.cos(a * freqB) * 0.33 * (preset.wobbleMix ?? 1) +
+          Math.sin(a * (0.11 + rough * 0.06) + phase) * 0.25 * (preset.wobbleMix ?? 1);
+        const curl =
+          Math.sin(a * 0.07 + rough * 1.2 + phase) *
+          Math.cos(a * (0.18 + rough * 0.11)) *
+          (preset.curlMix ?? 1);
+        radius += (wobble * 0.55 + curl * 0.28) * amp;
+      }
+      points.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius });
+    }
+    return points;
+  }
+
+  /** קונטור offset סימטרי — 360 קרניים, עוטף L2+L3 במרחק שווה */
+  function buildSummoningFrameContour(cx, cy, samples, pad, style2) {
+    const r = new Float64Array(360);
+    for (const s of samples) {
+      const dx = s.x - cx;
+      const dy = s.y - cy;
+      const dist = Math.hypot(dx, dy) + (s.outset || PATH_MAIN_W / 2);
+      if (dist < 1) continue;
+      let deg = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (deg < 0) deg += 360;
+      const idx = Math.min(359, Math.round(deg) % 360);
+      if (dist > r[idx]) r[idx] = dist;
+    }
+    let radii = fillEmptyBins(Array.from(r));
+    for (let a = 0; a < 360; a++) {
+      const mirror = (360 - a) % 360;
+      const sym = Math.max(radii[a], radii[mirror]);
+      radii[a] = sym;
+      radii[mirror] = sym;
+    }
+    const smooth = frameSmoothnessFromStyle(style2);
+    const rough = 1 - smooth;
+    const preset = style2?.frameContour || {};
+    const smoothIters = Math.max(1, Math.round(1 + smooth * 4));
+    radii = smoothCircularRadii(radii, smoothIters);
+    if (rough > 0.28) {
+      const amp = rough * 7 * (preset.ampScale || 1);
+      const phase = preset.phase || 0;
+      for (let a = 0; a < 360; a++) {
+        const wobble =
+          Math.sin(a * (0.24 + rough * 0.2 + (preset.freqBias || 0) * 0.1)) *
+            0.55 *
+            (preset.wobbleMix ?? 1) +
+          Math.cos(a * (0.43 - rough * 0.1)) * 0.45 * (preset.wobbleMix ?? 1);
+        const curl =
+          Math.sin(a * 0.08 + rough * 1.5 + phase) *
+          Math.cos(a * (0.17 + rough * 0.13)) *
+          (preset.curlMix ?? 1);
+        radii[a] += (wobble * 0.5 + curl * 0.32) * amp;
+      }
+      radii = smoothCircularRadii(radii, rough > 0.72 ? 1 : 2);
+    }
+    const points = [];
+    for (let a = 0; a < 360; a++) {
+      const rad = (a * Math.PI) / 180;
+      const radius = radii[a] + pad;
+      points.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius });
+    }
+    return points;
+  }
+
+  /** מסגרת — עוטפת צורת האבן (מסכת L2 ממוזגת), עם עיקולים לפי Q5 */
+  async function buildIntentFrameLayer(style3, extentBBox, layersHtml, defsHtml, style2, centerDx, centerDy) {
+    const intent = style3.intent || (style3.amuletType === 'summoning' ? 'summoning' : 'protection');
+    if (intent !== 'protection' && intent !== 'summoning') return null;
+
+    const cx = CX;
+    const cy = CY;
+    const halfW = extentBBox.halfW;
+    const halfH = extentBBox.halfH;
+    const attrs = frameStrokeAttrs(style3.strokeColor, style2);
+    const strokePad = PATH_MAIN_W / 2;
+    const framePad = STONE_FRAME_PAD;
+
+    let contourPts = [];
+    const { points } = await buildStoneSlabFrameContour(layersHtml, defsHtml, framePad, style2, style3);
+    if (points.length >= 8) {
+      contourPts = applyFrameQ5Wobble(points, style2);
+    } else {
+      const rx = halfW + strokePad + framePad;
+      const ry = halfH + strokePad + framePad;
+      for (let a = 0; a < 360; a++) {
+        const rad = (a * Math.PI) / 180;
+        contourPts.push({ x: cx + Math.cos(rad) * rx, y: cy + Math.sin(rad) * ry });
+      }
+    }
+
+    const pathD = closedCatmullRomPath(contourPts);
+    return {
+      markup:
+        '<path class="amulet-frame amulet-frame-stone" data-shape="stone" d="' +
+        pathD +
+        '" ' +
+        attrs +
+        '/>',
+      bounds: boundsFromContour(contourPts)
+    };
+  }
+
+  /** ממרכז שכבה 3 (כוונה) על מרכז שכבה 2 (שם) — שכבה 2 נשארת קבועה */
+  function alignLayer3ToLayer2(layer2Content, layer3Content, vb, defsHtml) {
+    const c2 = measureContentBBox(layer2Content, vb, defsHtml);
+    const c3 = measureContentBBox(layer3Content, vb, defsHtml);
+    const dx = c2.cx - c3.cx;
+    const dy = c2.cy - c3.cy;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      return { layer2: layer2Content, layer3: layer3Content, sharedCenter: c2, dx: 0, dy: 0 };
+    }
+    return {
+      layer2: layer2Content,
+      layer3:
+        '<g class="layer-aligned" transform="translate(' +
+        dx.toFixed(2) +
+        ',' +
+        dy.toFixed(2) +
+        ')">' +
+        layer3Content +
+        '</g>',
+      sharedCenter: c2,
+      dx,
+      dy
+    };
+  }
+
+  let composeBusy = false;
+  let appReady = false;
+  let lastComposeLetters = [];
+  let lastComposedSvg = null;
+  let lastComposeCacheKey = '';
+  let lastComposeResult = null;
+  let pbrRendered = false;
+  const Q5_CERAMIC_MAT_LABEL = {
+    hope: 'לבן·מט',
+    excitement: 'כרום·כסף',
+    fear: 'כרום·שחור',
+    confusion: 'מתכת·מברשת',
+    impatience: 'שחור·מט',
+    longing: 'זכוכית'
+  };
+
+  const Q4_STONE_MAT_LABEL = {
+    concrete_actions: 'אבן·sage',
+    signs: 'אבן·כהה',
+    gut: 'חם·בז׳',
+    support: 'בזלת',
+    doubt: 'שיש·חם',
+  };
+
+  function glyphFilename(letter) {
+    return letter === 'א' ? 'א1.svg' : letter + '2.svg';
+  }
+
+  function letterFromFilename(file) {
+    const base = file.replace(/\.svg$/i, '');
+    if (base === 'א1') return 'א';
+    const m = base.match(/^(.)(?:1|2)$/);
+    return m && HEB.includes(m[1]) ? m[1] : null;
+  }
+
+  async function loadGlyphManifest() {
+    const res = await fetch(GLYPHS_DIR + '/manifest.json');
+    if (!res.ok) throw new Error('manifest.json לא נטען');
+    const data = await res.json();
+    const files = data.files || [];
+    glyphLetters = [];
+    for (const f of files) {
+      const ch = letterFromFilename(f);
+      if (ch && !glyphLetters.includes(ch)) glyphLetters.push(ch);
+    }
+    if (!glyphLetters.length) glyphLetters = HEB.slice();
+  }
+
+  async function loadConnections() {
+    try {
+      const api = await fetch('/api/connections');
+      if (api.ok) {
+        const data = await api.json();
+        connections = data.connections || [];
+        return;
+      }
+    } catch (_) { /* fallback */ }
+    const res = await fetch('../connections.json');
+    if (!res.ok) throw new Error('connections.json לא נטען');
+    const data = await res.json();
+    connections = data.connections || [];
+  }
+
+  /** שכבת Q3: רק האות הראשונה של המילה הראשונה */
+  function getFirstWordFirstLetter(str) {
+    const word = String(str || '')
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0)[0];
+    if (!word) return [];
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    for (const ch of word) {
+      if (avail.has(ch)) return [ch];
+    }
+    return [];
+  }
+
+  /** שכבת כוונה: אות ראשונה מכל מילה; כפילות → האות השנייה במילה (ואז הבאה) */
+  function getSentenceLetters(str) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const word of str.split(/\s+/).filter((w) => w.length > 0)) {
+      if (out.length >= MAX_LETTERS_LAYER3) break;
+      const chars = [...word];
+      let picked = null;
+      for (let i = 0; i < chars.length; i++) {
+        const ch = chars[i];
+        if (!avail.has(ch)) continue;
+        if (i === 0 && !used.has(ch)) {
+          picked = ch;
+          break;
+        }
+        if (i > 0 && !used.has(ch)) {
+          picked = ch;
+          break;
+        }
+      }
+      if (picked) {
+        used.add(picked);
+        out.push(picked);
+      }
+    }
+    return out;
+  }
+
+  /** שכבת Q1 (קרמיקה) — עד 2 אותיות: ראשונה מכל מילה, עם גיבוי לאות שנייה במילה הראשונה */
+  function getQ1CeramicLetters(str) {
+    const letters = getSentenceLetters(str);
+    if (letters.length >= MAX_Q1_CERAMIC_LETTERS) return letters.slice(0, MAX_Q1_CERAMIC_LETTERS);
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const words = String(str || '')
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+    const out = letters.slice();
+    if (words.length && out.length === 1) {
+      for (const ch of [...words[0]]) {
+        if (!avail.has(ch) || out.includes(ch)) continue;
+        out.push(ch);
+        break;
+      }
+    }
+    for (const word of words.slice(1)) {
+      if (out.length >= MAX_Q1_CERAMIC_LETTERS) break;
+      for (const ch of [...word]) {
+        if (!avail.has(ch) || out.includes(ch)) continue;
+        out.push(ch);
+        break;
+      }
+    }
+    return out.slice(0, MAX_Q1_CERAMIC_LETTERS);
+  }
+
+  /** אותיות עבריות מהשם — ללא כפילויות, עד 3 */
+  function lettersFromName(name) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const ch of String(name || '').replace(/\s/g, '')) {
+      if (out.length >= MAX_LETTERS) break;
+      if (!avail.has(ch) || used.has(ch)) continue;
+      used.add(ch);
+      out.push(ch);
+    }
+    return out;
+  }
+
+  /** אות ראשונה מכל מילה ב-Q7 — טבעת הבלטה על האבן */
+  const Q7_CIRCLE = {
+    radiusFrac: 0.36,
+    letterSz: 36,
+    jitterRad: 16,
+    jitterAng: 0.1,
+    maxLetters: 12
+  };
+
+  function lettersFromQ7Change(str) {
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const out = [];
+    for (const word of String(str || '').trim().split(/\s+/).filter(Boolean)) {
+      if (out.length >= Q7_CIRCLE.maxLetters) break;
+      for (const ch of word) {
+        if (avail.has(ch)) {
+          out.push(ch);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  function q7CircleJitter(seed, i, spread) {
+    const h = letterHashSeed(String(seed) + ':' + i) ?? 0.5;
+    return (h * 2 - 1) * spread;
+  }
+
+  /** Q7 — אותיות מפוזרות במעגל (ללא חיבורים) להבלטה על האבן */
+  async function buildQ7CircleEmbossMarkup(letters, style, center) {
+    if (!letters.length) return '';
+    const n = letters.length;
+    const cx = center?.cx ?? CX;
+    const cy = center?.cy ?? CY;
+    const R = Math.min(W, H) * Q7_CIRCLE.radiusFrac;
+    const seed = letters.join('');
+    const glyphs = await Promise.all(letters.map((l) => getParsedGlyph(l)));
+    const parts = [];
+    for (let i = 0; i < n; i++) {
+      const glyph = glyphs[i];
+      if (!glyph) continue;
+      const vb = glyph.viewBox || '0 0 ' + (glyph.vw || 100) + ' ' + (glyph.vh || 100);
+      const vbp = vb.trim().split(/[\s,]+/).map(Number);
+      const vw = vbp[2] || 100;
+      const vh = vbp[3] || 100;
+      const baseAng = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const ang = baseAng + q7CircleJitter(seed, i, Q7_CIRCLE.jitterAng);
+      const r = R + q7CircleJitter(seed, i + 17, Q7_CIRCLE.jitterRad);
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
+      const sz = Q7_CIRCLE.letterSz * (0.9 + q7CircleJitter(seed, i + 31, 0.08));
+      const half = sz / 2;
+      const scaleX = (sz / vw).toFixed(4);
+      const scaleY = (sz / vh).toFixed(4);
+      parts.push(
+        '<g class="amulet-glyph amulet-glyph-' +
+        letters[i] +
+        '"><g transform="translate(' +
+        x.toFixed(2) +
+        ',' +
+        y.toFixed(2) +
+        ') translate(' +
+        (-half).toFixed(2) +
+        ',' +
+        (-half).toFixed(2) +
+        ') scale(' +
+        scaleX +
+        ',' +
+        scaleY +
+        ')">' +
+        pathLayers(sanitizePathsInner(glyph.inner), style, style.filterId) +
+        '</g></g>'
+      );
+    }
+    if (!parts.length) return '';
+    return '<g class="amulet-glyphs amulet-glyphs-q7">' + parts.join('') + '</g>';
+  }
+
+  const Q4_BELIEF_PHRASE = {
+    concrete_actions: 'מעשים קונקרטיים',
+    signs: 'סימנים בדרך',
+    gut: 'תחושת בטן',
+    support: 'תמיכה סביב',
+    doubt: 'עדיין לא מאמין'
+  };
+
+  function lettersFromBelief(beliefKey) {
+    const phrase = Q4_BELIEF_PHRASE[beliefKey] || Q4_BELIEF_PHRASE.signs;
+    const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
+    const used = new Set();
+    const out = [];
+    for (const ch of phrase.replace(/\s/g, '')) {
+      if (out.length >= MAX_FRINGE_LETTERS) break;
+      if (!avail.has(ch) || used.has(ch)) continue;
+      used.add(ch);
+      out.push(ch);
+    }
+    return out;
+  }
+
+  function visualStyleMetalFringe(p) {
+    const base = visualStyleLayer2(p);
+    return {
+      ...base,
+      layer: 2,
+      maxLetters: MAX_FRINGE_LETTERS,
+      filterId: FILTER_ID_LAYER2,
+      strokeColor: '#9A9A9A'
+    };
+  }
+
+  /** Q4 — שכבת מתכת מחוברת (כמו שם), מיושרת לשכבת האבן */
+  async function buildQ4MetalLayer(letters, style, intent) {
+    if (!letters.length) {
+      return { content: '', placements: [], skipped: letters };
+    }
+    return buildLayerContent(letters, style, intent);
+  }
+
+  async function loadGlyphSvg(letter) {
+    if (glyphSvgCache[letter]) return glyphSvgCache[letter];
+    const url = GLYPHS_DIR + '/' + encodeURIComponent(glyphFilename(letter));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('חסר SVG: ' + letter);
+    glyphSvgCache[letter] = await res.text();
+    return glyphSvgCache[letter];
+  }
+
+  function parseGlyphSvg(svgText) {
+    const clean = svgText.trim().replace(/^<\?xml[^>]*>\s*/i, '').replace(/^<!DOCTYPE[^>]*>\s*/i, '');
+    const doc = new DOMParser().parseFromString(clean, 'image/svg+xml');
+    if (doc.querySelector('parsererror')) throw new Error('SVG לא תקין');
+    const el = doc.querySelector('svg');
+    if (!el) throw new Error('אין svg');
+    const vb = el.getAttribute('viewBox') || '0 0 100 100';
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    const raw = el.innerHTML;
+    const inner = sanitizePathsInner(raw);
+    return { inner, vw, vh, viewBox: el.getAttribute('viewBox') || '0 0 ' + vw + ' ' + vh };
+  }
+
+  async function getParsedGlyph(letter) {
+    if (parsedGlyphCache[letter]) return parsedGlyphCache[letter];
+    const parsed = parseGlyphSvg(await loadGlyphSvg(letter));
+    parsedGlyphCache[letter] = parsed;
+    return parsed;
+  }
+
+  function hubPositionOverlaps(x, y, placed, skipIdx) {
+    for (const [idx, pl] of placed) {
+      if (idx === skipIdx) continue;
+      if (Math.hypot(x - pl.x, y - pl.y) < HUB_OVERLAP_DIST) return true;
+    }
+    return false;
+  }
+
+  /** מיקומים מוחלטים מהעורך — ללא hub, spacing, twist או seed */
+  function findEditorLetterConnection(letter, letters, intent, prevLetter, letterIdx) {
+    const CC = requireConnectionCore();
+    if (prevLetter) {
+      const seq = CC.findConnectionBetweenWithFallback(connections, prevLetter, letter, intent);
+      if (seq) return seq;
+    }
+    if (letterIdx + 1 < letters.length) {
+      const next = letters[letterIdx + 1];
+      const seq = CC.findConnectionBetweenWithFallback(connections, letter, next, intent);
+      if (seq) return seq;
+    }
+    for (const partner of letters) {
+      if (partner === letter) continue;
+      const conn = CC.findConnectionBetweenWithFallback(connections, letter, partner, intent);
+      if (conn) return conn;
+    }
+    const intents = intent === 'protection' ? ['protection'] : [intent, 'protection'];
+    let best = null;
+    for (const row of connections || []) {
+      if (row.from !== letter && row.to !== letter) continue;
+      if (!intents.includes(row.intent)) continue;
+      const norm = CC.normalizeConnection(row);
+      if (!norm) continue;
+      const other = norm.from === letter ? norm.to : norm.from;
+      if (letters.includes(other)) best = norm;
+      else if (!best) best = norm;
+    }
+    return best;
+  }
+
+  function buildEditorPlacements(letters, intent) {
+    const CC = requireConnectionCore();
+    letters = CC.limitConnectedLetters(letters, MAX_LETTERS_LAYER3);
+    const placements = [];
+    const usedPairs = [];
+    const skipped = [];
+    const usedPairKeys = new Set();
+
+    for (let i = 0; i < letters.length; i++) {
+      const letter = letters[i];
+      const prevLetter = i > 0 ? letters[i - 1] : null;
+      const conn = findEditorLetterConnection(letter, letters, intent, prevLetter, i);
+
+      if (!conn) {
+        skipped.push(letter);
+        continue;
+      }
+
+      const g = conn.from === letter ? conn.fromGlyph : conn.toGlyph;
+      placements.push(CC.placementFromGlyph(letter, g));
+
+      const pairKey = conn.from + '\0' + conn.to + '\0' + conn.intent;
+      if (!usedPairKeys.has(pairKey)) {
+        usedPairKeys.add(pairKey);
+        usedPairs.push({ from: conn.from, to: conn.to });
+      }
+    }
+
+    const anchor = letters[0] || null;
+    const byLetter = new Map();
+    for (const p of placements) {
+      if (!byLetter.has(p.letter)) byLetter.set(p.letter, p);
+    }
+    return { placements, anchor, usedPairs, skipped, byLetter };
+  }
+
+  function hubCandidatesForLetter(letter, anchorLetter, anchorIdx, placed, intent, CC) {
+    const candidates = [];
+    const anchorPl = placed.get(anchorIdx);
+    const anchorConn = CC.findConnectionBetween(connections, anchorLetter, letter, intent);
+    if (anchorConn && anchorPl) {
+      const pos = CC.placementRelativeTo(anchorConn, anchorLetter, letter, anchorPl.x, anchorPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: true });
+    }
+    for (const [refIdx, refPl] of placed) {
+      if (refIdx === anchorIdx) continue;
+      const conn = CC.findConnectionBetween(connections, refPl.letter, letter, intent);
+      if (!conn) continue;
+      const pos = CC.placementRelativeTo(conn, refPl.letter, letter, refPl.x, refPl.y);
+      if (pos) candidates.push({ pos, viaAnchor: false });
+    }
+    return candidates;
+  }
+
+  function pickHubPlacement(candidates, placed, skipIdx, composeSeed, letterIdx) {
+    const viable = candidates.filter(
+      (c) => !hubPositionOverlaps(c.pos.x, c.pos.y, placed, skipIdx)
+    );
+    if (!viable.length) {
+      const viaAnchor = candidates.find((c) => c.viaAnchor);
+      if (viaAnchor) return viaAnchor.pos;
+      return candidates.length ? candidates[0].pos : null;
+    }
+    if (composeSeed == null || viable.length === 1) {
+      const viaFirst = viable.find((c) => c.viaAnchor);
+      return (viaFirst || viable[0]).pos;
+    }
+    const pick =
+      viable[
+        Math.floor((((composeSeed * 997 + letterIdx * 13.7) % 1) * viable.length) % viable.length)
+      ];
+    return pick.pos;
+  }
+
+  function buildHubPlacements(letters, intent, composeSeed) {
+    const CC = requireConnectionCore();
+    const anchorLetter = CC.pickHubAnchor(letters, connections, intent);
+    const defaultSz = CC.CANVAS.DEFAULT_SIZE;
+    const anchorIdx = letters.indexOf(anchorLetter);
+    const placed = new Map();
+    placed.set(anchorIdx, {
+      letter: anchorLetter,
+      x: CX,
+      y: CY,
+      rotation: 0,
+      sz: defaultSz,
+      flipX: false,
+      flipY: false
+    });
+
+    const usedPairs = [];
+    const skipped = [];
+    let remaining = letters
+      .map((letter, idx) => ({ letter, idx }))
+      .filter((item) => item.idx !== anchorIdx);
+    if (composeSeed != null) {
+      remaining = remaining.slice().sort((a, b) => {
+        const ra = (composeSeed * 73 + a.idx * 17) % 1;
+        const rb = (composeSeed * 73 + b.idx * 17) % 1;
+        return ra - rb;
+      });
+    }
+    for (const { letter, idx } of remaining) {
+      const candidates = hubCandidatesForLetter(letter, anchorLetter, anchorIdx, placed, intent, CC);
+      const pos = pickHubPlacement(candidates, placed, idx, composeSeed, idx);
+      if (!pos) {
+        skipped.push(letter);
+        continue;
+      }
+      placed.set(idx, {
+        letter: pos.letter,
+        x: pos.x,
+        y: pos.y,
+        rotation: pos.rotation,
+        sz: pos.sz,
+        flipX: pos.flipX,
+        flipY: pos.flipY
+      });
+      usedPairs.push(pos.pair);
+    }
+
+    const placements = letters.map((_, idx) => placed.get(idx)).filter(Boolean);
+    const byLetter = new Map();
+    for (const p of placements) {
+      if (!byLetter.has(p.letter)) byLetter.set(p.letter, p);
+    }
+    return { placements, anchor: anchorLetter, usedPairs, skipped, byLetter };
+  }
+
+  /**
+   * מרחק בין אותיות סביב ה-hub — כמו דחיפות בשכבה 3.
+   * מכפיל את המרחק מנקודת העוגן (לא את גודל האותיות).
+   */
+  function applySpacingToPlacements(placements, anchor, factor) {
+    const hub = placements.find((p) => p.letter === anchor);
+    const ox = hub ? hub.x : CX;
+    const oy = hub ? hub.y : CY;
+    return placements.map((p) => {
+      if (p.letter === anchor) return p;
+      return {
+        ...p,
+        x: ox + (p.x - ox) * factor,
+        y: oy + (p.y - oy) * factor
+      };
+    });
+  }
+
+  /** עיקול קל של חיבורים — סיבוב אותיות סביב העוגן + זווית גליף */
+  function applyConnectionTwist(placements, anchor, twistDeg, seed) {
+    const hub = placements.find((p) => p.letter === anchor);
+    const ox = hub ? hub.x : CX;
+    const oy = hub ? hub.y : CY;
+    const rad = (twistDeg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return placements.map((p, i) => {
+      const baseRot = Number(p.rotation) || 0;
+      const jitter = (((seed || 0) * 17.31 + i * 0.73) % 1) * 2 - 1;
+      const rotJitter = jitter * 20;
+      if (p.letter === anchor) {
+        return { ...p, rotation: baseRot + rotJitter * 0.35 };
+      }
+      const dx = p.x - ox;
+      const dy = p.y - oy;
+      return {
+        ...p,
+        x: ox + dx * cos - dy * sin,
+        y: oy + dx * sin + dy * cos,
+        rotation: baseRot + rotJitter + twistDeg * 0.45
+      };
+    });
+  }
+
+  function getRawConnection(from, to, intent) {
+    const matches = connections.filter((c) => c.from === from && c.to === to && c.intent === intent);
+    return matches.length ? matches[matches.length - 1] : null;
+  }
+
+  function collectConnectionSymbols(usedPairs, intent, byLetter) {
+    const CC = requireConnectionCore();
+    const out = [];
+    const seen = new Set();
+    for (const pair of usedPairs) {
+      const key = pair.from + '\u2192' + pair.to;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const raw = getRawConnection(pair.from, pair.to, intent);
+      if (!raw?.symbols?.length) continue;
+      const norm = CC.normalizeConnection(raw);
+      const refPl = byLetter.get(pair.from);
+      if (!norm || !refPl) {
+        out.push(...raw.symbols);
+        continue;
+      }
+      const ox = norm.fromGlyph.x;
+      const oy = norm.fromGlyph.y;
+      for (const sym of raw.symbols) {
+        out.push({
+          ...sym,
+          x: refPl.x + (Number(sym.x) - ox),
+          y: refPl.y + (Number(sym.y) - oy)
+        });
+      }
+    }
+    return out;
+  }
+
+  function buildArcPath(cx, cy, r, spanDeg) {
+    const span = clampNum(spanDeg, 30, 330);
+    const half = (span / 2) * (Math.PI / 180);
+    const x1 = cx + r * Math.cos(Math.PI + half);
+    const y1 = cy + r * Math.sin(Math.PI + half);
+    const x2 = cx + r * Math.cos(Math.PI - half);
+    const y2 = cy + r * Math.sin(Math.PI - half);
+    const large = span > 180 ? 1 : 0;
+    return 'M' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2);
+  }
+
+  function buildSymbolInner(sym) {
+    const t = sym.type;
+    if (t === 'circle') return '<circle cx="50" cy="50" r="40"/>';
+    if (t === 'dot') return '<circle cx="50" cy="50" r="14"/>';
+    if (t === 'triangle') {
+      const ratio = clampNum(sym.triangleRatio || 1, 0.5, 2);
+      return '<g transform="translate(50 50) scale(' + ratio.toFixed(3) + ' 1) translate(-50 -50)"><path d="M50 12 L88 88 L12 88 Z"/></g>';
+    }
+    if (t === 'arc') return '<path d="' + buildArcPath(50, 52, 38, sym.arcAngle || 180) + '"/>';
+    return '';
+  }
+
+  function symbolGroupMarkup(sym, style, filterId) {
+    if (!BUILTIN_SYMBOLS[sym.type]) return '';
+    const size = Number(sym.size) || 64;
+    const inner = buildSymbolInner(sym);
+    const rot = Number(sym.rotation) || 0;
+    const fx = sym.flipX ? -1 : 1;
+    const fy = sym.flipY ? -1 : 1;
+    const vb = BUILTIN_SYMBOLS[sym.type].viewBox.trim().split(/[\s,]+/).map(Number);
+    const vw = vb[2] || 100;
+    const vh = vb[3] || 100;
+    const half = size / 2;
+    return (
+      '<g class="amulet-symbol">' +
+      '<g transform="translate(' +
+      sym.x.toFixed(2) +
+      ',' +
+      sym.y.toFixed(2) +
+      ') rotate(' +
+      rot.toFixed(2) +
+      ') scale(' +
+      fx +
+      ',' +
+      fy +
+      ') translate(' +
+      (-half).toFixed(2) +
+      ',' +
+      (-half).toFixed(2) +
+      ')">' +
+      '<svg width="' +
+      size +
+      '" height="' +
+      size +
+      '" viewBox="0 0 ' +
+      vw +
+      ' ' +
+      vh +
+      '" preserveAspectRatio="xMidYMid meet" overflow="visible">' +
+      pathLayers(inner, style, filterId) +
+      '</svg></g></g>'
+    );
+  }
+
+  /** Positioned glyph paths only (no per-glyph strokes) for unified group rendering. */
+  function glyphPathsMarkup(placement, glyph) {
+    const vb = glyph.viewBox || '0 0 ' + (glyph.vw || 100) + ' ' + (glyph.vh || 100);
+    const vbp = vb.trim().split(/[\s,]+/).map(Number);
+    const vw = vbp[2] || 100;
+    const vh = vbp[3] || 100;
+    const fx = placement.flipX ? -1 : 1;
+    const fy = placement.flipY ? -1 : 1;
+    const half = placement.sz / 2;
+    const rot = Number(placement.rotation) || 0;
+    const scaleX = ((placement.sz / vw) * fx).toFixed(4);
+    const scaleY = ((placement.sz / vh) * fy).toFixed(4);
+    const clean = sanitizePathsInner(glyph.inner);
+    return (
+      '<g class="amulet-glyph amulet-glyph-' +
+      placement.letter +
+      '">' +
+      '<g transform="translate(' +
+      placement.x.toFixed(2) +
+      ',' +
+      placement.y.toFixed(2) +
+      ') rotate(' +
+      rot.toFixed(2) +
+      ') translate(' +
+      (-half).toFixed(2) +
+      ',' +
+      (-half).toFixed(2) +
+      ') scale(' +
+      scaleX +
+      ',' +
+      scaleY +
+      ')">' +
+      clean +
+      '</g></g>'
+    );
+  }
+
+  function buildUnifiedGlyphRendering(pathsMarkup, style, filterId) {
+    if (!pathsMarkup) return '';
+    return '<g class="amulet-glyphs">' + pathLayers(pathsMarkup, style, filterId) + '</g>';
+  }
+
+  function wrapSymmetric(content) {
+    return (
+      '<g class="amulet-symmetric">' +
+      '<g class="amulet-half amulet-original">' +
+      content +
+      '</g>' +
+      '<g class="amulet-half amulet-mirror" transform="translate(' +
+      W +
+      ',0) scale(-1,1)">' +
+      content +
+      '</g>' +
+      '</g>'
+    );
+  }
+
+  async function buildLayerContent(letters, style, intent) {
+    const CC = requireConnectionCore();
+    const maxLetters =
+      style.maxLetters ?? (style.layer === 3 ? MAX_LETTERS_LAYER3 : MAX_LETTERS);
+    letters = CC.limitConnectedLetters(letters, maxLetters);
+    const keepAllLetters = style.layer === 3;
+    const unique = keepAllLetters
+      ? letters.slice()
+      : letters.filter((ch, i) => letters.indexOf(ch) === i);
+    if (!unique.length) {
+      return { content: '', placements: [], anchor: null, skipped: [], style };
+    }
+
+    const LAYER2_HUB = 'א';
+    let hubLetters = unique;
+    let hideHubLetter = null;
+    if (
+      style.layer === 2 &&
+      !unique.includes(LAYER2_HUB) &&
+      nameLettersNeedHiddenAleph(unique, intent)
+    ) {
+      hubLetters = [LAYER2_HUB, ...unique];
+      hideHubLetter = LAYER2_HUB;
+    }
+
+    let placements;
+    let anchor;
+    let usedPairs;
+    let skipped;
+    let byLetter;
+    if (style.layer === 2) {
+      ({ placements, anchor, usedPairs, skipped, byLetter } = buildHubPlacements(
+        hubLetters,
+        intent,
+        style.composeSeed
+      ));
+      placements = applySpacingToPlacements(placements, anchor, style.spacing ?? 1);
+    } else {
+      ({ placements, anchor, usedPairs, skipped, byLetter } = buildEditorPlacements(
+        hubLetters,
+        intent
+      ));
+    }
+
+    byLetter = new Map(placements.map((p) => [p.letter, p]));
+    const renderPlacements = hideHubLetter
+      ? placements.filter((p) => p.letter !== hideHubLetter)
+      : placements;
+    const symbols = collectConnectionSymbols(usedPairs, intent, byLetter);
+
+    const symbolParts = symbols.map((sym) => symbolGroupMarkup(sym, style, style.filterId));
+    const glyphs = await Promise.all(renderPlacements.map((p) => getParsedGlyph(p.letter)));
+    const glyphPathParts = renderPlacements.map((p, i) => glyphPathsMarkup(p, glyphs[i]));
+    if (!symbolParts.length && !glyphPathParts.length) {
+      return { content: '', placements: [], anchor: null, skipped: unique, style };
+    }
+
+    const unifiedGlyphs = buildUnifiedGlyphRendering(glyphPathParts.join(''), style, style.filterId);
+    const groups = symbolParts.join('') + unifiedGlyphs;
+    const body = style.symmetric === false ? groups : wrapSymmetric(groups);
+    const content = wrapAmuletScale(body, style);
+    return {
+      content,
+      placements: renderPlacements,
+      anchor,
+      skipped,
+      style,
+      hiddenHub: hideHubLetter
+    };
+  }
+
+  async function buildDualLayerAmulet(metalLetters, nameLetters, stoneQuestionnaire = null) {
+    readParams();
+    const vectorStage = stoneQuestionnaire?.vectorStage ?? 0;
+    const vectorCompose = vectorStage >= 1 && vectorStage <= 3;
+    const style3 = visualStyleLayer3(params);
+    document.title =
+      'v2 color:' + style3.strokeColor + ' age:' + style3.ageTexture + ' g:' + style3.gender;
+
+    const l3Letters = metalLetters;
+    const layer3 = await buildLayerContent(l3Letters, style3, style3.intent);
+    if (!layer3.content) {
+      throw new Error('לא ניתן לצייר שכבת כוונה — בדקי חיבורים וגליפים');
+    }
+
+    const style2 = visualStyleLayer2(params);
+    let layer2 = null;
+    if (nameLetters.length) {
+      layer2 = await buildLayerContent(nameLetters, style2, style2.intent);
+      if (layer2.style) Object.assign(style2, layer2.style);
+    }
+
+    /** Stone engraving (Q3) + Q7 stone emboss + metal emboss (Q1) — PBR only. */
+    let metalEmbossMarkup = '';
+    let q3ThreadMarkup = '';
+    let q3StoneEngraveMarkup = '';
+    let q7EmbossMarkup = '';
+    const metalEmbossLetters = stoneQuestionnaire?.metalEmbossLetters || [];
+    const q3ThreadLetters =
+      stoneQuestionnaire?.q3ThreadLetters || stoneQuestionnaire?.q3Letters || [];
+    const q3StoneEngraveLetters = stoneQuestionnaire?.q3StoneEngraveLetters || [];
+    const q7Letters = stoneQuestionnaire?.q7Letters || [];
+    if (!vectorCompose && metalEmbossLetters.length) {
+      const embossLayer = await buildLayerContent(metalEmbossLetters, style3, style3.intent);
+      if (embossLayer.content) metalEmbossMarkup = embossLayer.content;
+    }
+    if ((!vectorCompose || vectorStage >= 3) && q3ThreadLetters.length) {
+      const q3ThreadLayer = await buildLayerContent(q3ThreadLetters, style2, style2.intent);
+      if (q3ThreadLayer.content) q3ThreadMarkup = q3ThreadLayer.content;
+    }
+    if ((!vectorCompose || vectorStage >= 3) && q3StoneEngraveLetters.length) {
+      const q3StoneLayer = await buildLayerContent(q3StoneEngraveLetters, style2, style2.intent);
+      if (q3StoneLayer.content) q3StoneEngraveMarkup = q3StoneLayer.content;
+    }
+
+    const q4Letters = stoneQuestionnaire?.q4Letters || [];
+
+    const l3Placements = layer3.placements.map((p) => ({
+      ...p,
+      amuletScale: style3.amuletScale
+    }));
+    const allPlacements = l3Placements.slice();
+    if (layer2?.placements?.length) {
+      allPlacements.push(...layer2.placements.map((p) => ({ ...p, amuletScale: style2.amuletScale })));
+    }
+    const surfaceScale = style3.surfaceScale || 0;
+    /** viewBox לפי שכבה 3 בלבד — כמו דחיפות; כדי שסטטוס משפחתי לא ישנה זום של כל הקמע */
+    let vb = viewBoxForPlacements(l3Placements, surfaceScale);
+    if (style2?.spacing > 1 && layer2?.placements?.length) {
+      const l2SpreadPad = Math.round((style2.spacing - 1) * 55);
+      vb = {
+        x: vb.x - l2SpreadPad,
+        y: vb.y - l2SpreadPad,
+        w: vb.w + l2SpreadPad * 2,
+        h: vb.h + l2SpreadPad * 2
+      };
+    }
+    const defs = buildSvgDefs(style2, style3);
+
+    let alignDx = 0;
+    let alignDy = 0;
+    let sharedCenter;
+    let layer2Markup = '';
+    let layer3Markup = layer3.content;
+
+    if (layer2?.content) {
+      const aligned = alignLayer3ToLayer2(layer2.content, layer3.content, vb, defs);
+      alignDx = aligned.dx;
+      alignDy = aligned.dy;
+      sharedCenter = aligned.sharedCenter;
+      layer2Markup = aligned.layer2;
+      layer3Markup = aligned.layer3;
+    } else {
+      const c3 = measureContentBBox(layer3.content, vb, defs);
+      sharedCenter = { cx: c3.cx, cy: c3.cy };
+    }
+
+    if (!vectorCompose && q7Letters.length) {
+      const q7Style = { ...style3, layer: 3, filterId: FILTER_ID_LAYER3 };
+      q7EmbossMarkup = await buildQ7CircleEmbossMarkup(q7Letters, q7Style, sharedCenter);
+    }
+
+    let metalFringeMarkup = '';
+    /* Q4 metal fringe behind stone — disabled per user request */
+    const ENABLE_METAL_FRINGE_SVG = false;
+    if (ENABLE_METAL_FRINGE_SVG && q4Letters.length) {
+      const fringeStyle = visualStyleMetalFringe(params);
+      const q4Layer = await buildQ4MetalLayer(q4Letters, fringeStyle, fringeStyle.intent);
+      if (q4Layer.content) {
+        if (layer2Markup) {
+          const q4Aligned = alignLayer3ToLayer2(layer2Markup, q4Layer.content, vb, defs);
+          metalFringeMarkup = q4Aligned.layer3;
+        } else {
+          metalFringeMarkup = q4Layer.content;
+        }
+      }
+    }
+
+    const q1CeramicLetters = stoneQuestionnaire?.q1CeramicLetters || l3Letters.slice(0, MAX_Q1_CERAMIC_LETTERS);
+    let q1CeramicMarkup = layer3Markup;
+    if (!vectorCompose && q1CeramicLetters.length) {
+      const q1Style = { ...style3, maxLetters: MAX_Q1_CERAMIC_LETTERS };
+      const q1Layer = await buildLayerContent(q1CeramicLetters, q1Style, style3.intent);
+      if (q1Layer.content) {
+        if (layer2Markup) {
+          const q1Aligned = alignLayer3ToLayer2(layer2Markup, q1Layer.content, vb, defs);
+          q1CeramicMarkup = q1Aligned.layer3;
+        } else {
+          q1CeramicMarkup = q1Layer.content;
+        }
+      }
+    }
+
+    const layer2Group = layer2Markup
+      ? '<g class="amulet-layer layer-2" data-layer="name">' + layer2Markup + '</g>'
+      : '';
+    const l3DebugFilter = isSvgDebugMode() ? ' filter="url(#inflate3d-debug)"' : '';
+    const layer3Group =
+      '<g class="amulet-layer layer-3" data-layer="intent"' + l3DebugFilter + '>' + layer3Markup + '</g>';
+    const q1CeramicGroup = vectorCompose
+      ? ''
+      : '<g class="amulet-layer layer-q1-ceramic" data-layer="q1-ceramic">' + q1CeramicMarkup + '</g>';
+
+    const stoneTypoLayers = vectorCompose
+      ? (q3ThreadMarkup
+          ? '<g class="amulet-layer layer-q3-thread" data-layer="q3-thread">' + q3ThreadMarkup + '</g>'
+          : '') +
+        (q3StoneEngraveMarkup
+          ? '<g class="amulet-layer layer-q3-stone-engrave" data-layer="q3-stone-engrave">' +
+            q3StoneEngraveMarkup +
+            '</g>'
+          : '')
+      : (q3ThreadMarkup
+          ? '<g class="amulet-layer layer-q3-thread" data-layer="q3-thread">' + q3ThreadMarkup + '</g>'
+          : '') +
+        (q3StoneEngraveMarkup
+          ? '<g class="amulet-layer layer-q3-stone-engrave" data-layer="q3-stone-engrave">' +
+            q3StoneEngraveMarkup +
+            '</g>'
+          : '') +
+        (q7EmbossMarkup
+          ? '<g class="amulet-layer layer-q7-emboss" data-layer="q7-emboss">' + q7EmbossMarkup + '</g>'
+          : '') +
+        (metalEmbossMarkup
+          ? '<g class="amulet-layer layer-metal-emboss" data-layer="metal-emboss">' + metalEmbossMarkup + '</g>'
+          : '');
+    const metalFringeGroup = metalFringeMarkup
+      ? '<g class="amulet-layer layer-metal-fringe" data-layer="metal-fringe">' + metalFringeMarkup + '</g>'
+      : '';
+    const contentForMeasure = metalFringeGroup + layer2Group + layer3Group;
+
+    const centered = centerLayersOnCanvas(contentForMeasure, defs);
+    const extentBBox = measureSvgContentBBox(layer2Group + layer3Group, vb, defs);
+    const frameLayer = vectorCompose
+      ? null
+      : await buildIntentFrameLayer(
+          style3,
+          extentBBox,
+          layer2Group || layer3Group,
+          defs,
+          style2,
+          centered.dx,
+          centered.dy
+        );
+    let contentLayers = metalFringeGroup + layer2Group + layer3Group + q1CeramicGroup + stoneTypoLayers;
+    if (Math.abs(centered.dx) > 0.01 || Math.abs(centered.dy) > 0.01) {
+      contentLayers =
+        '<g class="amulet-canvas-center" transform="translate(' +
+        centered.dx.toFixed(2) +
+        ',' +
+        centered.dy.toFixed(2) +
+        ')">' +
+        contentLayers +
+        '</g>';
+    }
+    let finalLayers = contentLayers;
+    if (frameLayer) {
+      finalLayers =
+        '<g class="amulet-layer layer-frame" data-layer="frame" data-intent="' +
+        (style3.intent || (style3.amuletType === 'summoning' ? 'summoning' : 'protection')) +
+        '">' +
+        frameLayer.markup +
+        '</g>' +
+        contentLayers;
+    }
+    const finalVb = centered.vb;
+
+    const svg = assembleAmuletSvg(finalVb, defs, finalLayers);
+    return {
+      svg,
+      layer2,
+      layer3,
+      style2,
+      style3,
+      l3Letters,
+      q1CeramicLetters,
+      metalEmbossLetters,
+      q3ThreadLetters,
+      q3StoneEngraveLetters,
+      q7Letters,
+      q4Letters,
+      nameSeedLetter: nameLetters[0] || null,
+      viewBox: finalVb,
+      placements: allPlacements,
+      anchor: layer3.anchor,
+      skipped: layer3.skipped,
+      alignDx,
+      alignDy,
+      centerDx: centered.dx,
+      centerDy: centered.dy
+    };
+  }
+
+  function showDebug(layer2, layer3, style2, style3) {
+    const el = document.getElementById('debugList');
+    const blocks = [];
+
+    if (layer2?.placements?.length && style2) {
+      const rows2 = layer2.placements
+        .map((p) => {
+          const tag = p.letter === layer2.anchor ? ' (hub)' : '';
+          return '<li>L2 ' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
+        })
+        .join('');
+      const combo = layer2FactorSummary(style2, layer2)
+        .map((line) => '<li>' + line + '</li>')
+        .join('');
+      blocks.push(
+        '<strong>שכבה 2 (שם) · ' + style2.intent + '</strong>' +
+          '<ul style="margin:4px 0 6px;padding-right:16px;color:#555;font-size:10px">' +
+          combo +
+          '</ul>' +
+          '<ul>' +
+          rows2 +
+          '</ul>'
+      );
+    }
+
+    if (layer3?.placements?.length && style3) {
+      const rows3 = layer3.placements
+        .map((p) => {
+          const tag = p.letter === layer3.anchor ? ' (hub)' : '';
+          return '<li>L3 ' + p.letter + tag + ': x=' + p.x.toFixed(1) + ', y=' + p.y.toFixed(1) + '</li>';
+        })
+        .join('');
+      blocks.push(
+        '<strong>שכבה 3 (כוונה) · ' +
+          style3.amuletType +
+          '/' +
+          style3.domainKey +
+          ' age=' +
+          style3.ageTexture +
+          ' | cap=' +
+          style3.linecap +
+          '/' +
+          style3.linejoin +
+          ' | fx=' +
+          effectLabel(style3) +
+          ' spacing=' +
+          style3.spacing.toFixed(2) +
+          '</strong><ul>' +
+          rows3 +
+          '</ul>'
+      );
+    }
+
+    if (!blocks.length) {
+      el.hidden = true;
+      return;
+    }
+    el.innerHTML = blocks.join('<hr style="margin:6px 0;border:none;border-top:1px dashed #ccc">');
+    el.hidden = false;
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  let activeThreeRenderer = null;
+  let activeEnvMap = null;
+
+  function showRenderSpinner(show) {
+    const container = document.getElementById('amuletContainer');
+    let el = document.getElementById('renderSpinner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'renderSpinner';
+      el.className = 'render-spinner';
+      el.innerHTML =
+        '<div class="spinner-ring"></div>' +
+        '<span class="render-progress-label">מעבד PBR תלת־ממד…</span>' +
+        '<div class="render-progress-track"><div class="render-progress-bar"></div></div>' +
+        '<span class="render-progress-pct">0%</span>';
+      container.appendChild(el);
+    }
+    el.hidden = !show;
+    if (show) updateRenderProgress(0, 'מתחיל…');
+  }
+
+  function updateRenderProgress(frac, label) {
+    const el = document.getElementById('renderSpinner');
+    if (!el || el.hidden) return;
+    const pct = Math.round(Math.min(100, Math.max(0, frac * 100)));
+    const bar = el.querySelector('.render-progress-bar');
+    const pctEl = el.querySelector('.render-progress-pct');
+    const labelEl = el.querySelector('.render-progress-label');
+    if (bar) bar.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    if (labelEl && label) labelEl.textContent = label;
+  }
+
+  /** Schedule heavy work on next macrotask so spinner/button state paints first. */
+  function deferToNextTask(fn) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => Promise.resolve(fn()).then(resolve, reject), 0);
+    });
+  }
+
+  /** Yield to browser + cap PBR work so tab/server don't freeze. */
+  function withRenderTimeout(promise, ms = 360000) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('PBR timeout — נסי שוב')), ms)
+      )
+    ]);
+  }
+
+  async function yieldToBrowser() {
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+
+  function disposeThreeScene(scene, envMap) {
+    if (envMap) envMap.dispose();
+    if (!scene) return;
+    scene.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+        else obj.material.dispose();
+      }
+    });
+  }
+
+  function disposeActiveThreeRenderer() {
+    if (activeEnvMap) {
+      activeEnvMap.dispose();
+      activeEnvMap = null;
+    }
+    if (activeThreeRenderer) {
+      activeThreeRenderer.dispose();
+      activeThreeRenderer = null;
+    }
+  }
+
+  function setResultCanvas(canvas) {
+    showRenderSpinner(false);
+    const container = document.getElementById('amuletContainer');
+    container.innerHTML = '';
+    container.appendChild(canvas);
+  }
+
+  function setExportPngEnabled(enabled) {
+    document.getElementById('exportPngBtn').disabled = !enabled;
+  }
+
+  function buildExportFilename() {
+    const date = new Date().toISOString().slice(0, 10);
+    return 'amulet_questionnaire_' + date + '.png';
+  }
+
+  function triggerPngDownload(dataUrl) {
+    if (!dataUrl || dataUrl === 'data:,') {
+      throw new Error('נתוני PNG ריקים');
+    }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = buildExportFilename();
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 200);
+  }
+
+  /** מסיר את מלבן הרקע הלבן מה-SVG לפני ייצוא PNG שקוף */
+  function svgForTransparentPngExport(svgString) {
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    if (doc.querySelector('parsererror')) return svgString;
+    const svg = doc.documentElement;
+    const vbParts = (svg.getAttribute('viewBox') || '0 0 ' + W + ' ' + H)
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    const bx = vbParts[0] || 0;
+    const by = vbParts[1] || 0;
+    const bw = vbParts[2] || W;
+    const bh = vbParts[3] || H;
+    svg.querySelectorAll('rect').forEach((rect) => {
+      const x = parseFloat(rect.getAttribute('x') || 0);
+      const y = parseFloat(rect.getAttribute('y') || 0);
+      const rw = parseFloat(rect.getAttribute('width') || 0);
+      const rh = parseFloat(rect.getAttribute('height') || 0);
+      const fill = (rect.getAttribute('fill') || '').trim().toLowerCase();
+      const coversViewBox =
+        Math.abs(x - bx) < 1 &&
+        Math.abs(y - by) < 1 &&
+        Math.abs(rw - bw) < 1 &&
+        Math.abs(rh - bh) < 1;
+      if (
+        coversViewBox &&
+        (fill === '#ffffff' || fill === '#fff' || fill === 'white' || fill === AMULET_BG.toLowerCase())
+      ) {
+        rect.remove();
+      }
+    });
+    svg.setAttribute('style', 'background: none; background-color: transparent');
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  function canvasToTransparentPngDataUrl(sourceCanvas, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(sourceCanvas, 0, 0, width, height);
+    return canvas.toDataURL('image/png');
+  }
+
+  function loadSvgAsImage(transparentSvg) {
+    return new Promise((resolve, reject) => {
+      const el = new Image();
+      const url = URL.createObjectURL(
+        new Blob([transparentSvg], { type: 'image/svg+xml;charset=utf-8' })
+      );
+      el.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(el);
+      };
+      el.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('טעינת SVG לייצוא נכשלה'));
+      };
+      el.src = url;
+    });
+  }
+
+  async function exportSvgStringAsPng(svgString) {
+    const transparentSvg = svgForTransparentPngExport(svgString);
+    const img = await loadSvgAsImage(transparentSvg);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(img, 0, 0, W, H);
+    triggerPngDownload(canvas.toDataURL('image/png'));
+  }
+
+  function exportCanvasPng(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (!w || !h) throw new Error('קנבס ריק');
+    try {
+      triggerPngDownload(canvas.toDataURL('image/png'));
+    } catch (directErr) {
+      triggerPngDownload(canvasToTransparentPngDataUrl(canvas, w, h));
+    }
+  }
+
+  async function exportAmuletPng() {
+    const container = document.getElementById('amuletContainer');
+    const canvas = container.querySelector('canvas');
+
+    /* ייצוא מיידי מה-canvas — בלי await לפני ההורדה (חשוב ל-user gesture) */
+    if (canvas) {
+      try {
+        exportCanvasPng(canvas);
+        setStatus('PNG יוצא (רקע שקוף)');
+      } catch (err) {
+        setStatus('שגיאת ייצוא PNG: ' + err.message);
+        console.error('[prototype-v2] canvas export:', err);
+      }
+      return;
+    }
+
+    const svgEl = container.querySelector('svg');
+    const svgString = lastComposedSvg
+      ? lastComposedSvg
+      : svgEl
+        ? new XMLSerializer().serializeToString(svgEl)
+        : null;
+    if (!svgString) {
+      setStatus('אין קמע לייצוא — צרי קמע קודם');
+      return;
+    }
+    try {
+      await exportSvgStringAsPng(svgString);
+      setStatus('PNG יוצא מה-SVG (רקע שקוף)');
+    } catch (err) {
+      setStatus('שגיאת ייצוא PNG: ' + err.message);
+      console.error('[prototype-v2] svg export:', err);
+    }
+  }
+
+  function setResultSvg(svgString) {
+    showRenderSpinner(false);
+    const container = document.getElementById('amuletContainer');
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const err = doc.querySelector('parsererror');
+    container.innerHTML = '';
+    if (err) {
+      console.error('[prototype] SVG parse error:', err.textContent);
+      container.insertAdjacentHTML('beforeend', svgString);
+      return;
+    }
+    container.appendChild(doc.documentElement);
+  }
+
+  function appendStackSvg(stack, svgString, className) {
+    if (!svgString) return;
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const err = doc.querySelector('parsererror');
+    if (err) {
+      console.error('[stack] SVG parse error:', err.textContent);
+      const wrap = document.createElement('div');
+      wrap.className = className || '';
+      wrap.innerHTML = svgString;
+      stack.appendChild(wrap);
+      return;
+    }
+    const el = doc.documentElement;
+    if (className) el.setAttribute('class', className);
+    stack.appendChild(el);
+  }
+
+  /** L2 (3D או SVG) + L3 SVG מלמעלה */
+  function setResultStacked(l2Node, l3SvgString) {
+    showRenderSpinner(false);
+    const container = document.getElementById('amuletContainer');
+    container.innerHTML = '';
+    const stack = document.createElement('div');
+    stack.className = 'amulet-stack';
+    const bg = document.createElement('div');
+    bg.className = 'amulet-stack-bg';
+    stack.appendChild(bg);
+    if (l2Node) {
+      if (l2Node.tagName === 'CANVAS') l2Node.className = 'layer-l2';
+      stack.appendChild(l2Node);
+    }
+    appendStackSvg(stack, l3SvgString, 'layer-l3');
+    container.appendChild(stack);
+  }
+
+  function buildLayerOverlaySvg(mount, layerSelector) {
+    const vb = mount.getAttribute('viewBox') || '0 0 680 680';
+    const defsEl = mount.querySelector('defs');
+    const layer = mount.querySelector(layerSelector);
+    if (!layer) return null;
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+      W +
+      '" height="' +
+      H +
+      '" viewBox="' +
+      vb +
+      '" preserveAspectRatio="xMidYMid meet">' +
+      (defsEl ? defsEl.outerHTML : '') +
+      layer.outerHTML +
+      '</svg>'
+    );
+  }
+
+  function buildLayer2OverlaySvg(mount) {
+    return buildLayerOverlaySvg(mount, '.layer-2');
+  }
+
+  function buildLayer3OverlaySvg(mount) {
+    return buildLayerOverlaySvg(mount, '.layer-3');
+  }
+
+  function canvasHasInk(canvas) {
+    if (!canvas) return false;
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r < 248 || g < 248 || b < 248) return true;
+    }
+    return false;
+  }
+
+  function mountSvgForPathExtraction(svgString) {
+    const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const err = doc.querySelector('parsererror');
+    if (err) throw new Error('SVG parse error: ' + err.textContent);
+    const svg = doc.documentElement;
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.style.cssText =
+      'position:fixed;left:0;top:0;width:' +
+      W +
+      'px;height:' +
+      H +
+      'px;opacity:0;pointer-events:none;z-index:-1;visibility:visible';
+    document.body.appendChild(svg);
+    return svg;
+  }
+
+  /** חספוס מתכת — מלוטש (0.06) עד מעט פחות מבריק עם גיל */
+  function ageToMetalRoughness(age) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    return 0.06 + (a / 120) * 0.1;
+  }
+
+  /** חספוס זכוכית חלבית — מטושטש (frosted) */
+  function ageToGlassRoughness(age, surfaceScale) {
+    const a = Math.max(1, Math.min(120, Number(age) || 25));
+    const base = 0.38 + (a / 120) * 0.12;
+    return Math.min(0.55, base + (surfaceScale || 0) * 0.004);
+  }
+
+  /** ערבוב צבע תחום עם קרם לזכוכית חלבית */
+  function milkyGlassColor(hex) {
+    const domain = new THREE.Color(hex);
+    const cream = new THREE.Color(0xfff8e8);
+    domain.lerp(cream, 0.62);
+    return domain;
+  }
+
+  /** סטודיו פנימי ל-reflections על המתכת (PMREM) */
+  function createStudioEnvMap(renderer) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x888890);
+
+    const room = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({
+        color: 0xc8c8d0,
+        metalness: 0,
+        roughness: 0.85,
+        side: THREE.BackSide
+      })
+    );
+    room.scale.setScalar(80);
+    envScene.add(room);
+
+    const key = new THREE.DirectionalLight(0xffffff, 5);
+    key.position.set(4, 8, 6);
+    envScene.add(key);
+    const fill = new THREE.DirectionalLight(0xe8eeff, 2.5);
+    fill.position.set(-6, 2, 4);
+    envScene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffeedd, 1.8);
+    rim.position.set(0, -4, -6);
+    envScene.add(rim);
+
+    const envMap = pmrem.fromScene(envScene, 0.04).texture;
+    pmrem.dispose();
+    return envMap;
+  }
+
+  /** תואם ל-pathLayers stroke-width */
+  const PATH_MAIN_STROKE = 45;
+  const TUBE_RADIUS = PATH_MAIN_STROKE / 2;
+  /** דגימה כל N פיקסלים לאורך הנתיב — שומר פינות כמו SVG */
+  const PATH_SAMPLE_STEP = 2;
+
+  /** נקודת נתיב → קואורדינטות root SVG (תומך ב-SVG מקונן) */
+  function pathPointToRoot(rootSvg, pathEl, x, y) {
+    const pt = pathEl.ownerSVGElement.createSVGPoint();
+    pt.x = x;
+    pt.y = y;
+    let gx;
+    let gy;
+    if (typeof pathEl.getTransformToElement === 'function') {
+      const g = pt.matrixTransform(pathEl.getTransformToElement(rootSvg));
+      gx = g.x;
+      gy = g.y;
+    } else {
+      const scr = pt.matrixTransform(pathEl.getScreenCTM());
+      const g = scr.matrixTransform(rootSvg.getScreenCTM().inverse());
+      gx = g.x;
+      gy = g.y;
+    }
+    return new THREE.Vector3(gx - CX, -(gy - CY), 0);
+  }
+
+  function sampleSvgPath(pathEl, rootSvg, stepPx) {
+    const len = pathEl.getTotalLength();
+    if (!isFinite(len) || len < 4) return [];
+    if (!rootSvg) return [];
+    const steps = Math.max(4, Math.ceil(len / stepPx));
+    const pts = [];
+    for (let i = 0; i < steps; i++) {
+      const t = steps <= 1 ? 0 : i / (steps - 1);
+      const p = pathEl.getPointAtLength(len * t);
+      pts.push(pathPointToRoot(rootSvg, pathEl, p.x, p.y));
+    }
+    return pts;
+  }
+
+  /** פוליליין — אותה צורה כמו SVG, בלי עיגול פינות */
+  function buildStrokeCurve(pts) {
+    const curve = new THREE.CurvePath();
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (pts[i].distanceTo(pts[i + 1]) > 0.05) {
+        curve.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
+      }
+    }
+    return curve.curves.length ? curve : null;
+  }
+
+  function polylineLength(pts) {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += pts[i].distanceTo(pts[i - 1]);
+    return len;
+  }
+
+  /** תאורה מהצד — מדגישה עיגול הצינור (לא מהמצלמה) */
+  function addMetalLights(scene) {
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x505060, 0.5));
+    const key = new THREE.DirectionalLight(0xffffff, 4.2);
+    key.position.set(-480, 720, 880);
+    const fill = new THREE.DirectionalLight(0x90a8e0, 1.8);
+    fill.position.set(580, 160, 520);
+    const rim = new THREE.DirectionalLight(0xfff4e0, 2.6);
+    rim.position.set(420, -580, 700);
+    const under = new THREE.DirectionalLight(0x707080, 0.7);
+    under.position.set(0, -800, 400);
+    scene.add(key, fill, rim, under);
+  }
+
+  function createMetalCamera() {
+    const cam = new THREE.OrthographicCamera(-340, 340, 340, -340, 0.1, 3000);
+    cam.position.set(0, 0, 1000);
+    cam.lookAt(0, 0, 0);
+    return cam;
+  }
+
+  function renderThreeLayer(renderer, envMap, camera, layerEl, rootSvg, material, z, renderOrder) {
+    const scene = new THREE.Scene();
+    scene.environment = envMap;
+    addMetalLights(scene);
+    const count = addTubesFromLayer(layerEl, rootSvg, material, scene, z, TUBE_RADIUS, renderOrder);
+    renderer.render(scene, camera);
+    disposeThreeScene(scene);
+    return count;
+  }
+
+  /** מסכה לבנה — stroke על כל path (ב-SVG האמיתי ה-stroke על ה-<g>) */
+  function stylizeMaskLayer(layerEl) {
+    const clone = layerEl.cloneNode(true);
+    clone.querySelectorAll('*').forEach((el) => {
+      el.removeAttribute('filter');
+    });
+    clone.querySelectorAll('g').forEach((g) => {
+      g.removeAttribute('stroke');
+      g.removeAttribute('stroke-width');
+      g.removeAttribute('stroke-opacity');
+      g.removeAttribute('stroke-linecap');
+      g.removeAttribute('stroke-linejoin');
+    });
+    clone.querySelectorAll('path,circle,ellipse,line,polyline,polygon').forEach((el) => {
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', '#ffffff');
+      el.setAttribute('stroke-width', String(PATH_MAIN_STROKE));
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('stroke-linejoin', 'round');
+      el.setAttribute('stroke-opacity', '1');
+    });
+    return clone;
+  }
+
+  function buildMaskSvgFromMount(mount, layerSelector) {
+    const layer = mount.querySelector(layerSelector);
+    if (!layer) return null;
+    const vb = mount.getAttribute('viewBox') || '0 0 680 680';
+    const clone = stylizeMaskLayer(layer);
+    return (
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="680" height="680" viewBox="' +
+      vb +
+      '">' +
+      new XMLSerializer().serializeToString(clone) +
+      '</svg>'
+    );
+  }
+
+  function maskCanvasHasInk(maskCanvas) {
+    const ctx = maskCanvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, W, H).data;
+    for (let i = 3; i < data.length; i += 16) {
+      if (data[i] > 8) return true;
+    }
+    return false;
+  }
+
+  function rasterizeSvgMask(svgString) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0, W, H);
+        resolve(c);
+      };
+      img.onerror = () => reject(new Error('לא ניתן לרסטר מסכת SVG'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+    });
+  }
+
+  function applyStrokeMask(colorCanvas, maskCanvas) {
+    const out = document.createElement('canvas');
+    out.width = W;
+    out.height = H;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(colorCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(maskCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    return out;
+  }
+
+  function addTubesFromLayer(layerEl, rootSvg, material, scene, z, tubeRadius, renderOrder) {
+    if (!layerEl || !rootSvg) return 0;
+    let count = 0;
+    layerEl.querySelectorAll('path').forEach((pathEl) => {
+      const pts = sampleSvgPath(pathEl, rootSvg, PATH_SAMPLE_STEP);
+      if (pts.length < 2) return;
+      const curve = buildStrokeCurve(pts);
+      if (!curve) return;
+      const pathLen = polylineLength(pts);
+      const tubularSegs = Math.min(400, Math.max(48, Math.ceil(pathLen / 2)));
+      const geom = new THREE.TubeGeometry(curve, tubularSegs, tubeRadius, 40, false);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.position.z = z;
+      mesh.renderOrder = renderOrder || 0;
+      scene.add(mesh);
+      count++;
+    });
+    return count;
+  }
+
+  function buildMetalMaterial(envMap, roughness) {
+    return new THREE.MeshPhysicalMaterial({
+      color: 0xd0d0d8,
+      metalness: 1.0,
+      roughness: roughness,
+      envMap: envMap,
+      envMapIntensity: 3.0,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.06,
+      reflectivity: 1.0
+    });
+  }
+
+  async function waitForSvgLayout() {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
+
+  /**
+   * L2 = צינורות מתכת 3D (Three.js) · L3 = זכוכית SVG מלמעלה.
+   * בלי מסכה — הצורה נלקחת מנתיבי ה-SVG הקיימים.
+   */
+
+let composeInitPromise = null;
+
+export async function initAmuletCompose() {
+  if (composeInitPromise) return composeInitPromise;
+  composeInitPromise = (async function () {
+    requireConnectionCore();
+    await Promise.all([loadGlyphManifest(), loadConnections()]);
+    return true;
+  })();
+  return composeInitPromise;
+}
+
+export async function composeFromAnswers(answers, options = {}) {
+  applyAnswers(answers, options);
+  let metalLetters = params.q1Wish ? getSentenceLetters(params.q1Wish) : [];
+  if (!metalLetters.length) return null;
+  const q1CeramicLetters = params.q1Wish ? getQ1CeramicLetters(params.q1Wish) : [];
+  const nameLetters = params.q2Name ? lettersFromName(params.q2Name) : [];
+  const q3ThreadLetters = params.q3WhyNow ? getFirstWordFirstLetter(params.q3WhyNow) : [];
+  const q3StoneEngraveLetters = params.q3WhyNow ? getSentenceLetters(params.q3WhyNow) : [];
+  const q4Letters = params.q4Belief ? lettersFromBelief(params.q4Belief) : [];
+  const q7Letters = params.q7Change ? lettersFromQ7Change(params.q7Change) : [];
+  const metalEmbossLetters = metalLetters.slice();
+  const shapeDerived = deriveAmuletShapeParams(
+    params.q1Wish,
+    params.q2Name,
+    params.q3WhyNow,
+    params.q4Belief || undefined
+  );
+  const result = await buildDualLayerAmulet(metalLetters, nameLetters, {
+    q1CeramicLetters,
+    q3ThreadLetters,
+    q3StoneEngraveLetters,
+    q3Text: params.q3WhyNow,
+    q7Letters,
+    stoneShapeParams: shapeDerived.stoneShapeParams,
+    metalEmbossLetters,
+    q4Letters,
+    vectorStage: options.vectorStage ?? 0,
+  });
+  return { result, shapeDerived, params: { ...params } };
+}
+
+export async function composeFullAmuletForPbr(answers) {
+  applyAnswers(answers, { partial: false });
+  readParams();
+
+  const metalLetters = params.q1Wish ? getSentenceLetters(params.q1Wish) : [];
+  if (!metalLetters.length) return null;
+
+  const q1CeramicLetters = params.q1Wish ? getQ1CeramicLetters(params.q1Wish) : [];
+  const nameLetters = params.q2Name ? lettersFromName(params.q2Name) : [];
+  const q3ThreadLetters = params.q3WhyNow ? getFirstWordFirstLetter(params.q3WhyNow) : [];
+  const q3StoneEngraveLetters = params.q3WhyNow ? getSentenceLetters(params.q3WhyNow) : [];
+  const q4Letters = lettersFromBelief(params.q4Belief);
+  const q7Letters = params.q7Change ? lettersFromQ7Change(params.q7Change) : [];
+  const metalEmbossLetters = metalLetters.slice();
+
+  const shapeDerived = deriveAmuletShapeParams(
+    params.q1Wish,
+    params.q2Name,
+    params.q3WhyNow,
+    params.q4Belief
+  );
+
+  const result = await buildDualLayerAmulet(metalLetters, nameLetters, {
+    q1CeramicLetters,
+    q3ThreadLetters,
+    q3StoneEngraveLetters,
+    q3Text: params.q3WhyNow,
+    q7Letters,
+    stoneShapeParams: shapeDerived.stoneShapeParams,
+    metalEmbossLetters,
+    q4Letters,
+  });
+
+  const styleBase = questionnaireStyleBase(params);
+  const questionnaire = {
+    wishText: params.q1Wish,
+    requesterName: params.q2Name,
+    timingReason: params.q3WhyNow,
+    q4Belief: params.q4Belief,
+    embossedText: params.q1Wish,
+    engravedText: params.q3WhyNow,
+    embossedLetters: metalEmbossLetters,
+    engravedLetters: q3StoneEngraveLetters,
+    q7Change: params.q7Change,
+    q7Letters,
+    fringeLetters: q4Letters,
+    stoneShapeParams: shapeDerived.stoneShapeParams,
+    stoneEngravingPattern: shapeDerived.stoneEngravingPattern,
+    metalPlateParams: shapeDerived.metalPlateParams,
+    metalEmbossPattern: shapeDerived.metalEmbossPattern,
+    l3Spike: L3_SPIKE_BY_DIFFICULTY[params.q6Difficulty] ?? 0.5,
+    stoneRoughness: occupationRoughnessFromQ6(params.q6Difficulty),
+    occupationKey: occupationFromQ6(params.q6Difficulty),
+    q5Feeling: params.q5Feeling,
+    ceramicHex: ceramicHexFromQ5(params.q5Feeling),
+  };
+
+  return {
+    svg: result.svg,
+    style2: result.style2,
+    style3: result.style3,
+    questionnaire,
+    ageNum: styleBase.age,
+    domainHex: ceramicHexFromQ5(params.q5Feeling),
+  };
+}
+
+export function buildQuestionnairePayload(
+  answers,
+  shapeDerived,
+  metalEmbossLetters,
+  q3StoneEngraveLetters,
+  q7Letters,
+  q4Letters,
+  options = {}
+) {
+  applyAnswers(answers, options);
+  const styleBase = questionnaireStyleBase(params);
+  const payload = {
+    wishText: params.q1Wish,
+    requesterName: params.q2Name,
+    timingReason: params.q3WhyNow,
+    embossedText: params.q1Wish,
+    engravedText: params.q3WhyNow,
+    embossedLetters: metalEmbossLetters,
+    engravedLetters: q3StoneEngraveLetters,
+    stoneShapeParams: shapeDerived.stoneShapeParams,
+    stoneEngravingPattern: shapeDerived.stoneEngravingPattern,
+    metalPlateParams: shapeDerived.metalPlateParams,
+    metalEmbossPattern: shapeDerived.metalEmbossPattern,
+    ageNum: styleBase.age,
+  };
+
+  if (params.q4Belief) {
+    payload.q4Belief = params.q4Belief;
+    payload.fringeLetters = q4Letters;
+  }
+  if (params.q7Change) {
+    payload.q7Change = params.q7Change;
+    payload.q7Letters = q7Letters;
+  }
+  if (params.q5Feeling) {
+    payload.q5Feeling = params.q5Feeling;
+    payload.ceramicHex = ceramicHexFromQ5(params.q5Feeling);
+  }
+  if (params.q6Difficulty) {
+    payload.q6Difficulty = params.q6Difficulty;
+    payload.l3Spike = L3_SPIKE_BY_DIFFICULTY[params.q6Difficulty] ?? 0.5;
+    payload.stoneRoughness = occupationRoughnessFromQ6(params.q6Difficulty);
+    payload.occupationKey = occupationFromQ6(params.q6Difficulty);
+  }
+
+  return payload;
+}
+
+export function visualStageFromAnswers(answers) {
+  if (!answers.q1Wish?.trim()) return 0;
+  if (!answers.q2Name?.trim()) return 1;
+  if (!answers.q3WhyNow?.trim()) return 2;
+  if (!answers.q4Belief) return 3;
+  return 4;
+}

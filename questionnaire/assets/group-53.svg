@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 143.47 62.84" fill="none" aria-hidden="true">
+  <!-- Group_53  143.47�62.84 @ 1920 artboard, 1px #F1F1F1, fill #1B1613 -->
+  <path
+    d="M 22.2 0.5
+       H 121.27
+       C 133.8 0.5 142.47 9.17 142.47 21.67
+       C 142.47 28.5 139.8 34.7 135.3 39.5
+       C 139.8 44.3 142.47 50.5 142.47 57.33
+       C 142.47 69.83 133.8 78.5 121.27 78.5
+       H 22.2
+       C 9.67 78.5 1 69.83 1 57.33
+       C 1 50.5 3.67 44.3 8.17 39.5
+       C 3.67 34.7 1 28.5 1 21.67
+       C 1 9.17 9.67 0.5 22.2 0.5
+       Z"
+    transform="translate(0.5 0) scale(1 0.7965)"
+    fill="#1B1613"
+    stroke="#F4F4F4"
+    stroke-width="1"
+    vector-effect="non-scaling-stroke"
+    shape-rendering="geometricPrecision"
+  />
+  <image
+    href="emblem.png"
+    x="18"
+    y="10"
+    width="108"
+    height="42"
+    preserveAspectRatio="xMidYMid meet"
+  />
+</svg>

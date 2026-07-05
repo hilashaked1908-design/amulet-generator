@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בדיקת מסכה — טיפוגרפיה עברית (Q2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #ececec;
+      color: #222;
+      padding: 20px 24px 32px;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.15rem; margin-bottom: 6px; }
+    p.sub { font-size: 0.85rem; color: #555; margin-bottom: 18px; }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 14px;
+      min-width: 280px;
+      max-width: 100%;
+    }
+    .panel h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .panel canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      background: #fafafa;
+    }
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .field input {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 1rem;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    #renderBtn {
+      padding: 10px 16px;
+      background: #2a5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #renderBtn:hover { background: #248a42; }
+    #status {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: #444;
+      font-family: monospace, ui-monospace, monospace;
+      direction: ltr;
+      text-align: left;
+    }
+    .hint {
+      margin-top: 16px;
+      font-size: 0.78rem;
+      color: #888;
+    }
+    .hint code { direction: ltr; unicode-bidi: embed; }
+  </style>
+</head>
+<body>
+  <h1>בדיקת מסכה — טיפוגרפיה עברית</h1>
+  <p class="sub">שלב 1 בלבד: <strong>fillText → canvas → binary mask</strong> (לפני חיבור ל-SDF). ברירת מחדל: שם Q2.</p>
+
+  <div class="field" style="max-width:420px;margin-bottom:16px">
+    <label for="nameInput">טקסט (Q2 — שם)</label>
+    <input id="nameInput" type="text" value="הילה">
+  </div>
+  <button type="button" id="renderBtn">צור מסכה</button>
+
+  <div class="row" style="margin-top:20px">
+    <div class="panel">
+      <h2>1. Silhouette (fillText)</h2>
+      <canvas id="silhouetteCanvas"></canvas>
+    </div>
+    <div class="panel">
+      <h2>2. Binary mask grid</h2>
+      <canvas id="maskCanvas"></canvas>
+    </div>
+  </div>
+
+  <p id="status">טוען…</p>
+  <p class="hint">פתחי: <code>http://localhost:8080/text-mask-test.html</code> · גופן: Frank Ruhl Libre 700</p>
+
+  <script type="module">
+    import {
+      buildHebrewTextMaskGrid,
+      maskGridToCanvas
+    } from './hebrew-text-mask.js';
+
+    const nameInput = document.getElementById('nameInput');
+    const statusEl = document.getElementById('status');
+    const silCanvas = document.getElementById('silhouetteCanvas');
+    const maskCanvas = document.getElementById('maskCanvas');
+
+    function showCanvas(target, source) {
+      target.width = source.width;
+      target.height = source.height;
+      target.getContext('2d').drawImage(source, 0, 0);
+    }
+
+    async function renderMask() {
+      const text = nameInput.value.trim();
+      if (!text) {
+        statusEl.textContent = 'הזיני טקסט';
+        return;
+      }
+      statusEl.textContent = 'מרנדר…';
+      try {
+        await document.fonts.ready;
+        const result = await buildHebrewTextMaskGrid(text, {
+          fontFamily: 'Frank Ruhl Libre',
+          fontWeight: '700',
+          fontSize: 200,
+          padding: 56,
+          pixelRatio: 4
+        });
+        showCanvas(silCanvas, result.canvas);
+        const maskVis = maskGridToCanvas(result.grid, result.w, result.h);
+        showCanvas(maskCanvas, maskVis);
+        statusEl.textContent =
+          'text="' + text + '" · grid ' + result.w + '×' + result.h +
+          ' · filled=' + result.filledPx + ' px · ratio=' + result.pixelRatio +
+          ' · lines=' + JSON.stringify(result.lines);
+      } catch (err) {
+        statusEl.textContent = 'שגיאה: ' + err.message;
+        console.error(err);
+      }
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', renderMask);
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') renderMask();
+    });
+
+    renderMask();
+  </script>
+</body>
+</html>

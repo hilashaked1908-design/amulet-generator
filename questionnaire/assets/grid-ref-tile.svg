@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="43" height="43" viewBox="0 0 43 43">
+  <g fill="none" stroke="rgba(255,255,255,0.075)" stroke-width="1" shape-rendering="geometricPrecision">
+    <line x1="0.5" y1="0" x2="0.5" y2="43"/>
+    <line x1="0" y1="0.5" x2="43" y2="0.5"/>
+    <polygon points="0.5,2.5 3.8,9.2 0.5,15.9 -2.8,9.2"/>
+  </g>
+</svg>

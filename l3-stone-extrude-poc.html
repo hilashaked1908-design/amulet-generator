@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>L3 Stone Extrude POC — Three.js</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f0ea;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+    }
+    h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    p { font-size: 0.85rem; color: #666; max-width: 640px; text-align: center; line-height: 1.5; margin-bottom: 16px; }
+    #canvasWrap {
+      width: min(680px, 92vw);
+      aspect-ratio: 1;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    #err { color: #c0392b; margin-top: 12px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>L3 Stone — ExtrudeGeometry POC</h1>
+  <p>
+    Single glyph path (ה from <code>glyphs/ה2.svg</code>) → closed stroke outline →
+    <code>ExtrudeGeometry</code> with bevel · <code>MeshStandardMaterial</code> · FBM bump · orthographic camera
+  </p>
+  <div id="canvasWrap"></div>
+  <p id="err"></p>
+
+  <!-- Hidden SVG for path sampling (same d as L3 glyph) -->
+  <svg id="glyphSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 998 1288" width="0" height="0" aria-hidden="true">
+    <path id="glyphPath" d="M185.68 485.237C295.995 485.237 369.149 537.401 369.149 627.193M369.149 627.193V1147.93M369.149 627.193C369.149 537.401 442.304 485.237 552.619 485.237M369.149 1147.93C369.149 1208.91 278.892 1270.48 187.39 1263.64M369.149 1147.93C369.149 1208.91 459.407 1270.48 550.909 1263.64M970.002 1232.33C824.499 1313.9 636.557 1236.07 673.897 1028.87C703.692 863.545 940.256 537.651 967.634 401.566C1009.95 191.219 853.24 32.6129 696.119 23.6681C524.761 13.9129 380.257 110.531 361.078 248.159C336.261 110.531 185.447 23.6681 23 23.6681"/>
+  </svg>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    const GLYPH_STROKE_W = 46;
+    const HALF_W = GLYPH_STROKE_W * 0.5;
+
+    /** Sample open SVG stroke → closed 2D outline (round caps) for extrusion */
+    function strokePathToShape(pathEl, halfWidth) {
+      const len = pathEl.getTotalLength();
+      const steps = Math.max(96, Math.ceil(len / 3));
+      const left = [];
+      const right = [];
+
+      const tangentAt = (dist) => {
+        const eps = Math.min(2, len * 0.002);
+        const a = pathEl.getPointAtLength(Math.max(0, dist - eps));
+        const b = pathEl.getPointAtLength(Math.min(len, dist + eps));
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const l = Math.hypot(dx, dy) || 1;
+        return { nx: -dy / l, ny: dx / l, tx: dx / l, ty: dy / l };
+      };
+
+      for (let i = 0; i < steps; i++) {
+        const t = steps <= 1 ? 0 : i / (steps - 1);
+        const d = len * t;
+        const p = pathEl.getPointAtLength(d);
+        const { nx, ny } = tangentAt(d);
+        left.push(new THREE.Vector2(p.x + nx * halfWidth, -(p.y + ny * halfWidth)));
+        right.push(new THREE.Vector2(p.x - nx * halfWidth, -(p.y - ny * halfWidth)));
+      }
+
+      const capArc = (center, tangent, sign) => {
+        const pts = [];
+        const segs = 12;
+        for (let i = 0; i <= segs; i++) {
+          const a = (i / segs) * Math.PI;
+          const px = center.x + Math.cos(a) * tangent.nx * sign * halfWidth + Math.sin(a) * tangent.tx * halfWidth;
+          const py = center.y + Math.cos(a) * tangent.ny * sign * halfWidth + Math.sin(a) * tangent.ty * halfWidth;
+          pts.push(new THREE.Vector2(px, py));
+        }
+        return pts;
+      };
+
+      const pStart = pathEl.getPointAtLength(0);
+      const pEnd = pathEl.getPointAtLength(len);
+      const tStart = tangentAt(0);
+      const tEnd = tangentAt(len);
+      const startC = new THREE.Vector2(pStart.x, -pStart.y);
+      const endC = new THREE.Vector2(pEnd.x, -pEnd.y);
+
+      const shape = new THREE.Shape();
+      const startCap = capArc(startC, tStart, 1);
+      shape.moveTo(startCap[0].x, startCap[0].y);
+      for (let i = 1; i < startCap.length; i++) shape.lineTo(startCap[i].x, startCap[i].y);
+      for (let i = 0; i < left.length; i++) shape.lineTo(left[i].x, left[i].y);
+      const endCap = capArc(endC, tEnd, -1);
+      for (let i = 0; i < endCap.length; i++) shape.lineTo(endCap[i].x, endCap[i].y);
+      for (let i = right.length - 1; i >= 0; i--) shape.lineTo(right[i].x, right[i].y);
+      shape.closePath();
+      return shape;
+    }
+
+    function hash(x, y) {
+      const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+      return s - Math.floor(s);
+    }
+    function smoothNoise(x, y) {
+      const xi = Math.floor(x), yi = Math.floor(y);
+      const xf = x - xi, yf = y - yi;
+      const u = xf * xf * (3 - 2 * xf);
+      const v = yf * yf * (3 - 2 * yf);
+      const a = hash(xi, yi), b = hash(xi + 1, yi);
+      const c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+      return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+    }
+    function fbm(x, y) {
+      let v = 0, amp = 0.5, freq = 1;
+      for (let i = 0; i < 5; i++) {
+        v += amp * smoothNoise(x * freq, y * freq);
+        freq *= 2.15;
+        amp *= 0.5;
+      }
+      return v;
+    }
+
+    function createGrainBumpTexture(size = 512) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const n = fbm(x / 40, y / 40);
+          const gray = Math.floor(100 + n * 100);
+          const i = (x + y * size) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = gray;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 4);
+      tex.colorSpace = THREE.NoColorSpace;
+      return tex;
+    }
+
+    function fitOrthographicCamera(camera, object, aspect, pad = 1.12) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const halfH = Math.max(size.x, size.y, size.z) * 0.5 * pad;
+      const halfW = halfH * aspect;
+      camera.left = center.x - halfW;
+      camera.right = center.x + halfW;
+      camera.top = center.y + halfH;
+      camera.bottom = center.y - halfH;
+      camera.near = -500;
+      camera.far = 500;
+      camera.position.set(center.x, center.y, 200);
+      camera.lookAt(center);
+      camera.updateProjectionMatrix();
+      return center;
+    }
+
+    function main() {
+      const wrap = document.getElementById('canvasWrap');
+      const W = wrap.clientWidth || 680;
+      const H = wrap.clientHeight || 680;
+
+      const pathEl = document.getElementById('glyphPath');
+      const shape = strokePathToShape(pathEl, HALF_W);
+
+      const extrudeSettings = {
+        depth: 22,
+        bevelEnabled: true,
+        bevelThickness: 10,
+        bevelSize: 10,
+        bevelOffset: 0,
+        bevelSegments: 8,
+        curveSegments: 20
+      };
+
+      const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.computeVertexNormals();
+
+      const bumpMap = createGrainBumpTexture();
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xf5e8d0,
+        roughness: 0.85,
+        metalness: 0,
+        bumpMap,
+        bumpScale: 2.2
+      });
+
+      const mesh = new THREE.Mesh(geom, mat);
+      const scene = new THREE.Scene();
+
+      const box = new THREE.Box3().setFromObject(mesh);
+      const center = box.getCenter(new THREE.Vector3());
+      mesh.position.sub(center);
+      scene.add(mesh);
+
+      const aspect = W / H;
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -500, 500);
+      fitOrthographicCamera(camera, mesh, aspect);
+
+      scene.add(new THREE.HemisphereLight(0xfff6ee, 0xe8ddd0, 0.55));
+      scene.add(new THREE.AmbientLight(0xfff8f0, 0.35));
+
+      // Key light — similar direction to SVG fePointLight (260, 130, 220) in amulet space
+      const key = new THREE.DirectionalLight(0xfff4ea, 1.15);
+      key.position.set(260 - 340, -(130 - 340), 220);
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xf0e8dc, 0.4);
+      fill.position.set(-120, 80, 160);
+      scene.add(fill);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(W, H);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      wrap.appendChild(renderer.domElement);
+
+      renderer.render(scene, camera);
+
+      window.addEventListener('resize', () => {
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight;
+        renderer.setSize(w, h);
+        fitOrthographicCamera(camera, mesh, w / h);
+        renderer.render(scene, camera);
+      });
+    }
+
+    try {
+      main();
+    } catch (e) {
+      document.getElementById('err').textContent = 'Error: ' + e.message;
+      console.error(e);
+    }
+  </script>
+</body>
+</html>

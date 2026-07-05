@@ -97,7 +97,8 @@
     }
     #createBtn:hover { background: #248a42; }
     #createBtn:disabled { opacity: 0.5; cursor: default; }
-    #exportPngBtn {
+    #exportPngBtn,
+    #exportGlbBtn {
       padding: 10px 20px;
       background: #fff;
       color: #222;
@@ -108,8 +109,16 @@
       cursor: pointer;
       font-family: inherit;
     }
-    #exportPngBtn:hover:not(:disabled) { background: #f0f0f0; }
-    #exportPngBtn:disabled { opacity: 0.45; cursor: default; }
+    #exportPngBtn:hover:not(:disabled),
+    #exportGlbBtn:hover:not(:disabled) { background: #f0f0f0; }
+    #exportPngBtn:disabled,
+    #exportGlbBtn:disabled { opacity: 0.45; cursor: default; }
+    .export-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
     .preview {
       display: flex;
       flex-direction: column;
@@ -127,7 +136,18 @@
       min-height: 200px;
     }
     #amuletContainer svg,
-    #amuletContainer canvas { display: block; max-width: 100%; height: auto; }
+    #amuletContainer canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      touch-action: none;
+    }
+    #amuletContainer canvas {
+      cursor: grab;
+    }
+    #amuletContainer canvas:active {
+      cursor: grabbing;
+    }
     .amulet-stack {
       position: relative;
       width: 100%;
@@ -300,7 +320,10 @@
           <text x="340" y="340" text-anchor="middle" fill="#bbb" font-family="monospace" font-size="14">לחצי «צור קמע»</text>
         </svg>
       </div>
-      <button type="button" id="exportPngBtn" disabled>ייצא PNG</button>
+      <div class="export-actions">
+        <button type="button" id="exportPngBtn" disabled>ייצא PNG</button>
+        <button type="button" id="exportGlbBtn" disabled>Save GLB</button>
+      </div>
       <p id="status">—</p>
       <div id="debugList" hidden></div>
     </main>
@@ -2230,7 +2253,7 @@
   let lastComposeCacheKey = '';
   let lastComposeResult = null;
   let pbrRendered = false;
-  const PBR_MODULE_VER = '20250623-basalt-support-v6-micro';
+  const PBR_MODULE_VER = '20250626-glb-export';
   const pbrModulePromise = import('./three-pbr-amulet.js?v=' + PBR_MODULE_VER);
   const shapeModulePromise = import('./amulet-shape-from-text.js');
 
@@ -3372,6 +3395,57 @@
     document.getElementById('exportPngBtn').disabled = !enabled;
   }
 
+  function setExportGlbEnabled(enabled) {
+    document.getElementById('exportGlbBtn').disabled = !enabled;
+  }
+
+  function buildGlbExportFilename() {
+    const date = new Date().toISOString().slice(0, 10);
+    return 'amulet_' + date + '.glb';
+  }
+
+  async function exportAmuletGlb() {
+    const { getActivePbrScene } = await pbrModulePromise;
+    const amuletMesh = getActivePbrScene();
+    if (!amuletMesh) {
+      setStatus('אין קמע תלת־ממדי לייצוא — צרי קמע קודם');
+      return;
+    }
+
+    try {
+      const { GLTFExporter } = await import(
+        'https://esm.sh/three@0.170.0/examples/jsm/exporters/GLTFExporter.js?deps=three@0.170.0'
+      );
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        amuletMesh,
+        (gltf) => {
+          const blob = new Blob([gltf], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = buildGlbExportFilename();
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+            if (a.parentNode) a.parentNode.removeChild(a);
+          }, 200);
+          setStatus('GLB יוצא');
+        },
+        (error) => {
+          setStatus('שגיאת ייצוא GLB: ' + (error?.message || String(error)));
+          console.error('[prototype-v2] glb export:', error);
+        },
+        { binary: true }
+      );
+    } catch (err) {
+      setStatus('שגיאת ייצוא GLB: ' + err.message);
+      console.error('[prototype-v2] glb export:', err);
+    }
+  }
+
   function buildExportFilename() {
     const date = new Date().toISOString().slice(0, 10);
     return 'amulet_questionnaire_' + date + '.png';
@@ -4034,6 +4108,7 @@
     const btn = document.getElementById('createBtn');
     composeBusy = true;
     btn.disabled = true;
+    setExportGlbEnabled(false);
     setStatus('בונה קמע…');
     showRenderSpinner(true);
     updateRenderProgress(0.02, 'בונה SVG…');
@@ -4163,11 +4238,11 @@
             )
           );
         } else {
-          const { renderThreePbrAmulet } = await pbrModulePromise;
+          const { renderThreePbrAmuletInteractive } = await pbrModulePromise;
           const styleBase = questionnaireStyleBase(params);
           renderStats = await withRenderTimeout(
             deferToNextTask(() =>
-              renderThreePbrAmulet({
+              renderThreePbrAmuletInteractive({
                 ...renderOpts,
                 domainHex: ceramicHexFromQ5(params.q5Feeling),
                 ageNum: styleBase.age,
@@ -4201,7 +4276,7 @@
           ? 'תצוגת מתכת · Q1 הטבעה: ' + l3Display + ' · Q4 אליפסה: ' + (Q4_LABELS[params.q4Belief] || params.q4Belief)
           : 'תצוגת מתכת · Q1: ' + l3Display
         : renderStats
-          ? 'PBR 3D · Q2 אבן | Q3 חוטים | Q1 קרמיקה: ' + q1Display
+          ? 'PBR 3D · גררי לסיבוב · Q2 אבן | Q3 חוטים | Q1 קרמיקה: ' + q1Display
           : 'SVG · Q1 קרמיקה: ' + q1Display + ' | מרכז: ' + anchor;
       if (renderFail) msg += ' | PBR נכשל: ' + renderFail;
       if (params.q1Wish) msg += ' · Q1: ' + params.q1Wish.slice(0, 20) + (params.q1Wish.length > 20 ? '…' : '');
@@ -4265,6 +4340,7 @@
       msg += ' | שאלון+slab';
       setStatus(msg);
       pbrRendered = !!(renderStats && renderStats.pbr);
+      setExportGlbEnabled(pbrRendered);
     } catch (err) {
       setStatus('שגיאה: ' + err.message);
       console.error(err);
@@ -4281,6 +4357,7 @@
 
   document.getElementById('createBtn').addEventListener('click', composeAmulet);
   document.getElementById('exportPngBtn').addEventListener('click', exportAmuletPng);
+  document.getElementById('exportGlbBtn').addEventListener('click', exportAmuletGlb);
 
   init();
 })();

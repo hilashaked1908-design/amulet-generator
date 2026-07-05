@@ -4,8 +4,12 @@
 import json
 import os
 import re
+import signal
 import sys
+import time
+import traceback
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import unquote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -177,6 +181,25 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
 
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError):
+            # Browser cancelled a request — not a server crash.
+            pass
+        except Exception:
+            traceback.print_exc()
+            raise
+
+    def log_message(self, format, *args):
+        # Skip noisy health checks from start-server.sh.
+        try:
+            if args and str(args[0]).startswith("GET / "):
+                return
+        except Exception:
+            pass
+        super().log_message(format, *args)
+
     def end_headers(self):
         path = urlparse(self.path).path
         if path.endswith((".js", ".html", ".css")):
@@ -321,6 +344,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(raw)
 
 
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def print_glyphs_startup_info():
     """Print resolved paths and glyph inventory when the server starts."""
     print("=" * 60)
@@ -359,17 +387,33 @@ if __name__ == "__main__":
     print(f"Open editor: http://localhost:{PORT}/editor.html", flush=True)
     print(f"Open prototype: http://localhost:{PORT}/prototype-v2-thick.html", flush=True)
     print("All paths URL-decoded (unquote) for Hebrew filenames", flush=True)
-    try:
-        httpd = HTTPServer(("", PORT), Handler)
-    except OSError as err:
-        if getattr(err, "errno", None) in (48, 98, 10048):
-            print(f"\nPort {PORT} is already in use.")
-            print(f"If another server is running, open: http://localhost:{PORT}/prototype-v2-thick.html")
-            print("To stop the old server: lsof -ti :8080 | xargs kill")
-            sys.exit(1)
-        raise
+    def shutdown(signum, _frame):
+        print(f"\nReceived signal {signum}, shutting down...", flush=True)
+        httpd.shutdown()
+
+    httpd = None
+    for attempt in range(6):
+        try:
+            httpd = ThreadingHTTPServer(("", PORT), Handler)
+            break
+        except OSError as err:
+            if getattr(err, "errno", None) in (48, 98, 10048) and attempt < 5:
+                print(f"Port {PORT} busy, retrying in 2s ({attempt + 1}/5)...", flush=True)
+                time.sleep(2)
+                continue
+            if getattr(err, "errno", None) in (48, 98, 10048):
+                print(f"\nPort {PORT} is already in use.")
+                print(f"If another server is running, open: http://localhost:{PORT}/prototype-v2-thick.html")
+                print("To stop the old server: bash start-server.sh stop")
+                sys.exit(1)
+            raise
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nServer stopped.")
+        print("\nServer stopped.", flush=True)
+    finally:
         httpd.server_close()

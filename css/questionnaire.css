@@ -1,0 +1,4169 @@
+/* Pagmar — Figma node 1322:65279 @ 1920×1080 */
+
+:root {
+  --page-bg: #080808;
+  --ink: #1B1613;
+  --pagmar-content-margin: 20px;
+  --pagmar-margin: var(--pagmar-content-margin);
+  --pagmar-w: 1920;
+  --pagmar-h: 1080;
+  --frame-line: #969696;
+  /* Vector 10 / 11 */
+  --frame-x: 20;
+  --frame-top: 20.41;
+  --frame-w: 1880;
+  --frame-h: 50.055;
+  /* כפתור עליון.svg — Figma @ 1920×1080 */
+  --emblem-w: 164;
+  --emblem-h: 83;
+  --emblem-symbol-w: 52;
+  --emblem-symbol-h: 40;
+  --emblem-x: 878;
+  --emblem-y: 50;
+  /* כפתור פילטר.svg — Figma @ 1920×1080 */
+  --filter-btn-w: 53;
+  --filter-btn-h: 48;
+  --filter-btn-x: 1847;
+  --filter-btn-y: 67;
+  /* grid */
+  --grid-x: -62.85;
+  --grid-y: -130.45;
+  --grid-w: 2675.2;
+  --grid-h: 1229.638;
+  /* step indicators — Figma @ x1530 y1012.71 (1547 − 17px), gap 44.34 */
+  --step-size: 27.841;
+  --step-gap: 44.34;
+  --step-y: 1012.71;
+  /* מסגרת תחתונה — Figma y=1008.71 (כוכבים נשארים ב-y1012.71) */
+  --frame-bottom: 1008.71;
+  --step-x1: 1530;
+  --step-x2: 1574.34;
+  --step-x3: 1618.68;
+  --step-x4: 1663.02;
+  --step-x5: 1707.36;
+  --step-x6: 1751.7;
+  --step-x7: 1796.04;
+  --step-x8: 1840.38;
+  /* inner stage — מעל הכוכבים התחתונים */
+  --stage-top: 70;
+  --stage-bottom-gap: 73;
+  /* Component 10 — question panel (Figma 1357:65705) */
+  --qf-anchor-x: 1025.701;
+  --qf-anchor-y: 350.515;
+  --question-comp-w: 653.865;
+  --question-comp-h: 394.033;
+  --question-star-size: 61.721;
+  --question-star-x: 592.14;
+  --question-shell-x: 571;
+  --question-shell-y: 31;
+  --question-shell-w: 621.449;
+  --question-shell-h: 362.564;
+  --question-frame-line: #222;
+  --question-open-duration: 1.05s;
+  --question-open-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* נקודת התרחבות — פינה שמאלית-תחתונה של הכוכב ביחס ל-shell */
+  --question-clip-origin-x: calc(var(--question-star-x) - var(--question-shell-x));
+  --question-clip-origin-y: calc(var(--question-star-size) - var(--question-shell-y));
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: "DavidLibre", "Ratzif22", "David", "Times New Roman", serif;
+  background: var(--page-bg);
+  color: #e8e8e8;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.is-modal-open {
+  overflow: hidden;
+}
+
+/* --- Pagmar canvas @ 1920×1080 --- */
+
+.pagmar-viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--pagmar-margin);
+  background: var(--page-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.pagmar-canvas {
+  container-type: inline-size;
+  position: relative;
+  width: min(
+    calc(100vw - var(--pagmar-margin) * 2),
+    calc((100dvh - var(--pagmar-margin) * 2) * var(--pagmar-w) / var(--pagmar-h)),
+    calc(var(--pagmar-w) * 1px)
+  );
+  aspect-ratio: 1920 / 1080;
+  max-height: calc(100dvh - var(--pagmar-margin) * 2);
+  overflow: hidden;
+  background: var(--page-bg);
+  --u: calc(100cqw / var(--pagmar-w));
+}
+
+.pagmar__grid {
+  position: absolute;
+  z-index: 0;
+  left: calc(var(--grid-x) * var(--u));
+  top: calc(var(--grid-y) * var(--u));
+  width: calc(var(--grid-w) * var(--u));
+  height: calc(var(--grid-h) * var(--u));
+  pointer-events: none;
+  user-select: none;
+  object-fit: fill;
+}
+
+.pagmar__frame {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--frame-x) * var(--u));
+  width: calc(var(--frame-w) * var(--u));
+  height: calc(var(--frame-h) * var(--u));
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__frame--top {
+  top: calc(var(--frame-top) * var(--u));
+}
+
+.pagmar__frame--bottom {
+  top: calc(var(--frame-bottom) * var(--u));
+}
+
+.pagmar__steps {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pagmar__step {
+  position: absolute;
+  top: calc(var(--step-y) * var(--u));
+  width: calc(var(--step-size) * var(--u));
+  height: calc(var(--step-size) * var(--u));
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pagmar__step img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__step:hover {
+  transform: scale(1.06);
+}
+
+.pagmar__step--answered {
+  opacity: 0.55;
+}
+
+.pagmar__step:focus-visible {
+  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline-offset: calc(2 * var(--u));
+}
+
+.pagmar__step:nth-child(1) { left: calc(var(--step-x1) * var(--u)); }
+.pagmar__step:nth-child(2) { left: calc(var(--step-x2) * var(--u)); }
+.pagmar__step:nth-child(3) { left: calc(var(--step-x3) * var(--u)); }
+.pagmar__step:nth-child(4) { left: calc(var(--step-x4) * var(--u)); }
+.pagmar__step:nth-child(5) { left: calc(var(--step-x5) * var(--u)); }
+.pagmar__step:nth-child(6) { left: calc(var(--step-x6) * var(--u)); }
+.pagmar__step:nth-child(7) { left: calc(var(--step-x7) * var(--u)); }
+.pagmar__step:nth-child(8) { left: calc(var(--step-x8) * var(--u)); }
+
+.pagmar__emblem {
+  position: absolute;
+  z-index: 5;
+  left: calc(var(--emblem-x) * var(--u));
+  top: calc(var(--emblem-y) * var(--u));
+  width: calc(var(--emblem-w) * var(--u));
+  height: calc(var(--emblem-h) * var(--u));
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.pagmar__emblem-art,
+.pagmar__emblem img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__emblem-art {
+  border: none;
+  overflow: visible;
+}
+
+.pagmar__emblem:focus-visible {
+  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline-offset: calc(2 * var(--u));
+}
+
+.pagmar__stage {
+  position: absolute;
+  z-index: 3;
+  left: calc(var(--frame-x) * var(--u));
+  width: calc(var(--frame-w) * var(--u));
+  top: calc(var(--stage-top) * var(--u));
+  bottom: calc(var(--stage-bottom-gap) * var(--u));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pagmar__garden {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pagmar__garden.is-dragging {
+  cursor: grabbing;
+}
+
+body.is-panel-open .pagmar__garden {
+  pointer-events: none;
+  cursor: default;
+}
+
+body.is-spec-panel-open .pagmar__garden {
+  pointer-events: auto;
+  cursor: default;
+}
+
+/* finished amulet — interactive 3D on same page */
+body.is-amulet-ready .pagmar__emblem:not(.pagmar__emblem--create),
+body.is-amulet-ready .pagmar__garden {
+  display: none !important;
+}
+
+body.is-amulet-ready .pagmar__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--u));
+  overflow: visible;
+  pointer-events: auto;
+}
+
+body.is-amulet-ready .result__amulet {
+  width: min(72cqw, calc(420 * var(--u)));
+  height: min(72cqw, calc(420 * var(--u)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.is-amulet-ready .result__amulet canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+body.is-amulet-ready .result__amulet canvas:active {
+  cursor: grabbing;
+}
+
+body.is-amulet-ready .result__status[hidden] {
+  display: none;
+}
+
+body.is-amulet-ready .result__status:not([hidden]) {
+  display: block;
+}
+
+.pagmar__star {
+  position: absolute;
+  z-index: 2;
+  width: calc(var(--question-star-size) * var(--u));
+  height: calc(var(--question-star-size) * var(--u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  line-height: 0;
+  will-change: left, top;
+  transition: filter 0.25s ease;
+}
+
+.pagmar__star img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 0 calc(6 * var(--u)) rgba(150, 150, 150, 0.2));
+}
+
+.pagmar__star:hover,
+.pagmar__star:focus-visible {
+  filter: brightness(1.12);
+}
+
+.pagmar__star.is-paused img {
+  filter: drop-shadow(0 0 calc(8 * var(--u)) rgba(150, 150, 150, 0.35));
+}
+
+.pagmar__star:focus-visible {
+  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline-offset: calc(3 * var(--u));
+}
+
+/* --- In-canvas question frame (Figma Component 10) --- */
+
+.pagmar__question-frame {
+  position: absolute;
+  z-index: 6;
+  left: calc(
+    (var(--qf-anchor-x) - var(--question-star-x) - var(--question-star-size) / 2) * var(--u)
+  );
+  top: calc((var(--qf-anchor-y) - var(--question-star-size) / 2) * var(--u));
+  width: calc(var(--question-comp-w) * var(--u));
+  height: calc(var(--question-comp-h) * var(--u));
+  pointer-events: none;
+}
+
+.pagmar__question-frame.is-open {
+  pointer-events: auto;
+}
+
+.pagmar__question-frame-star {
+  position: absolute;
+  left: calc(var(--question-star-x) * var(--u));
+  top: 0;
+  z-index: 3;
+  width: calc(var(--question-star-size) * var(--u));
+  height: calc(var(--question-star-size) * var(--u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.pagmar__question-frame.is-open .pagmar__question-frame-star {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pagmar__question-frame-star img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Clip grows from star bottom-left into final shell position */
+.pagmar__question-clip {
+  position: absolute;
+  left: calc(var(--question-shell-x) * var(--u));
+  top: calc(var(--question-shell-y) * var(--u));
+  width: calc(var(--question-shell-w) * var(--u));
+  height: calc(var(--question-shell-h) * var(--u));
+  overflow: hidden;
+  transform: scale(0);
+  transform-origin: calc(var(--question-clip-origin-x) * var(--u))
+    calc(var(--question-clip-origin-y) * var(--u));
+  transition: transform var(--question-open-duration) var(--question-open-ease);
+}
+
+.pagmar__question-frame.is-open .pagmar__question-clip {
+  transform: scale(1);
+}
+
+.pagmar__question-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--question-shell-w) * var(--u));
+  height: calc(var(--question-shell-h) * var(--u));
+}
+
+.pagmar__question-panel-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__question-panel-inner {
+  position: absolute;
+  top: calc(52 * var(--u));
+  right: calc(48 * var(--u));
+  bottom: calc(34 * var(--u));
+  left: calc(48 * var(--u));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pagmar__question-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(10 * var(--u));
+  margin-bottom: calc(14 * var(--u));
+  flex-shrink: 0;
+}
+
+.pagmar__question-num {
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.75rem, calc(18 * var(--u)));
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.pagmar__question-text {
+  width: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(1rem, calc(32 * var(--u)));
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-align: right;
+}
+
+.pagmar__question-field {
+  flex: 1 1 auto;
+  min-height: calc(128.78 * var(--u));
+  display: flex;
+  flex-direction: column;
+}
+
+.pagmar__question-field .intro__question-input {
+  width: 100%;
+  height: 100%;
+  min-height: calc(128.78 * var(--u));
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.85rem, calc(16 * var(--u)));
+  line-height: 1.4;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border: 1px solid #222;
+  background: #080808;
+  color: #f1f1f1;
+  resize: none;
+}
+
+.pagmar__question-field .intro__question-input--single {
+  min-height: calc(48 * var(--u));
+  height: auto;
+}
+
+.pagmar__question-field .intro__choice-row {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+  overflow: auto;
+  height: 100%;
+}
+
+.pagmar__question-field .intro__choice-btn {
+  font-size: max(0.82rem, calc(14 * var(--u)));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+}
+
+.pagmar__question-save {
+  position: relative;
+  align-self: flex-start;
+  margin-top: calc(16 * var(--u));
+  width: calc(142.296 * var(--u));
+  height: calc(34.215 * var(--u));
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.pagmar__question-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pagmar__question-save-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.pagmar__question-save-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.7rem, calc(18 * var(--u)));
+  line-height: 0.8;
+  color: #f1f1f1;
+  pointer-events: none;
+}
+
+.pagmar__question-save:hover:not(:disabled) .pagmar__question-save-label {
+  color: #fff;
+}
+
+.pagmar-canvas:has(.pagmar__question-frame.is-open) .pagmar__garden {
+  opacity: 1;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* --- Result page stage (centered content) --- */
+
+.pagmar-canvas--result .pagmar__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--u));
+  overflow: visible;
+  pointer-events: auto;
+}
+
+body.result-page {
+  overflow: hidden;
+}
+
+/* --- Legacy fullscreen modal (unused on intro) --- */
+
+.result__amulet {
+  width: min(72cqw, calc(420 * var(--u)));
+  height: min(72cqw, calc(420 * var(--u)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result__amulet canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.result__status {
+  color: rgba(241, 241, 241, 0.45);
+  font-size: max(0.75rem, calc(11 * var(--u)));
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.result__status[hidden] {
+  display: none;
+}
+
+/* --- Modal dialog --- */
+
+.intro-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.intro-modal.is-visible {
+  pointer-events: auto;
+}
+
+.intro-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.72);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.28s ease;
+}
+
+.intro-modal.is-visible .intro-modal__backdrop {
+  opacity: 1;
+}
+
+.intro-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(400px, calc(100vw - 48px));
+  max-height: min(88vh, 640px);
+  overflow: auto;
+  padding: 24px 24px 20px;
+  background: rgba(8, 8, 8, 0.97);
+  border: 1px solid rgba(241, 241, 241, 0.16);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+}
+
+.intro-modal.is-visible .intro-modal__dialog {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.intro__question-label {
+  display: block;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(241, 241, 241, 0.45);
+  margin-bottom: 10px;
+}
+
+.intro__question-text {
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: #ececec;
+  margin-bottom: 14px;
+}
+
+.intro__question-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(241, 241, 241, 0.18);
+  background: rgba(0, 0, 0, 0.45);
+  color: #f5f5f5;
+  font: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.45;
+}
+
+.intro__question-input--single {
+  min-height: 0;
+  resize: none;
+}
+
+.intro__question-input::placeholder {
+  color: rgba(241, 241, 241, 0.28);
+}
+
+.intro__question-input:focus {
+  outline: none;
+  border-color: rgba(241, 241, 241, 0.35);
+}
+
+.intro__choice-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.intro__choice-btn {
+  padding: 10px 12px;
+  border: 1px solid rgba(241, 241, 241, 0.18);
+  background: transparent;
+  color: #e8e8e8;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: right;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.intro__choice-btn:hover {
+  border-color: rgba(241, 241, 241, 0.32);
+}
+
+.intro__choice-btn.is-selected {
+  border-color: rgba(241, 241, 241, 0.5);
+  background: rgba(241, 241, 241, 0.08);
+}
+
+.intro__question-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.intro__question-next {
+  padding: 8px 18px;
+  border: 1px solid rgba(241, 241, 241, 0.22);
+  background: transparent;
+  color: #eee;
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.intro__question-next:hover:not(:disabled) {
+  background: rgba(241, 241, 241, 0.06);
+  border-color: rgba(241, 241, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --question-open-duration: 0.25s;
+  }
+
+  .pagmar__question-clip {
+    transition: transform var(--question-open-duration) ease;
+  }
+
+  .pagmar__star {
+    will-change: auto;
+  }
+}
+
+/* --- 3D viewer page --- */
+
+body.viewer-page {
+  overflow: hidden;
+}
+
+.viewer__stage {
+  gap: calc(8 * var(--u));
+  pointer-events: auto;
+}
+
+.viewer__amulet {
+  width: min(78cqw, calc(520 * var(--u)));
+  height: min(78cqw, calc(520 * var(--u)));
+}
+
+.viewer__hint {
+  color: rgba(150, 150, 150, 0.72);
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.72rem, calc(11 * var(--u)));
+  letter-spacing: 0.06em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.viewer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8 * var(--u));
+  justify-content: center;
+}
+
+.viewer__btn {
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  border: 1px solid rgba(150, 150, 150, 0.35);
+  background: rgba(8, 8, 8, 0.6);
+  color: #e0e0e0;
+  font: inherit;
+  font-size: max(0.75rem, calc(10 * var(--u)));
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.viewer__btn:hover {
+  border-color: rgba(200, 200, 200, 0.5);
+  background: rgba(20, 20, 20, 0.75);
+}
+
+.viewer__btn--link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.result__viewer-link-wrap {
+  text-align: center;
+}
+
+.result__viewer-link {
+  color: rgba(150, 150, 150, 0.85);
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.72rem, calc(11 * var(--u)));
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
+.result__viewer-link:hover {
+  color: #e0e0e0;
+}
+
+/* 3D viewer — fixed top bar, impossible to miss */
+.viewer-cta {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 100000;
+  transform: translateX(-50%);
+  display: inline-block;
+  padding: 14px 32px;
+  border: 2px solid #f1f1f1;
+  background: #f1f1f1;
+  color: #080808;
+  font-family: "Ratzif22", "DavidLibre", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.65);
+}
+
+.viewer-cta:hover {
+  background: #fff;
+  border-color: #fff;
+}
+
+.viewer-cta[hidden] {
+  display: none !important;
+}
+
+/* legacy bottom bar */
+.result-viewer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  padding: 0 20px;
+  pointer-events: none;
+}
+
+.result-viewer-bar__link {
+  pointer-events: auto;
+  padding: 12px 28px;
+  border: 1px solid rgba(241, 241, 241, 0.55);
+  background: rgba(8, 8, 8, 0.94);
+  color: #f1f1f1;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.result-viewer-bar__link:hover {
+  border-color: #f1f1f1;
+  background: rgba(24, 24, 24, 0.98);
+}
+
+/* legacy in-canvas CTA (unused) */
+.pagmar__viewer-cta {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: calc(12 * var(--u));
+  transform: translateX(-50%);
+  padding: calc(10 * var(--u)) calc(22 * var(--u));
+  border: 1px solid rgba(241, 241, 241, 0.42);
+  background: rgba(8, 8, 8, 0.88);
+  color: #f1f1f1;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.8rem, calc(14 * var(--u)));
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  white-space: nowrap;
+  pointer-events: auto;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.pagmar__viewer-cta:hover {
+  border-color: rgba(241, 241, 241, 0.65);
+  background: rgba(20, 20, 20, 0.95);
+}
+
+.pagmar__viewer-cta[hidden] {
+  display: none;
+}
+
+/* ============================================================
+   Index page — Figma 1412:12 light garden
+   ============================================================ */
+
+/* Site intro — Figma Frame 225 (1763:26756), Cyber Garden enter pattern */
+body.pagmar-index.is-site-intro-open {
+  overflow: hidden;
+}
+
+.pagmar__site-intro {
+  --intro-w: 930;
+  --intro-h: 638;
+  --intro-u: min(calc((100vw - 40px) / var(--intro-w)), 1px);
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  cursor: pointer;
+  background: rgba(248, 248, 247, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 1;
+  transition: opacity 420ms cubic-bezier(0.33, 0, 0.2, 1);
+}
+
+.pagmar__site-intro[hidden] {
+  display: none;
+}
+
+.pagmar__site-intro.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pagmar__site-intro__card {
+  position: relative;
+  width: min(calc(var(--intro-w) * 1px), calc(100vw - 48px));
+  min-height: min(calc(var(--intro-h) * var(--intro-u)), calc(100dvh - 48px));
+  box-sizing: border-box;
+  padding:
+    calc(58 * var(--intro-u))
+    calc(95 * var(--intro-u))
+    calc(60 * var(--intro-u));
+  background: #ededeb;
+  border: 1px solid #ccc8c0;
+  border-radius: 4px;
+  box-shadow: 7px 7px 7px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pagmar__site-intro__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(19 * var(--intro-u));
+  width: min(100%, calc(596 * var(--intro-u)));
+  margin: 0 auto calc(42 * var(--intro-u));
+  text-align: center;
+}
+
+.pagmar__site-intro__head-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(8 * var(--intro-u));
+  width: 100%;
+}
+
+.pagmar__site-intro__hint {
+  margin: 0;
+  width: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.9rem, calc(18 * var(--intro-u)));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: calc(-0.36 * var(--intro-u));
+  color: #000;
+}
+
+.pagmar__site-intro__title {
+  margin: 0;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(1.85rem, calc(42 * var(--intro-u)));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: calc(-0.84 * var(--intro-u));
+  color: #0b0b0b;
+  white-space: nowrap;
+}
+
+.pagmar__site-intro__lead {
+  margin: 0;
+  width: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.95rem, calc(24 * var(--intro-u)));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: calc(-0.48 * var(--intro-u));
+  color: #000;
+}
+
+.pagmar__site-intro__columns {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  justify-content: center;
+  gap: calc(60 * var(--intro-u));
+  width: 100%;
+  border-top: 1px solid #808080;
+  padding-top: calc(30 * var(--intro-u));
+}
+
+.pagmar__site-intro__col {
+  flex: 0 1 calc(340 * var(--intro-u));
+  width: min(100%, calc(340 * var(--intro-u)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(13 * var(--intro-u));
+  text-align: center;
+}
+
+.pagmar__site-intro__col-title {
+  margin: 0;
+  padding: calc(10 * var(--intro-u));
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(1.25rem, calc(32 * var(--intro-u)));
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: calc(-0.64 * var(--intro-u));
+  color: #0b0b0b;
+  white-space: nowrap;
+}
+
+.pagmar__site-intro__col-text {
+  margin: 0;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.95rem, calc(24 * var(--intro-u)));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: calc(-0.48 * var(--intro-u));
+  color: #000;
+}
+
+.pagmar__site-intro__thumbs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: calc(16 * var(--intro-u));
+}
+
+.pagmar__site-intro__thumbs img {
+  display: block;
+  width: calc(100 * var(--intro-u));
+  height: calc(100 * var(--intro-u));
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__site-intro__diagram {
+  position: relative;
+  width: 100%;
+  min-height: calc(105 * var(--intro-u));
+  margin-top: calc(16 * var(--intro-u));
+}
+
+.pagmar__site-intro__diagram-label {
+  position: absolute;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.8rem, calc(18 * var(--intro-u)));
+  line-height: 1.1;
+  letter-spacing: calc(-0.36 * var(--intro-u));
+  color: #000;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pagmar__site-intro__diagram-label--click {
+  right: calc(52 * var(--intro-u));
+  top: calc(1 * var(--intro-u));
+  width: calc(114 * var(--intro-u));
+}
+
+.pagmar__site-intro__diagram-label--hold {
+  right: calc(52 * var(--intro-u));
+  top: calc(82 * var(--intro-u));
+  width: calc(90 * var(--intro-u));
+}
+
+.pagmar__site-intro__diagram-label--move {
+  left: calc(1 * var(--intro-u));
+  top: calc(82 * var(--intro-u));
+  width: calc(90 * var(--intro-u));
+}
+
+.pagmar__site-intro__diagram-arrow {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__site-intro__diagram-arrow--vertical {
+  right: calc(99 * var(--intro-u));
+  top: calc(28 * var(--intro-u));
+  width: calc(13 * var(--intro-u));
+  height: calc(43 * var(--intro-u));
+}
+
+.pagmar__site-intro__diagram-arrow--horizontal {
+  right: calc(20 * var(--intro-u));
+  top: calc(86 * var(--intro-u));
+  width: calc(44 * var(--intro-u));
+  height: calc(13 * var(--intro-u));
+}
+
+@media (max-width: 860px) {
+  .pagmar__site-intro__columns {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pagmar__site-intro__title {
+    white-space: normal;
+  }
+
+  .pagmar__site-intro__col-title {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__site-intro {
+    transition-duration: 0.15s;
+  }
+}
+
+body.pagmar-index {
+  --page-bg: #000000;
+  --index-chrome-accent: #ffffff;
+  --index-chrome-line: #ffffff;
+  --index-filter-bg: #131415;
+  --index-ink: var(--ink);
+  --index-transition-duration: 300ms;
+  --index-transition-ease: cubic-bezier(0.42, 0, 0.58, 1);
+  --index-create-transition-duration: 520ms;
+  --index-create-transition-ease: cubic-bezier(0.33, 0, 0.2, 1);
+  background: #000000;
+  color: var(--ink);
+  overflow: hidden;
+  transition:
+    background var(--index-create-transition-duration) var(--index-create-transition-ease),
+    color var(--index-create-transition-duration) var(--index-create-transition-ease);
+}
+
+body.pagmar-index .pagmar-viewport {
+  padding: var(--pagmar-content-margin);
+  background: transparent;
+  width: 100vw;
+  height: 100dvh;
+  box-sizing: border-box;
+}
+
+body.pagmar-index .pagmar-canvas {
+  container-type: inline-size;
+  position: relative;
+  width: min(
+    calc(100vw - var(--pagmar-content-margin) * 2),
+    calc((100dvh - var(--pagmar-content-margin) * 2) * var(--pagmar-w) / var(--pagmar-h)),
+    calc(var(--pagmar-w) * 1px)
+  );
+  aspect-ratio: 1920 / 1080;
+  max-height: calc(100dvh - var(--pagmar-content-margin) * 2);
+  max-width: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  --u: calc(100cqw / var(--pagmar-w));
+  --index-u: var(--u);
+  /* Figma 2127:3662 — chrome coords (viewport padding supplies outer ~20px margin) */
+  --index-chrome-margin: 0;
+  --index-chrome-top: calc(1.361 * var(--index-u));
+  --index-cta-left: calc(838 * var(--index-u));
+  --index-cta-bottom: calc(39.883 * var(--index-u));
+  --index-filter-sidebar-right: calc(47 * var(--index-u));
+  --index-filter-sidebar-top: calc(47 * var(--index-u));
+  --index-filter-column-width: calc(296 * var(--index-u));
+  --index-filter-stack-gap: calc(80 * var(--index-u));
+  --index-filter-item-gap: calc(6 * var(--index-u));
+  /* Figma 2266:22459 Frame 336 — glass column 460px, full-bleed right/top/bottom */
+  --index-filter-glass-width: calc(460 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  display: block;
+}
+
+body.pagmar-index > .pagmar__stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  display: block;
+  opacity: 0;
+  transition: opacity 520ms ease;
+}
+
+body.pagmar-index .pagmar__atmosphere--back {
+  z-index: 0;
+  background: #000000;
+}
+
+body.pagmar-index .pagmar__depth-rim {
+  display: none;
+}
+
+body.pagmar-index .pagmar__atmosphere--fallback {
+  background:
+    radial-gradient(ellipse 120% 95% at 50% 52%, #000000 0%, #050505 28%, #0a0a0a 52%, #111111 76%, #1a1a1a 100%),
+    #000000;
+  background-size: cover;
+}
+
+body.pagmar-index .pagmar-viewport {
+  position: relative;
+  z-index: 1;
+}
+
+body.pagmar-index .pagmar__stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100dvh;
+  overflow: visible;
+  pointer-events: none;
+}
+
+body.pagmar-index #grid-bg {
+  display: none;
+}
+
+body.pagmar-index .pagmar__garden canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100vw !important;
+  height: 100dvh !important;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+body.pagmar-index .pagmar__garden {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100dvh;
+  overflow: visible;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  background: transparent;
+  opacity: 1;
+  transition: opacity 700ms var(--index-transition-ease, ease);
+}
+
+body.pagmar-index .pagmar__figma-field {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  --garden-u: calc(100vw / var(--pagmar-w));
+  margin-left: calc(-960 * var(--garden-u));
+  width: calc(1920 * var(--garden-u));
+  height: calc(1080 * var(--garden-u));
+  will-change: transform;
+}
+
+body.pagmar-index .pagmar__figma-amulet-wrap {
+  position: absolute;
+  z-index: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(49.52 * var(--garden-u, var(--u)));
+  line-height: 0;
+}
+
+body.pagmar-index .pagmar__figma-amulet {
+  position: relative;
+  display: block;
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+  transition: transform 0.22s ease;
+}
+
+body.pagmar-index .pagmar__figma-amulet-label {
+  display: block;
+  width: 100%;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(1rem, calc(34.045 * var(--garden-u, var(--u))));
+  font-weight: 400;
+  line-height: 0.8;
+  letter-spacing: calc(-0.68 * var(--garden-u, var(--u)));
+  color: #383838;
+  text-align: center;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__figma-amulet-wrap.is-selected .pagmar__figma-amulet {
+  filter: brightness(1.03);
+}
+
+body.pagmar-index .pagmar__garden.is-dragging {
+  cursor: grabbing;
+}
+
+body.pagmar-index.is-panel-open .pagmar__garden {
+  pointer-events: none;
+  cursor: default;
+}
+
+body.pagmar-index.is-spec-panel-open .pagmar__garden {
+  pointer-events: auto;
+  cursor: default;
+}
+
+/* index frame borders — Figma Group 60 */
+body.pagmar-index .pagmar__index-frame {
+  position: absolute;
+  z-index: 90;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(1880 * var(--index-u)), calc(100% - calc(40 * var(--index-u))));
+  pointer-events: none;
+  line-height: 0;
+}
+
+body.pagmar-index .pagmar__index-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+body.pagmar-index .pagmar__index-frame--top {
+  top: 0;
+}
+
+body.pagmar-index .pagmar__index-frame--bottom {
+  bottom: 0;
+}
+
+/* filter + chrome — Figma 2127:3662 */
+body.pagmar-index .pagmar__index-about {
+  position: absolute;
+  z-index: 110;
+  left: var(--index-chrome-margin);
+  top: var(--index-chrome-top);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: calc(116.602 * var(--index-u));
+  min-height: calc(23.488 * var(--index-u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--index-chrome-accent);
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(24 * var(--index-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 110%;
+  letter-spacing: calc(-0.72 * var(--index-u));
+  text-align: right;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-about__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  direction: rtl;
+  text-align: right;
+}
+
+body.pagmar-index .pagmar__index-about:hover,
+body.pagmar-index .pagmar__index-filter-trigger:hover {
+  opacity: 0.82;
+}
+
+body.pagmar-index .pagmar__index-type-target,
+body.pagmar-index .pagmar__index-filter-item {
+  font-variant-ligatures: none;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+body.pagmar-index .pagmar__index-type-target {
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-type-target.is-typing,
+body.pagmar-index .pagmar__index-filter-item.is-typing {
+  display: block;
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  min-height: calc(25 * var(--index-u));
+  width: var(--type-full-width, auto);
+  min-width: var(--type-full-width, auto);
+  max-width: 100%;
+}
+
+body.pagmar-index .pagmar__index-about__label.is-typing,
+body.pagmar-index .pagmar__index-filter-item.is-typing {
+  width: 100%;
+}
+
+body.pagmar-index .pagmar__index-cta-pill__label.is-typing {
+  width: var(--type-full-width, auto);
+  max-width: 100%;
+}
+
+body.pagmar-index .pagmar__index-type-target.is-typing,
+body.pagmar-index .pagmar__index-filter-item.is-typing {
+  opacity: 1;
+}
+
+body.pagmar-index .pagmar__index-about:active {
+  opacity: 0.68;
+}
+
+body.pagmar-index .pagmar__index-about:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(3 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-sidebar {
+  position: absolute;
+  z-index: 110;
+  right: var(--index-filter-sidebar-right);
+  top: var(--index-filter-sidebar-top);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--index-filter-stack-gap);
+  width: var(--index-filter-column-width);
+  max-height: calc(75 * var(--index-u));
+  overflow: hidden;
+  pointer-events: auto;
+  direction: ltr;
+  isolation: isolate;
+  transition: max-height var(--index-transition-duration) var(--index-transition-ease);
+}
+
+/* Figma 2266:22459 — glass full-bleed on viewport right/top/bottom (over content margins) */
+body.pagmar-index .pagmar__index-filter-sidebar::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--index-filter-glass-width);
+  background: rgba(19, 20, 21, 0.4);
+  backdrop-filter: blur(calc(20 * var(--index-u)));
+  -webkit-backdrop-filter: blur(calc(20 * var(--index-u)));
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__index-filter-sidebar.is-expanded {
+  max-height: calc(
+    100% - var(--index-filter-sidebar-top) - var(--index-cta-bottom) - calc(55 * var(--index-u))
+  );
+  overflow: visible;
+}
+
+body.pagmar-index .pagmar__index-filter-sidebar.is-expanded::before {
+  opacity: 1;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 calc(50 * var(--index-u));
+  width: calc(50 * var(--index-u));
+  height: calc(50 * var(--index-u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger:active {
+  opacity: 0.68;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(3 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-sidebar.is-expanded .pagmar__index-filter-wrap {
+  pointer-events: auto;
+}
+
+body.pagmar-index .pagmar__index-filter-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 1 1 auto;
+  gap: var(--index-filter-item-gap);
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+body.pagmar-index .pagmar__index-filter-list::-webkit-scrollbar {
+  width: calc(4 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-list::-webkit-scrollbar-thumb {
+  border-radius: calc(4 * var(--index-u));
+  background: rgba(255, 255, 255, 0.35);
+}
+
+body.pagmar-index .pagmar__index-filter-item {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: calc(25 * var(--index-u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--index-chrome-accent);
+  font-family: "TheBasics", sans-serif;
+  font-size: calc(24 * var(--index-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 110%;
+  letter-spacing: calc(-0.48 * var(--index-u));
+  direction: rtl;
+  text-align: right;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-filter-item--mono {
+  font-family: "TheBasics Mono", "TheBasics", monospace;
+  letter-spacing: 0;
+}
+
+body.pagmar-index .pagmar__index-filter-list.is-typing .pagmar__index-filter-item.is-typed,
+body.pagmar-index .pagmar__index-filter-list.is-typing .pagmar__index-filter-item:not(.is-typed):not(:empty) {
+  opacity: 1;
+}
+
+body.pagmar-index .pagmar__index-filter-list:not(.is-typing) .pagmar__index-filter-item {
+  opacity: 1;
+}
+
+body.pagmar-index .pagmar__index-filter-list.is-typing .pagmar__index-filter-item:empty {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-list.is-typing .pagmar__index-filter-item:not(.is-typed) {
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-item:hover {
+  opacity: 0.82;
+}
+
+body.pagmar-index .pagmar__index-filter-item:active {
+  opacity: 0.68;
+}
+
+body.pagmar-index .pagmar__index-filter-item:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(2 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-item.is-active {
+  color: var(--index-chrome-accent);
+}
+
+body.pagmar-index .pagmar__index-filter-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(16 * var(--index-u));
+  flex: 0 0 auto;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-head {
+  gap: calc(36 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-close {
+  display: none;
+  flex: 0 0 auto;
+  width: calc(16.119 * var(--index-u));
+  height: calc(22.235 * var(--index-u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar:not(.is-expanded) {
+  max-height: calc(180 * var(--index-u));
+  overflow: visible;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar.is-expanded {
+  max-height: calc(
+    100% - var(--index-filter-sidebar-top) - var(--index-cta-bottom) - calc(55 * var(--index-u))
+  );
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-close:not([hidden]) {
+  display: block;
+}
+
+body.pagmar-index .pagmar__index-filter-close img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-close:hover {
+  opacity: 0.82;
+}
+
+body.pagmar-index .pagmar__index-filter-close:active {
+  opacity: 0.68;
+}
+
+body.pagmar-index .pagmar__index-filter-close:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(2 * var(--index-u));
+}
+
+/* Filter page (עמוד פילטר) — Figma 2295:28985 grid */
+body.pagmar-index.is-filter-page .pagmar__garden {
+  pointer-events: none;
+  cursor: default;
+}
+
+body.pagmar-index.is-filter-page .pagmar__garden canvas {
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-active {
+  position: relative;
+  z-index: 1;
+  display: none;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(8 * var(--index-u));
+  width: 100%;
+  max-width: 100%;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-active:not([hidden]) {
+  display: flex;
+}
+
+body.pagmar-index .pagmar__index-filter-active-tag {
+  font-family: "TheBasics", sans-serif;
+  font-size: calc(24 * var(--index-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 110%;
+  letter-spacing: calc(-0.48 * var(--index-u));
+  color: var(--index-chrome-accent);
+  white-space: nowrap;
+}
+
+body.pagmar-index .pagmar__index-filter-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 240;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-card {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: visible;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-filter-card:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(2 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-filter-card-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* Old localStorage JPEG/WebP snapshots had no alpha — black fills transparent areas */
+body.pagmar-index .pagmar__index-filter-card-img--legacy {
+  mix-blend-mode: lighten;
+}
+
+body.pagmar-index .pagmar__index-filter-card-corner {
+  position: absolute;
+  z-index: 2;
+  width: calc(25.928 * var(--index-u));
+  height: calc(25.924 * var(--index-u));
+  box-sizing: border-box;
+  pointer-events: none;
+  border-color: #ffffff;
+  border-style: solid;
+  border-width: 0;
+  opacity: 0.5;
+}
+
+body.pagmar-index .pagmar__index-filter-card-corner--tl {
+  left: calc(1.565 * var(--index-u));
+  top: calc(1.566 * var(--index-u));
+  border-left-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-index .pagmar__index-filter-card-corner--tr {
+  right: calc(1.565 * var(--index-u));
+  top: calc(1.566 * var(--index-u));
+  border-right-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-index .pagmar__index-filter-card-corner--bl {
+  left: calc(1.565 * var(--index-u));
+  bottom: calc(1 * var(--index-u));
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+}
+
+body.pagmar-index .pagmar__index-filter-card-corner--br {
+  right: calc(1.565 * var(--index-u));
+  bottom: calc(1 * var(--index-u));
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+body.pagmar-index .pagmar__index-filter-card-label {
+  position: absolute;
+  z-index: 3;
+  top: calc(20 * var(--index-u));
+  right: calc(20 * var(--index-u));
+  left: auto;
+  min-width: calc(39 * var(--index-u));
+  padding: calc(4 * var(--index-u));
+  background: #ffffff;
+  font-family: "TheBasics", sans-serif;
+  font-size: calc(18 * var(--index-u));
+  line-height: 1.05;
+  color: #161616;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 160ms ease;
+}
+
+body.pagmar-index .pagmar__index-filter-card:hover .pagmar__index-filter-card-label,
+body.pagmar-index .pagmar__index-filter-card:focus-visible .pagmar__index-filter-card-label {
+  opacity: 1;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-cta-pill,
+body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar {
+  z-index: 300;
+}
+
+/* CTA — Figma 2127:3662 Component 15 */
+body.pagmar-index .pagmar__index-cta-pill {
+  position: absolute;
+  z-index: 300;
+  left: var(--index-cta-left);
+  bottom: var(--index-cta-bottom);
+  box-sizing: border-box;
+  width: calc(244 * var(--index-u));
+  height: calc(55 * var(--index-u));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  isolation: isolate;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-cta__corner {
+  position: absolute;
+  width: calc(8.947 * var(--index-u));
+  height: calc(8.946 * var(--index-u));
+  pointer-events: none;
+  user-select: none;
+  transition:
+    top var(--index-transition-duration) var(--index-transition-ease),
+    right var(--index-transition-duration) var(--index-transition-ease),
+    bottom var(--index-transition-duration) var(--index-transition-ease),
+    left var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__index-cta__corner--tl {
+  left: calc(4.392 * var(--index-u));
+  top: calc(5.506 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-cta__corner--tr {
+  right: calc(6.027 * var(--index-u));
+  top: calc(5.506 * var(--index-u));
+  transform: scaleX(-1);
+}
+
+body.pagmar-index .pagmar__index-cta__corner--bl {
+  left: calc(4.392 * var(--index-u));
+  bottom: calc(4.983 * var(--index-u));
+  transform: scaleY(-1);
+}
+
+body.pagmar-index .pagmar__index-cta__corner--br {
+  right: calc(6.027 * var(--index-u));
+  bottom: calc(4.983 * var(--index-u));
+  transform: scale(-1, -1);
+}
+
+body.pagmar-index .pagmar__index-cta-pill__body {
+  position: absolute;
+  left: calc(4.392 * var(--index-u));
+  right: calc(6.027 * var(--index-u));
+  top: calc(5.506 * var(--index-u));
+  bottom: calc(4.494 * var(--index-u));
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10 * var(--index-u));
+  direction: ltr;
+  box-sizing: border-box;
+  padding: calc(10 * var(--index-u)) calc(40 * var(--index-u));
+  border: none;
+  border-radius: calc(60 * var(--index-u));
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--index-chrome-accent);
+  transition:
+    background var(--index-transition-duration) var(--index-transition-ease),
+    backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
+    -webkit-backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
+    box-shadow var(--index-transition-duration) var(--index-transition-ease);
+}
+
+/* Figma Component 15 — glass only when a garden amulet sits behind the fixed pill */
+body.pagmar-index .pagmar__index-cta-pill.is-over-amulet .pagmar__index-cta-pill__body {
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(calc(12 * var(--index-u)));
+  backdrop-filter: blur(calc(12 * var(--index-u)));
+  box-shadow:
+    inset 0 calc(1 * var(--index-u)) calc(2 * var(--index-u)) rgba(255, 255, 255, 0.06),
+    0 calc(2 * var(--index-u)) calc(8 * var(--index-u)) rgba(0, 0, 0, 0.12);
+}
+
+body.pagmar-index .pagmar__index-cta__arrow {
+  flex: 0 0 auto;
+  width: calc(14.593 * var(--index-u));
+  height: calc(14.593 * var(--index-u));
+  transform: rotate(90deg) scaleY(-1);
+  pointer-events: none;
+  user-select: none;
+}
+
+body.pagmar-index .pagmar__index-cta-pill__label {
+  position: relative;
+  z-index: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: calc(25 * var(--index-u));
+  color: var(--index-chrome-accent);
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(24 * var(--index-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 110%;
+  letter-spacing: calc(-0.72 * var(--index-u));
+  direction: rtl;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--tl {
+  left: 0;
+  top: 0;
+}
+
+body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--tr {
+  right: 0;
+  top: 0;
+  transform: scaleX(-1);
+}
+
+body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--bl {
+  left: 0;
+  bottom: 0;
+  transform: scaleY(-1);
+}
+
+body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--br {
+  right: 0;
+  bottom: 0;
+  transform: scale(-1, -1);
+}
+
+body.pagmar-index .pagmar__index-cta-pill:active {
+  opacity: 0.82;
+}
+
+body.pagmar-index .pagmar__index-cta-pill:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: calc(3 * var(--index-u));
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-cta-pill,
+body.pagmar-index.is-create-mode .pagmar__index-filter-sidebar,
+body.pagmar-index.is-create-mode .pagmar__index-filter-trigger {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-frame img {
+  opacity: 0.35;
+}
+
+/* legacy emblem — hidden on index */
+body.pagmar-index .pagmar__emblem--index {
+  display: none !important;
+}
+
+/* legacy filter SVG — hidden */
+body.pagmar-index .pagmar__filter-btn {
+  display: none !important;
+}
+
+/* legacy fixed action button — hidden */
+body.pagmar-index .pagmar__action-btn--fixed {
+  display: none !important;
+}
+
+/* progress bar — hidden on index */
+body.pagmar-index .pagmar__progress {
+  display: none !important;
+}
+
+body.pagmar-index .pagmar__progress-track {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(4 * var(--u));
+  background: rgba(180, 180, 180, 0.38);
+}
+
+body.pagmar-index .pagmar__progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: calc(4 * var(--u));
+  background: rgba(120, 120, 120, 0.55);
+  transition: width 0.35s ease;
+}
+
+body.pagmar-index .pagmar__progress-dots {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(18 * var(--u));
+}
+
+body.pagmar-index .pagmar__progress-dot {
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+body.pagmar-index .pagmar__progress-dot.is-answered {
+  background: rgba(80, 80, 80, 0.7);
+}
+
+body.pagmar-index .pagmar__progress-dot.is-current {
+  background: var(--ink);
+  transform: scale(1.25);
+}
+
+/* choice panel — Figma right side */
+body.pagmar-index .pagmar__choice-panel {
+  position: absolute;
+  z-index: 8;
+  right: calc(49.531 * var(--u));
+  top: calc(155.117 * var(--u));
+  width: calc(254 * var(--u));
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(calc(12 * var(--u)));
+  transition:
+    opacity var(--index-transition-duration) var(--index-transition-ease),
+    transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__choice-panel.is-open {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+body.pagmar-index .pagmar__choice-panel[hidden] {
+  display: none;
+}
+
+body.pagmar-index .pagmar__choice-title {
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(1rem, calc(24 * var(--u)));
+  font-weight: 400;
+  line-height: normal;
+  color: #ffffff;
+  text-align: right;
+  letter-spacing: calc(-0.72 * var(--u));
+  margin-bottom: calc(26 * var(--u));
+}
+
+body.pagmar-index .pagmar__choice-question {
+  display: none;
+}
+
+body.pagmar-index .pagmar__choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+}
+
+body.pagmar-index .pagmar__choice-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(38 * var(--u));
+  padding: calc(9 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
+  border: 1px solid #ffffff;
+  border-radius: calc(50 * var(--u));
+  background: #131415;
+  color: #ffffff;
+  font-family: "TheBasics", "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.8rem, calc(20 * var(--u)));
+  font-weight: 400;
+  font-style: normal;
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--index-transition-duration) var(--index-transition-ease),
+    color var(--index-transition-duration) var(--index-transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__choice-pill.is-selected {
+  background: #ffffff;
+  color: #131415;
+}
+
+body.pagmar-index .pagmar__choice-pill:hover {
+  background: #1f2021;
+}
+
+/* amulet spec panel — Figma Frame 265 */
+body.pagmar-index .pagmar__spec-panel {
+  position: absolute;
+  z-index: 200;
+  width: calc(115 * var(--u));
+  pointer-events: auto;
+  overflow: visible;
+  opacity: 0;
+  transform: translateX(calc(8 * var(--u)));
+  transition:
+    opacity var(--index-transition-duration) var(--index-transition-ease),
+    transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__spec-panel.is-open {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+body.pagmar-index .pagmar__spec-panel.is-anchored {
+  transform: none;
+}
+
+body.pagmar-index .pagmar__spec-panel.is-anchored.is-open {
+  transform: none;
+}
+
+body.pagmar-index .pagmar__spec-panel[hidden] {
+  display: none;
+}
+
+body.pagmar-index .pagmar__spec-panel__rule {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 1px;
+  margin-bottom: calc(8 * var(--u));
+  background: #c5c5c5;
+}
+
+body.pagmar-index .pagmar__spec-panel__notch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: calc(22.353 * var(--u));
+  height: calc(4.159 * var(--u));
+  background: #c5c5c5;
+}
+
+body.pagmar-index .pagmar__spec-panel__title {
+  margin: 0;
+  padding-bottom: calc(4 * var(--u));
+  border-bottom: 2px solid #c5c5c5;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.85rem, calc(18 * var(--u)));
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: calc(-0.36 * var(--u));
+  color: #c5c5c5;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* text question overlay */
+body.pagmar-index .pagmar__text-panel {
+  position: absolute;
+  z-index: 8;
+  left: calc(50 * var(--u));
+  top: 50%;
+  transform: translateY(-50%) translateX(calc(-16 * var(--u)));
+  width: min(calc(520 * var(--u)), 42vw);
+  padding: calc(28 * var(--u)) calc(32 * var(--u));
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: calc(6 * var(--u));
+  pointer-events: auto;
+  opacity: 0;
+  transition:
+    opacity var(--index-transition-duration) var(--index-transition-ease),
+    transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__text-panel.is-open {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+body.pagmar-index .pagmar__text-panel[hidden] {
+  display: none;
+}
+
+body.pagmar-index .pagmar__text-num {
+  display: block;
+  font-family: "Ratzif22", "DavidLibre", serif;
+  font-size: max(0.7rem, calc(13 * var(--u)));
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: calc(8 * var(--u));
+}
+
+body.pagmar-index .pagmar__text-question {
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(1rem, calc(22 * var(--u)));
+  line-height: 1.45;
+  color: var(--ink);
+  margin-bottom: calc(16 * var(--u));
+}
+
+body.pagmar-index .pagmar__text-input {
+  width: 100%;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: max(0.9rem, calc(17 * var(--u)));
+  resize: vertical;
+  min-height: calc(88 * var(--u));
+  line-height: 1.45;
+}
+
+body.pagmar-index .pagmar__text-input--single {
+  min-height: 0;
+  resize: none;
+}
+
+body.pagmar-index .pagmar__text-input:focus {
+  outline: none;
+  border-color: rgba(0, 0, 0, 0.45);
+}
+
+body.pagmar-index .pagmar__text-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
+  margin-top: calc(16 * var(--u));
+}
+
+body.pagmar-index .pagmar__text-save {
+  padding: calc(8 * var(--u)) calc(20 * var(--u));
+  border: 1px solid var(--ink);
+  border-radius: calc(70 * var(--u));
+  background: var(--ink);
+  color: #F4F4F4;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: max(0.82rem, calc(16 * var(--u)));
+  cursor: pointer;
+}
+
+body.pagmar-index .pagmar__text-save:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+body.pagmar-index .pagmar__text-close {
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: max(1.1rem, calc(22 * var(--u)));
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* CTA — Figma "צור קמע כפתור" + Frame 223 text roll (224×83) */
+body.pagmar-index .pagmar__action-btn,
+body.pagmar-create .pagmar__action-btn {
+  display: inline-flex;
+  line-height: 0;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: transparent;
+  filter: none;
+  transition:
+    filter var(--index-transition-duration) var(--index-transition-ease),
+    transform var(--index-transition-duration) var(--index-transition-ease),
+    opacity var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__action-btn__inner,
+body.pagmar-create .pagmar__action-btn__inner {
+  --action-btn-h: clamp(44px, round(calc(83 * var(--index-u)), 1px), 83px);
+  --action-btn-w: round(calc(var(--action-btn-h) * 224 / 83), 1px);
+  --action-btn-text: calc(var(--action-btn-h) * 24 / 83);
+  --action-btn-text-gap: calc(var(--action-btn-h) * 10 / 83);
+  --action-btn-text-roll: calc(var(--action-btn-h) * -34 / 83);
+  /* Design coordinate space for text-band positioning */
+  --action-btn-design-w: 224;
+  --action-btn-design-h: 83;
+  /* Inner text band — viewBox 224×83 (Figma Frame 223) */
+  --action-btn-text-box-x: 22;
+  --action-btn-text-box-center-y: 35.419;
+  --action-btn-text-box-w: 183.473;
+  --action-btn-text-box-h: 42;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--action-btn-w);
+  height: var(--action-btn-h);
+  line-height: 0;
+  filter: drop-shadow(-2px 6px 10px rgba(0, 0, 0, 0.1));
+  transition: filter var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__action-btn__art,
+body.pagmar-create .pagmar__action-btn__art {
+  grid-area: 1 / 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.pagmar-index .pagmar__action-btn__label,
+body.pagmar-create .pagmar__action-btn__label {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--action-btn-w) * var(--action-btn-text-box-x) / var(--action-btn-design-w));
+  width: calc(var(--action-btn-w) * var(--action-btn-text-box-w) / var(--action-btn-design-w));
+  top: calc(
+    var(--action-btn-h) * var(--action-btn-text-box-center-y) / var(--action-btn-design-h)
+    - var(--action-btn-text) / 2
+  );
+  height: var(--action-btn-text);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.pagmar-index .pagmar__action-btn__label-track,
+body.pagmar-create .pagmar__action-btn__label-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: calc(var(--action-btn-text) * -0.06);
+  gap: var(--action-btn-text-gap);
+  transition: transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__action-btn__label-line,
+body.pagmar-create .pagmar__action-btn__label-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--action-btn-text);
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-weight: 500;
+  font-size: var(--action-btn-text);
+  line-height: 1;
+  letter-spacing: calc(var(--action-btn-text) * -0.02);
+  color: var(--ink);
+  white-space: nowrap;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+body.pagmar-index .pagmar__action-btn:hover .pagmar__action-btn__inner,
+body.pagmar-create .pagmar__action-btn:hover .pagmar__action-btn__inner {
+  filter: drop-shadow(-2px 6px 10px rgba(0, 0, 0, 0.1)) brightness(1.03);
+}
+
+body.pagmar-index .pagmar__action-btn:focus-visible,
+body.pagmar-create .pagmar__action-btn:focus-visible {
+  outline: 1px solid rgba(128, 128, 128, 0.35);
+  outline-offset: 3px;
+}
+
+/* finished amulet on index */
+body.pagmar-index.is-amulet-ready .pagmar__index-frame,
+body.pagmar-index.is-amulet-ready .pagmar__index-filter-sidebar,
+body.pagmar-index.is-amulet-ready .pagmar__index-filter-trigger,
+body.pagmar-index.is-amulet-ready .pagmar__index-filter-trigger,
+body.pagmar-index.is-amulet-ready .pagmar__index-cta-pill,
+body.pagmar-index.is-amulet-ready .pagmar__index-about,
+body.pagmar-index.is-amulet-ready .pagmar__garden,
+body.pagmar-index.is-amulet-ready .pagmar__progress,
+body.pagmar-index.is-amulet-ready .pagmar__choice-panel,
+body.pagmar-index.is-amulet-ready .pagmar__text-panel,
+body.pagmar-index.is-amulet-ready .pagmar__spec-panel {
+  display: none !important;
+}
+
+body.pagmar-index.is-amulet-ready .pagmar__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-amulet-ready .result__amulet {
+  width: min(72cqw, calc(420 * var(--u)));
+  height: min(72cqw, calc(420 * var(--u)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.pagmar-index.is-amulet-ready .result__amulet canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+body.pagmar-index.is-amulet-ready .result__status:not([hidden]) {
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pagmar-index {
+    --index-transition-duration: 150ms;
+    --index-create-transition-duration: 150ms;
+  }
+
+  body.pagmar-index .pagmar__choice-panel,
+  body.pagmar-index .pagmar__text-panel,
+  body.pagmar-index .pagmar__spec-panel {
+    transition-duration: var(--index-transition-duration);
+  }
+
+  body.pagmar-index .pagmar__action-btn:hover .pagmar__action-btn__label-track {
+    transform: none;
+  }
+
+  body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner {
+    transition-duration: 0.01ms;
+  }
+}
+
+/* ============================================================
+   Index — inline create mode (Figma 1744:23679 — אנכי)
+   ============================================================ */
+
+body.pagmar-index.is-create-mode {
+  --page-bg: #000000;
+  --ink: #F8F8F7;
+  --index-ink: #f8f8f7;
+  --index-transition-duration: var(--index-create-transition-duration);
+  --index-transition-ease: var(--index-create-transition-ease);
+  --create-ink: #f8f8f7;
+  --create-stack-w: 835.125;
+  --create-amulet-area-h: 635.188;
+  --create-question-area-h: 262.767;
+  --create-question-content-h: 207;
+  --create-question-content-top: 32;
+  --create-question-content-bottom: 32;
+  --create-stack-h: 897.955;
+  --create-stack-y: 112.838;
+  --create-stack-bottom-margin: 20;
+  --create-amulet-pct: calc(var(--create-amulet-area-h) / var(--create-stack-h) * 100%);
+  --create-question-pct: calc(var(--create-question-area-h) / var(--create-stack-h) * 100%);
+  --create-content-top-pct: calc(
+    (var(--create-amulet-area-h) + var(--create-question-content-top)) / var(--create-stack-h) * 100%
+  );
+  --create-content-bottom-pct: calc(var(--create-question-content-bottom) / var(--create-stack-h) * 100%);
+  --create-frame-stroke: #5b5b5b;
+  --create-content-inset-x: 32;
+  --create-content-inset-left: 32;
+  --create-content-inset-y: 32;
+  --create-frame-inset: 40;
+  --create-head-area: 48;
+  --create-question-box-h: 96;
+  --create-save-w: 169.617;
+  --create-save-h: 39.15;
+  --create-save-label-w: 118;
+  --create-save-label-size: 24;
+  --create-save-label-gap: 10;
+  --create-save-label-tracking: -0.48;
+  --create-save-label-roll: calc((var(--create-save-label-size) + var(--create-save-label-gap)) * -1);
+  --index-create-scale: 1;
+  background: #000000;
+  color: #f8f8f7;
+}
+
+body.pagmar-index.is-create-mode.is-create-exiting {
+  background: #F8F8F7;
+  --ink: #1B1613;
+  color: var(--ink);
+  --index-ink: var(--ink);
+}
+
+body.pagmar-index.is-create-mode:not(.is-create-exiting) [stroke="#1B1613"],
+body.pagmar-create [stroke="#1B1613"] {
+  stroke: #F8F8F7;
+}
+
+body.pagmar-index.is-create-mode:not(.is-create-exiting) [fill="#1B1613"],
+body.pagmar-create [fill="#1B1613"] {
+  fill: #F8F8F7;
+}
+
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__index-cta-pill,
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__index-about,
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__index-filter-sidebar,
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__index-filter-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode #grid-bg {
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-filter-sidebar,
+body.pagmar-index.is-create-mode .pagmar__index-cta-pill,
+body.pagmar-index.is-create-mode .pagmar__index-frame,
+body.pagmar-index.is-create-mode .pagmar__choice-panel,
+body.pagmar-index.is-create-mode .pagmar__text-panel,
+body.pagmar-index.is-create-mode .pagmar__spec-panel {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__garden,
+body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__garden {
+  opacity: 1;
+  pointer-events: none;
+  cursor: default;
+}
+
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__garden {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create:not(.pagmar__request-flow) {
+  position: fixed;
+  z-index: 25;
+  left: 50%;
+  top: calc(var(--create-stack-y) * 100dvh / var(--pagmar-h));
+  container-type: size;
+  width: min(96vw, calc(var(--create-stack-w) * 100vw / 1920));
+  aspect-ratio: var(--create-stack-w) / var(--create-stack-h);
+  max-height: calc(
+    100dvh -
+      (var(--create-stack-y) + var(--create-stack-bottom-margin)) * 100dvh / var(--pagmar-h)
+  );
+  height: auto;
+  transform: translateX(-50%) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
+  filter: none;
+  box-shadow: none;
+  overflow: visible;
+  transition:
+    opacity var(--index-transition-duration) var(--index-transition-ease),
+    transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create:not(.pagmar__request-flow).is-open {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create[hidden] {
+  display: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-stack,
+body.pagmar-create .pagmar__create-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  --u: min(
+    100cqw / var(--create-stack-w),
+    100cqh / var(--create-stack-h),
+    100vw / 1920
+  );
+  --create-amulet-pct: calc(var(--create-amulet-area-h) / var(--create-stack-h) * 100%);
+  --create-question-pct: calc(var(--create-question-area-h) / var(--create-stack-h) * 100%);
+  --create-content-top-pct: calc(
+    (var(--create-amulet-area-h) + var(--create-question-content-top)) / var(--create-stack-h) * 100%
+  );
+  --create-content-bottom-pct: calc(var(--create-question-content-bottom) / var(--create-stack-h) * 100%);
+  overflow: visible;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* Figma Component 12 (1748:25754) — percentage insets from stack root */
+body.pagmar-index.is-create-mode .pagmar__component12__frame-shell,
+body.pagmar-create .pagmar__component12__frame-shell {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame-shell--top,
+body.pagmar-create .pagmar__component12__frame-shell--top {
+  inset: 0 0.1% var(--create-question-pct) 0;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame-shell--bottom,
+body.pagmar-create .pagmar__component12__frame-shell--bottom {
+  inset: var(--create-amulet-pct) 0 0 0;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame-bleed,
+body.pagmar-create .pagmar__component12__frame-bleed {
+  position: absolute;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame-shell--top .pagmar__component12__frame-bleed,
+body.pagmar-create .pagmar__component12__frame-shell--top .pagmar__component12__frame-bleed {
+  inset: -0.71% -1.02% -2.6% -1.5%;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame-shell--bottom .pagmar__component12__frame-bleed,
+body.pagmar-create .pagmar__component12__frame-shell--bottom .pagmar__component12__frame-bleed {
+  inset: -1.71% -1.02% -6.28% -1.5%;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__frame,
+body.pagmar-create .pagmar__component12__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  object-fit: fill;
+  filter: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__component12__amulet,
+body.pagmar-create .pagmar__component12__amulet {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0.1% var(--create-question-pct) 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-inner,
+body.pagmar-create .pagmar__create-amulet-inner {
+  position: absolute;
+  z-index: 1;
+  inset: calc(var(--create-frame-inset) * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+}
+
+/* Figma Frame 242 — content band inside bottom frame */
+body.pagmar-index.is-create-mode .pagmar__component12__question,
+body.pagmar-create .pagmar__component12__question {
+  position: absolute;
+  z-index: 3;
+  top: var(--create-amulet-pct);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding:
+    calc(var(--create-question-content-top) * var(--u))
+    calc(var(--create-content-inset-x) * var(--u))
+    calc(var(--create-question-content-bottom) * var(--u))
+    calc(var(--create-content-inset-left) * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame:not(.pagmar__component12__amulet),
+body.pagmar-create .pagmar__create-amulet-frame:not(.pagmar__component12__amulet) {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.pagmar-index.is-create-mode .pagmar__create-question-block,
+body.pagmar-create .pagmar__create-question-block {
+  min-width: 0;
+  min-height: 0;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-block,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-block {
+  min-height: 0;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-panel,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-stack,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-head,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-head {
+  min-height: 0;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-save-wrap {
+  margin-top: 0;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: calc(var(--create-save-h) * var(--u));
+  padding-top: 0;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-view {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-view canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+  height: auto !important;
+  touch-action: none;
+  cursor: grab;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-view canvas:active {
+  cursor: grabbing;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-status {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(18 * var(--fu, 1px));
+  letter-spacing: -0.02em;
+  color: rgba(244, 244, 244, 0.55);
+  text-align: center;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
+  display: none;
+}
+
+/* Amulet loader — finished gallery amulet spins while vectors / textures build */
+.pagmar__amulet-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u)) calc(16 * var(--u));
+  background: transparent;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.pagmar__amulet-loader[hidden] {
+  display: none;
+}
+
+.pagmar__amulet-loader__scene {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagmar__amulet-loader__slot {
+  width: min(96%, 560px);
+  height: min(88%, 520px);
+  min-width: 260px;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1.12);
+  transform-origin: center center;
+}
+
+.pagmar__amulet-loader__slot canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  touch-action: none;
+}
+
+.pagmar__amulet-loader__scratch {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 680px;
+  height: 680px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.pagmar__amulet-loader__label {
+  flex: 0 0 auto;
+  margin: 0;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(32 * var(--u));
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.88);
+  text-align: center;
+  text-shadow: 0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.85);
+}
+
+/* Vessel loader — inside create amulet frame only (detail page loader, frame-scoped) */
+.pagmar__amulet-frame-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: transparent;
+}
+
+.pagmar__amulet-frame-loader[hidden] {
+  display: none;
+}
+
+.pagmar__amulet-frame-loader__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pagmar__amulet-frame-loader__vessels {
+  position: relative;
+  width: 44%;
+  height: 44%;
+  min-width: 108px;
+  min-height: 108px;
+  max-width: 280px;
+  max-height: 280px;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.pagmar__amulet-frame-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+.pagmar__amulet-frame-loader__vessel--1 {
+  width: 52%;
+  height: auto;
+  animation-delay: 0s;
+}
+
+.pagmar__amulet-frame-loader__vessel--2 {
+  width: 90%;
+  height: auto;
+  animation-delay: -1s;
+}
+
+.pagmar__amulet-frame-loader__vessel--3 {
+  width: 94%;
+  height: auto;
+  animation-delay: -2s;
+}
+
+.pagmar__amulet-frame-loader__vessel--4 {
+  width: 88%;
+  height: auto;
+  animation-delay: -3s;
+}
+
+@keyframes pagmar-detail-vessel-slot {
+  0%, 24.999% { opacity: 1; }
+  25%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__amulet-frame-loader__vessel {
+    animation: none;
+    opacity: 0;
+  }
+
+  .pagmar__amulet-frame-loader__vessel--1 {
+    opacity: 1;
+  }
+}
+
+/* Full-page vessel loader — final PBR build (matches amulet detail page) */
+.pagmar__create-fullpage-loader {
+  --loader-u: min(
+    calc((100vw - var(--pagmar-content-margin, 20px) * 2) / 1920),
+    calc((100dvh - var(--pagmar-content-margin, 20px) * 2) / 1080)
+  );
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.pagmar__create-fullpage-loader[hidden] {
+  display: none;
+}
+
+.pagmar__create-fullpage-loader__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(24 * var(--loader-u));
+}
+
+.pagmar__create-fullpage-loader__vessels {
+  position: relative;
+  width: calc(305 * var(--loader-u));
+  height: calc(305 * var(--loader-u));
+  flex: 0 0 auto;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.pagmar__create-fullpage-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  backface-visibility: hidden;
+}
+
+.pagmar__create-fullpage-loader__vessel--1 {
+  width: calc(158.765 * var(--loader-u));
+  height: calc(277.371 * var(--loader-u));
+  animation-delay: 0s;
+}
+
+.pagmar__create-fullpage-loader__vessel--2 {
+  width: calc(274.478 * var(--loader-u));
+  height: calc(280.742 * var(--loader-u));
+  animation-delay: -1s;
+}
+
+.pagmar__create-fullpage-loader__vessel--3 {
+  width: calc(287.758 * var(--loader-u));
+  height: calc(158.675 * var(--loader-u));
+  animation-delay: -2s;
+}
+
+.pagmar__create-fullpage-loader__vessel--4 {
+  width: calc(268.429 * var(--loader-u));
+  height: calc(273.41 * var(--loader-u));
+  animation-delay: -3s;
+}
+
+.pagmar__create-fullpage-loader__caption {
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  gap: calc(16 * var(--loader-u));
+  font-family: "TheBasics", "TheBasics Mono", serif;
+  font-size: calc(75 * var(--loader-u));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: calc(-0.75 * var(--loader-u));
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 calc(2 * var(--loader-u)) calc(10 * var(--loader-u)) rgba(0, 0, 0, 0.85);
+}
+
+.pagmar__create-fullpage-loader__percent,
+.pagmar__create-fullpage-loader__label {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+.pagmar__create-fullpage-loader__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body.is-create-fullpage-loading .pagmar__request-artboard {
+  pointer-events: none;
+}
+
+/* Final build — loader only; hide question card, step rail, amulet frame, close */
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-q,
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-step-marker,
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-step-rail__line,
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-close,
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-panel,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-q,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-step-marker,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-step-rail__line,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-close,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-panel,
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-q,
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-step-marker,
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-step-rail__line,
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-close,
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-panel {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__create-fullpage-loader__vessel {
+    animation: none;
+    opacity: 0;
+  }
+
+  .pagmar__create-fullpage-loader__vessel--1 {
+    opacity: 1;
+  }
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame.is-amulet-loading .pagmar__index-create-amulet-view,
+body.pagmar-create .pagmar__create-amulet-frame.is-amulet-loading .pagmar__create-amulet-view {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame.is-amulet-loading.is-amulet-loading-keep-preview .pagmar__index-create-amulet-view,
+body.pagmar-create .pagmar__create-amulet-frame.is-amulet-loading.is-amulet-loading-keep-preview .pagmar__create-amulet-view {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame.is-textures-loading .pagmar__index-create-amulet-view,
+body.pagmar-create .pagmar__create-amulet-frame.is-textures-loading .pagmar__create-amulet-view {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame.is-building {
+  opacity: 0.92;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-view .result__amulet,
+body.pagmar-index.is-create-mode.is-amulet-ready .pagmar__index-create-amulet-view .result__amulet,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__index-create-amulet-view .result__amulet {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__index-create-amulet-view,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__create-amulet-view {
+  opacity: 0;
+  visibility: hidden;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__index-create-amulet-frame.is-amulet-loading .pagmar__amulet-frame-loader,
+body.pagmar-create.is-amulet-rendering .pagmar__create-amulet-frame.is-amulet-loading .pagmar__amulet-frame-loader {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-frame.is-textures-loading .pagmar__index-create-status {
+  top: auto;
+  bottom: calc(12 * var(--u));
+  transform: translateX(-50%);
+  color: rgba(244, 244, 244, 0.72);
+  font-size: calc(14 * var(--u));
+  max-width: 90%;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions {
+  position: absolute;
+  z-index: 4;
+  left: calc(var(--create-frame-inset) * var(--u));
+  right: calc(var(--create-frame-inset) * var(--u));
+  top: calc(100% + 14 * var(--u));
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--u));
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions[hidden] {
+  display: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__create-amulet-action {
+  flex: 0 0 auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__create-question-line--hint {
+  margin-top: calc(6 * var(--u));
+  font-size: calc(22 * var(--u));
+  letter-spacing: calc(-0.44 * var(--u));
+  color: rgba(248, 248, 247, 0.55);
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__index-create-amulet-actions,
+body.pagmar-index.is-create-mode.is-building .pagmar__index-create-amulet-actions {
+  display: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__index-create-amulet-frame {
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-box,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-box,
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-save-wrap {
+  display: none !important;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-stack,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-stack {
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pagmar-index.is-create-mode .pagmar__index-create {
+    transition-duration: var(--index-transition-duration);
+  }
+}
+
+/* --- Create page — Figma 1537:4415 @ 1920×1080 (exact coords) --- */
+
+body.pagmar-create {
+  --pagmar-w: 1920;
+  --pagmar-h: 1080;
+  --page-bg: #000000;
+  --ink: #F8F8F7;
+  --create-bg: #000000;
+  --create-ink: #F4F4F4;
+  --create-panel-bg: transparent;
+  --create-stack-w: 835.125;
+  --create-amulet-area-h: 635.188;
+  --create-question-area-h: 262.767;
+  --create-question-content-h: 207;
+  --create-question-content-top: 32;
+  --create-question-content-bottom: 32;
+  --create-stack-h: 897.955;
+  --create-stack-y: 112.838;
+  --create-stack-bottom-margin: 20;
+  --create-amulet-pct: calc(var(--create-amulet-area-h) / var(--create-stack-h) * 100%);
+  --create-question-pct: calc(var(--create-question-area-h) / var(--create-stack-h) * 100%);
+  --create-content-top-pct: calc(
+    (var(--create-amulet-area-h) + var(--create-question-content-top)) / var(--create-stack-h) * 100%
+  );
+  --create-content-bottom-pct: calc(var(--create-question-content-bottom) / var(--create-stack-h) * 100%);
+  --create-frame-stroke: #5b5b5b;
+  --create-content-inset-x: 32;
+  --create-content-inset-left: 32;
+  --create-content-inset-y: 32;
+  --create-frame-inset: 40;
+  --create-head-area: 48;
+  --create-question-box-h: 96;
+  background: #000000;
+  color: #F4F4F4;
+  overflow: hidden;
+}
+
+body.pagmar-create #grid-bg {
+  z-index: 0;
+}
+
+body.pagmar-create .pagmar-viewport {
+  padding: var(--pagmar-content-margin);
+  width: 100vw;
+  height: 100dvh;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+body.pagmar-create .pagmar-canvas {
+  container-type: inline-size;
+  position: relative;
+  width: min(
+    calc(100vw - var(--pagmar-content-margin) * 2),
+    calc((100dvh - var(--pagmar-content-margin) * 2) * var(--pagmar-w) / var(--pagmar-h)),
+    calc(var(--pagmar-w) * 1px)
+  );
+  aspect-ratio: 1920 / 1080;
+  max-height: calc(100dvh - var(--pagmar-content-margin) * 2);
+  max-width: none;
+  background: transparent;
+  overflow: hidden;
+  --u: calc(100cqw / var(--pagmar-w));
+}
+
+body.pagmar-create .pagmar__request-flow .pagmar__create-amulet-view {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+body.pagmar-create .pagmar__request-flow .pagmar__create-amulet-view canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+  height: auto !important;
+  touch-action: none;
+  cursor: grab;
+}
+
+body.pagmar-create .pagmar__request-flow .pagmar__create-amulet-view canvas:active {
+  cursor: grabbing;
+}
+
+body.pagmar-create .pagmar__request-flow .pagmar__create-status {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(18 * var(--u));
+  letter-spacing: -0.02em;
+  color: rgba(244, 244, 244, 0.72);
+  text-align: center;
+  pointer-events: none;
+}
+
+body.pagmar-create .pagmar__request-flow .pagmar__create-amulet-frame.is-building,
+body.pagmar-create .figma-amulet.pagmar__create-amulet-frame.is-building,
+body.pagmar-index.is-create-mode .figma-amulet.pagmar__index-create-amulet-frame.is-building {
+  opacity: 1;
+}
+
+/* Create stack — Figma Component 12 */
+body.pagmar-create .pagmar__create-stack {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: calc(var(--create-stack-y) * 100dvh / var(--pagmar-h));
+  transform: translateX(-50%);
+  container-type: size;
+  width: min(96vw, calc(var(--create-stack-w) * 100vw / 1920));
+  aspect-ratio: var(--create-stack-w) / var(--create-stack-h);
+  max-height: calc(
+    100dvh -
+      (var(--create-stack-y) + var(--create-stack-bottom-margin)) * 100dvh / var(--pagmar-h)
+  );
+  height: auto;
+  --u: min(100cqw / var(--create-stack-w), 100cqh / var(--create-stack-h));
+}
+
+body.pagmar-create .pagmar__create-amulet-frame {
+  min-width: 0;
+  min-height: 0;
+}
+
+body.pagmar-create .pagmar__create-amulet-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+body.pagmar-create .pagmar__create-question-block {
+  min-width: 0;
+  min-height: 0;
+}
+
+body.pagmar-create .pagmar__create-amulet-view canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+  height: auto !important;
+  touch-action: none;
+  cursor: grab;
+}
+
+body.pagmar-create .pagmar__create-amulet-view canvas:active {
+  cursor: grabbing;
+}
+
+body.pagmar-create .pagmar__create-status {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(18 * var(--u));
+  letter-spacing: -0.02em;
+  color: rgba(244, 244, 244, 0.72);
+  text-align: center;
+  pointer-events: none;
+}
+
+body.pagmar-create .pagmar__create-status[hidden] {
+  display: none;
+}
+
+body.pagmar-create .pagmar__create-amulet-frame.is-building {
+  opacity: 0.92;
+}
+
+body.pagmar-create .pagmar__create-amulet-frame.is-textures-loading .pagmar__create-amulet-view {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.pagmar-create .pagmar__create-amulet-frame.is-textures-loading .pagmar__create-status {
+  top: auto;
+  bottom: calc(12 * var(--u));
+  transform: translateX(-50%);
+  color: rgba(244, 244, 244, 0.92);
+  font-size: calc(14 * var(--u));
+}
+
+/* Figma Frame 242 — תוכן שאלה בתוך מסגרת תחתונה */
+body.pagmar-create .pagmar__create-question-panel,
+body.pagmar-index.is-create-mode .pagmar__create-question-panel {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  max-height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  pointer-events: auto;
+  overflow: hidden;
+  background: transparent;
+  color: #f8f8f7;
+}
+
+body.pagmar-create .pagmar__create-question-panel[hidden],
+body.pagmar-index.is-create-mode .pagmar__create-question-panel[hidden] {
+  display: none;
+}
+
+body.pagmar-create .pagmar__create-question-stack,
+body.pagmar-index.is-create-mode .pagmar__create-question-stack {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: calc(24 * var(--u));
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  max-height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+body.pagmar-create .pagmar__create-question-fields,
+body.pagmar-index.is-create-mode .pagmar__create-question-fields {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(16 * var(--u));
+  flex: 0 0 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__create-save-wrap,
+body.pagmar-create.is-panel-open .pagmar__create-save-wrap {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.pagmar-create .pagmar__create-question-head,
+body.pagmar-index.is-create-mode .pagmar__create-question-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  width: 100%;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+body.pagmar-create .pagmar__create-question-num,
+body.pagmar-index.is-create-mode .pagmar__create-question-num {
+  display: none;
+}
+
+body.pagmar-create .pagmar__create-question-text,
+body.pagmar-index.is-create-mode .pagmar__create-question-text {
+  margin: 0;
+  display: block;
+  width: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(32 * var(--u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: calc(-0.64 * var(--u));
+  color: #f8f8f7;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.pagmar-create .pagmar__create-question-line,
+body.pagmar-index.is-create-mode .pagmar__create-question-line {
+  display: block;
+  width: 100%;
+  text-align: right;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+body.pagmar-create .pagmar__create-question-box,
+body.pagmar-index.is-create-mode .pagmar__create-question-box {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: calc(var(--create-question-box-h, 96) * var(--u));
+  margin-bottom: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--create-frame-stroke, #5b5b5b);
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  transition: height var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-box,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-box,
+body.pagmar-create.is-choice-question .pagmar__create-question-box,
+body.pagmar-index.is-create-mode .pagmar__create-question-box:has(.intro__choice-grid--figma),
+body.pagmar-create .pagmar__create-question-box:has(.intro__choice-grid--figma) {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  height: calc(var(--create-question-box-h) * var(--u));
+  min-height: calc(var(--create-question-box-h) * var(--u));
+  max-height: none;
+  overflow: visible;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__create-question-field,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-choice-question .pagmar__create-question-field,
+body.pagmar-create.is-choice-question .pagmar__create-question-field,
+body.pagmar-index.is-create-mode .pagmar__create-question-field:has(.intro__choice-grid--figma),
+body.pagmar-create .pagmar__create-question-field:has(.intro__choice-grid--figma) {
+  flex: 0 0 auto;
+  min-height: calc(var(--create-question-box-h) * var(--u));
+  height: calc(var(--create-question-box-h) * var(--u));
+  padding: 0;
+  justify-content: flex-start;
+  align-items: stretch;
+  overflow: visible;
+}
+
+/* Figma 1729:22573 — גריד אפשרויות עם מסגרות נפרדות */
+body.pagmar-create .pagmar__create-question-field .intro__choice-grid--figma,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid--figma {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-height: calc(var(--create-question-box-h) * var(--u));
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-grid-row,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid-row {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: stretch;
+  width: 100%;
+  direction: rtl;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-grid-row--partial,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid-row--partial {
+  direction: rtl;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-grid-row--partial .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid-row--partial .intro__choice-btn--figma {
+  flex: 0 0 auto;
+  min-width: min-content;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma.is-fit-width,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma.is-fit-width {
+  flex: 0 0 auto;
+  min-width: min-content;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma {
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: calc(48 * var(--u));
+  height: calc(48 * var(--u));
+  padding: calc(12 * var(--u)) calc(10 * var(--u));
+  margin: -0.5px;
+  border: 1px solid #7e7e7e;
+  border-radius: 0;
+  background: transparent;
+  color: #f8f8f7;
+  font-family: "TheBasics", serif;
+  font-size: calc(24 * var(--u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 110%;
+  letter-spacing: calc(-0.48 * var(--u));
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--index-transition-duration) var(--index-transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma:hover,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma:hover {
+  background: rgba(248, 248, 247, 0.08);
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma.is-selected,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma.is-selected {
+  background: rgba(248, 248, 247, 0.12);
+  color: #f8f8f7;
+}
+
+body.pagmar-create .pagmar__create-question-field,
+body.pagmar-index.is-create-mode .pagmar__create-question-field {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  border: none;
+  padding: calc(12 * var(--u)) calc(10 * var(--u));
+  overflow: hidden;
+}
+
+body.pagmar-create .pagmar__create-question-field:has(.intro__choice-grid--figma),
+body.pagmar-index.is-create-mode .pagmar__create-question-field:has(.intro__choice-grid--figma) {
+  padding: 0;
+  align-items: stretch;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__question-input,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question-input {
+  width: 100%;
+  max-width: 100%;
+  align-self: flex-end;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(24 * var(--u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: calc(-0.48 * var(--u));
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #f8f8f7;
+  text-align: right;
+  resize: none;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__question-input::placeholder,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question-input::placeholder {
+  color: rgba(248, 248, 247, 0.55);
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__question-input:focus,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question-input:focus {
+  outline: none;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__question-input--single,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question-input--single {
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+/* 1548:6424 Frame 199 — py 12, px 10 */
+/* legacy choice styles — not used in Frame 236 flow */
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-row:not(.intro__choice-row--figma) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4 * var(--u));
+  width: calc(184.859 * var(--u));
+  max-width: 100%;
+  align-self: center;
+  height: 100%;
+  padding: 0;
+  overflow: auto;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma),
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma) {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #F4F4F4;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(24 * var(--u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: calc(-0.48 * var(--u));
+  text-align: center;
+  cursor: pointer;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma):hover,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma):hover {
+  background: rgba(244, 244, 244, 0.08);
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma).is-selected,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma).is-selected {
+  color: #F4F4F4;
+  text-decoration: underline;
+  text-underline-offset: calc(3 * var(--u));
+}
+
+/* Figma 1661:16102 Frame 236 — save button (physical left, matching Component 12) */
+body.pagmar-create .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode .pagmar__create-save-wrap {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  height: calc(var(--create-save-h) * var(--u));
+  min-height: calc(var(--create-save-h) * var(--u));
+  margin-top: 0;
+  padding-top: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  direction: ltr;
+}
+
+body.pagmar-index.is-create-mode:not(.is-create-complete):not(.is-create-amulet-ready) .pagmar__create-save-wrap,
+body.pagmar-create:not(.is-create-complete) .pagmar__create-save-wrap {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.pagmar-create .pagmar__create-save-wrap[hidden],
+body.pagmar-index.is-create-mode .pagmar__create-save-wrap[hidden] {
+  display: none;
+}
+
+body.pagmar-create .pagmar__create-question-box[hidden],
+body.pagmar-index.is-create-mode .pagmar__create-question-box[hidden] {
+  display: none !important;
+}
+
+/* Figma 1661:16102 Frame 236 — save button */
+body.pagmar-create .pagmar__create-save,
+body.pagmar-index.is-create-mode .pagmar__create-save {
+  display: inline-grid;
+  grid-template-columns: max-content;
+  grid-template-rows: max-content;
+  place-items: center;
+  position: relative;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  overflow: visible;
+  pointer-events: auto;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+body.pagmar-create .pagmar__create-save-shape,
+body.pagmar-index.is-create-mode .pagmar__create-save-shape {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  width: calc(var(--create-save-w) * var(--u));
+  height: calc(var(--create-save-h) * var(--u));
+  transition: filter var(--index-transition-duration) var(--index-transition-ease);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.pagmar-create .pagmar__create-save-bg,
+body.pagmar-index.is-create-mode .pagmar__create-save-bg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.pagmar-create .pagmar__create-save-label-wrap,
+body.pagmar-index.is-create-mode .pagmar__create-save-label-wrap {
+  grid-column: 1;
+  grid-row: 1;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: calc(var(--create-save-w) * var(--u));
+  height: calc(var(--create-save-h) * var(--u));
+  pointer-events: none;
+}
+
+body.pagmar-create .pagmar__create-save-label-clip,
+body.pagmar-index.is-create-mode .pagmar__create-save-label-clip {
+  flex: 0 0 auto;
+  width: calc(var(--create-save-label-w) * var(--u));
+  height: calc(var(--create-save-label-size) * var(--u));
+  overflow: hidden;
+}
+
+body.pagmar-create .pagmar__create-save-label-track,
+body.pagmar-index.is-create-mode .pagmar__create-save-label-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--create-save-label-gap) * var(--u));
+  transition: transform var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-create .pagmar__create-save-label,
+body.pagmar-index.is-create-mode .pagmar__create-save-label {
+  display: block;
+  width: 100%;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(var(--create-save-label-size) * var(--u));
+  font-weight: 500;
+  font-style: normal;
+  line-height: calc(var(--create-save-label-size) * var(--u));
+  letter-spacing: calc(var(--create-save-label-tracking) * var(--u));
+  color: #161616;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+body.pagmar-create .pagmar__create-save:hover:not(:disabled) .pagmar__create-save-shape,
+body.pagmar-index.is-create-mode .pagmar__create-save:hover:not(:disabled) .pagmar__create-save-shape {
+  filter: brightness(1.03);
+}
+
+body.pagmar-create .pagmar__create-save:disabled,
+body.pagmar-index.is-create-mode .pagmar__create-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+body.pagmar-create .pagmar__create-save:disabled .pagmar__create-save-label,
+body.pagmar-index.is-create-mode .pagmar__create-save:disabled .pagmar__create-save-label {
+  opacity: 1;
+}
+
+body.pagmar-create.is-building .pagmar__create-save,
+body.pagmar-index.is-create-mode.is-building .pagmar__create-save {
+  pointer-events: none;
+}
+
+body.pagmar-create.is-building .pagmar__create-save .pagmar__create-save-label,
+body.pagmar-index.is-create-mode.is-building .pagmar__create-save .pagmar__create-save-label {
+  opacity: 0.35;
+}
+
+body.pagmar-create .pagmar__create-save:focus-visible,
+body.pagmar-index.is-create-mode .pagmar__create-save:focus-visible {
+  outline: 1px solid rgba(11, 11, 11, 0.35);
+  outline-offset: calc(2 * var(--u));
+}
+
+/* פעולות קמע — same banner button as site CTA */
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn {
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn__inner {
+  --action-btn-h: calc(39 * var(--u));
+  --action-btn-w: 100%;
+  --action-btn-text: calc(15 * var(--u));
+  --action-btn-text-gap: calc(6 * var(--u));
+  --action-btn-text-roll: calc(-21 * var(--u));
+  filter: drop-shadow(calc(-2 * var(--u)) calc(6 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.1));
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn:hover {
+  transform: none;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn__label-track {
+  margin-top: 0;
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn:hover:not(:disabled) .pagmar__action-btn__inner {
+  filter: drop-shadow(calc(-2 * var(--u)) calc(6 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.1)) brightness(1.03);
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn__art {
+  shape-rendering: geometricPrecision;
+}
+
+body.pagmar-create .pagmar__emblem--create {
+  display: none !important;
+}
+
+body.pagmar-create .pagmar__export-btn {
+  position: absolute;
+  z-index: 6;
+  left: calc(var(--create-amulet-x) * var(--u));
+  top: calc((var(--create-amulet-y) + var(--create-amulet-h) + 16) * var(--u));
+  width: calc(var(--create-amulet-w) * var(--u));
+  min-height: calc(44 * var(--u));
+  padding: calc(10 * var(--u)) calc(16 * var(--u));
+  border: 1px solid #F4F4F4;
+  border-radius: 999px;
+  background: transparent;
+  color: #F4F4F4;
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-size: calc(16 * var(--u));
+  line-height: 1.2;
+  letter-spacing: calc(-0.32 * var(--u));
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+body.pagmar-create .pagmar__export-btn:hover {
+  background: rgba(244, 244, 244, 0.08);
+}
+
+body.pagmar-create .pagmar__export-btn:focus-visible {
+  outline: 1px solid rgba(244, 244, 244, 0.35);
+  outline-offset: calc(3 * var(--u));
+}
+
+body.pagmar-create .pagmar__export-btn[hidden] {
+  display: none;
+}
+
+body.pagmar-create.is-building .pagmar__create-save,
+body.pagmar-create.is-building .intro__choice-btn {
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode.is-building .pagmar__create-question-field .intro__choice-btn--figma {
+  pointer-events: auto;
+}
+
+body.pagmar-create.is-amulet-rendering .pagmar__export-btn {
+  display: none !important;
+}
+
+/* Completion — only headline in right panel, no input square */
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-stack,
+body.pagmar-index.is-create-mode.is-create-complete .pagmar__create-question-stack,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-stack {
+  gap: 0;
+  justify-content: center;
+}
+
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-head,
+body.pagmar-index.is-create-mode.is-create-complete .pagmar__create-question-head,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-head {
+  min-height: 0;
+  padding-top: calc(8 * var(--u));
+  padding-bottom: calc(8 * var(--u));
+}
+
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-box,
+body.pagmar-index.is-create-mode.is-create-complete .pagmar__create-question-box,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-box,
+body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode.is-create-complete .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-save-wrap,
+body.pagmar-index.is-create-mode #createInputStash {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Request flow styles: see request-flow-figma.css (linked from HTML) */
+/* Result overlay styles: see result-overlay.css (linked from index.html) */

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>קמע — מידע</title>
+  <link rel="stylesheet" href="../css/fonts.css?v=20250702-white">
+  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250705-corners-story">
+  <style>
+    /* One keyframe + phased delays = seamless 1→2→3→4→1 loop */
+    .pagmar__detail-page-loader__vessels {
+      isolation: isolate;
+      transform: translateZ(0);
+    }
+    .pagmar__detail-page-loader__vessel {
+      will-change: opacity;
+      transform: translate3d(-50%, -50%, 0);
+      opacity: 0;
+      animation-name: pagmar-detail-vessel-slot;
+      animation-duration: 4s;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+      animation-fill-mode: both;
+      animation-play-state: running !important;
+    }
+    .pagmar__detail-page-loader__vessel--1 { animation-delay: 0s; }
+    .pagmar__detail-page-loader__vessel--2 { animation-delay: -1s; }
+    .pagmar__detail-page-loader__vessel--3 { animation-delay: -2s; }
+    .pagmar__detail-page-loader__vessel--4 { animation-delay: -3s; }
+    @keyframes pagmar-detail-vessel-slot {
+      0%, 24.999% { opacity: 1; }
+      25%, 100% { opacity: 0; }
+    }
+  </style>
+  <script>
+    (function () {
+      document.documentElement.classList.add('pagmar-detail-booting');
+      window.pagmarDetailBoot = {
+        _startedAt: Date.now(),
+        MIN_MS: 5000,
+        _pending: { content: 1, fonts: 1, vectors: 1, scene: 1 },
+        _finished: false,
+        onFinish: function () {
+          var boot = '20250705-fog-match';
+          import('./amulet-detail-fog.js?v=' + boot)
+            .then(function (mod) {
+              var host = document.getElementById('detailFogHost');
+              if (host && typeof mod.bootDetailFogWebGL === 'function') {
+                mod.bootDetailFogWebGL(host);
+              }
+            })
+            .catch(function (err) {
+              console.warn('[amulet-detail] fog WebGL boot failed', err);
+            });
+          var atmosphere = document.createElement('script');
+          atmosphere.src = 'amulet-detail-atmosphere.js?v=20250704b';
+          atmosphere.defer = true;
+          document.body.appendChild(atmosphere);
+        },
+        done: function (key) {
+          if (this._finished || !this._pending[key]) return;
+          delete this._pending[key];
+          if (!Object.keys(this._pending).length) this.finish();
+        },
+        finish: function () {
+          if (this._finished) return;
+          var self = this;
+          var wait = Math.max(0, this.MIN_MS - (Date.now() - this._startedAt));
+          window.setTimeout(function () {
+            self._finishNow();
+          }, wait);
+        },
+        _finishNow: function () {
+          if (this._finished) return;
+          this._finished = true;
+          var loader = document.getElementById('detailPageLoader');
+          var body = document.body;
+          if (loader) loader.classList.add('is-leaving');
+          window.setTimeout(function () {
+            if (body) body.classList.remove('is-detail-loading');
+            document.documentElement.classList.remove('pagmar-detail-booting');
+            if (loader) {
+              loader.hidden = true;
+              loader.setAttribute('aria-busy', 'false');
+            }
+          }, 320);
+          if (typeof this.onFinish === 'function') {
+            try { this.onFinish(); } catch (_) {}
+          }
+        },
+      };
+      window.setTimeout(function () {
+        window.pagmarDetailBoot._finishNow();
+      }, 15000);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          window.pagmarDetailBoot.done('fonts');
+        });
+      } else {
+        window.pagmarDetailBoot.done('fonts');
+      }
+
+      var idMatch = location.search.match(/[?&]id=(\d+)/);
+      var detailId = idMatch ? parseInt(idMatch[1], 10) : 0;
+      if (Number.isFinite(detailId) && detailId >= 0) {
+        ['fetch', 'image'].forEach(function (as) {
+          var link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = as;
+          link.href = as === 'fetch'
+            ? '/public/amulets/amulet-' + detailId + '.answers.json?v=1'
+            : '/public/amulets/amulet-' + detailId + '.png';
+          document.head.appendChild(link);
+        });
+      }
+
+      [
+        'assets/detail/loader-vessel-1.svg',
+        'assets/detail/loader-vessel-2.svg',
+        'assets/detail/loader-vessel-3.svg',
+        'assets/detail/loader-vessel-4.svg',
+      ].forEach(function (href) {
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = href;
+        document.head.appendChild(link);
+      });
+      var cloudPreload = document.createElement('link');
+      cloudPreload.rel = 'preload';
+      cloudPreload.as = 'image';
+      cloudPreload.href = 'assets/atmosphere/cloud.png';
+      document.head.appendChild(cloudPreload);
+    })();
+  </script>
+  <script>
+    (function () {
+      var NAV_GUARD_MS = 900;
+      var landedAt = Date.now();
+      try {
+        var stored = sessionStorage.getItem('pagmarAmuletNavAt');
+        if (stored) {
+          var parsed = parseInt(stored, 10);
+          if (Number.isFinite(parsed)) landedAt = parsed;
+          sessionStorage.removeItem('pagmarAmuletNavAt');
+        }
+      } catch (_) {}
+
+      function shouldBlockNavClick(target) {
+        return (
+          Date.now() - landedAt < NAV_GUARD_MS &&
+          target &&
+          target.closest &&
+          target.closest('.pagmar__detail-close')
+        );
+      }
+
+      document.addEventListener(
+        'click',
+        function (e) {
+          if (shouldBlockNavClick(e.target)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        },
+        true
+      );
+
+      document.addEventListener(
+        'pointerup',
+        function (e) {
+          if (shouldBlockNavClick(e.target)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        },
+        true
+      );
+    })();
+  </script>
+</head>
+<body class="pagmar-amulet-detail is-detail-loading">
+
+  <div class="pagmar__detail-fog" id="detailFogHost" aria-hidden="true"></div>
+  <script type="module">
+    import { bootDetailFogWebGL } from './amulet-detail-fog.js?v=20250705-fog-match';
+    bootDetailFogWebGL(document.getElementById('detailFogHost'));
+  </script>
+
+  <div class="pagmar__detail-page-loader" id="detailPageLoader" role="status" aria-live="polite" aria-busy="true">
+    <div class="pagmar__detail-page-loader__vessels" aria-hidden="true">
+      <img class="pagmar__detail-page-loader__vessel pagmar__detail-page-loader__vessel--1" src="assets/detail/loader-vessel-1.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__detail-page-loader__vessel pagmar__detail-page-loader__vessel--2" src="assets/detail/loader-vessel-2.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__detail-page-loader__vessel pagmar__detail-page-loader__vessel--3" src="assets/detail/loader-vessel-3.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__detail-page-loader__vessel pagmar__detail-page-loader__vessel--4" src="assets/detail/loader-vessel-4.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+    </div>
+    <span class="pagmar__detail-page-loader__sr">טוען</span>
+  </div>
+
+  <div class="pagmar-viewport">
+    <div class="pagmar-canvas pagmar-canvas--detail" id="detailCanvas">
+
+      <button type="button" class="pagmar__detail-close" id="detailCloseBtn" aria-label="חזרה לגן הקמעות">
+        <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
+      </button>
+
+      <main class="pagmar__detail-main">
+        <div class="pagmar__detail-content">
+
+          <!-- [בקשה] — request section -->
+          <section class="pagmar__detail-request" aria-label="בקשה">
+            <div class="pagmar__detail-request-text">
+              <span class="pagmar__detail-section-tag">[בקשה]</span>
+              <p class="pagmar__detail-story" id="detailStory">—</p>
+            </div>
+          </section>
+
+          <!-- [תזמון] — timing section (Figma 2327:36517) -->
+          <section class="pagmar__detail-timing" aria-label="תזמון">
+            <div class="pagmar__detail-timing-text">
+              <span class="pagmar__detail-section-tag">[תזמון]</span>
+              <p class="pagmar__detail-field" id="detailTiming">—</p>
+            </div>
+          </section>
+
+          <!-- [שייכות] — belonging/creator section (Figma 2327:36525) -->
+          <section class="pagmar__detail-belonging" aria-label="שייכות">
+            <div class="pagmar__detail-belonging-text">
+              <span class="pagmar__detail-section-tag">[שייכות]</span>
+              <p class="pagmar__detail-field" id="detailName">—</p>
+            </div>
+          </section>
+
+          <!-- [בקשה] — request criterion column (Figma 2327:36521) -->
+          <section class="pagmar__detail-request-criterion" aria-label="בקשה">
+            <div class="pagmar__detail-request-criterion-text">
+              <span class="pagmar__detail-section-tag">[בקשה]</span>
+              <p class="pagmar__detail-field" id="detailRequestCriterion">—</p>
+            </div>
+          </section>
+
+          <!-- Criterion vectors — 253×243 frames (Figma 2327:36511+) -->
+          <div class="pagmar__detail-vector pagmar__detail-vector--timing" id="detailVectorTiming" aria-hidden="true">
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
+          </div>
+          <div class="pagmar__detail-vector pagmar__detail-vector--belonging" id="detailVectorBelonging" aria-hidden="true">
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
+          </div>
+          <div class="pagmar__detail-vector pagmar__detail-vector--request" id="detailVectorRequest" aria-hidden="true">
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
+            <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
+          </div>
+
+          <!-- [תגיות] and [מרכיבים] -->
+          <div class="pagmar__detail-meta">
+            <aside class="pagmar__detail-tags-wrap" aria-labelledby="detailTagsLabel">
+              <span class="pagmar__detail-section-tag" id="detailTagsLabel">[תגיות]</span>
+              <ul class="pagmar__detail-tags" id="detailTags"></ul>
+            </aside>
+            <section class="pagmar__detail-components-wrap" aria-labelledby="detailComponentsLabel">
+              <span class="pagmar__detail-section-tag" id="detailComponentsLabel">[מרכיבים]</span>
+              <ul class="pagmar__detail-components" id="detailComponents"></ul>
+            </section>
+          </div>
+        </div>
+
+        <!-- Frame 311 — 2120:2410 -->
+        <figure class="pagmar__detail-amulet" aria-label="קמע מסתובב">
+          <div class="pagmar__detail-amulet-frame">
+            <span class="pagmar__detail-num" id="detailNum">[001]</span>
+
+            <div class="pagmar__detail-corner pagmar__detail-corner--l-tl" aria-hidden="true"></div>
+            <div class="pagmar__detail-corner pagmar__detail-corner--l-tr" aria-hidden="true"></div>
+            <div class="pagmar__detail-corner pagmar__detail-corner--l-bl" aria-hidden="true"></div>
+            <div class="pagmar__detail-corner pagmar__detail-corner--l-br" aria-hidden="true"></div>
+
+            <img class="pagmar__detail-scan-curve" src="assets/detail/scan-curve.svg" alt="" aria-hidden="true">
+
+            <div class="pagmar__detail-amulet-media">
+              <div id="detailAmulet3D" class="pagmar__detail-amulet-3d" style="display:none"></div>
+              <div id="detailAmuletFallback" class="pagmar__detail-amulet-spin">
+                <div class="pagmar__detail-amulet-coin">
+                  <div class="pagmar__detail-amulet-face pagmar__detail-amulet-face--front">
+                    <img id="detailAmuletImg" class="pagmar__detail-amulet-img" src="" alt="">
+                  </div>
+                  <div class="pagmar__detail-amulet-face pagmar__detail-amulet-face--back">
+                    <img id="detailAmuletImgBack" class="pagmar__detail-amulet-img" src="" alt="">
+                  </div>
+                  <div class="pagmar__detail-amulet-edge" aria-hidden="true"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pagmar__detail-scan-overlay" aria-hidden="true">
+              <div class="pagmar__detail-scan-box pagmar__detail-scan-box--tl"></div>
+              <div class="pagmar__detail-scan-box pagmar__detail-scan-box--mr"></div>
+              <div class="pagmar__detail-scan-box pagmar__detail-scan-box--bl"></div>
+              <span class="pagmar__detail-scan-box-label pagmar__detail-scan-box-label--tl">[שייכות]</span>
+              <span class="pagmar__detail-scan-box-label pagmar__detail-scan-box-label--mr">[בקשה]</span>
+              <span class="pagmar__detail-scan-box-label pagmar__detail-scan-box-label--bl">[מוטיבציה]</span>
+              <img class="pagmar__detail-scan-dot pagmar__detail-scan-dot--tl" src="assets/detail/scan-dot.svg" alt="">
+              <img class="pagmar__detail-scan-dot pagmar__detail-scan-dot--mr" src="assets/detail/scan-dot.svg" alt="">
+              <img class="pagmar__detail-scan-dot pagmar__detail-scan-dot--bl" src="assets/detail/scan-dot.svg" alt="">
+              <img class="pagmar__detail-scan-hub" src="assets/detail/scan-hub.svg" alt="">
+              <img class="pagmar__detail-scan-lines" src="assets/detail/scan-lines.svg" alt="">
+            </div>
+
+            <div class="pagmar__detail-scan-btn" id="detailExportBtnWrap" hidden>
+              <img class="pagmar__detail-scan-btn-bracket pagmar__detail-scan-btn-bracket--tl" src="assets/detail/scan-bracket-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+              <img class="pagmar__detail-scan-btn-bracket pagmar__detail-scan-btn-bracket--tr" src="assets/detail/scan-bracket-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+              <img class="pagmar__detail-scan-btn-bracket pagmar__detail-scan-btn-bracket--bl" src="assets/detail/scan-bracket-bl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+              <img class="pagmar__detail-scan-btn-bracket pagmar__detail-scan-btn-bracket--br" src="assets/detail/scan-bracket-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+              <button type="button" class="pagmar__detail-scan-btn__pill" id="detailExportBtn">ייצוא קמע</button>
+            </div>
+
+          </div>
+        </figure>
+
+      </main>
+
+    </div>
+  </div>
+
+  <script defer src="questions.js?v=20250704b"></script>
+  <script defer src="amulet-catalog.js?v=20250705-garden-only"></script>
+  <script defer src="../connection-core.js"></script>
+  <script defer src="amulet-detail.js?v=20250705-figma-2327"></script>
+  <script type="module">
+    const BOOT = '20250705-fog-match';
+    const HEAVY_DEFER_MS = 3200;
+
+    function waitForPaint() {
+      return new Promise(function (resolve) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(resolve);
+        });
+      });
+    }
+
+    await waitForPaint();
+    await new Promise(function (resolve) {
+      window.setTimeout(resolve, HEAVY_DEFER_MS);
+    });
+
+    import('./amulet-detail-vectors.js?v=' + BOOT)
+      .then(function (mod) {
+        if (typeof mod.bootDetailVectors === 'function') {
+          return mod.bootDetailVectors();
+        }
+      })
+      .catch(function (err) {
+        console.warn('[amulet-detail] vectors boot failed', err);
+        if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('vectors');
+      });
+
+    import('./amulet-detail-scene.js?v=20250705-shesh-fix').catch(function (err) {
+      console.warn('[amulet-detail] scene boot failed', err);
+      if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('scene');
+    });
+  </script>
+</body>
+</html>

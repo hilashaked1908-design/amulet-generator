@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בדיקת snapshot — קמע</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    h1 { font-size: 1.25rem; font-weight: 500; margin: 0 0 8px; }
+    .meta { color: #aaa; font-size: 0.9rem; margin-bottom: 24px; line-height: 1.6; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+    }
+    .panel {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .panel h2 { font-size: 0.95rem; margin: 0 0 12px; color: #ccc; }
+    .panel img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px;
+      border-radius: 4px;
+    }
+    .stats { margin-top: 10px; font-size: 0.85rem; color: #888; font-family: ui-monospace, monospace; }
+    .err { color: #f88; }
+    a.dl {
+      display: inline-block;
+      margin-top: 20px;
+      color: #9cf;
+      text-decoration: none;
+    }
+    a.dl:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1 id="title">בדיקת snapshot</h1>
+  <div class="meta" id="meta">טוען…</div>
+  <div class="grid" id="grid"></div>
+  <a class="dl" id="download" hidden download="">הורד hi-res PNG</a>
+
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const labelParam = params.get('label');
+    const indexParam = params.get('index');
+
+    const QUESTIONS = 8; // AMULET_QUESTIONS length — gallery removed
+    const base = QUESTIONS;
+
+    let index;
+    if (indexParam != null && indexParam !== '') {
+      index = parseInt(indexParam, 10);
+    } else if (labelParam != null && labelParam !== '') {
+      index = parseInt(labelParam, 10) - 1;
+    } else {
+      index = 13; // default 014
+    }
+
+    const label = String(index + 1).padStart(3, '0');
+    document.getElementById('title').textContent = 'בדיקת snapshot — קמע ' + label;
+
+    function loadCollection() {
+      try {
+        const raw = localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function loadUserSnapshot() {
+      try {
+        return (
+          sessionStorage.getItem('amuletUserSnapshot') ||
+          localStorage.getItem('amuletUserSnapshot') ||
+          null
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function panel(title, dataUrl, stats) {
+      const el = document.createElement('div');
+      el.className = 'panel';
+      el.innerHTML = '<h2></h2><img alt=""><div class="stats"></div>';
+      el.querySelector('h2').textContent = title;
+      const img = el.querySelector('img');
+      const st = el.querySelector('.stats');
+      if (!dataUrl) {
+        st.textContent = stats || 'אין תמונה';
+        st.classList.add('err');
+        return el;
+      }
+      img.src = dataUrl;
+      img.onload = function () {
+        st.textContent =
+          (stats ? stats + ' · ' : '') +
+          img.naturalWidth + '×' + img.naturalHeight + ' px';
+      };
+      img.onerror = function () {
+        st.textContent = 'שגיאה בטעינת התמונה';
+        st.classList.add('err');
+      };
+      return el;
+    }
+
+    async function main() {
+      const meta = document.getElementById('meta');
+      const grid = document.getElementById('grid');
+      const dl = document.getElementById('download');
+
+      if (!Number.isFinite(index) || index < base) {
+        meta.innerHTML = '<span class="err">index=' + index + ' — קמעות משתמש מתחילות מ-' + String(base + 1).padStart(3, '0') + ' (index ' + base + ')</span>';
+        return;
+      }
+
+      const collectionIndex = index - base;
+      const collection = loadCollection();
+      const isCurrentUser = collectionIndex === collection.length;
+      const entry = isCurrentUser ? null : collection[collectionIndex];
+
+      meta.textContent =
+        'index=' + index + ' · collectionIndex=' + collectionIndex +
+        (entry && entry.id ? ' · id=' + entry.id : isCurrentUser ? ' · (קמע נוכחי / user-amulet)' : ' · לא נמצא');
+
+      let loRes = null;
+      let snapKey = null;
+
+      if (entry) {
+        loRes = entry.snapshot || null;
+        snapKey = entry.id ? 'collection-' + entry.id : null;
+      } else if (isCurrentUser) {
+        loRes = loadUserSnapshot();
+        snapKey = 'user-amulet';
+      }
+
+      grid.appendChild(panel('localStorage / collection snapshot (lo-res)', loRes, loRes ? 'נשמר ב-collection' : ''));
+
+      let hiRes = null;
+      if (snapKey) {
+        try {
+          const store = await import('./amulet-glb-store.js');
+          hiRes = await store.loadSnapshot(snapKey);
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+
+      grid.appendChild(panel('IndexedDB hi-res snapshot', hiRes, hiRes ? 'snap-' + snapKey : 'לא נמצא ב-IndexedDB'));
+
+      const best = hiRes || loRes;
+      if (best) {
+        dl.hidden = false;
+        dl.href = best;
+        dl.download = 'amulet-' + label + '-snapshot.png';
+      } else {
+        meta.innerHTML += '<br><span class="err">לא נמצא snapshot — פתחי את העמוד מאותו דפדפן שבו יצרת את הקמעות (localhost:8080)</span>';
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

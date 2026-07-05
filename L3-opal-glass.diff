@@ -1,0 +1,143 @@
+# L3 only — before/after diff
+# Baseline: prototype-v2-thick.checkpoint.html
+# Current:  prototype-v2-thick.html
+# (prototype-v2-thick.html is not tracked in git)
+
+================================================================================
+1) CSS — layer 3 opacity
+================================================================================
+
+--- BEFORE (checkpoint)
+    .amulet-stack .layer-l3 { z-index: 2; }
+
++++ AFTER (current)
+    .amulet-stack .layer-frame { z-index: 2; }
+    .amulet-stack .layer-l3 { z-index: 3; }
+    #amuletContainer .layer-3,
+    .amulet-stack .layer-l3 {
+      opacity: 0.82;
+      mix-blend-mode: normal;
+    }
+    #amuletContainer .layer-3 .opal-glass-root,
+    .amulet-stack .layer-l3 .opal-glass-root {
+      isolation: isolate;
+    }
+
+================================================================================
+2) Constants — OPAL_GLASS (new, L3 only)
+================================================================================
+
+--- BEFORE
+  (no OPAL_GLASS block)
+
++++ AFTER
+  const OPAL_GLASS = {
+    fill: '#EDE8D0',
+    core: '#FDFAF0',
+    edge: '#D4B483',
+    layerOpacity: 0.82,
+    fillOpacity: 0.75,
+    highlightOpacity: 0.25
+  };
+  const L3_GRADIENT_ID = 'l3-opal-radial';
+  const L3_EDGE_GLOW_FILTER = 'l3-opal-edge-glow';
+  const L3_HIGHLIGHT_BLUR_FILTER = 'l3-inner-highlight-blur';
+
+================================================================================
+3) visualStyleLayer3 — ivory fill, separate frame color
+================================================================================
+
+--- BEFORE
+    const baseColor = strokeByDomain[p.domain] || strokeByDomain.love;
+    const strokeColor = shiftHex(baseColor, hueShift);
+    const ageTexture = surfaceScale <= 0 ? 'gloss' : surfaceScale < 9 ? 'gloss+bump' : 'gloss+rough';
+    return {
+      ...
+      strokeColor,
+      ageTexture,
+
++++ AFTER
+    const glass = milkyGlassColors(p.domain, hueShift);
+    const frameStrokeColor = shiftHex(strokeByDomain[p.domain] || strokeByDomain.love, hueShift);
+    return {
+      ...
+      fillColor: OPAL_GLASS.fill,
+      strokeColor: glass.ivory,
+      frameStrokeColor,
+      ageTexture: 'opal-glass',
+
+================================================================================
+4) buildSvgDefs — L3 uses opal defs, not combined bump filter
+================================================================================
+
+--- BEFORE
+    console.log('[layer3] surfaceScale:', style3.surfaceScale, 'gender:', style3.gender);
+    defs += buildCombinedFilter(FILTER_ID_LAYER3, style3);
+
++++ AFTER
+    console.log('[layer3] opal-glass fill:', style3.fillColor || OPAL_GLASS.fill);
+    defs += buildL3OpalGlassDefs();
+
+--- NEW FUNCTION buildL3OpalGlassDefs() ---
+  <radialGradient id="l3-opal-radial" ...>
+    #FDFAF0 → #EDE8D0 → #D4B483
+  </radialGradient>
+  <filter id="l3-opal-edge-glow">
+    <feGaussianBlur stdDeviation="1.2" .../>
+  </filter>
+  <filter id="l3-inner-highlight-blur">
+    <feGaussianBlur stdDeviation="8"/>
+  </filter>
+
+================================================================================
+5) pathLayers — multi-layer opal glass body (L3 only branch)
+================================================================================
+
+--- BEFORE
+  function pathLayers(pathMarkup, style, filterId) {
+    const clean = sanitizePathsInner(pathMarkup);
+    const mainFid = filterId || style.filterId || FILTER_ID_COMBINED;
+    return (
+      '<g class="path-layers"><g class="path-main" ' +
+      strokeAttrs(style, PATH_MAIN_W, mainFid) +
+      '>' + clean + '</g></g>'
+    );
+  }
+
++++ AFTER
+  function opalGlassPathBody(...)  // edge + ivory fill + gradient + core
+  function opalGlassHighlights(...) // white ellipses, blur 8px
+  function milkyGlassPathLayers(...)
+  function pathLayers(...) {
+    if (style.layer === 3) {
+      return milkyGlassPathLayers(pathMarkup, style);
+    }
+    // L2 unchanged — same single stroke path
+  }
+
+================================================================================
+6) buildUnifiedGlyphRendering — highlights on L3
+================================================================================
+
+--- BEFORE
+  return '<g class="amulet-glyphs">' + pathLayers(...) + '</g>';
+
++++ AFTER
+  if (style.layer !== 3) { ... same as before ... }
+  return (
+    '<g class="amulet-glyphs opal-glass-root">' +
+    layers +
+    opalGlassHighlights(CX, CY) +
+    '</g>'
+  );
+
+================================================================================
+7) Status line
+================================================================================
+
+--- BEFORE
+  (PBR / bump scale messaging)
+
++++ AFTER
+  L3mat=opal-glass
+  L3fill=#EDE8D0

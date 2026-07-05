@@ -1,0 +1,101 @@
+/* Site fonts — files in /fonts/ */
+
+:root {
+  --pagmar-green: #ffffff;
+}
+
+@font-face {
+  font-family: "DavidLibre";
+  src: url("../fonts/DavidLibre-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DavidLibre";
+  src: url("../fonts/DavidLibre-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DavidLibre";
+  src: url("../fonts/DavidLibre-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Romema Spitzer TRIAL";
+  src: url("../fonts/RomemaSpitzerTRIAL-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics Display Thin";
+  src: url("../fonts/TheBasics-DisplayThin.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics Mono";
+  src: url("../fonts/TheBasics-Mono.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics";
+  src: url("../fonts/TheBasics-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics";
+  src: url("../fonts/TheBasics-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics";
+  src: url("../fonts/TheBasics-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

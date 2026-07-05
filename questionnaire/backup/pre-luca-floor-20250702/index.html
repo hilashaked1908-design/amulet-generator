@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קמע — אינדקס</title>
+  <link rel="stylesheet" href="../css/fonts.css">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250702-luca-exact">
+</head>
+<body class="pagmar-index">
+
+  <div class="pagmar-viewport">
+    <div class="pagmar-canvas" id="pagmarCanvas" aria-label="פתיחת שאלון קמע">
+
+      <div class="pagmar__stage" id="questionStage">
+        <div
+          class="pagmar__garden"
+          id="questionGarden"
+          aria-label="מרחב קמעים — גררי לניווט, לחצי על קמע למפרט"
+        ></div>
+        <div
+          id="amuletContainer"
+          class="result__amulet"
+          role="img"
+          aria-label="קמע — גררי לסיבוב"
+          hidden
+        ></div>
+        <p id="amuletStatus" class="result__status" aria-live="polite" hidden>מכין את הקמע…</p>
+      </div>
+
+      <!-- יצירת קמע — מרחב קמע למעלה, שאלות במלבן למטה (Figma 1744:23679) -->
+      <div class="pagmar__index-create" id="indexCreateWorkspace" hidden>
+        <div class="pagmar__index-create-stack pagmar__component12">
+          <div class="pagmar__component12__frame-shell pagmar__component12__frame-shell--top" aria-hidden="true">
+            <div class="pagmar__component12__frame-bleed">
+              <img
+                class="pagmar__component12__frame pagmar__component12__frame--top"
+                src="assets/create/component12-top.svg?v=20250630-c12fix"
+                alt=""
+                decoding="async"
+                draggable="false"
+              >
+            </div>
+          </div>
+          <div class="pagmar__component12__frame-shell pagmar__component12__frame-shell--bottom" aria-hidden="true">
+            <div class="pagmar__component12__frame-bleed">
+              <img
+                class="pagmar__component12__frame pagmar__component12__frame--bottom"
+                src="assets/create/component12-bottom.svg?v=20250630-c12fix"
+                alt=""
+                decoding="async"
+                draggable="false"
+              >
+            </div>
+          </div>
+
+          <div class="pagmar__component12__amulet pagmar__index-create-amulet-frame" aria-label="מסגרת הקמע">
+            <div class="pagmar__index-create-amulet-inner">
+              <div id="createAmuletSlot" class="pagmar__index-create-amulet-view"></div>
+              <p id="createAmuletStatus" class="pagmar__index-create-status" aria-live="polite" hidden>בונה את הקמע…</p>
+              <div class="pagmar__index-create-amulet-actions" id="createAmuletActions" hidden>
+                <button type="button" class="pagmar__action-btn pagmar__create-amulet-action" id="exportAmuletBtn">
+                  <span class="pagmar__action-btn__inner">
+                    <svg class="pagmar__action-btn__art" viewBox="0 0 224 83" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M12 4H94.9347C99.2114 4 103.521 4.31092 107.591 5.62449C107.759 5.67877 107.923 5.73326 108.081 5.78775C110.321 6.55938 113.736 9 113.736 9C113.736 9 117.251 6.56165 119.537 5.78775C123.822 4.33697 128.388 4 132.912 4H215.473V12.7004C215.473 16.0268 215.108 19.3585 214.014 22.5C213.414 24.2262 212.666 26.0993 211.849 27.53C209.883 30.9692 205.473 35.4189 205.473 35.4189C205.473 35.4189 209.895 39.6822 211.849 43.0328C212.779 44.6295 213.594 46.7824 214.214 48.6899C215.162 51.6062 215.473 54.6769 215.473 57.7434V66.8379H133.451C128.564 66.8379 123.511 66.6911 118.925 65.0014C116.886 64.2502 113.736 61.8379 113.736 61.8379C113.736 61.8379 110.735 64.248 108.634 65.0014C103.938 66.6856 98.857 66.8379 93.8678 66.8379H12V59.7401C12 55.362 12.6434 50.98 14.3971 46.9685C15.0254 45.5311 15.724 44.0769 16.4239 42.8954C18.2804 39.7617 22 35.4189 22 35.4189C22 35.4189 18.2622 31.2683 16.4239 28.2266C15.6057 26.8727 14.8109 25.1547 14.126 23.5016C12.5602 19.7226 12 15.6279 12 11.5374V4Z" fill="#F8F8F7" shape-rendering="geometricPrecision"/>
+                    </svg>
+                    <span class="pagmar__action-btn__label" aria-hidden="true">
+                      <span class="pagmar__action-btn__label-track">
+                        <span class="pagmar__action-btn__label-line">ייצא כתמונה</span>
+                        <span class="pagmar__action-btn__label-line">ייצא כתמונה</span>
+                      </span>
+                    </span>
+                  </span>
+                </button>
+                <button type="button" class="pagmar__action-btn pagmar__create-amulet-action" id="saveAmuletBtn">
+                  <span class="pagmar__action-btn__inner">
+                    <svg class="pagmar__action-btn__art" viewBox="0 0 224 83" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M12 4H94.9347C99.2114 4 103.521 4.31092 107.591 5.62449C107.759 5.67877 107.923 5.73326 108.081 5.78775C110.321 6.55938 113.736 9 113.736 9C113.736 9 117.251 6.56165 119.537 5.78775C123.822 4.33697 128.388 4 132.912 4H215.473V12.7004C215.473 16.0268 215.108 19.3585 214.014 22.5C213.414 24.2262 212.666 26.0993 211.849 27.53C209.883 30.9692 205.473 35.4189 205.473 35.4189C205.473 35.4189 209.895 39.6822 211.849 43.0328C212.779 44.6295 213.594 46.7824 214.214 48.6899C215.162 51.6062 215.473 54.6769 215.473 57.7434V66.8379H133.451C128.564 66.8379 123.511 66.6911 118.925 65.0014C116.886 64.2502 113.736 61.8379 113.736 61.8379C113.736 61.8379 110.735 64.248 108.634 65.0014C103.938 66.6856 98.857 66.8379 93.8678 66.8379H12V59.7401C12 55.362 12.6434 50.98 14.3971 46.9685C15.0254 45.5311 15.724 44.0769 16.4239 42.8954C18.2804 39.7617 22 35.4189 22 35.4189C22 35.4189 18.2622 31.2683 16.4239 28.2266C15.6057 26.8727 14.8109 25.1547 14.126 23.5016C12.5602 19.7226 12 15.6279 12 11.5374V4Z" fill="#F8F8F7" shape-rendering="geometricPrecision"/>
+                    </svg>
+                    <span class="pagmar__action-btn__label" aria-hidden="true">
+                      <span class="pagmar__action-btn__label-track">
+                        <span class="pagmar__action-btn__label-line">שמור קמע</span>
+                        <span class="pagmar__action-btn__label-line">שמור קמע</span>
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="pagmar__component12__question pagmar__create-question-block">
+            <div
+              class="pagmar__create-question-panel"
+              id="questionFrame"
+              role="region"
+              aria-labelledby="questionText"
+            >
+              <div class="pagmar__create-question-stack">
+                <div class="pagmar__create-question-fields">
+                  <div class="pagmar__create-question-head">
+                    <span class="pagmar__create-question-num" id="questionLabel" hidden aria-hidden="true"></span>
+                    <p class="pagmar__create-question-text" id="questionText"></p>
+                  </div>
+                  <div class="pagmar__create-question-box">
+                    <div class="pagmar__create-question-field" id="questionField"></div>
+                  </div>
+                </div>
+                <div class="pagmar__create-save-wrap">
+                  <button type="button" class="pagmar__create-save" id="questionSubmit" disabled>
+                    <span class="pagmar__create-save-shape" aria-hidden="true">
+                      <img
+                        class="pagmar__create-save-bg"
+                        src="assets/create/save-btn-shape.svg?v=single-path"
+                        width="150"
+                        height="39"
+                        alt=""
+                        decoding="async"
+                        draggable="false"
+                      >
+                    </span>
+                    <span class="pagmar__create-save-label-wrap">
+                      <span class="pagmar__create-save-label-clip">
+                        <span class="pagmar__create-save-label-track">
+                          <span class="pagmar__create-save-label">לשאלה הבאה</span>
+                          <span class="pagmar__create-save-label">לשאלה הבאה</span>
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside
+        class="pagmar__spec-panel"
+        id="amuletSpecPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="amuletSpecIndex"
+        hidden
+      >
+        <div class="pagmar__spec-panel__rule" aria-hidden="true">
+          <span class="pagmar__spec-panel__notch"></span>
+        </div>
+        <p class="pagmar__spec-panel__title" id="amuletSpecIndex"></p>
+      </aside>
+
+      <aside
+        class="pagmar__choice-panel"
+        id="choicePanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="choiceTitle"
+        hidden
+      >
+        <h2 class="pagmar__choice-title" id="choiceTitle"></h2>
+        <p class="pagmar__choice-question" id="choiceQuestion" hidden></p>
+        <div class="pagmar__choice-options" id="choiceOptions"></div>
+      </aside>
+
+      <div
+        class="pagmar__text-panel"
+        id="textPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="textQuestion"
+        hidden
+      >
+        <span class="pagmar__text-num" id="textLabel">[ 01 ]</span>
+        <p class="pagmar__text-question" id="textQuestion"></p>
+        <div class="pagmar__text-field" id="textField"></div>
+        <div class="pagmar__text-actions">
+          <button type="button" class="pagmar__text-save" id="textSubmit" disabled>שמור תשובה</button>
+          <button type="button" class="pagmar__text-close" id="textClose" aria-label="סגירה">×</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../connection-core.js"></script>
+  <script src="questions.js?v=20250630-c12fix"></script>
+  <script src="amulet-catalog.js?v=20250629-user-spec"></script>
+  <script src="garden-atmosphere.js?v=20250702-luca-exact"></script>
+  <script type="module" src="garden-three.js?v=20250702-luca-exact"></script>
+  <script src="questionnaire-ui.js?v=20250701-stable"></script>
+</body>
+</html>

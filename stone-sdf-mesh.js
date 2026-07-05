@@ -223,9 +223,11 @@ function addSlabSurfaceRelief(hSurf, x, y, edgeDist, roundR, params) {
     hSurf += meteoriteSilhouetteMassAt(x, y, edgeDist, roundR, params);
   }
   const delta = slabSurfaceReliefAt(x, y, edgeDist, roundR, params);
-  if (!isMeteoriteStonePreset(params)) return hSurf + delta;
+  const thorn = slabThornReliefAt(x, y, edgeDist, roundR, params);
+  const total = delta + thorn;
+  if (!isMeteoriteStonePreset(params)) return hSurf + total;
   const baseH = params.basePlateHeight ?? params.maxH * 0.4;
-  return Math.max(baseH * 0.58, hSurf + delta);
+  return Math.max(baseH * 0.58, hSurf + total);
 }
 
 function slabSurfaceReliefAt(x, y, edgeDist, roundR, params) {
@@ -1033,7 +1035,8 @@ function stoneSmoothSettings(
   stoneRoughness = 0,
   hasMachineCut = false,
   hasHairlineEngrave = false,
-  hasChannelEngrave = false
+  hasChannelEngrave = false,
+  slabThornIntensity = 0
 ) {
   if ((sharpRelief || hasMachineCut || hasHairlineEngrave || hasChannelEngrave) && slabMode) {
     return { iter: 0, lambda: 0, pass2: null };
@@ -1057,11 +1060,13 @@ function stoneSmoothSettings(
     };
   }
   const keep = 1 - Math.min(1, stoneRoughness) * 0.92;
-  settings.iter = Math.max(0, Math.round(settings.iter * keep));
-  settings.lambda *= keep;
+  const thornKeep = 1 - Math.min(1, slabThornIntensity) * 0.82;
+  const smoothKeep = keep * thornKeep;
+  settings.iter = Math.max(0, Math.round(settings.iter * smoothKeep));
+  settings.lambda *= smoothKeep;
   if (settings.pass2) {
-    settings.pass2.iter = Math.max(0, Math.round(settings.pass2.iter * keep));
-    settings.pass2.lambda *= keep;
+    settings.pass2.iter = Math.max(0, Math.round(settings.pass2.iter * smoothKeep));
+    settings.pass2.lambda *= smoothKeep;
   }
   return settings;
 }
@@ -1923,6 +1928,80 @@ function slabSurfaceSwell(x, y, din, roundR, params) {
   );
 }
 
+function slabThornRng(state) {
+  state.s = (state.s + 0x6d2b79f5) | 0;
+  let t = state.s;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/** Q6-driven thorn sites — cone spikes on slab surface (geometry only, not texture). */
+function buildSlabThornCatalog(params) {
+  const intensity = Math.max(0, Math.min(1, params.slabThornIntensity ?? 0));
+  if (intensity < 0.04) return null;
+
+  const minX = params.maskOrigin.minX;
+  const minY = params.maskOrigin.minY;
+  const maxX = params.maskOrigin.maxX;
+  const maxY = params.maskOrigin.maxY;
+  const span = Math.min(maxX - minX, maxY - minY);
+  const ox = (minX + maxX) * 0.5;
+  const oy = (minY + maxY) * 0.5;
+  const count = Math.round(10 + intensity * 34);
+  const thorns = [];
+  const rng = { s: (params.slabThornSeed ?? 0x9e3779b9) | 0 };
+
+  for (let i = 0; i < count; i++) {
+    const ang = slabThornRng(rng) * Math.PI * 2;
+    const rad = Math.sqrt(slabThornRng(rng)) * span * 0.44;
+    const sizeJitter = 0.62 + slabThornRng(rng) * 0.76;
+    thorns.push({
+      cx: ox + Math.cos(ang) * rad,
+      cy: oy + Math.sin(ang) * rad,
+      radius: span * (0.014 + slabThornRng(rng) * 0.028) * (0.55 + intensity * 0.95) * sizeJitter,
+      height: params.roundR * (0.42 + intensity * 1.28) * (0.58 + slabThornRng(rng) * 0.84),
+      sharpness: 0.48 + slabThornRng(rng) * 0.42,
+    });
+  }
+
+  return { thorns, intensity, span, ox, oy };
+}
+
+function thornConeProfile(dist, radius, height, sharpness) {
+  if (dist > radius) return 0;
+  const t = 1 - dist / Math.max(radius, 0.001);
+  return height * Math.pow(t, 1 / Math.max(0.34, sharpness));
+}
+
+function slabThornReliefAt(x, y, edgeDist, roundR, params) {
+  const catalog = params.slabThornCatalog;
+  if (!catalog?.thorns?.length) return 0;
+  if (insideMachineEngraveAt(x, y, params)) return 0;
+
+  const edgeFade = Math.min(1, edgeDist / Math.max(roundR * 0.9, 0.001));
+  if (edgeFade < 0.12) return 0;
+
+  let relief = 0;
+  for (const th of catalog.thorns) {
+    const dist = Math.hypot(x - th.cx, y - th.cy);
+    relief = Math.max(relief, thornConeProfile(dist, th.radius, th.height, th.sharpness));
+  }
+
+  if (insideEmbossOverlayAt(x, y, params)) relief *= 0.12;
+  else if (embossHeightAt(x, y, params) > roundR * 0.05) relief *= 0.28;
+
+  return relief * edgeFade * (0.55 + catalog.intensity * 0.45);
+}
+
+function attachSlabThornCatalog(params, slabMode) {
+  if (!slabMode) return params;
+  const intensity = Math.max(0, Math.min(1, params.slabThornIntensity ?? 0));
+  if (intensity < 0.04) return params;
+  params.slabThornCatalog = buildSlabThornCatalog(params);
+  return params;
+}
+
 /** Deterministic RNG for reproducible terracotta scrapes. */
 function terracottaRand(state) {
   state.s = (state.s + 0x6d2b79f5) | 0;
@@ -2266,18 +2345,18 @@ function stoneVertexColorPalette(params) {
   }
   if (preset === PREMIUM_MATERIAL_IDS.DEEP_STONEWARE) {
     return {
-      hi: [0.78, 0.88, 0.8],
-      lo: [0.2, 0.34, 0.3],
-      grime: [0.16, 0.28, 0.26],
+      hi: [0.89, 0.78, 0.7],
+      lo: [0.72, 0.58, 0.46],
+      grime: [0.58, 0.48, 0.38],
       ridgeWear: true,
       wearStyle: 'seafoam_jade',
     };
   }
   if (preset === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT) {
     return {
-      hi: [0.93, 0.91, 0.87],
-      lo: [0.7, 0.68, 0.64],
-      grime: [0.56, 0.54, 0.5],
+      hi: [0.86, 0.8, 0.73],
+      lo: [0.6, 0.55, 0.48],
+      grime: [0.5, 0.45, 0.38],
       ridgeWear: true,
       wearStyle: 'warm_marble',
     };
@@ -2327,6 +2406,15 @@ function stoneVertexColorPalette(params) {
       wearStyle: 'slate_marble',
     };
   }
+  if (preset === PREMIUM_MATERIAL_IDS.SAGE_STONE) {
+    return {
+      hi: [0.96, 0.97, 0.95],
+      lo: [0.36, 0.38, 0.34],
+      grime: [0.28, 0.3, 0.27],
+      ridgeWear: false,
+      wearStyle: 'sage',
+    };
+  }
   return {
     hi: [0.98, 0.99, 0.97],
     lo: [0.5, 0.52, 0.48],
@@ -2342,9 +2430,9 @@ function applySculptureVertexAO(geom, params) {
   const colors = new Float32Array(pos.count * 3);
   const { maskScale, roundR, maxDistInScene } = params;
   const palette = stoneVertexColorPalette(params);
-  const archDoubt =
-    normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage') ===
-    PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT;
+  const stonePreset = normalizePremiumMaterialId(params.stoneMaterialPreset ?? 'sage');
+  const archDoubt = stonePreset === PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT;
+  const sageStone = stonePreset === PREMIUM_MATERIAL_IDS.SAGE_STONE;
   const meteoriteStone = isMeteoriteStonePreset(params);
   const meteoriteSpec = meteoriteStone
     ? getPremiumMaterialSpec(PREMIUM_MATERIAL_IDS.METEORITE_STONE)
@@ -2425,9 +2513,11 @@ function applySculptureVertexAO(geom, params) {
             ? 0.62 * meteoriteAoK * 0.22
             : params.sharpRelief
               ? 0.58
-              : 0.36
+              : sageStone
+                ? 0.41
+                : 0.36
           : 0.28) +
-      narrow * (params.slabMode ? (meteoriteStone ? 0.34 : 0.1) : 0.12);
+      narrow * (params.slabMode ? (meteoriteStone ? 0.34 : sageStone ? 0.12 : 0.1) : 0.12);
     let meteoriteCraterRelief = 0;
     if (meteoriteStone && params.slabMode) {
       meteoriteCraterRelief = meteoriteSlabSurfaceRelief(x, y, params);
@@ -2447,7 +2537,9 @@ function applySculptureVertexAO(geom, params) {
           ? 0.28 + (1.0 - Math.pow(cavityT, 0.48) * 0.72) * 0.56
           : archDoubt
             ? 0.48 + (1.0 - Math.pow(cavityT, 0.52) * 0.58) * 0.42
-            : 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
+            : sageStone
+              ? 0.32 + (1.0 - Math.pow(cavityT, 0.56) * 0.66) * 0.5
+              : 0.4 + (1.0 - Math.pow(cavityT, 0.62) * 0.62) * 0.44
       : 0.88 + 0.12 * (1 - cavityT);
     if (meteoriteStone) {
       const spatial = meteoriteShadeSpatialFactors(x, y, params);
@@ -2487,7 +2579,7 @@ function applySculptureVertexAO(geom, params) {
     }
     if (carve > roundR * 0.002) {
       const carveShade = Math.min(1, carve / Math.max(roundR * 0.1, 0.001));
-      lit *= 1 - carveShade * (params.slabMode ? (meteoriteStone ? 0.72 : 0.5) : 0.18);
+      lit *= 1 - carveShade * (params.slabMode ? (meteoriteStone ? 0.72 : sageStone ? 0.56 : 0.5) : 0.18);
     }
     if (bed > 0 && z < baseZ + bed * 0.35) {
       grime = Math.min(1, (baseZ + bed * 0.42 - z) / Math.max(bed * 0.78, 0.01));
@@ -3049,7 +3141,10 @@ export function buildStoneSculptureMeshFromMask(
   for (const ov of options?.embossOverlays || []) {
     embossExtraH = Math.max(embossExtraH, ov.height || 0);
   }
-  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH, options);
+  const slabThornIntensity = Math.max(0, Math.min(1, options?.slabThornIntensity ?? 0));
+  const thornExtraH =
+    slabThornIntensity > 0.04 ? roundR * (0.38 + slabThornIntensity * 1.42) : 0;
+  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH + thornExtraH, options);
 
   const spanX = maxX - minX;
   const spanY = maxY - minY;
@@ -3144,12 +3239,15 @@ export function buildStoneSculptureMeshFromMask(
     letterGapRelief: !!options?.letterGapRelief,
     stoneMaterialPreset: options?.stoneMaterialPreset ?? 'sage',
     stoneRoughness: options?.stoneRoughness ?? 0,
+    slabThornIntensity: options?.slabThornIntensity ?? 0,
+    slabThornSeed: options?.slabThornSeed ?? 0,
     erodedArtifact,
     agedTerracottaArtifact,
     softStoneTier,
     sharpRelief,
   };
   attachMeteoriteCraterCatalog(params, slabMode);
+  attachSlabThornCatalog(params, slabMode);
 
   const potential = (x, y, z) => {
     let sdf = stoneSdfAt(x, y, z, params);
@@ -3180,7 +3278,8 @@ export function buildStoneSculptureMeshFromMask(
       params.stoneRoughness ?? 0,
       hasMachineCut,
       hasHairlineEngrave,
-      hasChannelEngrave
+      hasChannelEngrave,
+      params.slabThornIntensity ?? 0
     );
     if (smooth.iter > 0) laplacianSmoothGeometry(geom, smooth.iter, smooth.lambda);
     geom.computeVertexNormals();
@@ -3271,7 +3370,10 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   for (const ov of options?.embossOverlays || []) {
     embossExtraH = Math.max(embossExtraH, ov.height || 0);
   }
-  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH, options);
+  const slabThornIntensity = Math.max(0, Math.min(1, options?.slabThornIntensity ?? 0));
+  const thornExtraH =
+    slabThornIntensity > 0.04 ? roundR * (0.38 + slabThornIntensity * 1.42) : 0;
+  const maxZ = slabStoneMaxZ(maxH, roundR, embossExtraH + thornExtraH, options);
 
   const spanX = maxX - minX;
   const spanY = maxY - minY;
@@ -3366,12 +3468,15 @@ export async function buildStoneSculptureMeshFromMaskAsync(
     letterGapRelief: !!options?.letterGapRelief,
     stoneMaterialPreset: options?.stoneMaterialPreset ?? 'sage',
     stoneRoughness: options?.stoneRoughness ?? 0,
+    slabThornIntensity: options?.slabThornIntensity ?? 0,
+    slabThornSeed: options?.slabThornSeed ?? 0,
     erodedArtifact,
     agedTerracottaArtifact,
     softStoneTier,
     sharpRelief,
   };
   attachMeteoriteCraterCatalog(params, slabMode);
+  attachSlabThornCatalog(params, slabMode);
 
   const potential = (x, y, z) => {
     let sdf = stoneSdfAt(x, y, z, params);
@@ -3404,7 +3509,8 @@ export async function buildStoneSculptureMeshFromMaskAsync(
       params.stoneRoughness ?? 0,
       hasMachineCut,
       hasHairlineEngrave,
-      hasChannelEngrave
+      hasChannelEngrave,
+      params.slabThornIntensity ?? 0
     );
     if (smooth.iter > 0) laplacianSmoothGeometry(geom, smooth.iter, smooth.lambda);
     geom.computeVertexNormals();

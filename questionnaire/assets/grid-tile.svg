@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="212" height="140" viewBox="0 0 212 140" fill="none">
+  <!-- Figma Pagmar grid cell  212�140, line #1B1B1B, diamond at intersection -->
+  <g stroke="#1B1B1B" stroke-width="1" shape-rendering="geometricPrecision">
+    <line x1="0.5" y1="0" x2="0.5" y2="140"/>
+    <line x1="0" y1="0.5" x2="212" y2="0.5"/>
+  </g>
+  <polygon fill="#1B1B1B" points="0.5,3 4.5,10 0.5,17 -3.5,10"/>
+</svg>

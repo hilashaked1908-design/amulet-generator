@@ -482,7 +482,7 @@ function symbolSvgMarkup(sym) {
   const size = sym.size * sym.scale;
   const inner = buildSymbolInner(sym);
   const mode = sym.fillMode || 'stroke';
-  const color = '#000';
+  const color = '#1B1613';
   const fill = mode === 'stroke' ? 'none' : color;
   const stroke = mode === 'fill' ? 'none' : color;
   const sw = clamp(sym.strokeWidth || 2, 1, 10);
@@ -556,7 +556,7 @@ async function drawCanvas() {
 
   symLayer.innerHTML = symbols.map(symbolSvgMarkup).join('');
   glyphLayer.innerHTML =
-    glyphSvgMarkup(textA, glyphA.x, glyphA.y, glyphA.rot, sizeA, '#000', 'a', glyphA.flipX, glyphA.flipY) +
+    glyphSvgMarkup(textA, glyphA.x, glyphA.y, glyphA.rot, sizeA, '#1B1613', 'a', glyphA.flipX, glyphA.flipY) +
     glyphSvgMarkup(textB, glyphB.x, glyphB.y, glyphB.rot, sizeB, '#1565c0', 'b', glyphB.flipX, glyphB.flipY);
 
   $('infoAx').textContent = Math.round(glyphA.x);

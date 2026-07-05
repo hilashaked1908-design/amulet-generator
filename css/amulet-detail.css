@@ -1,0 +1,995 @@
+/* Amulet detail — Figma 2327:35485 @ 1920×1080 (absolute coords, LTR canvas) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body.pagmar-amulet-detail {
+  margin: 0;
+  overflow: hidden;
+  background: #000000;
+  --detail-bg: #000000;
+  --detail-fg: #ffffff;
+  --detail-badge-bg: #ffffff;
+  --detail-ink-on-badge: #161616;
+  --detail-scan: #ffffff;
+  --detail-scan-box-bg: #161616;
+  --detail-divider: rgba(255, 255, 255, 0.3);
+  --detail-font: "TheBasics", "TheBasics Mono", monospace;
+  --pagmar-content-margin: 20px;
+  --detail-chrome-margin: 50.432;
+  --detail-content-w: 1030.906;
+  --detail-chrome-w: 406;
+  --detail-row-w: 880;
+  --detail-col-w: 253;
+  --detail-col-belonging-w: 254;
+  --detail-col-request-w: 254;
+  --detail-col2-left: 357.932;
+  --detail-col3-left: 676.432;
+  --detail-meta-gap: 37;
+  --detail-meta-tags-w: 172;
+  --detail-meta-components-w: 197;
+  --detail-amulet-left: 1030.906;
+  --detail-vector-inset: 10;
+  --detail-vector-scale: 0.8;
+  --pagmar-w: 1920;
+  --pagmar-h: 1080;
+  --pagmar-margin: var(--pagmar-content-margin, 20px);
+}
+
+/* Full-page loader — cycling vessel vectors over fog (Figma 2298:32207) */
+body.pagmar-amulet-detail.is-detail-loading .pagmar-canvas--detail {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.pagmar-amulet-detail.is-detail-loading .pagmar-viewport {
+  pointer-events: none;
+}
+
+.pagmar__detail-page-loader {
+  --loader-u: min(
+    calc((100vw - var(--pagmar-content-margin, 20px) * 2) / 1920),
+    calc((100dvh - var(--pagmar-content-margin, 20px) * 2) / 1080)
+  );
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.pagmar__detail-page-loader.is-leaving {
+  opacity: 0;
+}
+
+.pagmar__detail-page-loader[hidden] {
+  display: none;
+}
+
+.pagmar__detail-page-loader__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 2298:32207 — vessel clip, centered on viewport */
+.pagmar__detail-page-loader__vessels {
+  position: relative;
+  width: calc(305 * var(--loader-u));
+  height: calc(305 * var(--loader-u));
+  flex: 0 0 auto;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.pagmar__detail-page-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: running;
+  backface-visibility: hidden;
+}
+
+.pagmar__detail-page-loader__vessel--1 {
+  width: calc(158.765 * var(--loader-u));
+  height: calc(277.371 * var(--loader-u));
+  animation-delay: 0s;
+}
+
+.pagmar__detail-page-loader__vessel--2 {
+  width: calc(274.478 * var(--loader-u));
+  height: calc(280.742 * var(--loader-u));
+  animation-delay: -1s;
+}
+
+.pagmar__detail-page-loader__vessel--3 {
+  width: calc(287.758 * var(--loader-u));
+  height: calc(158.675 * var(--loader-u));
+  animation-delay: -2s;
+}
+
+.pagmar__detail-page-loader__vessel--4 {
+  width: calc(268.429 * var(--loader-u));
+  height: calc(273.41 * var(--loader-u));
+  animation-delay: -3s;
+}
+
+@keyframes pagmar-detail-vessel-slot {
+  0%, 24.999% { opacity: 1; }
+  25%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__detail-page-loader__vessel {
+    animation: none;
+    opacity: 0;
+  }
+
+  .pagmar__detail-page-loader__vessel--1 {
+    opacity: 1;
+  }
+}
+
+body.pagmar-amulet-detail .pagmar__detail-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+body.pagmar-amulet-detail .pagmar-viewport {
+  position: relative;
+  z-index: 1;
+  padding: var(--pagmar-content-margin, 20px);
+  box-sizing: border-box;
+  min-height: 100dvh;
+  width: 100vw;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  background: transparent;
+}
+
+body.pagmar-amulet-detail .pagmar-canvas--detail {
+  container-type: inline-size;
+  position: relative;
+  width: min(
+    calc(100vw - var(--pagmar-content-margin, 20px) * 2),
+    calc((100dvh - var(--pagmar-content-margin, 20px) * 2) * var(--pagmar-w) / var(--pagmar-h)),
+    calc(var(--pagmar-w) * 1px)
+  );
+  aspect-ratio: 1920 / 1080;
+  max-height: calc(100dvh - var(--pagmar-content-margin, 20px) * 2);
+  height: auto;
+  overflow: hidden;
+  background: transparent;
+  direction: ltr;
+  --u: calc(100cqw / var(--pagmar-w));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-fog {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: #000000;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-fog-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-main {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* ── Close button — top-right ── */
+body.pagmar-amulet-detail .pagmar__detail-close {
+  position: absolute;
+  z-index: 20;
+  left: auto;
+  right: calc(51.881 * var(--u));
+  top: calc(55 * var(--u));
+  width: calc(16.119 * var(--u));
+  height: calc(22.235 * var(--u));
+  padding: 0 0 calc(1 * var(--u));
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-close img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── [001] badge — Figma Frame 281 @ (1823, 133.1) ── */
+body.pagmar-amulet-detail .pagmar__detail-num {
+  position: absolute;
+  z-index: 25;
+  left: calc(792.094 * var(--u));
+  right: auto;
+  bottom: calc(100% + 33.867 * var(--u));
+  top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(47 * var(--u));
+  height: calc(27 * var(--u));
+  padding: calc(4 * var(--u));
+  background: var(--detail-badge-bg);
+  color: var(--detail-ink-on-badge);
+  font-family: var(--detail-font);
+  font-size: calc(18 * var(--u));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Left content area — Figma coords within 1920 canvas ── */
+body.pagmar-amulet-detail .pagmar__detail-content {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--detail-content-w) * var(--u));
+  height: calc(1080 * var(--u));
+  pointer-events: auto;
+  --detail-vector-w: 253;
+  --detail-vector-h: 243.344;
+}
+
+/* ── [בקשה] request story — Frame 351 @ (50.432, 193) ── */
+body.pagmar-amulet-detail .pagmar__detail-request {
+  position: absolute;
+  left: calc(var(--detail-chrome-margin) * var(--u));
+  top: calc(193 * var(--u));
+  width: calc(var(--detail-row-w) * var(--u));
+  height: calc(146 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-request-text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(879 * var(--u));
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(16 * var(--u));
+  min-width: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-request-text .pagmar__detail-section-tag {
+  align-self: stretch;
+  width: auto;
+  max-width: 100%;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-story {
+  width: 100%;
+  max-width: 100%;
+  height: calc(110 * var(--u));
+  margin: 0;
+  padding: 0;
+  color: var(--detail-fg);
+  font-family: "Romema Spitzer TRIAL", "Romema", "DavidLibre", serif;
+  font-size: calc(32 * var(--u));
+  font-weight: 300;
+  font-style: normal;
+  line-height: 1.16;
+  letter-spacing: calc(1.28 * var(--u));
+  text-align: right;
+  direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: hidden;
+}
+
+/* ── Vector preview containers — 236×227 with in-frame corners (Figma 2276:23552+) ── */
+body.pagmar-amulet-detail .pagmar__detail-vector {
+  position: absolute;
+  width: calc(var(--detail-vector-w) * var(--u));
+  height: calc(var(--detail-vector-h) * var(--u));
+  padding: calc(var(--detail-vector-inset) * var(--u));
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector svg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: calc(var(--detail-vector-scale) * 100%);
+  height: calc(var(--detail-vector-scale) * 100%);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector-corner {
+  position: absolute;
+  z-index: 2;
+  width: calc(16.57 * var(--u));
+  height: calc(16.57 * var(--u));
+  box-sizing: border-box;
+  pointer-events: none;
+  opacity: 0.5;
+  border-color: #ffffff;
+  border-style: solid;
+  border-width: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector-corner--tl {
+  left: 0;
+  top: 0;
+  border-left-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector-corner--tr {
+  right: 0;
+  left: auto;
+  top: 0;
+  border-right-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector-corner--bl {
+  left: 0;
+  bottom: 0;
+  top: auto;
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector-corner--br {
+  right: 0;
+  left: auto;
+  bottom: 0;
+  top: auto;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector--request {
+  left: calc(var(--detail-col3-left) * var(--u));
+  top: calc(549.828 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector--timing {
+  left: calc(var(--detail-chrome-margin) * var(--u));
+  top: calc(549.828 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-vector--belonging {
+  left: calc(var(--detail-col2-left) * var(--u));
+  top: calc(549.828 * var(--u));
+}
+
+/* ── [תזמון] timing — Frame 347 @ (50.432, 398.828) ── */
+body.pagmar-amulet-detail .pagmar__detail-timing {
+  position: absolute;
+  left: calc(var(--detail-chrome-margin) * var(--u));
+  top: calc(398.828 * var(--u));
+  width: calc(var(--detail-col-w) * var(--u));
+  height: calc(133 * var(--u));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: calc(40 * var(--u));
+  border-top: 1px solid var(--detail-divider);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-timing-text {
+  width: calc(179.255 * var(--u));
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(16 * var(--u));
+}
+
+/* ── [שייכות] belonging — Frame 353 @ (357.932, 398.828) ── */
+body.pagmar-amulet-detail .pagmar__detail-belonging {
+  position: absolute;
+  left: calc(var(--detail-col2-left) * var(--u));
+  top: calc(398.828 * var(--u));
+  width: calc(var(--detail-col-belonging-w) * var(--u));
+  height: calc(133 * var(--u));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: calc(40 * var(--u));
+  border-top: 1px solid var(--detail-divider);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-belonging-text {
+  width: calc(179.255 * var(--u));
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(16 * var(--u));
+}
+
+/* ── [בקשה] request criterion — Frame 345 @ (676.432, 398.828) ── */
+body.pagmar-amulet-detail .pagmar__detail-request-criterion {
+  position: absolute;
+  left: calc(var(--detail-col3-left) * var(--u));
+  top: calc(398.828 * var(--u));
+  width: calc(var(--detail-col-request-w) * var(--u));
+  height: calc(133 * var(--u));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: calc(40 * var(--u));
+  border-top: 1px solid var(--detail-divider);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-request-criterion-text {
+  width: calc(179.255 * var(--u));
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(16 * var(--u));
+}
+
+/* ── Shared field text style (name, timing) ── */
+body.pagmar-amulet-detail .pagmar__detail-field {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--detail-fg);
+  font-family: var(--detail-font);
+  font-size: calc(26 * var(--u));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: calc(-0.26 * var(--u));
+  text-align: right;
+  direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── Section tag badges ── */
+body.pagmar-amulet-detail .pagmar__detail-section-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(4 * var(--u));
+  background: transparent;
+  color: var(--detail-fg);
+  font-family: var(--detail-font);
+  font-size: calc(18 * var(--u));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Corner brackets (decorative) — amulet frame only ── */
+body.pagmar-amulet-detail .pagmar__detail-corner {
+  box-sizing: border-box;
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  border-left: 1px solid #FFFFFF;
+  border-top: 1px solid #FFFFFF;
+}
+
+/* Amulet frame corners — Figma 2327:36473+ (~34.75px, 50% opacity) */
+body.pagmar-amulet-detail .pagmar__detail-corner--l-tl,
+body.pagmar-amulet-detail .pagmar__detail-corner--l-tr,
+body.pagmar-amulet-detail .pagmar__detail-corner--l-bl,
+body.pagmar-amulet-detail .pagmar__detail-corner--l-br {
+  width: calc(34.755 * var(--u));
+  height: calc(34.75 * var(--u));
+  z-index: 20;
+  opacity: 0.5;
+  border-color: white;
+  border-style: solid;
+  border-width: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-corner--l-tl {
+  left: 0;
+  top: 0;
+  border-left-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-corner--l-tr {
+  right: 0;
+  left: auto;
+  top: 0;
+  border-right-width: 1px;
+  border-top-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-corner--l-bl {
+  left: 0;
+  bottom: 0;
+  top: auto;
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-corner--l-br {
+  right: 0;
+  left: auto;
+  bottom: 0;
+  top: auto;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+/* ── [תגיות] and [מרכיבים] bottom meta — Frame 350 @ (50.432, 853) ── */
+body.pagmar-amulet-detail .pagmar__detail-meta {
+  position: absolute;
+  left: calc(var(--detail-chrome-margin) * var(--u));
+  top: calc(853 * var(--u));
+  width: calc(var(--detail-chrome-w) * var(--u));
+  height: calc(177 * var(--u));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: calc(var(--detail-meta-gap) * var(--u));
+  padding-top: calc(30 * var(--u));
+  border-top: 1px solid var(--detail-divider);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-tags-wrap {
+  width: calc(var(--detail-meta-tags-w) * var(--u));
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(16 * var(--u));
+  flex-shrink: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-tags-wrap > .pagmar__detail-section-tag {
+  align-self: flex-end;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(8 * var(--u));
+  width: 100%;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-components-wrap {
+  width: calc(var(--detail-meta-components-w) * var(--u));
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(16 * var(--u));
+  flex-shrink: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-components-wrap > .pagmar__detail-section-tag {
+  align-self: flex-end;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-components {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(8 * var(--u));
+  width: 100%;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-list-item {
+  color: var(--detail-fg);
+  font-family: var(--detail-font);
+  font-size: calc(18 * var(--u));
+  font-weight: 400;
+  line-height: 110%;
+  letter-spacing: calc(-0.72 * var(--u));
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  text-align: right;
+  direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-components .pagmar__detail-list-item {
+  font-size: calc(19 * var(--u));
+  letter-spacing: calc(-0.76 * var(--u));
+}
+
+/* Stone / Q4 material row — wraps within 180.5px frame */
+body.pagmar-amulet-detail .pagmar__detail-components .pagmar__detail-list-item--material {
+  line-height: 110%;
+}
+
+/* ── Amulet (right side) — Figma 2327:36475 @ (1030.906, 193.969) 835×835 ── */
+body.pagmar-amulet-detail .pagmar__detail-amulet {
+  position: absolute;
+  top: calc(193.969 * var(--u));
+  left: calc(var(--detail-amulet-left) * var(--u));
+  right: auto;
+  width: calc(835 * var(--u));
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  pointer-events: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-frame {
+  position: relative;
+  width: calc(835 * var(--u));
+  height: calc(835 * var(--u));
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  z-index: 1;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-3d {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-3d:active {
+  cursor: grabbing;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-spin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: calc(1400 * var(--u));
+  perspective-origin: 50% 48%;
+  pointer-events: auto;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-coin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(12deg) rotateY(20deg);
+  cursor: grab;
+  will-change: transform;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-coin:active {
+  cursor: grabbing;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-face--front {
+  transform: translateZ(calc(8 * var(--u)));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-face--back {
+  transform: rotateY(180deg) translateZ(calc(8 * var(--u)));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-face--back img {
+  filter: brightness(0.6) sepia(0.3);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-edge {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(16 * var(--u));
+  height: 100%;
+  transform: translateX(-50%) rotateY(90deg);
+  background: linear-gradient(
+    180deg,
+    rgba(90, 80, 65, 0.9) 0%,
+    rgba(60, 55, 45, 0.95) 30%,
+    rgba(45, 40, 35, 0.9) 70%,
+    rgba(65, 58, 48, 0.85) 100%
+  );
+  backface-visibility: hidden;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-amulet-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  object-position: center center;
+}
+
+/* ── Scan overlay (unchanged) ── */
+body.pagmar-amulet-detail .pagmar__detail-scan-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-overlay--visible {
+  opacity: 1;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box {
+  position: absolute;
+  width: calc(123.142 * var(--u));
+  height: calc(123.142 * var(--u));
+  background: var(--detail-scan-box-bg);
+  border: calc(1 * var(--u)) solid var(--detail-scan);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box--tl {
+  left: calc(310.11 * var(--u));
+  top: calc(285.04 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box--mr {
+  left: calc(515.93 * var(--u));
+  top: calc(421.78 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box--bl {
+  left: calc(283.07 * var(--u));
+  top: calc(655.28 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box-label {
+  position: absolute;
+  z-index: 3;
+  color: var(--detail-scan);
+  font-family: var(--detail-font);
+  font-size: calc(20 * var(--u));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box-label--tl {
+  left: calc(406.44 * var(--u));
+  top: calc(270.47 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box-label--mr {
+  left: calc(614.37 * var(--u));
+  top: calc(408.19 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-box-label--bl {
+  left: calc(366.99 * var(--u));
+  top: calc(640.54 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-dot {
+  position: absolute;
+  display: block;
+  width: calc(8.329 * var(--u));
+  height: calc(8.329 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-dot--tl {
+  left: calc(367.51 * var(--u));
+  top: calc(342.45 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-dot--mr {
+  left: calc(572.31 * var(--u));
+  top: calc(479.19 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-dot--bl {
+  left: calc(336.31 * var(--u));
+  top: calc(712.95 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-hub {
+  position: absolute;
+  left: calc(253.23 * var(--u));
+  top: calc(549.21 * var(--u));
+  width: calc(11.883 * var(--u));
+  height: calc(11.883 * var(--u));
+  display: block;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-lines {
+  position: absolute;
+  left: calc(260.003 * var(--u));
+  top: calc(346.652 * var(--u));
+  width: calc(316.731 * var(--u));
+  height: calc(370.83 * var(--u));
+  display: block;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-curve {
+  display: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn {
+  position: absolute;
+  left: calc(330 * var(--u));
+  top: calc(971 * var(--u));
+  z-index: 3;
+  width: calc(244 * var(--u));
+  height: calc(55 * var(--u));
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn-bracket {
+  position: absolute;
+  display: block;
+  width: calc(8.947 * var(--u));
+  height: calc(8.946 * var(--u));
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn-bracket--tl {
+  left: 4.67%;
+  top: 10.01%;
+  transform: none;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn-bracket--bl {
+  left: 4.67%;
+  bottom: 9.06%;
+  top: auto;
+  transform: rotate(180deg) scaleX(-1);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn-bracket--tr {
+  right: 5.74%;
+  left: auto;
+  top: 10.01%;
+  transform: scaleX(-1);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn-bracket--br {
+  right: 5.74%;
+  left: auto;
+  bottom: 9.06%;
+  top: auto;
+  transform: rotate(180deg);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-scan-btn__pill {
+  position: absolute;
+  left: 50%;
+  top: 10.01%;
+  bottom: 8.17%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(10 * var(--u)) calc(40 * var(--u));
+  border: none;
+  border-radius: calc(60 * var(--u));
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(calc(12 * var(--u)));
+  backdrop-filter: blur(calc(12 * var(--u)));
+  box-shadow:
+    inset 0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(255, 255, 255, 0.06),
+    0 calc(2 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.12);
+  color: var(--detail-fg);
+  font-family: var(--detail-font);
+  font-size: calc(26 * var(--u));
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: calc(-0.72 * var(--u));
+  text-align: center;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  body.pagmar-amulet-detail .pagmar__detail-amulet-coin {
+    transform: rotateX(0deg) rotateY(0deg);
+  }
+}

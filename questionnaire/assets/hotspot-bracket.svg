@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+  <!-- מסגרת אנכית — קצוות עליון/תחתון ישרים, צדדים concave (לפי layout + קומפוננטה) -->
+  <path
+    d="M 0.5 0.5
+       H 45.5
+       Q 42 23 45.5 45.5
+       H 0.5
+       Q 3 23 0.5 0.5
+       Z"
+    fill="#1B1613"
+    stroke="#F1F1F1"
+    stroke-width="1"
+    vector-effect="non-scaling-stroke"
+  />
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 574" fill="none" aria-hidden="true">
+  <!-- Frame traced from user mockup @ 1024×574 (Figma Pagmar) -->
+  <g stroke="#F1F1F1" stroke-width="1" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision">
+    <!-- Vector 10 — top line + center gap for emblem -->
+    <path d="M 10.133 10.133 H 499.2 M 524.8 10.133 H 1013.867"/>
+    <!-- Vector 11 — bottom line + center gap + corner ticks -->
+    <path d="M 10.133 564.8 H 499.2 M 524.8 564.8 H 1013.867 M 499.2 564.8 V 560.533 M 524.8 564.8 V 560.533"/>
+    <!-- Side lines -->
+    <path d="M 10.133 13.867 V 561.067"/>
+    <path d="M 1013.867 13.867 V 561.067"/>
+    <!-- Corner L-brackets -->
+    <path d="M 10.133 10.133 H 13.867 M 10.133 10.133 V 13.867"/>
+    <path d="M 1010.133 10.133 H 1013.867 M 1013.867 10.133 V 13.867"/>
+    <path d="M 10.133 561.067 H 13.867 M 10.133 564.8 V 561.067"/>
+    <path d="M 1010.133 564.8 H 1013.867 M 1013.867 564.8 V 561.067"/>
+  </g>
+</svg>

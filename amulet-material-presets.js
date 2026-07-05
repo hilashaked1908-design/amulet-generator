@@ -127,9 +127,9 @@ export const PREMIUM_MATERIAL_LIBRARY = {
     bumpScale: 0.32,
   },
   [PREMIUM_MATERIAL_IDS.DEEP_STONEWARE]: {
-    label: 'Seafoam Jade Gut',
+    label: 'Warm Gut Stoneware',
     kind: 'stone',
-    color: 0x7aab98,
+    color: 0xd8ac89,
     metalness: 0.0,
     roughness: 0.48,
     clearcoat: 0.72,
@@ -194,7 +194,7 @@ export const PREMIUM_MATERIAL_LIBRARY = {
   [PREMIUM_MATERIAL_IDS.ARCHAEOLOGICAL_DOUBT]: {
     label: 'Calacatta Marble',
     kind: 'stone',
-    color: 0xc4bdb4,
+    color: 0x958a7c,
     metalness: 0.0,
     roughness: 0.32,
     clearcoat: 0.28,
