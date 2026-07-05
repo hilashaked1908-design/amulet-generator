@@ -125,6 +125,12 @@ export async function saveGlb(amuletId, sceneOrObject, opts = {}) {
  * @returns {Promise<{ scene: THREE.Group, lighting: Array, rendererSettings: Object } | null>}
  */
 export async function loadGlb(amuletId) {
+  const fromIdb = await loadGlbFromIdb(amuletId);
+  if (fromIdb) return fromIdb;
+  return loadGlbFromSeed(amuletId);
+}
+
+async function loadGlbFromIdb(amuletId) {
   const db = await openDB();
   const raw = await idbGet(db, amuletId);
   db.close();
@@ -147,6 +153,52 @@ export async function loadGlb(amuletId) {
     lighting: raw.lighting || [],
     rendererSettings: raw.rendererSettings || {},
     materialOverrides: raw.materialOverrides || [],
+  };
+}
+
+function seedIdFromAmuletId(amuletId) {
+  if (!amuletId || typeof amuletId !== 'string') return null;
+  const m = amuletId.match(/^collection-(\d+)$/);
+  return m ? m[1] : null;
+}
+
+async function loadGlbFromSeed(amuletId) {
+  const seedId = seedIdFromAmuletId(amuletId);
+  if (!seedId) return null;
+
+  const glbUrl = '/questionnaire/seed/glbs/' + seedId + '.glb';
+  const metaUrl = '/questionnaire/seed/glbs/' + seedId + '.json';
+
+  let glbRes;
+  try {
+    glbRes = await fetch(glbUrl, { cache: 'force-cache' });
+  } catch (_) {
+    return null;
+  }
+  if (!glbRes.ok) return null;
+
+  const buffer = await glbRes.arrayBuffer();
+  let meta = {};
+  try {
+    const metaRes = await fetch(metaUrl, { cache: 'force-cache' });
+    if (metaRes.ok) meta = await metaRes.json();
+  } catch (_) {}
+
+  const loader = new GLTFLoader();
+  const scene = await new Promise((resolve, reject) => {
+    loader.parse(
+      buffer, '',
+      (gltf) => resolve(gltf.scene),
+      (error) => reject(error)
+    );
+  });
+
+  console.log('[glb-store] loaded seed GLB', glbUrl);
+  return {
+    scene: scene,
+    lighting: meta.lighting || [],
+    rendererSettings: meta.rendererSettings || {},
+    materialOverrides: meta.materialOverrides || [],
   };
 }
 
@@ -206,5 +258,33 @@ export async function loadSnapshot(key) {
   const db = await openDB();
   const data = await idbGet(db, 'snap-' + key);
   db.close();
-  return data || null;
+  if (data) return data;
+
+  const m = String(key || '').match(/^collection-(\d+)$/);
+  if (!m) return null;
+  const hiUrl = '/questionnaire/seed/snapshots/' + m[1] + '.png';
+  try {
+    const res = await fetch(hiUrl, { cache: 'force-cache' });
+    if (!res.ok) {
+      const jpgUrl = '/questionnaire/seed/snapshots/' + m[1] + '.jpg';
+      const res2 = await fetch(jpgUrl, { cache: 'force-cache' });
+      if (!res2.ok) return null;
+      const blob = await res2.blob();
+      return await new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+    const blob = await res.blob();
+    return await new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (_) {
+    return null;
+  }
 }

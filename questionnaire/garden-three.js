@@ -513,6 +513,24 @@ function stripHeavyCollectionFields(collection) {
   return dirty;
 }
 
+const SEED_COLLECTION_URL = '/questionnaire/seed/collection.json';
+
+/** Load bundled amulets for Netlify (static seed folder). Merges with local storage. */
+async function loadSeedCollectionFromFile() {
+  try {
+    const res = await fetch(SEED_COLLECTION_URL, { cache: 'no-store' });
+    if (!res.ok) return;
+    const seed = await res.json();
+    if (!Array.isArray(seed) || !seed.length) return;
+    const local = runtimeCollection || readCollectionFromStorage();
+    runtimeCollection = local.length ? mergeCollectionEntries(local, seed) : seed.slice();
+    saveCollection(runtimeCollection);
+    console.log('[garden-three] loaded', seed.length, 'seed amulet(s) from', SEED_COLLECTION_URL);
+  } catch (err) {
+    console.warn('[garden-three] seed collection unavailable', err);
+  }
+}
+
 function initCollectionFromStorage() {
   const local = parseCollectionRaw(localStorage.getItem(COLLECTION_KEY));
   const session = parseCollectionRaw(sessionStorage.getItem(COLLECTION_KEY));
@@ -2307,9 +2325,13 @@ function restoreCollectionFromStorage() {
   if (!collection.length) return Promise.resolve();
   updateCameraScrollLimit(collection.length);
 
-  return Promise.all(collection.map(function (entry, index) {
+  function restoreOneEntry(entry, index) {
     var snapKey = entry.id ? 'collection-' + entry.id : null;
-    return (snapKey
+    var snapshotIsUrl =
+      typeof entry.snapshot === 'string' &&
+      (entry.snapshot.startsWith('/') || entry.snapshot.startsWith('http'));
+    var tryIdb = snapKey && entry.snapshotInIdb !== false && !snapshotIsUrl;
+    return (tryIdb
       ? glbStore().then(function (store) { return store.loadSnapshot(snapKey); }).catch(function () { return null; })
       : Promise.resolve(null)
     ).then(function (hiResUrl) {
@@ -2347,7 +2369,22 @@ function restoreCollectionFromStorage() {
         img.src = dataUrl;
       });
     });
-  }));
+  }
+
+  /* Load a few amulets at a time — same quality, less network congestion online. */
+  var batchSize = 3;
+  var chain = Promise.resolve();
+  for (var start = 0; start < collection.length; start += batchSize) {
+    (function (from) {
+      chain = chain.then(function () {
+        var slice = collection.slice(from, from + batchSize);
+        return Promise.all(slice.map(function (entry, j) {
+          return restoreOneEntry(entry, from + j);
+        }));
+      });
+    })(start);
+  }
+  return chain;
 }
 
 /* Snapshot upgrades handled via IndexedDB hi-res storage */
@@ -3111,6 +3148,9 @@ Promise.resolve()
     migrateUserAmuletPositionIfNeeded();
     restoreUserAmuletAnswersIfNeeded();
     initCollectionFromStorage();
+    return loadSeedCollectionFromFile();
+  })
+  .then(() => {
     return purgeAmulets021022023Once();
   })
   .then(() => {

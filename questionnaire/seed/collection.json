@@ -1,0 +1,433 @@
+[
+  {
+    "id": 1783185095666,
+    "answers": {
+      "q1Wish": "הלוואי שאמצא עבודה טובה",
+      "q2Name": "רועי",
+      "q3WhyNow": "עבדתי ממש קשה בשביל זה ועכשיו מגיע לי להצליח",
+      "q4Belief": "gut",
+      "q5Feeling": "fear",
+      "q6Difficulty": "failure",
+      "q7Change": "אהיה גאה בעצמי",
+      "completedAt": 1782751051247
+    },
+    "position": {
+      "x": -6.46,
+      "z": 3.57,
+      "yWorld": -1.38
+    },
+    "createdAt": 1782751051247,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783185095666.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783185095666.glb"
+  },
+  {
+    "id": 1783167794017,
+    "answers": {
+      "q1Wish": "להפסיק לעשן",
+      "q2Name": "תומר",
+      "q3WhyNow": "כי זה מתחיל להשפיע לי על הבריאות והריצות",
+      "q4Belief": "support",
+      "q5Feeling": "impatience",
+      "q6Difficulty": "failure",
+      "q7Change": "אהיה בריא יותר",
+      "q8Motivation": "דודה שלי הצליחה להפסיק לעשן לפני עשר שנים",
+      "completedAt": 1783164810711
+    },
+    "position": {
+      "x": 0.2,
+      "z": -0.55,
+      "yWorld": -1.95
+    },
+    "createdAt": 1783164810711,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783167794017.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783167794017.glb"
+  },
+  {
+    "id": 1783179295064,
+    "answers": {
+      "q1Wish": "הלוואי שאצליח למצוא עבודה אחרי התואר",
+      "q2Name": "ניר",
+      "q3WhyNow": "אני מרגישה מוכנה אחרי 4 שנים שלמדתי בהם הרבה",
+      "q4Belief": "doubt",
+      "q5Feeling": "fear",
+      "q6Difficulty": "uncertainty",
+      "q7Change": "אצליח לחיות ברמת החיים שאני רוצה",
+      "q8Motivation": "ההורים שלי שמאמינים בי",
+      "completedAt": 1783166961797
+    },
+    "position": {
+      "x": 8.72,
+      "z": 2.7172964687695664,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783166961797,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783179295064.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783179295064.glb"
+  },
+  {
+    "id": 1783181084420,
+    "answers": {
+      "q1Wish": "למצוא דירה בתל אביב עם הבן זוג שלי",
+      "q2Name": "שירה",
+      "q3WhyNow": "אנחנו ביחד כבר 6 שנים ועכשיו זה הזמן המתאים",
+      "q4Belief": "concrete_actions",
+      "q5Feeling": "hope",
+      "q6Difficulty": "letting_go",
+      "q7Change": "נתחיל את החיים שלנו ביחד",
+      "q8Motivation": "אני פשוט יודעת",
+      "completedAt": 1783179089064
+    },
+    "position": {
+      "x": 5.98344444509831,
+      "z": -7.5449832170451145,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783179089064,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783181084420.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783181084420.glb"
+  },
+  {
+    "id": 1783187223282,
+    "answers": {
+      "q1Wish": "אצליח לאהוב את עצמי כמו שאני",
+      "q2Name": "דניאל",
+      "q3WhyNow": "אני רוצה לאהוב את עצמי כמו שאני, נמאס לי לאכול סרט כל יציאה מהבית וכל פעם שאני רואה אנשים חדשים",
+      "q4Belief": "support",
+      "q5Feeling": "confusion",
+      "q6Difficulty": "uncertainty",
+      "q7Change": "אוכל לאהוב את עצמי כמו שאני סוף סוף",
+      "q8Motivation": "המשפחה שלי שאוהבת אותי כמו שאני",
+      "completedAt": 1783184991211
+    },
+    "position": {
+      "x": -7.76,
+      "z": -12.06,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783184991211,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783187223282.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783187223282.glb"
+  },
+  {
+    "id": 1783187972558,
+    "answers": {
+      "q1Wish": "בית גדול בתאילנד עם גינה",
+      "q2Name": "דוד",
+      "q3WhyNow": "אני רוצה לרדת מהארץ בגלל המצב הפוליטי ולהיות נווד דיגיטלי",
+      "q4Belief": "doubt",
+      "q5Feeling": "confusion",
+      "q6Difficulty": "no_control",
+      "q7Change": "לא נחייה יותר בבלאגנים בלי לרוץ למקלטים כל חודש ולפחד שיקרה משהו",
+      "q8Motivation": "מלא אנשים עושים את זה",
+      "completedAt": 1783187140037
+    },
+    "position": {
+      "x": 1.62,
+      "z": -18.67,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783187140037,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783187972558.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783187972558.glb"
+  },
+  {
+    "id": 1783256855984,
+    "answers": {
+      "q1Wish": "אני רוצה להצליח לסלוח לעצמי על טעויות שעשיתי ולהפסיק להרגיש שאני סוחב אותן לכל מקום.",
+      "q2Name": "יוני",
+      "q3WhyNow": "התחושות האלו ממש מכבידות עליי",
+      "q4Belief": "signs",
+      "q5Feeling": "fear",
+      "q6Difficulty": "no_control",
+      "q7Change": "אוכל להמשיך הלאה",
+      "q8Motivation": "אני לא יודע",
+      "completedAt": 1783256433896
+    },
+    "position": {
+      "x": -5.775981534537981,
+      "z": -30.08240882477136,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783256433896,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783256855984.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783256855984.glb"
+  },
+  {
+    "id": 1783257843509,
+    "answers": {
+      "q1Wish": "הלוואי שאצליח לשחרר מטעויות עבר ולפתוח דף חדש",
+      "q2Name": "עומר",
+      "q3WhyNow": "הרגשות האלו כבר מכבידים עליי ממש ואני לא מצליח להתקדם הלאה מהעבר שלי",
+      "q4Belief": "signs",
+      "q5Feeling": "fear",
+      "q6Difficulty": "no_control",
+      "q7Change": "אוכל לפתוח דף חדש",
+      "q8Motivation": "אני לא יודע אם אי פעם זה יקרה",
+      "completedAt": 1783256742543
+    },
+    "position": {
+      "x": 3.790502943144305,
+      "z": -41.49481764954272,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783256742543,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783257843509.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783257843509.glb"
+  },
+  {
+    "id": 1783261842300,
+    "answers": {
+      "q1Wish": "שאבא שלי יחלים ויחזור להיות כמו שהיה לפני המחלה",
+      "q2Name": "ניב",
+      "q3WhyNow": "עברנו שנה קשה ממש והגיע הזמן שהוא יחזור להיות עצמו",
+      "q4Belief": "signs",
+      "q5Feeling": "fear",
+      "q6Difficulty": "failure",
+      "q7Change": "אבא שלי יחזור להיות כמו שהיה",
+      "q8Motivation": "הידיעה שהוא מתקדם לאט לאט",
+      "completedAt": 1783257723803
+    },
+    "position": {
+      "x": 9.264312248885373,
+      "z": -10.363755459169855,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783257723803,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783261842300.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783261842300.glb"
+  },
+  {
+    "id": 1783262129298,
+    "answers": {
+      "q1Wish": "להתפטר ולהיות עצמאית בתחום שלי",
+      "q2Name": "שירי",
+      "q3WhyNow": "נמאס לי כבר מהעבודה הזאת ואני רוצה להיות הבוסית של עצמי",
+      "q4Belief": "concrete_actions",
+      "q5Feeling": "hope",
+      "q6Difficulty": "uncertainty",
+      "q7Change": "לא אהיה תלויה באחרים יותר אהיה תלויה רק בעצמי ואוכל לקבוע איך החיים שלי נראים",
+      "q8Motivation": "בעלי הגב שלי",
+      "completedAt": 1783261741357
+    },
+    "position": {
+      "x": -12.940870858055046,
+      "z": -23.80558397114711,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783261741357,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783262129298.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783262129298.glb"
+  },
+  {
+    "id": 1783262929653,
+    "answers": {
+      "q1Wish": "להצליח להיכנס להריון",
+      "q2Name": "שירה",
+      "q3WhyNow": "אנחנו מנסים כבר תקופה יחסית ארוכה ללא הצלחה, אני ממש רוצה להיות אמא",
+      "q4Belief": "gut",
+      "q5Feeling": "hope",
+      "q6Difficulty": "failure",
+      "q7Change": "נקים משפחה כמו שחלמנו עליה",
+      "q8Motivation": "הידיעה שבסוף זה קורה כמעט לכולן",
+      "completedAt": 1783262052269
+    },
+    "position": {
+      "x": 19.318804513006118,
+      "z": -31.109525619000785,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783262052269,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783262929653.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783262929653.glb"
+  },
+  {
+    "id": 1783263575785,
+    "answers": {
+      "q1Wish": "להתחיל לפתח תחביבים בזמן הפנוי",
+      "q2Name": "יאיר",
+      "q3WhyNow": "רוב הזמן אני בבית לבד, נמאס לי לשבת על הספה ולהיות באינסטגרם או בטלוויזיה",
+      "q4Belief": "concrete_actions",
+      "q5Feeling": "excitement",
+      "q6Difficulty": "decision",
+      "q7Change": "יהיו לחיים שלי יותר משמעות",
+      "q8Motivation": "שלכל הסביבה שלי יש מלא תחביבים",
+      "completedAt": 1783262864047
+    },
+    "position": {
+      "x": -11.520592446763988,
+      "z": -35.78861323715704,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783262864047,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783263575785.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783263575785.glb"
+  },
+  {
+    "id": 1783268062084,
+    "answers": {
+      "q1Wish": "דירה בבוגרשוב בתל אביב",
+      "q2Name": "רוני",
+      "q3WhyNow": "כי כל החברות שלי עברו כבר לעיר ונמאס לי להיות אצל ההורים",
+      "q4Belief": "support",
+      "q5Feeling": "impatience",
+      "q6Difficulty": "failure",
+      "q7Change": "יהיה לי חברים חדשים בעיר חדשה",
+      "q8Motivation": "כל החברות שלי כבר שם",
+      "completedAt": 1783265067200
+    },
+    "position": {
+      "x": 1.3738794687177016,
+      "z": -51.76598559183694,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783265067200,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783268062084.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783268062084.glb"
+  },
+  {
+    "id": 1783271269341,
+    "answers": {
+      "q1Wish": "הלוואי שיהיה לי פגמר מוצלח",
+      "q2Name": "עדי",
+      "q3WhyNow": "כי עבדתי ממש קשה",
+      "q4Belief": "concrete_actions",
+      "q5Feeling": "confusion",
+      "q6Difficulty": "waiting",
+      "q7Change": "יהיה לי מוצלח ומהנה",
+      "q8Motivation": "שיהיה לי טוב",
+      "completedAt": 1783267967946
+    },
+    "position": {
+      "x": -21.06271183402235,
+      "z": -29.511788383532792,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783267967946,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783271269341.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783271269341.glb"
+  },
+  {
+    "id": 1783271834256,
+    "answers": {
+      "q1Wish": "שהבן זוג שלי יציע לי נישואין כבר",
+      "q2Name": "עדי",
+      "q3WhyNow": "אנחנו כבר עשור ביחד והגיע הזמן שנתמסד",
+      "q4Belief": "gut",
+      "q5Feeling": "excitement",
+      "q6Difficulty": "letting_go",
+      "q7Change": "נתחתן סוף סוף ונקים משפחה",
+      "q8Motivation": "הוא אמר לי שהוא יקנה טבעת",
+      "completedAt": 1783271175712
+    },
+    "position": {
+      "x": 32.41883987963517,
+      "z": -43.663175326249274,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783271175712,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783271834256.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783271834256.glb"
+  },
+  {
+    "id": 1783272921287,
+    "answers": {
+      "q1Wish": "הלוואי שאמצא את בעלי לעתיד בקרוב",
+      "q2Name": "אנה",
+      "q3WhyNow": "אני רווקה כבר כמעט שנתיים ואני מרגישה מוכנה",
+      "q4Belief": "support",
+      "q5Feeling": "impatience",
+      "q6Difficulty": "letting_go",
+      "q7Change": "יהיה חלק בחיים שלי שאוכל למלא, יהיה לי פרטנר שיהיה איתי ולא אהיה לבד כל הזמן",
+      "q8Motivation": "כל הסביבה שלי",
+      "completedAt": 1783271713427
+    },
+    "position": {
+      "x": -7.385509458283903,
+      "z": -44.91854029697413,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783271713427,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783272921287.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783272921287.glb"
+  },
+  {
+    "id": 1783273779272,
+    "answers": {
+      "q1Wish": "שאחותי תבוא לבקר מארצות הברית",
+      "q2Name": "אור",
+      "q3WhyNow": "לא ראיתי אותה כבר שנתיים מאז שהיא עברה מהעבודה",
+      "q4Belief": "gut",
+      "q5Feeling": "impatience",
+      "q6Difficulty": "letting_go",
+      "q7Change": "נתאחד המשפחה סוף סוף",
+      "q8Motivation": "העובדה שהיא תצטרך לחזור",
+      "completedAt": 1783272812951
+    },
+    "position": {
+      "x": 11.711081985706468,
+      "z": -51.53773741534152,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783272812951,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783273779272.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783273779272.glb"
+  },
+  {
+    "id": 1783273779317,
+    "answers": {
+      "q1Wish": "אני ממש רוצה להצליח לפתוח עסק קטן לתכשיטים משלי. כבר שנים שזה החלום שלי",
+      "q2Name": "נועה",
+      "q3WhyNow": "כי אם אני אמשיך לחכות זה פשוט לא יקרה",
+      "q4Belief": "concrete_actions",
+      "q5Feeling": "fear",
+      "q6Difficulty": "uncertainty",
+      "q7Change": "אתחיל לפתח את התחביב שלי ולעשות את מה שאני אוהבת",
+      "q8Motivation": "שאני יודעת שאני טובה",
+      "completedAt": 1783273701964
+    },
+    "position": {
+      "x": 1.62,
+      "z": -30.08240882477136,
+      "yWorld": -1.38
+    },
+    "createdAt": 1783273701964,
+    "isLive": false,
+    "snapshotInIdb": false,
+    "snapshot": "/questionnaire/seed/snapshots/1783273779317.png",
+    "glbUrl": "/questionnaire/seed/glbs/1783273779317.glb"
+  }
+]

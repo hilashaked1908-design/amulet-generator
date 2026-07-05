@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: echo "no build"
     startCommand: python server.py
+    healthCheckPath: /api/server-info
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"

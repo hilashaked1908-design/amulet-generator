@@ -85,7 +85,14 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   }
 
   const amuletIndex = parseIndex();
-  const glbKey = getGlbKey(amuletIndex);
+
+  import('./seed-bootstrap.js').then(function (seedMod) {
+    return seedMod.ensureSeedCollectionLoaded();
+  }).then(function () {
+    bootDetailScene();
+  }).catch(function () {
+    bootDetailScene();
+  });
 
   function getAnswersForIndex(index) {
     var questions = window.AMULET_QUESTIONS || [];
@@ -110,6 +117,9 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     } catch (_) {}
     return null;
   }
+
+  function bootDetailScene() {
+    const glbKeyNow = getGlbKey(amuletIndex);
 
   function fallbackPbrRender(answers) {
     if (!answers || !container3D) {
@@ -152,9 +162,9 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     });
   }
 
-  if (glbKey && container3D) {
+  if (glbKeyNow && container3D) {
     import('./amulet-glb-store.js')
-      .then(function (store) { return store.loadGlb(glbKey); })
+      .then(function (store) { return store.loadGlb(glbKeyNow); })
       .then(function (result) {
         if (!result) {
           var answers = getAnswersForIndex(amuletIndex);
@@ -181,6 +191,7 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   } else {
     signalSceneReady();
   }
+  } /* bootDetailScene */
 
   function setup3DAmulet(glbScene, _rs, materialOverrides) {
     mountDetailAmulet3D(container3D, glbScene, {

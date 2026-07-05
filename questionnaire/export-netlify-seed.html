@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ייצוא קמעות לאתר</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1410;
+      color: #e8e4dc;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 520px;
+      width: 100%;
+      background: #1a2118;
+      border: 1px solid #3d4a38;
+      border-radius: 12px;
+      padding: 28px;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 12px; font-weight: 500; }
+    p { line-height: 1.65; color: #b8b4aa; margin: 0 0 16px; }
+    .count { font-size: 2rem; color: #c8e6a0; margin: 16px 0; }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 1.05rem;
+      cursor: pointer;
+      background: #5a7a42;
+      color: #fff;
+      margin-top: 8px;
+    }
+    button:disabled { opacity: 0.45; cursor: wait; }
+    .steps { margin-top: 24px; padding-top: 20px; border-top: 1px solid #333; font-size: 0.92rem; color: #999; }
+    .steps ol { padding-right: 20px; margin: 0; }
+    .steps li { margin-bottom: 8px; }
+    .err { color: #f88; }
+    .ok { color: #9cf; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>ייצוא הקמעות לאתר</h1>
+    <p>מייצא תמונות + מודלים תלת־ממדיים — בדיוק כמו במחשב שלך.</p>
+    <div class="count" id="count">…</div>
+    <p id="status"></p>
+    <button type="button" id="exportBtn" disabled>הורד קובץ netlify-seed.zip</button>
+    <div class="steps">
+      <strong>אחרי ההורדה:</strong>
+      <ol>
+        <li>פתחי את <code>netlify-seed.zip</code></li>
+        <li>גררי את <code>seed</code> לתוך <code>amulet-generator/questionnaire/</code></li>
+        <li>העלי שוב את התיקייה לאתר</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script type="module">
+    const COLLECTION_KEY = 'amuletCollection';
+
+    function readCollection() {
+      try {
+        const raw = localStorage.getItem(COLLECTION_KEY) || sessionStorage.getItem(COLLECTION_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    const collection = readCollection();
+    const countEl = document.getElementById('count');
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('exportBtn');
+
+    if (!collection.length) {
+      countEl.textContent = '0 קמעות';
+      statusEl.innerHTML = '<span class="err">לא נמצאו קמעות.</span><br>פתחי דרך <strong>http://localhost:8080</strong> — אותו דפדפן.';
+    } else {
+      countEl.textContent = collection.length + ' קמעות';
+      statusEl.textContent = 'לחצי להורדה (לוקח דקה בערך — כולל 3D).';
+      btn.disabled = false;
+    }
+
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      btn.textContent = 'מייצא…';
+
+      try {
+        const store = await import('./amulet-glb-store.js');
+        const zip = new JSZip();
+        const seed = zip.folder('seed');
+        const snaps = seed.folder('snapshots');
+        const glbs = seed.folder('glbs');
+        const exportEntries = [];
+
+        for (let i = 0; i < collection.length; i += 1) {
+          const entry = collection[i];
+          if (!entry || entry.id == null) continue;
+          statusEl.textContent = 'מייצא קמע ' + (i + 1) + ' / ' + collection.length + '…';
+
+          let imageData = null;
+          try {
+            imageData = await store.loadSnapshot('collection-' + entry.id);
+          } catch (_) {}
+          if (!imageData && typeof entry.snapshot === 'string' && entry.snapshot.startsWith('data:')) {
+            imageData = entry.snapshot;
+          }
+
+          const exportEntry = {
+            id: entry.id,
+            answers: entry.answers || null,
+            position: entry.position || null,
+            createdAt: entry.createdAt || Date.now(),
+            isLive: false,
+            snapshotInIdb: false,
+          };
+
+          if (imageData && imageData.startsWith('data:')) {
+            const isJpeg = imageData.includes('image/jpeg');
+            const ext = isJpeg ? 'jpg' : 'png';
+            const fileName = entry.id + '.' + ext;
+            const comma = imageData.indexOf(',');
+            snaps.file(fileName, imageData.slice(comma + 1), { base64: true });
+            exportEntry.snapshot = '/questionnaire/seed/snapshots/' + fileName;
+          }
+
+          const glbKey = 'collection-' + entry.id;
+          let glbRaw = null;
+          try {
+            glbRaw = await store.loadGlbRaw(glbKey);
+          } catch (_) {}
+          if (glbRaw && glbRaw.glb) {
+            glbs.file(entry.id + '.glb', glbRaw.glb);
+            glbs.file(entry.id + '.json', JSON.stringify({
+              lighting: glbRaw.lighting || [],
+              rendererSettings: glbRaw.rendererSettings || {},
+              materialOverrides: glbRaw.materialOverrides || [],
+            }, null, 2));
+            exportEntry.glbUrl = '/questionnaire/seed/glbs/' + entry.id + '.glb';
+          }
+
+          if (exportEntry.snapshot || exportEntry.glbUrl) {
+            exportEntries.push(exportEntry);
+          }
+        }
+
+        if (!exportEntries.length) {
+          statusEl.innerHTML = '<span class="err">לא נמצאו קבצים לייצוא.</span>';
+          btn.disabled = false;
+          btn.textContent = 'נסי שוב';
+          return;
+        }
+
+        seed.file('collection.json', JSON.stringify(exportEntries, null, 2));
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'netlify-seed.zip';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        statusEl.innerHTML = '<span class="ok">הורדת ' + exportEntries.length + ' קמעות (תמונה + 3D)!</span>';
+        btn.textContent = 'הורד שוב';
+        btn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        statusEl.innerHTML = '<span class="err">שגיאה: ' + (err.message || err) + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'נסי שוב';
+      }
+    });
+  </script>
+</body>
+</html>

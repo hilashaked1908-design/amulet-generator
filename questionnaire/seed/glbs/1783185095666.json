@@ -1,0 +1,240 @@
+{
+  "lighting": [
+    {
+      "type": "AmbientLight",
+      "color": 13684424,
+      "intensity": 0.0816,
+      "position": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "HemisphereLight",
+      "color": 15263456,
+      "intensity": 0.043199999999999995,
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "groundColor": 5789264
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 15790316,
+      "intensity": 4.6,
+      "position": [
+        0.8,
+        2.6,
+        1.2
+      ]
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 10131604,
+      "intensity": 0.0434,
+      "position": [
+        -0.45,
+        0.9,
+        1.3
+      ]
+    },
+    {
+      "type": "HemisphereLight",
+      "color": 16777215,
+      "intensity": 0.24,
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "groundColor": 5263456
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 16777215,
+      "intensity": 4.2,
+      "position": [
+        -480,
+        720,
+        880
+      ]
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 9480416,
+      "intensity": 1.116,
+      "position": [
+        580,
+        160,
+        520
+      ]
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 16774368,
+      "intensity": 1.612,
+      "position": [
+        420,
+        -580,
+        700
+      ]
+    },
+    {
+      "type": "DirectionalLight",
+      "color": 7368832,
+      "intensity": 0.434,
+      "position": [
+        0,
+        -800,
+        400
+      ]
+    }
+  ],
+  "rendererSettings": {
+    "lighting": [
+      {
+        "type": "AmbientLight",
+        "color": 13684424,
+        "intensity": 0.0816,
+        "position": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "type": "HemisphereLight",
+        "color": 15263456,
+        "intensity": 0.043199999999999995,
+        "position": [
+          0,
+          1,
+          0
+        ],
+        "groundColor": 5789264
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 15790316,
+        "intensity": 4.6,
+        "position": [
+          0.8,
+          2.6,
+          1.2
+        ]
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 10131604,
+        "intensity": 0.0434,
+        "position": [
+          -0.45,
+          0.9,
+          1.3
+        ]
+      },
+      {
+        "type": "HemisphereLight",
+        "color": 16777215,
+        "intensity": 0.24,
+        "position": [
+          0,
+          1,
+          0
+        ],
+        "groundColor": 5263456
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 16777215,
+        "intensity": 4.2,
+        "position": [
+          -480,
+          720,
+          880
+        ]
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 9480416,
+        "intensity": 1.116,
+        "position": [
+          580,
+          160,
+          520
+        ]
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 16774368,
+        "intensity": 1.612,
+        "position": [
+          420,
+          -580,
+          700
+        ]
+      },
+      {
+        "type": "DirectionalLight",
+        "color": 7368832,
+        "intensity": 0.434,
+        "position": [
+          0,
+          -800,
+          400
+        ]
+      }
+    ],
+    "toneMapping": 4,
+    "toneMappingExposure": 1.0416,
+    "outputColorSpace": "srgb",
+    "environmentIntensity": 0.3024
+  },
+  "materialOverrides": [
+    {
+      "meshName": "0a5fb0d6-d69c-49a6-905c-41312160b856",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    },
+    {
+      "meshName": "4f5f42ba-bc47-4584-8231-9cd745b07336",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    },
+    {
+      "meshName": "ebb20472-cc7e-4027-ace4-40b04b1f869c",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    },
+    {
+      "meshName": "8a5dcc41-7b90-4b1f-a289-c123f321bfca",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    },
+    {
+      "meshName": "9c6b3093-682c-4387-8f9d-b8c95cc38c83",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    },
+    {
+      "meshName": "a93eba7a-9c06-46aa-b4de-41ae09b124ae",
+      "envMapIntensity": 2.75,
+      "clearcoat": 0.9,
+      "clearcoatRoughness": 0.06,
+      "reflectivity": 1
+    }
+  ]
+}

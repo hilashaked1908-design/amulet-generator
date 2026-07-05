@@ -204,6 +204,13 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path.endswith((".js", ".html", ".css")):
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        elif (
+            "/questionnaire/seed/" in path
+            or path.startswith("/fonts/")
+            or path.startswith("/glyphs/")
+            or path.endswith((".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2", ".otf", ".ttf", ".glb"))
+        ):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:
             self.send_header("Cache-Control", "no-cache")
         self.send_header("Access-Control-Allow-Origin", "*")
