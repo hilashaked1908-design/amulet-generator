@@ -1234,6 +1234,11 @@ body.pagmar-index .pagmar-canvas {
   --index-filter-head-gap: calc(16 * var(--index-u));
   /* Figma 2295:28985 — equal stack: X → tag → grid row 1 @ y=263.5 */
   --index-filter-grid-row1-top: calc(263.5 * var(--index-u));
+  --index-filter-card-size: 410;
+  --index-filter-card-gap: 92;
+  --index-filter-grid-row-w: calc(
+    4 * var(--index-filter-card-size) + 3 * var(--index-filter-card-gap)
+  );
   --index-filter-page-stack-gap: calc(
     (
       var(--index-filter-grid-row1-top) - var(--index-filter-sidebar-top) -
@@ -1703,7 +1708,7 @@ body.pagmar-index .pagmar__index-filter-trigger__icon {
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
-  display: none;
+  visibility: hidden;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger .pagmar__index-chrome-corner {
@@ -1712,12 +1717,16 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger .pagmar__index-ch
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
   position: absolute;
-  z-index: 1;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
   display: block;
-  width: 100%;
-  height: 100%;
-  transform: none;
+  width: calc(16.119 * var(--index-u));
+  height: calc(21.235 * var(--index-u));
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
   user-select: none;
 }
@@ -1847,12 +1856,21 @@ body.pagmar-index .pagmar__index-filter-item.is-active {
   color: var(--index-chrome-accent);
 }
 
-body.pagmar-index .pagmar__index-filter-item .pagmar-btn__roll--chars,
+body.pagmar-index .pagmar__index-filter-item .pagmar-btn__roll--chars {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
 body.pagmar-index .pagmar__index-filter-active-tag .pagmar-btn__roll--chars {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  width: 100%;
+  justify-content: flex-start;
+  width: auto;
+  max-width: 100%;
   direction: rtl;
   unicode-bidi: plaintext;
 }
@@ -1954,6 +1972,9 @@ body.pagmar-index .pagmar__index-filter-active-tag {
   min-height: var(--index-filter-tag-line-height);
   letter-spacing: calc(-0.48 * var(--index-u));
   color: var(--index-chrome-accent);
+  direction: rtl;
+  text-align: right;
+  width: 100%;
   white-space: nowrap;
   pointer-events: auto;
   cursor: pointer;
@@ -1983,12 +2004,13 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-grid {
   left: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
   right: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
   width: auto;
+  transform: none;
   --index-filter-grid-uy: var(--index-u);
   --index-filter-grid-u: var(--index-filter-grid-uy, var(--index-u));
   height: 100dvh;
   max-height: 100dvh;
   z-index: 240;
-  overflow-x: clip;
+  overflow-x: visible;
   overflow-y: auto;
   pointer-events: auto;
   overscroll-behavior: contain;
@@ -2047,31 +2069,6 @@ body.pagmar-index .pagmar__index-filter-card-img {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-}
-
-body.pagmar-index .pagmar__index-filter-card-label {
-  position: absolute;
-  z-index: 3;
-  top: calc(20 * var(--index-filter-grid-u, var(--index-u)));
-  right: calc(20 * var(--index-filter-grid-u, var(--index-u)));
-  left: auto;
-  min-width: calc(39 * var(--index-filter-grid-u, var(--index-u)));
-  padding: calc(4 * var(--index-filter-grid-u, var(--index-u)));
-  background: #F5F5F5;
-  font-family: "TheBasics", sans-serif;
-  font-size: calc(18 * var(--index-filter-grid-u, var(--index-u)));
-  line-height: 1.05;
-  color: #030303;
-  text-align: center;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0.5;
-  transition: opacity 160ms ease;
-}
-
-body.pagmar-index .pagmar__index-filter-card:hover .pagmar__index-filter-card-label,
-body.pagmar-index .pagmar__index-filter-card:focus-visible .pagmar__index-filter-card-label {
-  opacity: 1;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-cta-pill,
@@ -2163,6 +2160,29 @@ body.pagmar-index .pagmar__index-cta-pill__body {
     backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
     -webkit-backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
     box-shadow var(--index-transition-duration) var(--index-transition-ease);
+}
+
+/* K95-style hover pill — amulet number follows cursor on garden hover */
+body.pagmar-index .pagmar__garden-amulet-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+body.pagmar-index.is-filter-page .pagmar__garden-amulet-hover {
+  z-index: 400;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover .pagmar__glass-pill__text {
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
 }
 
 /* Figma Component 15 — glass only when a garden amulet sits behind the fixed pill */
@@ -2736,12 +2756,12 @@ body.pagmar-index.is-amulet-ready .result__status:not([hidden]) {
    ============================================================ */
 
 body.pagmar-index.is-create-mode {
-  --page-bg: #000000;
-  --ink: #F8F8F7;
-  --index-ink: #f8f8f7;
+  --page-bg: #1500E1;
+  --ink: #1500E1;
+  --index-ink: #1500E1;
   --index-transition-duration: var(--index-create-transition-duration);
   --index-transition-ease: var(--index-create-transition-ease);
-  --create-ink: #f8f8f7;
+  --create-ink: #1500E1;
   --create-stack-w: 835.125;
   --create-amulet-area-h: 635.188;
   --create-question-area-h: 262.767;
@@ -2772,8 +2792,8 @@ body.pagmar-index.is-create-mode {
   --create-save-label-tracking: -0.48;
   --create-save-label-roll: calc((var(--create-save-label-size) + var(--create-save-label-gap)) * -1);
   --index-create-scale: 1;
-  background: #000000;
-  color: #f8f8f7;
+  background: #1500E1;
+  color: #1500E1;
 }
 
 body.pagmar-index.is-create-mode.is-create-exiting {
@@ -3201,6 +3221,7 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
+  filter: brightness(0) invert(1);
 }
 
 .pagmar__amulet-frame-loader__vessel--1 {
@@ -3252,7 +3273,8 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: #1500E1;
+  color: #1500E1;
   pointer-events: none;
   transition: opacity 320ms ease;
 }
@@ -3357,11 +3379,11 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
 }
 
 .pagmar__create-fullpage-loader__percent {
-  font-family: "DavidLibre", "Ratzif22", serif;
-  font-size: calc(75 * var(--loader-u));
+  font-family: "TheBasics Display Thin", "TheBasics", serif;
+  font-size: calc(75 * var(--fu, var(--loader-u)));
   font-weight: 400;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  line-height: normal;
+  letter-spacing: calc(-0.75 * var(--fu, var(--loader-u)));
   color: inherit;
 }
 

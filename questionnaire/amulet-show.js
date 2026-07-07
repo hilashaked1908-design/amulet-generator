@@ -9,10 +9,45 @@ import {
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
 import { captureLiveAmuletSnapshot } from '../three-pbr-amulet.js';
-import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-detail-vector-fit';
+import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-result-align';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
 const SNAPSHOT_KEY = 'amuletUserSnapshot';
+const RESULT_VIEW_KEY = 'pagmarResultViewActive';
+
+export const DEMO_RESULT_ANSWERS = {
+  q1Wish: '״שאהיה בטוחה בעצמי. כי מגיע לי. אהיה מאושרת יותר״',
+  q2Name: 'שם היוצר',
+  q3WhyNow: 'האותיות שכתובות',
+  q4Belief: 'signs',
+  q5Feeling: 'hope',
+  q6Difficulty: 'uncertainty',
+  q7Change: 'self_confidence',
+  q8Motivation: 'happiness',
+  completedAt: Date.now(),
+};
+
+function markResultViewActive() {
+  try {
+    sessionStorage.setItem(RESULT_VIEW_KEY, '1');
+  } catch (_) {}
+}
+
+function clearResultViewActive() {
+  try {
+    sessionStorage.removeItem(RESULT_VIEW_KEY);
+  } catch (_) {}
+}
+
+export function shouldRestoreResultView() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('result') === '1') return true;
+    return sessionStorage.getItem(RESULT_VIEW_KEY) === '1';
+  } catch (_) {
+    return false;
+  }
+}
 
 let renderToken = 0;
 let exportBound = false;
@@ -218,14 +253,56 @@ function populateResultOverlay(answers) {
   const tagsEl = document.getElementById('resultTags');
   const componentsEl = document.getElementById('resultComponents');
 
-  if (numEl) numEl.textContent = '[' + String(getNextAmuletIndex()).padStart(3, '0') + ']';
+  if (numEl) {
+    const label = '[' + String(getNextAmuletIndex()).padStart(3, '0') + ']';
+    const inner = numEl.querySelector('.pagmar__glass-pill__text');
+    if (inner) inner.textContent = label;
+    else numEl.textContent = label;
+  }
 
   if (spec) {
     if (nameEl) nameEl.textContent = spec.name || '—';
-    if (storyEl) storyEl.textContent = spec.story || spec.wish || '—';
+    if (storyEl) storyEl.textContent = spec.wish || '—';
     if (timingEl) timingEl.textContent = spec.whyNow || '—';
     fillResultList(tagsEl, spec.tags);
     fillResultList(componentsEl, spec.components, RESULT_COMPONENT_ITEM_CLASSES);
+  }
+
+  fitResultStoryTypography();
+}
+
+function getResultUnitPx() {
+  const canvas = document.querySelector('.pagmar-canvas--result');
+  if (!canvas) return 1;
+  const w = canvas.clientWidth / 1920;
+  const h = canvas.clientHeight / 1080;
+  return Math.min(w, h) || 1;
+}
+
+function fitResultStoryTypography() {
+  const storyEl = document.getElementById('resultStory');
+  const requestEl = document.querySelector('.pagmar__result-request');
+  const rightEl = document.querySelector('.pagmar__result-right');
+  const vectorEl = rightEl?.querySelector('.pagmar__result-vector--request');
+  if (!storyEl || !requestEl) return;
+
+  const u = getResultUnitPx();
+  const tagEl = requestEl.querySelector('.pagmar__result-tag');
+  const tagH = tagEl ? tagEl.offsetHeight : 0;
+  const gap = 16 * u;
+  const vectorReserve = vectorEl ? vectorEl.offsetTop : 544.715 * u;
+  const maxStoryPx = Math.max(48, vectorReserve - tagH - gap - 8);
+  let sizePx = 75 * u;
+  const minPx = 28 * u;
+
+  storyEl.style.fontSize = sizePx + 'px';
+  storyEl.style.lineHeight = 'normal';
+
+  let guard = 0;
+  while (storyEl.scrollHeight > maxStoryPx + 1 && sizePx > minPx && guard < 80) {
+    sizePx -= 1;
+    storyEl.style.fontSize = sizePx + 'px';
+    guard += 1;
   }
 }
 
@@ -406,6 +483,25 @@ async function showResultOverlay(container, answers) {
 
   overlay.classList.add('is-visible');
   document.body.classList.remove('is-amulet-rendering');
+  markResultViewActive();
+
+  try {
+    const hoverMod = await import('./result-overlay-hover.js?v=20250708-result-hover');
+    if (typeof hoverMod.bootResultAmuletHover === 'function') {
+      hoverMod.bootResultAmuletHover();
+    }
+  } catch (err) {
+    console.warn('[amulet-show] result hover boot failed', err);
+  }
+
+  fitResultStoryTypography();
+  if (!window.__pagmarResultStoryFitBound) {
+    window.__pagmarResultStoryFitBound = true;
+    window.addEventListener('resize', function () {
+      if (!document.body.classList.contains('is-result-overlay-open')) return;
+      fitResultStoryTypography();
+    });
+  }
 
   await waitForOverlayLayout();
   try {
@@ -413,6 +509,8 @@ async function showResultOverlay(container, answers) {
   } catch (err) {
     console.warn('[amulet-show] result vectors failed', err);
   }
+
+  fitResultStoryTypography();
 
   setAmuletLoaderProgress(1);
   hideAmuletLoader();
@@ -433,6 +531,7 @@ function hideResultOverlay() {
   overlay.style.pointerEvents = 'none';
   overlay.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('is-result-overlay-open');
+  clearResultViewActive();
 
   import('./result-overlay-fog.js?v=20250708-result-layout')
     .then(function (mod) {
@@ -795,36 +894,32 @@ export async function showFinishedAmulet(answersOverride) {
     if (zone) zone.classList.remove('is-textures-loading');
 
     if (inlineCreate) {
-      if (wasIndexCreate) {
-        pendingAnswers = answers;
-        persistCompletedQuestionnaire(answers);
+      pendingAnswers = answers;
+      persistCompletedQuestionnaire(answers);
 
-        const shown = await showResultOverlay(container, answers);
-        if (shown) {
-          await rememberResultSnapshot();
-          bindResultOverlayButtons(container, answers);
-        } else {
-          document.body.classList.remove('is-amulet-rendering');
-          setAmuletLoaderProgress(1);
-          hideAmuletLoader();
-          const workspace = document.getElementById('indexCreateWorkspace');
-          if (workspace) workspace.classList.add('is-open');
-          document.body.classList.add('is-create-amulet-ready');
-          showCreateCompletePanel(true);
+      const shown = await showResultOverlay(container, answers);
+      if (shown) {
+        await rememberResultSnapshot();
+        bindResultOverlayButtons(container, answers);
+      } else {
+        document.body.classList.remove('is-amulet-rendering');
+        setAmuletLoaderProgress(1);
+        hideAmuletLoader();
+        const workspace = document.getElementById('indexCreateWorkspace');
+        if (wasIndexCreate && workspace) workspace.classList.add('is-open');
+        document.body.classList.add(
+          wasIndexCreate ? 'is-create-amulet-ready' : 'is-amulet-ready'
+        );
+        showCreateCompletePanel(wasIndexCreate);
+        if (wasIndexCreate) {
           showIndexCreateActionButtons();
           const placed = await placeIndexAmuletInGarden(container, answers);
           if (!placed) {
             setStatus('לא הצלחנו להציג את מסך התוצאה. נסי שוב או רענני.', true);
           }
+        } else if (isCreatePage) {
+          showCreateExportButton();
         }
-      } else {
-        document.body.classList.remove('is-amulet-rendering');
-        setAmuletLoaderProgress(1);
-        hideAmuletLoader();
-        persistCompletedQuestionnaire(answers);
-        document.body.classList.add('is-amulet-ready');
-        showCreateCompletePanel(false);
-        if (isCreatePage) showCreateExportButton();
       }
     } else {
       setAmuletLoaderProgress(1);
@@ -975,3 +1070,48 @@ window.showFinishedAmulet = showFinishedAmulet;
 window.resetAmuletSaveState = resetAmuletSaveState;
 window.restoreCreateQuestionInput = restoreCreateQuestionInput;
 window.pagmarHideResultOverlay = hideResultOverlayFromHistory;
+window.pagmarShouldRestoreResultView = shouldRestoreResultView;
+
+export async function restoreResultViewFromSession(answersOverride) {
+  const answers = answersOverride || loadAnswers();
+  if (!allAnswered(answers)) return false;
+
+  const container = document.getElementById('amuletContainer');
+  if (!container) return false;
+
+  const createSlot = document.getElementById('createAmuletSlot');
+  if (createSlot && container.parentElement !== createSlot) {
+    createSlot.appendChild(container);
+  }
+  container.hidden = false;
+
+  document.body.classList.add('is-amulet-rendering');
+  await showAmuletLoader('טוען קמע', { fullscreen: true, progress: 0 });
+
+  try {
+    const hasLiveCanvas = Boolean(container.querySelector('canvas')?.width);
+    if (!hasLiveCanvas) {
+      await renderFinalAmuletLikePrototype(answers, container, function (frac) {
+        setAmuletLoaderProgress(frac);
+      });
+    }
+
+    const shown = await showResultOverlay(container, answers);
+    if (!shown) {
+      hideAmuletLoader({ force: true });
+      document.body.classList.remove('is-amulet-rendering');
+      return false;
+    }
+
+    await rememberResultSnapshot();
+    bindResultOverlayButtons(container, answers);
+    return true;
+  } catch (err) {
+    console.error('[amulet-show] restore result view failed', err);
+    hideAmuletLoader({ force: true });
+    document.body.classList.remove('is-amulet-rendering');
+    return false;
+  }
+}
+
+window.pagmarRestoreResultView = restoreResultViewFromSession;

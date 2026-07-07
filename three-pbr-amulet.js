@@ -9103,14 +9103,22 @@ export async function renderVectorPreviewInteractive(opts) {
     mount = mountSvg(svg);
     await yieldToMainThread();
 
-    if (container) container.innerHTML = '';
+    const renderer = getOrCreateRenderer();
+    const canvas = renderer.domElement;
+    const canvasMounted = Boolean(container && canvas.parentNode === container);
+
+    /* Keep the previous frame visible until the new vector pass is drawn. */
+    if (!canvasMounted && container) {
+      container.innerHTML = '';
+    }
+
+    disposeInteractive();
     disposeActiveScene();
 
     const layer3 = mount.querySelector('.layer-3');
     if (!layer3) throw new Error('layer 3 missing');
     const layer2 = mount.querySelector('.layer-2');
 
-    const renderer = getOrCreateRenderer();
     renderer.setClearColor(0x000000, 0);
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -9157,11 +9165,12 @@ export async function renderVectorPreviewInteractive(opts) {
     active.scene = scene;
     active.camera = camera;
 
-    const canvas = renderer.domElement;
     canvas.style.display = 'block';
     canvas.style.width = '100%';
     canvas.style.height = '100%';
-    container.appendChild(canvas);
+    if (container && !canvasMounted) {
+      container.appendChild(canvas);
+    }
     opts.onProgress?.(1, 'הושלם');
 
     const orbit = attachAmuletOrbitControls(canvas, {

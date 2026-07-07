@@ -90,7 +90,7 @@ const CHAIN_SAVED_LABEL_NUDGE = {
 };
 
 /** Cyber Garden–style movement: low camera, hold + slide on ground plane */
-const CAMERA_Y = 1.5;
+const CAMERA_Y_BASE = 1.5;
 const PAN_SPEED = 0.028;
 const LOOK_AHEAD = 6;
 const ZOOM_SPEED = 0.012;
@@ -101,7 +101,7 @@ const CAMERA_Z_PADDING = 12;
 const CAMERA_X_PADDING = 14;
 let minCameraX = -18;
 let maxCameraX = 18;
-const LOOK_AT_Y = -0.45;
+const LOOK_AT_Y_BASE = -0.45;
 const CAMERA_FOV = 58;
 const SPRITE_WORLD_Y = -1.38;
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), -SPRITE_WORLD_Y);
@@ -128,10 +128,24 @@ const OPENING_SHIFT_RIGHT_PX = 120;
 const OPENING_ZOOM_IN_PX = 150;
 /** Extra opening-camera nudge in screen pixels (left / back). */
 const OPENING_CAMERA_NUDGE_LEFT_PX = 80;
-const OPENING_CAMERA_NUDGE_BACK_PX = 100;
+/** 100 base + 450 pull-back — camera farther from amulets at opening. */
+const OPENING_CAMERA_NUDGE_BACK_PX = 550;
 const OPENING_REF_VIEWPORT_H = 1080;
 const OPENING_CAMERA_BACK_Z = 8.2;
 const OPENING_CAMERA_SIDE_X = 1.4;
+/** Amulets sit lower on screen at opening; camera + lookAt lift together (same pitch). */
+const OPENING_AMULETS_LOWER_PX = 100;
+const OPENING_VIEW_REF_DIST = 9;
+const OPENING_VIEW_Y_OFFSET =
+  OPENING_AMULETS_LOWER_PX /
+  (OPENING_REF_VIEWPORT_H /
+    (2 * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2)) * OPENING_VIEW_REF_DIST));
+const CAMERA_Y = CAMERA_Y_BASE + OPENING_VIEW_Y_OFFSET;
+const LOOK_AT_Y = LOOK_AT_Y_BASE + OPENING_VIEW_Y_OFFSET;
+/** Revert one-time opening down-nudge if it was applied earlier. */
+const OPENING_DOWN_MIGRATION_KEY = 'opening-down-200-v1';
+const OPENING_DOWN_REVERT_KEY = 'opening-down-200-revert-v1';
+const OPENING_DOWN_NUDGE_PX = 200;
 
 function openingFrameCentroid(layout = AMULET_LAYOUT_BASE) {
   const slots = layout.filter((l) => OPENING_FRAME_TEX.includes(l.tex));
@@ -1017,6 +1031,42 @@ function positionFromEntry(entry, collectionIndex) {
   const saved = normalizeSavedPosition(entry?.position);
   if (saved) return saved;
   return collectionSlotPosition(collectionIndex);
+}
+
+/** Undo opening-down-200-v1 — restore saved positions after layout revert. */
+function revertOpeningGlobalDownOnce() {
+  try {
+    if (localStorage.getItem(OPENING_DOWN_MIGRATION_KEY) !== 'done') return;
+    if (localStorage.getItem(OPENING_DOWN_REVERT_KEY) === 'done') return;
+  } catch (_) {
+    return;
+  }
+
+  const collection = loadCollection();
+  const pose = openingCameraPose();
+  let dirty = false;
+
+  for (let index = 0; index < collection.length; index += 1) {
+    const entry = collection[index];
+    const saved = normalizeSavedPosition(entry?.position);
+    if (!saved) continue;
+    const up = nudgeScreenDownPx(saved.x, saved.z, -OPENING_DOWN_NUDGE_PX, pose);
+    entry.position = { x: up.x, z: up.z, yWorld: saved.yWorld };
+    dirty = true;
+  }
+
+  const userPos = loadUserAmuletPosition();
+  if (userPos) {
+    const up = nudgeScreenDownPx(userPos.x, userPos.z, -OPENING_DOWN_NUDGE_PX, pose);
+    persistUserAmuletPosition(up.x, up.z);
+  }
+
+  if (dirty) saveCollection(collection);
+
+  try {
+    localStorage.removeItem(OPENING_DOWN_MIGRATION_KEY);
+    localStorage.setItem(OPENING_DOWN_REVERT_KEY, 'done');
+  } catch (_) {}
 }
 
 /** One-time label nudges — persists to storage, never stacks on refresh. */
@@ -2356,6 +2406,7 @@ function restoreCollectionFromStorage() {
           applyPositionToSprite(sprite, pos, index);
           sprite.userData.isCollectionAmulet = true;
           sprite.userData.collectionIndex = index;
+          if (entry.id != null) sprite.userData.collectionEntryId = entry.id;
           sprite.userData.answers = entry.answers;
           collectionSprites.push(sprite);
           upgradeSpriteFromIndexedDb(sprite).finally(resolve);
@@ -2522,9 +2573,44 @@ function spriteRenderOrderForVeil(sprite) {
   return anchorZ < fogVeilZ() ? SPRITE_ORDER_BEHIND_VEIL : SPRITE_ORDER_IN_FRONT;
 }
 
+function spriteDisplayLabel(sprite) {
+  let index;
+  if (sprite.userData.isUserAmulet) {
+    index = USER_AMULET_INDEX + loadCollection().length;
+  } else if (sprite.userData.isCollectionAmulet) {
+    index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
+  } else {
+    index = sprite.userData.tex ?? sprite.userData.questionIndex;
+  }
+  return '[' + String(index + 1).padStart(3, '0') + ']';
+}
+
+function canShowAmuletHover() {
+  if (!document.body.classList.contains('pagmar-index')) return false;
+  if (!controlsEnabled) return false;
+  if (document.body.classList.contains('is-create-mode')) return false;
+  if (document.body.classList.contains('is-amulet-ready')) return false;
+  if (document.body.classList.contains('is-panel-open')) return false;
+  if (document.body.classList.contains('is-spec-panel-open')) return false;
+  if (document.body.classList.contains('is-filter-page')) return false;
+  if (pointerDown?.moved) return false;
+  return true;
+}
+
+function dispatchAmuletHover(detail) {
+  window.dispatchEvent(
+    new CustomEvent('questionnaire:amulet-hover', { detail: detail || { active: false } })
+  );
+}
+
 function updateCursorFromPointer(clientX, clientY) {
-  const hit = pickAmulet(clientX, clientY, false);
-  document.body.style.cursor = hit ? 'pointer' : 'grab';
+  const hit = canShowAmuletHover() ? pickAmulet(clientX, clientY, false) : null;
+  document.body.style.cursor = hit ? 'pointer' : controlsEnabled ? 'grab' : 'default';
+  dispatchAmuletHover(
+    hit
+      ? { active: true, label: spriteDisplayLabel(hit), x: clientX, y: clientY }
+      : { active: false }
+  );
 }
 
 let indexCtaPill = null;
@@ -2819,6 +2905,7 @@ const canvas = renderer.domElement;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   pointerDown = { x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false };
+  dispatchAmuletHover({ active: false });
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -2854,6 +2941,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerleave', () => {
   if (controlsEnabled) document.body.style.cursor = 'grab';
+  dispatchAmuletHover({ active: false });
 });
 
 function shouldIgnoreGardenWheel(target) {
@@ -3015,10 +3103,35 @@ function navigateToAmuletDetail(index) {
   if (typeof window.pagmarIndexChrome !== 'undefined' && window.pagmarIndexChrome.markTyped) {
     window.pagmarIndexChrome.markTyped();
   }
+  stashGardenStateForReturn();
   try {
     sessionStorage.setItem('pagmarAmuletNavAt', String(Date.now()));
   } catch (_) {}
-  window.location.href = 'amulet.html?id=' + encodeURIComponent(index);
+  var entryId =
+    typeof window.pagmarEntryIdForAmuletIndex === 'function'
+      ? window.pagmarEntryIdForAmuletIndex(index)
+      : null;
+  if (entryId == null) {
+    var base = USER_AMULET_INDEX;
+    if (index >= base) {
+      var collIdx = index - base;
+      var coll = loadCollection();
+      if (collIdx >= 0 && collIdx < coll.length && coll[collIdx] && coll[collIdx].id != null) {
+        entryId = coll[collIdx].id;
+      }
+    }
+  }
+  var url = 'amulet.html?id=' + encodeURIComponent(index);
+  if (entryId != null) {
+    url += '&entry=' + encodeURIComponent(entryId);
+    try {
+      sessionStorage.setItem(
+        'pagmarAmuletDetailNav',
+        JSON.stringify({ index: index, entryId: entryId })
+      );
+    } catch (_) {}
+  }
+  window.location.href = url;
 }
 
 window.pagmarNavigateToAmuletDetail = navigateToAmuletDetail;
@@ -3051,10 +3164,19 @@ canvas.addEventListener('pointerup', (e) => {
 });
 
 window.addEventListener('questionnaire:create-open', () => {
+  if (!preCreateGardenState) {
+    preCreateGardenState = captureGardenViewState();
+    writeGardenViewStateToStorage(preCreateGardenState);
+  }
+  dispatchAmuletHover({ active: false });
   updateFocusVisuals();
 });
 
 window.addEventListener('questionnaire:create-close', () => {
+  if (preCreateGardenState) {
+    applyGardenViewState(preCreateGardenState);
+    preCreateGardenState = null;
+  }
   updateFocusVisuals();
 });
 
@@ -3063,29 +3185,83 @@ window.addEventListener('questionnaire:answered', () => {
 });
 
 let preFilterGardenState = null;
+let preCreateGardenState = null;
 
-function stashPreFilterGardenState() {
-  if (preFilterGardenState) return;
-  preFilterGardenState = {
+const GARDEN_VIEW_STATE_KEY = 'pagmarGardenViewState';
+const GARDEN_RETURN_PENDING_KEY = 'pagmarGardenReturnPending';
+
+function captureGardenViewState() {
+  return {
     x: camera.position.x,
     z: camera.position.z,
     gridTravelZ: gridTravelZ,
   };
 }
 
-function restorePreFilterGardenState() {
-  if (!preFilterGardenState) return;
-  const state = preFilterGardenState;
+function writeGardenViewStateToStorage(state) {
+  if (!state || typeof state.x !== 'number' || typeof state.z !== 'number') return;
+  try {
+    sessionStorage.setItem(GARDEN_VIEW_STATE_KEY, JSON.stringify(state));
+  } catch (_) {}
+}
+
+function readGardenViewStateFromStorage() {
+  try {
+    const raw = sessionStorage.getItem(GARDEN_VIEW_STATE_KEY);
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    if (state && typeof state.x === 'number' && typeof state.z === 'number') return state;
+  } catch (_) {}
+  return null;
+}
+
+function applyGardenViewState(state) {
+  if (!state || typeof state.x !== 'number' || typeof state.z !== 'number') return false;
   camera.position.x = state.x;
   camera.position.z = state.z;
   lookForward();
-  gridTravelZ = state.gridTravelZ;
+  if (typeof state.gridTravelZ === 'number') gridTravelZ = state.gridTravelZ;
   lastCameraZ = state.z;
   window.dispatchEvent(
     new CustomEvent('questionnaire:camera-move', {
       detail: { travel: gridTravelZ, sync: 'pan' },
     })
   );
+  updateFocusVisuals();
+  return true;
+}
+
+function stashGardenStateForReturn() {
+  const state = captureGardenViewState();
+  writeGardenViewStateToStorage(state);
+  try {
+    sessionStorage.setItem(GARDEN_RETURN_PENDING_KEY, '1');
+  } catch (_) {}
+  return state;
+}
+
+function restoreGardenReturnStateOnLoad() {
+  try {
+    if (sessionStorage.getItem(GARDEN_RETURN_PENDING_KEY) !== '1') return false;
+    sessionStorage.removeItem(GARDEN_RETURN_PENDING_KEY);
+  } catch (_) {
+    return false;
+  }
+  const state = readGardenViewStateFromStorage();
+  if (!state) return false;
+  return applyGardenViewState(state);
+}
+
+function stashPreFilterGardenState() {
+  if (preFilterGardenState) return;
+  preFilterGardenState = captureGardenViewState();
+  writeGardenViewStateToStorage(preFilterGardenState);
+}
+
+function restorePreFilterGardenState() {
+  const state = preFilterGardenState || readGardenViewStateFromStorage();
+  if (!state) return;
+  applyGardenViewState(state);
   preFilterGardenState = null;
 }
 
@@ -3096,6 +3272,7 @@ window.addEventListener('questionnaire:index-filter-change', (evt) => {
     controlsEnabled = false;
     pointerDown = null;
     document.body.style.cursor = 'default';
+    dispatchAmuletHover({ active: false });
   } else {
     restorePreFilterGardenState();
     if (
@@ -3113,12 +3290,14 @@ window.addEventListener('questionnaire:index-filter-change', (evt) => {
 window.addEventListener('questionnaire:panel-open', () => {
   controlsEnabled = false;
   document.body.style.cursor = 'default';
+  dispatchAmuletHover({ active: false });
 });
 
 window.addEventListener('questionnaire:intro-open', () => {
   controlsEnabled = false;
   pointerDown = null;
   document.body.style.cursor = 'default';
+  dispatchAmuletHover({ active: false });
 });
 
 window.addEventListener('questionnaire:intro-close', () => {
@@ -3171,6 +3350,7 @@ Promise.resolve()
     return purgeAmulets021022023Once();
   })
   .then(() => {
+    revertOpeningGlobalDownOnce();
     migrateForwardNudgeLabels();
     forceRepositionLabel021Once();
     revertV10LayoutOnce();
@@ -3210,14 +3390,21 @@ Promise.resolve()
     window.__gardenReady = sprites.length || 1;
     return upgradeAllAmuletSprites().then(function () {
       updateFocusVisuals();
+      restoreGardenReturnStateOnLoad();
     });
   })
   .catch((err) => {
     console.error('[garden-three] failed to load amulets', err);
   });
 
+window.addEventListener('pageshow', function (evt) {
+  if (!evt.persisted || !window.__gardenReady) return;
+  restoreGardenReturnStateOnLoad();
+});
+
 window.gardenStashPreFilterState = stashPreFilterGardenState;
 window.gardenRestorePreFilterState = restorePreFilterGardenState;
+window.gardenStashIndexReturnState = stashGardenStateForReturn;
 
 window.gardenGetViewState = function gardenGetViewState() {
   return {

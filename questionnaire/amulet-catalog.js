@@ -83,15 +83,117 @@
     return trimmed.replace(/^[\u05F4"\u201C]+|[\u05F4"\u201D]+$/g, '').trim();
   }
 
-  function domainKeyFromRecord(data) {
-    const wish = stripQuotes(data.q1Wish);
-    const change = stripQuotes(data.q7Change);
-    if (
-      /עבודה|קריירה|תואר|הצלח|לשכור|פרנסה/.test(wish) ||
-      /להוכיח|בטוח|עצמי|גאה/.test(change)
-    ) {
-      return 'selfConfidence';
+  /** Topic rules derived from wish/change text — aligned with index filter sidebar labels. */
+  const CONTENT_TOPIC_RULES = [
+    {
+      key: 'family',
+      labels: ['משפחה'],
+      pattern:
+        /משפח(?:ה|תית)|הורים|(?:^|[\s,.])א(?:מא|בא)(?:[\s,.]|$)|אח(?:ות|י\b)|ילד(?:ים|ה)?|סב(?:ת)?(?:ה|א)|הריון|(?:להיות|אהיה)\s+אמ(?:א|ן)|נק(?:ים|ום)\s+משפח|התאחד\s+המשפח/i,
+      fields: ['q1Wish', 'q3WhyNow', 'q7Change', 'q8Motivation'],
+    },
+    {
+      key: 'love',
+      labels: ['זוגיות', 'אהבה'],
+      pattern:
+        /(?:^|[\s,.])א(?:הב(?:ה)?)(?:[\s,.]|$)|בן\s*זוג|בת\s*זוג|ניש(?:ו(?:י(?:ין|ם)?)|ו(?:יים|ים))|להתחת(?:ן|ין)|חתונ(?:ה|ות)|(?:^|[\s,.])רווק(?:ה)?(?:[\s,.]|$)|פרטנר|בעלי\s+לעתיד|הציע(?:\s+לי)?\s+(?:ניש|טבעת)|למצוא\s+(?:א(?:הבה|ת)|ב(?:ן|ת)\s*זוג)/i,
+      fields: ['q1Wish', 'q3WhyNow', 'q7Change', 'q8Motivation'],
+    },
+    {
+      key: 'health',
+      labels: ['בריאות'],
+      pattern:
+        /בריא(?:ות|(?:ה)?\s+יותר)?|(?:ה)?ע(?:י)?ש(?:ון|ן)|סיגר(?:יות|יה)?|(?:י)?חל(?:ים|ה|ות|ימ)|מחל(?:ה|ות)|ר(?:פוא|יצ)|הפסיק\s+לע(?:וש|ש)/i,
+      fields: ['q1Wish', 'q3WhyNow', 'q7Change', 'q8Motivation'],
+    },
+    {
+      key: 'housing',
+      labels: ['מגורים'],
+      pattern: /דיר(?:ה|ת)|מגור(?:ים)?|בית\s+(?:גדול|חדש|משלי|ב)/i,
+      fields: ['q1Wish', 'q7Change'],
+    },
+    {
+      key: 'livelihood',
+      labels: ['פרנסה'],
+      pattern:
+        /(?:^|[\s,.])(?:ע(?:בוד(?:ה|ות)|סק)|פרנס|קרייר|(?:ל)?מצ(?:א|וא)\s+עבוד|תואר|שכ(?:ר|ור)|התפטר|משר(?:ה|ות)|(?:להיות\s+)?עצמא|פתח(?:ו)?\s+עסק)/i,
+      fields: ['q1Wish', 'q7Change'],
+    },
+    {
+      key: 'selfConfidence',
+      labels: ['ביטחון עצמי'],
+      pattern:
+        /(?:לאהוב|אוהב(?:ת)?|אהב(?:ה)?)\s+(?:את\s+)?עצמי|ביטחון\s+עצמי|סלוח\s+לעצמ/i,
+      fields: ['q1Wish', 'q7Change'],
+    },
+  ];
+
+  const DOMAIN_PRIMARY_ORDER = [
+    'selfConfidence',
+    'family',
+    'love',
+    'health',
+    'housing',
+    'livelihood',
+    'meaning',
+  ];
+
+  function recordTextFromFields(data, fields) {
+    return (fields || ['q1Wish', 'q3WhyNow', 'q7Change', 'q8Motivation'])
+      .map(function (key) {
+        return stripQuotes(data && data[key]);
+      })
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function topicKeysFromRecord(data, restrictToField) {
+    const keys = new Set();
+    CONTENT_TOPIC_RULES.forEach(function (rule) {
+      if (restrictToField && rule.fields.indexOf(restrictToField) === -1) return;
+      const fields = restrictToField ? [restrictToField] : rule.fields;
+      const text = recordTextFromFields(data, fields);
+      if (text && rule.pattern.test(text)) keys.add(rule.key);
+    });
+    return keys;
+  }
+
+  function primaryTopicKeyFromRecord(data) {
+    const passes = ['q1Wish', 'q7Change', null];
+    for (let p = 0; p < passes.length; p += 1) {
+      const restrict = passes[p];
+      for (let i = 0; i < DOMAIN_PRIMARY_ORDER.length; i += 1) {
+        const key = DOMAIN_PRIMARY_ORDER[i];
+        const rule = CONTENT_TOPIC_RULES.find(function (r) {
+          return r.key === key;
+        });
+        if (!rule) continue;
+        if (restrict && rule.fields.indexOf(restrict) === -1) continue;
+        const fields = restrict ? [restrict] : rule.fields;
+        const text = recordTextFromFields(data, fields);
+        if (text && rule.pattern.test(text)) return key;
+      }
     }
+    return null;
+  }
+
+  function contentFilterLabelsFromRecord(data) {
+    const labels = new Set();
+    const matchedKeys = topicKeysFromRecord(data);
+    CONTENT_TOPIC_RULES.forEach(function (rule) {
+      if (!matchedKeys.has(rule.key)) return;
+      rule.labels.forEach(function (label) {
+        labels.add(label);
+      });
+      const domainLabel = DOMAIN_LABEL[rule.key];
+      if (domainLabel) labels.add(domainLabel);
+    });
+    return labels;
+  }
+
+  function domainKeyFromRecord(data) {
+    const topicKey = primaryTopicKeyFromRecord(data);
+    if (topicKey) return topicKey;
     const feeling = data && data.q5Feeling;
     return Q5_FEELING_TO_DOMAIN[feeling] || 'love';
   }
@@ -126,6 +228,11 @@
 
     if (domainKey === 'love') labels.add('זוגיות');
     if (domainKey === 'family') labels.add('משפחה');
+
+    contentFilterLabelsFromRecord(record).forEach(function (label) {
+      labels.add(label);
+    });
+
     if (record.q4Belief === 'doubt') labels.add('לא מאמין שזה יקרה');
     if (record.q6Difficulty === 'no_control') labels.add('לא לדעת מה יקרה');
 
@@ -294,6 +401,34 @@
       return Array.isArray(arr) ? arr : [];
     } catch (_) { return []; }
   }
+
+  function findCollectionEntryById(entryId) {
+    if (entryId == null) return null;
+    var collection = loadAmuletCollection();
+    for (var i = 0; i < collection.length; i += 1) {
+      if (collection[i] && collection[i].id === entryId) return collection[i];
+    }
+    return null;
+  }
+
+  function entryIdForAmuletIndex(index) {
+    var base = userAmuletBaseIndex();
+    if (index < base) return null;
+    var collectionIndex = index - base;
+    var collection = loadAmuletCollection();
+    if (collectionIndex < collection.length) {
+      var entry = collection[collectionIndex];
+      return entry && entry.id != null ? entry.id : null;
+    }
+    return null;
+  }
+
+  window.pagmarEntryIdForAmuletIndex = entryIdForAmuletIndex;
+  window.pagmarFindCollectionEntryById = findCollectionEntryById;
+  window.pagmarResolveCollectionEntry = function (index) {
+    var entryId = entryIdForAmuletIndex(index);
+    return entryId != null ? findCollectionEntryById(entryId) : null;
+  };
 
   window.getAmuletSpec = function (index, answers, recordOverride) {
     const base = userAmuletBaseIndex();

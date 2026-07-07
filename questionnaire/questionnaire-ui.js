@@ -206,7 +206,7 @@
     if (amuletModulesReady) return amuletModulesReady;
     amuletModulesReady = Promise.all([
       import('./amulet-build.js?v=20250705-q4-instant'),
-      import('./amulet-show.js?v=20250705-meadow-focus'),
+      import('./amulet-show.js?v=20250708-result-align'),
     ]).catch(function (err) {
       amuletModulesReady = null;
       throw err;
@@ -316,6 +316,10 @@
       const hidden = 'linear-gradient(to bottom, transparent 0%, transparent 100%)';
       lineEl.style.setProperty('-webkit-mask-image', hidden);
       lineEl.style.setProperty('mask-image', hidden);
+      lineEl.style.setProperty('-webkit-mask-size', '100% 100%');
+      lineEl.style.setProperty('mask-size', '100% 100%');
+      lineEl.style.setProperty('-webkit-mask-repeat', 'no-repeat');
+      lineEl.style.setProperty('mask-repeat', 'no-repeat');
       return;
     }
     const stops = ['transparent 0%'];
@@ -333,6 +337,35 @@
     const mask = 'linear-gradient(to bottom, ' + stops.join(', ') + ')';
     lineEl.style.setProperty('-webkit-mask-image', mask);
     lineEl.style.setProperty('mask-image', mask);
+    lineEl.style.setProperty('-webkit-mask-size', '100% 100%');
+    lineEl.style.setProperty('mask-size', '100% 100%');
+    lineEl.style.setProperty('-webkit-mask-repeat', 'no-repeat');
+    lineEl.style.setProperty('mask-repeat', 'no-repeat');
+  }
+
+  function getAllMarkerGaps(lineRect) {
+    return requestStepMarkers
+      .map(function (marker) {
+        const markerRect = marker.getBoundingClientRect();
+        const gapTop = Math.max(0, markerRect.top - lineRect.top);
+        const gapBottom = Math.min(lineRect.height, markerRect.bottom - lineRect.top);
+        if (gapBottom > gapTop + 1) {
+          return { start: gapTop, end: gapBottom };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        return a.start - b.start;
+      });
+  }
+
+  function subtractAllHoles(segment, holes) {
+    return holes.reduce(function (segments, hole) {
+      return segments.flatMap(function (seg) {
+        return subtractRailSegment(seg, hole);
+      });
+    }, [segment]);
   }
 
   function applyRequestStepRailLines(activeMarker, activeStep) {
@@ -345,19 +378,8 @@
       const lineRect = grayLine.getBoundingClientRect();
       if (!lineRect.height) return;
 
-      let gap = null;
-      if (activeMarker) {
-        const markerRect = activeMarker.getBoundingClientRect();
-        const gapTop = Math.max(0, markerRect.top - lineRect.top);
-        const gapBottom = Math.min(lineRect.height, markerRect.bottom - lineRect.top);
-        if (gapBottom > gapTop + 1) {
-          gap = { start: gapTop, end: gapBottom };
-        }
-      }
-
-      const graySegments = gap
-        ? subtractRailSegment({ start: 0, end: lineRect.height }, gap)
-        : [{ start: 0, end: lineRect.height }];
+      const allGaps = getAllMarkerGaps(lineRect);
+      const graySegments = subtractAllHoles({ start: 0, end: lineRect.height }, allGaps);
       applyStepRailMask(grayLine, lineRect.height, graySegments);
 
       if (!whiteLine) return;
@@ -386,12 +408,7 @@
         return;
       }
 
-      let whiteSegments = [progress];
-      if (gap) {
-        whiteSegments = whiteSegments.flatMap(function (segment) {
-          return subtractRailSegment(segment, gap);
-        });
-      }
+      const whiteSegments = subtractAllHoles(progress, allGaps);
       applyStepRailMask(whiteLine, lineRect.height, whiteSegments);
     });
   }
@@ -500,7 +517,7 @@
       };
     }
 
-    if (question.type === 'text' || question.key === 'q3WhyNow') {
+    if (question.type === 'text') {
       const questionAreaH = getQuestionAreaHeight(question);
       return {
         questionAreaH: questionAreaH,
@@ -629,7 +646,7 @@
     }
 
     try {
-      const mod = await import('./amulet-show.js?v=20250705-meadow-focus');
+      const mod = await import('./amulet-show.js?v=20250708-result-align');
       await mod.showFinishedAmulet(answers);
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
@@ -766,8 +783,11 @@
     if (zone) zone.classList.toggle('is-building', Boolean(isBuilding));
   }
 
-  async function runAmuletBuild(answers) {
+  async function runAmuletBuild(answers, options) {
     if (!isCreateFlow()) return;
+    const opts = options || {};
+    const uiBlocking = opts.uiBlocking !== false;
+    const showLoader = opts.showLoader !== false;
     try {
       await ensureAmuletModules();
     } catch (err) {
@@ -775,13 +795,22 @@
       return;
     }
     if (typeof window.amuletBuildUpdate !== 'function') return;
-    setBuilding(true);
+    if (uiBlocking) setBuilding(true);
     try {
-      await window.amuletBuildUpdate(answers);
+      await window.amuletBuildUpdate(answers, {
+        uiBlocking: uiBlocking,
+        showLoader: showLoader,
+      });
     } finally {
-      setBuilding(false);
+      if (uiBlocking) setBuilding(false);
     }
   }
+
+  function unlockSemanticQuestionUi() {
+    setBuilding(false);
+  }
+
+  window.amuletUnlockSemanticQuestionUi = unlockSemanticQuestionUi;
 
   /** Q4–Q7: vectors already visible — only warm PBR compose when browser is idle. */
   function schedulePostVectorPrecompose(answers, answeredIndex) {
@@ -850,12 +879,46 @@
           return;
         }
         const nextIndex = nextUnansweredIndex(answers);
-        openModal(nextIndex);
+        const willShowNewLayer =
+          typeof window.amuletWillShowNewVectorLayer === 'function' &&
+          window.amuletWillShowNewVectorLayer(answers);
+        const needsCatchup =
+          typeof window.amuletNeedsVectorCatchup === 'function' &&
+          window.amuletNeedsVectorCatchup(answers);
+
         mountAmuletInCreateSlot();
+
+        if (willShowNewLayer) {
+          document.body.classList.add('is-vector-frame-loading');
+          try {
+            if (typeof window.amuletShowLoader === 'function') {
+              await window.amuletShowLoader('טוען קמע', { keepPreview: false });
+            }
+            await runAmuletBuild(answers, {
+              uiBlocking: true,
+              showLoader: true,
+            });
+          } catch (err) {
+            console.error('[questionnaire] vector build failed', err);
+          } finally {
+            document.body.classList.remove('is-vector-frame-loading');
+          }
+        } else if (needsCatchup) {
+          void runAmuletBuild(answers, {
+            uiBlocking: false,
+            showLoader: false,
+          });
+        }
+
+        if (nextIndex >= 3) {
+          document.body.classList.add('is-semantic-questions');
+          unlockSemanticQuestionUi();
+        }
+
+        openModal(nextIndex);
+
         if (index >= 3 && index <= 6) {
           schedulePostVectorPrecompose(answers, index);
-        } else {
-          void runAmuletBuild(answers);
         }
       })();
       return;
@@ -891,11 +954,39 @@
         fieldWrap.dataset.choiceValue = selectedValue;
       }
 
-      const rowPlan = getChoiceRowIndices(question.options.length);
       const grid = document.createElement('div');
       grid.className = 'intro__choice-grid intro__choice-grid--figma';
       grid.dataset.choiceCount = String(question.options.length);
 
+      if (isRequestFlowActive()) {
+        grid.classList.add('intro__choice-grid--stack');
+        question.options.forEach(function (opt) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className =
+            'intro__choice-btn intro__choice-btn--figma' +
+            (selectedValue === opt.value ? ' is-selected' : '');
+          btn.textContent = opt.label;
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (useSaveForChoice) {
+              selectedValue = opt.value;
+              fieldWrap.dataset.choiceValue = opt.value;
+              grid.querySelectorAll('.intro__choice-btn--figma').forEach(function (b) {
+                b.classList.toggle('is-selected', b === btn);
+              });
+              if (submitBtn) submitBtn.disabled = !validate(question, opt.value);
+              return;
+            }
+            saveAnswer(index, opt.value);
+          });
+          grid.appendChild(btn);
+        });
+        fieldWrap.appendChild(grid);
+        return null;
+      }
+
+      const rowPlan = getChoiceRowIndices(question.options.length);
       rowPlan.forEach(function (indices, rowIndex) {
         const row = document.createElement('div');
         row.className = 'intro__choice-grid-row';
@@ -935,12 +1026,21 @@
     submitBtn.hidden = false;
     if (saveWrap) saveWrap.hidden = false;
 
-    if (question.type === 'textarea') {
+    const useTextareaField =
+      question.type === 'textarea' ||
+      (question.type === 'text' && isRequestFlowActive());
+
+    if (useTextareaField) {
       const el = document.createElement('textarea');
       el.className = 'intro__question-input';
       el.rows = 2;
       el.placeholder = '';
       el.value = value;
+      if (question.type === 'text') {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') e.preventDefault();
+        });
+      }
       fieldWrap.appendChild(el);
       return el;
     }
@@ -960,10 +1060,6 @@
         'is-title-offset-slot',
         Boolean(question.figmaTitleOffset)
       );
-      requestActiveCard.classList.toggle(
-        'is-request-wish-step',
-        question.key === 'q1Wish'
-      );
     }
   }
 
@@ -972,9 +1068,9 @@
       tagEl.textContent = question.tag || '[בקשה]';
     }
     applyRequestQuestionLayout(question);
-    const copyEl = requestActiveCard && requestActiveCard.querySelector('.figma-q__copy');
-    if (copyEl) {
-      copyEl.classList.toggle('is-title-offset', Boolean(question.figmaTitleOffset));
+    const headEl = requestActiveCard && requestActiveCard.querySelector('.figma-q__head');
+    if (headEl) {
+      headEl.classList.toggle('is-title-offset', Boolean(question.figmaTitleOffset));
     }
     if (!textEl) return;
     textEl.textContent = question.text;
@@ -1018,6 +1114,10 @@
     const question = questions[index];
     if (!question || !frame) return;
 
+    if (index >= 3) {
+      unlockSemanticQuestionUi();
+    }
+
     ensureCreateSaveVisible();
 
     if (typeof window.gardenCapturePlacementAnchor === 'function') {
@@ -1027,6 +1127,7 @@
     applyCreateLayout(question);
 
     document.body.classList.toggle('is-choice-question', question.type === 'choice');
+    document.body.classList.toggle('is-semantic-questions', index >= 3);
     if (indexCreateWorkspace) {
       indexCreateWorkspace.classList.toggle('is-choice-question', question.type === 'choice');
     }
@@ -1043,7 +1144,7 @@
       startPlaceholderCycle(fieldEl, question);
       submitBtn.disabled = !validate(question, fieldEl.value.trim());
       fieldEl.addEventListener('input', function () {
-        if (document.body.classList.contains('is-building')) return;
+        if (document.body.classList.contains('is-building') && index < 3) return;
         submitBtn.disabled = !validate(question, fieldEl.value.trim());
       });
     } else {
@@ -1081,6 +1182,11 @@
       isRequestFlowActive() && activeIndex !== null && activeIndex !== index;
 
     if (isAdvance) {
+      /* Q4–Q8: no vector work — show next question immediately. */
+      if (index >= 3) {
+        populateCreateQuestion(index);
+        return;
+      }
       animateRequestQuestionChange(function () {
         populateCreateQuestion(index);
       });
@@ -1492,6 +1598,7 @@
       'is-create-amulet-ready',
       'is-amulet-rendering',
       'is-choice-question',
+      'is-semantic-questions',
       'is-result-overlay-open'
     );
     var resultOverlay = document.getElementById('resultOverlay');
@@ -1625,6 +1732,9 @@
         indexCreateWorkspace.classList.add('is-open');
         activeIndex = null;
         openModal(0);
+        requestAnimationFrame(function () {
+          updateRequestProgress(0);
+        });
       });
     });
 
@@ -1764,6 +1874,56 @@
     } catch (_) { return false; }
   }
 
+  async function restoreResultViewIfNeeded() {
+    const params = new URLSearchParams(location.search);
+    const forcePreview = params.get('result') === '1';
+    const shouldRestore =
+      forcePreview ||
+      (typeof window.pagmarShouldRestoreResultView === 'function' &&
+        window.pagmarShouldRestoreResultView()) ||
+      (allAnswered(answers) && Boolean(answers.completedAt));
+
+    if (!shouldRestore) return;
+    if (!isIndexPage && !isCreatePage) return;
+
+    let answers = loadAnswers();
+    if (forcePreview && !allAnswered(answers)) {
+      try {
+        const mod = await import('./amulet-show.js?v=20250708-result-align');
+        answers = mod.DEMO_RESULT_ANSWERS;
+        saveAnswers(answers);
+      } catch (err) {
+        console.warn('[questionnaire] demo result answers unavailable', err);
+        return;
+      }
+    } else if (!allAnswered(answers)) {
+      return;
+    }
+
+    if (isIndexPage) {
+      document.body.classList.add('is-create-mode');
+      if (indexCreateWorkspace) {
+        indexCreateWorkspace.hidden = false;
+        indexCreateWorkspace.classList.remove('is-open');
+      }
+      mountAmuletInCreateSlot();
+    }
+
+    try {
+      await ensureAmuletModules();
+    } catch (err) {
+      console.error('[questionnaire] result restore modules failed', err);
+      return;
+    }
+
+    if (typeof window.pagmarRestoreResultView === 'function') {
+      await window.pagmarRestoreResultView(answers);
+      return;
+    }
+
+    await showFinishedAmuletNow(answers);
+  }
+
   function restoreCompletedSession() {
     if (isIndexPage) {
       const garden = document.getElementById('questionGarden');
@@ -1803,14 +1963,21 @@
 
   function initCreatePage() {
     if (!isCreatePage) return;
-    sessionStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem('amuletUserAnswers');
-    sessionStorage.removeItem('amuletComposed3D');
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem('amuletUserAnswers');
-      localStorage.removeItem('amuletComposed3D');
-    } catch (_) {}
+    const keepSession =
+      new URLSearchParams(location.search).get('result') === '1' ||
+      (typeof window.pagmarShouldRestoreResultView === 'function' &&
+        window.pagmarShouldRestoreResultView()) ||
+      (allAnswered(loadAnswers()) && Boolean(loadAnswers().completedAt));
+    if (!keepSession) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem('amuletUserAnswers');
+      sessionStorage.removeItem('amuletComposed3D');
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem('amuletUserAnswers');
+        localStorage.removeItem('amuletComposed3D');
+      } catch (_) {}
+    }
     if (typeof window.amuletInvalidateComposeCache === 'function') {
       window.amuletInvalidateComposeCache();
     }
@@ -1877,6 +2044,12 @@
   updateStepIndicators(loadAnswers());
   initCreatePage();
   bindFigmaSubmitButtonHover();
+
+  if (isIndexPage || isCreatePage) {
+    window.setTimeout(function () {
+      void restoreResultViewIfNeeded();
+    }, 320);
+  }
 
   if (isIndexPage) {
     window.startIndexCreateFlow = startIndexCreateFlow;

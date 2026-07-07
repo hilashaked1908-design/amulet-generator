@@ -6,15 +6,13 @@
 
   if (!document.body.classList.contains('pagmar-index')) return;
 
-  const GRID_COLS = [
-    50.56005859375,
-    516.56005859375,
-    983.1201171875,
-    1449.679931640625,
-  ];
+  const GRID_COLS_COUNT = 4;
   const GRID_ROW_TOPS = [263.5, 754];
   const CARD_SIZE = 410;
+  const GRID_GAP = 92;
+  const GRID_ROW_STEP = CARD_SIZE + 80.5;
   const GRID_BOTTOM_PAD = 200;
+  const FULL_ROW_WIDTH = GRID_COLS_COUNT * CARD_SIZE + (GRID_COLS_COUNT - 1) * GRID_GAP;
 
   const filterActive = document.getElementById('indexFilterActive');
   const filterGrid = document.getElementById('indexFilterGrid');
@@ -22,6 +20,11 @@
 
   let activeFilterLabels = [];
   let filterGridResizeRaf = 0;
+  let gridLayout = {
+    cardSizeU: CARD_SIZE,
+    gapU: GRID_GAP,
+    stepU: CARD_SIZE + GRID_GAP,
+  };
 
   function normalizeFilterLabels(input) {
     if (!input) return [];
@@ -37,23 +40,87 @@
     return String(index + 1).padStart(3, '0');
   }
 
-  function cardPosition(index) {
-    const col = index % GRID_COLS.length;
-    const row = Math.floor(index / GRID_COLS.length);
+  function getIndexU() {
+    if (!pagmarCanvas) return 1;
+    const rect = pagmarCanvas.getBoundingClientRect();
+    const style = getComputedStyle(pagmarCanvas);
+    const pagmarW = parseFloat(style.getPropertyValue('--pagmar-w')) || 1920;
+    const pagmarH = parseFloat(style.getPropertyValue('--pagmar-h')) || 1080;
+    if (!(rect.width > 0 && rect.height > 0)) return 1;
+    return Math.min(rect.width / pagmarW, rect.height / pagmarH);
+  }
+
+  function measureGridWidthU() {
+    if (!filterGrid) return FULL_ROW_WIDTH;
+    const widthPx = filterGrid.getBoundingClientRect().width;
+    if (!(widthPx > 0)) return FULL_ROW_WIDTH;
+    return widthPx / getIndexU();
+  }
+
+  function resolveGridMetrics(availableWidthU) {
+    const scale = Math.min(1, availableWidthU / FULL_ROW_WIDTH);
+    const cardSizeU = CARD_SIZE * scale;
+    const gapU = GRID_GAP * scale;
     return {
-      left: GRID_COLS[col],
+      cardSizeU: cardSizeU,
+      gapU: gapU,
+      stepU: cardSizeU + gapU,
+    };
+  }
+
+  function gridColumnLeft(col, metrics) {
+    return col * metrics.stepU;
+  }
+
+  function cardPosition(index, metrics) {
+    const col = index % GRID_COLS_COUNT;
+    const row = Math.floor(index / GRID_COLS_COUNT);
+    return {
+      left: gridColumnLeft(col, metrics),
       top:
         GRID_ROW_TOPS[row] != null
           ? GRID_ROW_TOPS[row]
           : GRID_ROW_TOPS[GRID_ROW_TOPS.length - 1] +
-            (row - GRID_ROW_TOPS.length + 1) * (CARD_SIZE + 80.5),
+            (row - GRID_ROW_TOPS.length + 1) * GRID_ROW_STEP,
     };
+  }
+
+  function dispatchAmuletHover(detail) {
+    window.dispatchEvent(
+      new CustomEvent('questionnaire:amulet-hover', { detail: detail || { active: false } })
+    );
+  }
+
+  function layoutFilterCards() {
+    if (!filterGrid) return;
+    const cards = filterGrid.querySelectorAll('.pagmar__index-filter-card');
+    const totalCards = cards.length;
+    const metrics = resolveGridMetrics(measureGridWidthU());
+
+    gridLayout = metrics;
+
+    cards.forEach(function (card, gridIndex) {
+      const pos = cardPosition(gridIndex, metrics);
+      card.style.left = 'calc(' + pos.left + ' * var(--index-u))';
+      card.style.top = 'calc(' + pos.top + ' * var(--index-u))';
+      card.style.width = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
+      card.style.height = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
+    });
+    updateFilterGridScrollHeight(totalCards);
+  }
+
+  function scheduleFilterGridLayout() {
+    cancelAnimationFrame(filterGridResizeRaf);
+    filterGridResizeRaf = requestAnimationFrame(function () {
+      syncFilterGridFrame();
+      layoutFilterCards();
+    });
   }
 
   function gridContentHeight(cardCount) {
     if (cardCount <= 0) return 0;
-    const pos = cardPosition(cardCount - 1);
-    return pos.top + CARD_SIZE + GRID_BOTTOM_PAD;
+    const pos = cardPosition(cardCount - 1, gridLayout);
+    return pos.top + gridLayout.cardSizeU + GRID_BOTTOM_PAD;
   }
 
   function syncFilterGridFrame() {
@@ -95,6 +162,7 @@
       tag.type = 'button';
       tag.className = 'pagmar__index-filter-active-tag';
       tag.textContent = '[' + filterLabel + ']';
+      tag.dataset.typeText = '[' + filterLabel + ']';
       tag.setAttribute('aria-label', 'הצג פילטרים נוספים — ' + filterLabel);
       tag.setAttribute('aria-pressed', 'true');
       tag.setAttribute('aria-expanded', 'false');
@@ -170,6 +238,21 @@
       .catch(function () {});
   }
 
+  function entryIdForAmuletIndex(amuletIndex) {
+    if (typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+      return window.pagmarEntryIdForAmuletIndex(amuletIndex);
+    }
+    const base = (window.AMULET_QUESTIONS || []).length;
+    if (amuletIndex < base) return null;
+    const collectionIndex = amuletIndex - base;
+    const collection = loadCollection();
+    if (collectionIndex < collection.length) {
+      const entry = collection[collectionIndex];
+      return entry && entry.id != null ? entry.id : null;
+    }
+    return null;
+  }
+
   function navigateToAmuletDetail(amuletIndex) {
     if (typeof window.pagmarNavigateToAmuletDetail === 'function') {
       window.pagmarNavigateToAmuletDetail(amuletIndex);
@@ -184,18 +267,30 @@
     try {
       sessionStorage.setItem('pagmarAmuletNavAt', String(Date.now()));
     } catch (_) {}
-    window.location.href = 'amulet.html?id=' + encodeURIComponent(amuletIndex);
+    var entryId = entryIdForAmuletIndex(amuletIndex);
+    var url = 'amulet.html?id=' + encodeURIComponent(amuletIndex);
+    if (entryId != null) {
+      url += '&entry=' + encodeURIComponent(entryId);
+      try {
+        sessionStorage.setItem(
+          'pagmarAmuletDetailNav',
+          JSON.stringify({ index: amuletIndex, entryId: entryId })
+        );
+      } catch (_) {}
+    }
+    window.location.href = url;
   }
 
   function createGridCard(amuletIndex, gridIndex) {
-    const pos = cardPosition(gridIndex);
+    const metrics = gridLayout;
+    const pos = cardPosition(gridIndex, metrics);
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'pagmar__index-filter-card';
     card.style.left = 'calc(' + pos.left + ' * var(--index-u))';
     card.style.top = 'calc(' + pos.top + ' * var(--index-u))';
-    card.style.width = 'calc(' + CARD_SIZE + ' * var(--index-u))';
-    card.style.height = 'calc(' + CARD_SIZE + ' * var(--index-u))';
+    card.style.width = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
+    card.style.height = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
     card.dataset.index = String(amuletIndex);
     card.setAttribute('aria-label', 'קמע ' + specIndexLabel(amuletIndex));
 
@@ -214,10 +309,17 @@
     assignCardImage(img, amuletIndex);
     card.appendChild(img);
 
-    const label = document.createElement('span');
-    label.className = 'pagmar__index-filter-card-label';
-    label.textContent = '[' + specIndexLabel(amuletIndex) + ']';
-    card.appendChild(label);
+    const hoverLabel = '[' + specIndexLabel(amuletIndex) + ']';
+
+    card.addEventListener('mouseenter', function (e) {
+      dispatchAmuletHover({ active: true, label: hoverLabel, x: e.clientX, y: e.clientY });
+    });
+    card.addEventListener('mousemove', function (e) {
+      dispatchAmuletHover({ active: true, label: hoverLabel, x: e.clientX, y: e.clientY });
+    });
+    card.addEventListener('mouseleave', function () {
+      dispatchAmuletHover({ active: false });
+    });
 
     card.addEventListener('click', function () {
       navigateToAmuletDetail(amuletIndex);
@@ -240,11 +342,12 @@
         : [];
 
     syncFilterGridFrame();
+    gridLayout = resolveGridMetrics(measureGridWidthU());
 
     indices.forEach(function (amuletIndex, gridIndex) {
       filterGrid.appendChild(createGridCard(amuletIndex, gridIndex));
     });
-    updateFilterGridScrollHeight(indices.length);
+    scheduleFilterGridLayout();
     filterGrid.scrollTop = 0;
   }
 
@@ -264,6 +367,7 @@
     } else if (filterGrid) {
       filterGrid.innerHTML = '';
       updateFilterGridScrollHeight(0);
+      dispatchAmuletHover({ active: false });
     }
 
     window.dispatchEvent(
@@ -298,8 +402,7 @@
 
   window.addEventListener('resize', function () {
     if (!document.body.classList.contains('is-filter-page')) return;
-    cancelAnimationFrame(filterGridResizeRaf);
-    filterGridResizeRaf = requestAnimationFrame(syncFilterGridFrame);
+    scheduleFilterGridLayout();
   });
 
   window.pagmarFilterPage = {

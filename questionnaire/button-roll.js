@@ -136,6 +136,7 @@
 
   function enhanceFilterButton(btn, textOverride) {
     if (!btn || btn.classList.contains('is-typing')) return;
+    if (btn.classList.contains('pagmar__index-filter-active-tag')) return;
 
     const text = String(
       textOverride != null ? textOverride : btn.dataset.typeText || btn.textContent || ''
@@ -151,6 +152,13 @@
 
   function syncFilterButton(btn, text) {
     if (!btn) return;
+    if (btn.classList.contains('pagmar__index-filter-active-tag')) {
+      const value = String(text == null ? '' : text);
+      btn.dataset.typeText = value;
+      btn.setAttribute('aria-label', value);
+      btn.textContent = value;
+      return;
+    }
     const value = String(text == null ? '' : text);
     btn.dataset.typeText = value;
     btn.setAttribute('aria-label', value);

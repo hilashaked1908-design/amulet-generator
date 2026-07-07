@@ -1,4 +1,4 @@
-/* Figma 2258:19215 — pixel layout @ 1920×1080. Coordinates from file metadata. */
+/* Figma 2481:23049 — pixel layout @ 1920×1080. Coordinates from file metadata. */
 
 body.pagmar-index.is-create-mode,
 body.pagmar-create {
@@ -6,8 +6,16 @@ body.pagmar-create {
     calc((100vw - var(--pagmar-content-margin, 20px) * 2) / 1920),
     calc((100dvh - var(--pagmar-content-margin, 20px) * 2) / 1080)
   );
+  --figma-q-block-gap: calc(50 * var(--fu));
+  --figma-step-rail-x: 1848.54;
+  --figma-step-rail-line-left: 1847.54;
   --figma-transition: 220ms cubic-bezier(0.33, 0, 0.2, 1);
-  background: #000000 !important;
+  --request-blue: #1500E1;
+  --request-ink: #ffffff;
+  --request-field-border: rgba(255, 255, 255, 0.5);
+  --request-muted-ink: rgba(255, 255, 255, 0.6);
+  --pagmar-content-margin: 0px;
+  background: var(--request-blue) !important;
 }
 
 body.pagmar-create .pagmar__atmosphere {
@@ -19,9 +27,10 @@ body.pagmar-create .pagmar__atmosphere {
   display: block;
 }
 
-body.pagmar-create .pagmar__atmosphere--back {
+body.pagmar-create .pagmar__atmosphere--back,
+body.pagmar-index.is-create-mode .pagmar__atmosphere--back {
   z-index: 0;
-  background: #000000;
+  background: transparent;
 }
 
 body.pagmar-create .pagmar-viewport,
@@ -47,12 +56,18 @@ body.pagmar-index.is-create-mode .pagmar__index-cta-pill {
   display: none !important;
 }
 
-body.pagmar-index.is-create-mode .pagmar__garden {
-  display: block !important;
+body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__garden,
+body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__atmosphere--back,
+body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__atmosphere--fantik {
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: none !important;
-  cursor: default;
+}
+
+body.pagmar-index.is-create-mode.is-create-exiting .pagmar__garden {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 body.pagmar-create #grid-bg {
@@ -77,6 +92,15 @@ body.pagmar-create .pagmar__garden {
   pointer-events: none;
   cursor: default;
   background: transparent;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+body.pagmar-create .pagmar__atmosphere--back,
+body.pagmar-create .pagmar__atmosphere--fantik {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
 }
 
 body.pagmar-create .pagmar__garden canvas {
@@ -142,9 +166,6 @@ body.pagmar-create .pagmar__request-flow {
   overflow: visible;
   background: transparent;
   pointer-events: none;
-  /* Bottom horizontal of panel corners: panel top + height − corner inset (0.5fu × scale) */
-  --figma-panel-bottom-line: calc((104 + 873 - 0.5 * var(--pagmar-corner-scale)) * var(--fu));
-  --figma-q-bottom: calc(1080 * var(--fu) - var(--figma-panel-bottom-line));
 }
 
 .pagmar__request-artboard > * {
@@ -165,10 +186,10 @@ body.pagmar-create .pagmar__request-flow {
   box-sizing: border-box;
 }
 
-/* Frame 322 — 2258:20200 @ 50,104 880×873 */
+/* Frame 322 — 2481:24034 @ 50,151.5 880×873 */
 .figma-panel {
   left: calc(50 * var(--fu));
-  top: calc(104 * var(--fu));
+  top: calc(151.5 * var(--fu));
   width: calc(880 * var(--fu));
   height: calc(873 * var(--fu));
   z-index: 1;
@@ -183,10 +204,19 @@ body.pagmar-create .pagmar__request-flow {
   overflow: visible;
 }
 
+/* Ellipse 22 — amulet panel floor shadow (hidden; amulet frame uses stroke ellipse) */
+.figma-panel__inner::after {
+  display: none;
+}
+
+.figma-panel__inner > .figma-corner {
+  display: none !important;
+}
+
 .figma-corner {
   position: absolute;
-  width: calc(59.621 * var(--fu) * var(--pagmar-corner-scale));
-  height: calc(59.613 * var(--fu) * var(--pagmar-corner-scale));
+  width: calc(38.037 * var(--fu) * var(--pagmar-corner-scale));
+  height: calc(38.032 * var(--fu) * var(--pagmar-corner-scale));
   display: block;
   pointer-events: none;
   user-select: none;
@@ -208,6 +238,45 @@ body.pagmar-create .pagmar__request-flow {
   height: calc(676.821 * var(--fu));
   z-index: 2;
   pointer-events: auto;
+  overflow: visible;
+}
+
+/* Bottom ellipse line — flush with frame bottom, centered on vector area */
+.figma-amulet__ellipse {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  height: calc(37.34 * var(--fu));
+  transform: translateX(-50%);
+  display: block;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+  z-index: 3;
+}
+
+body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading .pagmar__index-create-amulet-view,
+body.pagmar-create .figma-amulet.is-amulet-loading .pagmar__create-amulet-view,
+body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading .pagmar__create-amulet-view {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading.is-amulet-loading-keep-preview .pagmar__index-create-amulet-view,
+body.pagmar-create .figma-amulet.is-amulet-loading.is-amulet-loading-keep-preview .pagmar__create-amulet-view,
+body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading.is-amulet-loading-keep-preview .pagmar__create-amulet-view {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading .pagmar__amulet-frame-loader,
+body.pagmar-create .figma-amulet.is-amulet-loading .pagmar__amulet-frame-loader {
+  opacity: 1;
+  visibility: visible;
 }
 
 body.pagmar-create .figma-amulet.pagmar__create-amulet-frame,
@@ -228,6 +297,7 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
 .figma-amulet .pagmar__index-create-amulet-view {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,20 +322,22 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   display: none !important;
 }
 
-/* Frame 323 — 2127:3640 @ 1852,55 */
+/* Close — centered on step rail (same axis as progress slider) */
 .figma-close {
-  left: calc(1852 * var(--fu));
+  left: calc(var(--figma-step-rail-x) * var(--fu));
+  right: auto;
   top: calc(55 * var(--fu));
-  width: calc(16.118 * var(--fu));
-  height: calc(22.235 * var(--fu));
+  width: calc(50 * var(--fu));
+  height: calc(50 * var(--fu));
+  transform: translateX(-50%);
   z-index: 20;
   padding: 0;
   border: none;
   background: transparent;
   cursor: pointer;
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
   -webkit-appearance: none;
   appearance: none;
@@ -273,11 +345,16 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
 
 .figma-close img {
   display: block;
-  width: 100%;
+  width: calc(16.119 * var(--fu));
   height: calc(21.235 * var(--fu));
-  object-fit: fill;
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
   user-select: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+  filter: brightness(0) invert(1);
 }
 
 .figma-close:focus-visible {
@@ -300,10 +377,18 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
 
 .figma-step-rail__line--137,
 .figma-step-rail__line--progress {
-  left: calc(1855.097 * var(--fu));
-  top: calc(187.489 * var(--fu));
+  left: calc(var(--figma-step-rail-line-left) * var(--fu));
+  top: calc(176.772 * var(--fu));
   width: calc(2 * var(--fu));
-  height: calc(682.971 * var(--fu));
+  height: calc(726.67 * var(--fu));
+}
+
+.figma-step-rail__line--137 {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.figma-step-rail__line--progress {
+  background: #ffffff;
 }
 
 .figma-step-rail__line--136 {
@@ -314,22 +399,23 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
 }
 
 .figma-step-marker {
-  left: calc(1840.192 * var(--fu));
-  width: calc(29.808 * var(--fu));
-  height: calc(29.828 * var(--fu));
+  left: calc(var(--figma-step-rail-x) * var(--fu));
+  width: calc(39.102 * var(--fu));
+  height: calc(39.102 * var(--fu));
+  transform: translateX(-50%);
   z-index: 10;
   pointer-events: none;
   user-select: none;
 }
 
-.figma-step-marker--8 { top: calc(174.596 * var(--fu)); }
-.figma-step-marker--7 { top: calc(275.657 * var(--fu)); }
-.figma-step-marker--6 { top: calc(376.717 * var(--fu)); }
-.figma-step-marker--5 { top: calc(478.778 * var(--fu)); }
-.figma-step-marker--4 { top: calc(579.838 * var(--fu)); }
-.figma-step-marker--3 { top: calc(680.899 * var(--fu)); }
-.figma-step-marker--2 { top: calc(780.813 * var(--fu)); }
-.figma-step-marker--1 { top: calc(875.578 * var(--fu)); }
+.figma-step-marker--8 { top: calc(137.456 * var(--fu)); }
+.figma-step-marker--7 { top: calc(247.284 * var(--fu)); }
+.figma-step-marker--6 { top: calc(357.112 * var(--fu)); }
+.figma-step-marker--5 { top: calc(466.94 * var(--fu)); }
+.figma-step-marker--4 { top: calc(576.768 * var(--fu)); }
+.figma-step-marker--3 { top: calc(686.596 * var(--fu)); }
+.figma-step-marker--2 { top: calc(797.475 * var(--fu)); }
+.figma-step-marker--1 { top: calc(903.442 * var(--fu)); }
 
 .figma-step-marker__bracket,
 .figma-step-marker__frame-active {
@@ -342,15 +428,25 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   pointer-events: none;
 }
 
-.figma-step-marker__frame-active,
-.figma-step-marker__pill,
-.figma-step-marker__num {
+.figma-step-marker__frame-active {
   opacity: 0;
   transition: opacity var(--figma-transition);
 }
 
 .figma-step-marker__pill {
-  display: none !important;
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: calc(2 * var(--fu)) solid var(--request-field-border, rgba(255, 255, 255, 0.5));
+  background: transparent;
+  opacity: 1;
+  transition: border-color var(--figma-transition);
+}
+
+.figma-step-marker__num {
+  opacity: 0;
+  transition: opacity var(--figma-transition);
 }
 
 .figma-step-marker__bracket {
@@ -361,20 +457,31 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   opacity: 0;
 }
 
+.figma-step-marker.is-active .figma-step-marker__pill {
+  background: transparent;
+  border-color: #ffffff;
+}
+
 .figma-step-marker.is-active .figma-step-marker__frame-active,
 .figma-step-marker.is-active .figma-step-marker__num {
   opacity: 1;
 }
 
+.figma-step-marker.is-active .figma-step-marker__num {
+  color: #ffffff;
+}
+
 .figma-step-marker__num {
   position: absolute;
-  left: calc(9.904 * var(--fu));
-  top: calc(4.294 * var(--fu));
-  color: #F5F5F5;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--request-ink, #1500E1);
   font-family: "TheBasics", "DavidLibre", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
-  line-height: 110%;
+  line-height: 1;
   text-align: center;
   white-space: nowrap;
 }
@@ -394,25 +501,25 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   margin: 0;
   padding: 0;
   background: transparent;
-  color: #F5F5F5;
+  color: var(--request-ink, #1500E1);
 }
 
-/* Question card — bottom anchored to panel corner baseline (2258:20218 @ 1104.889) */
+/* Question card — Frame 369 @ 1147,151.846 566×776 */
 .figma-q {
   z-index: 5;
   transition:
     left var(--figma-transition),
-    bottom var(--figma-transition),
+    top var(--figma-transition),
     width var(--figma-transition),
     filter var(--figma-transition),
     opacity var(--figma-transition);
 }
 
 .figma-q--slot-0 {
-  left: calc(1104.889 * var(--fu));
-  top: auto;
-  bottom: var(--figma-q-bottom);
-  width: calc(560.414 * var(--fu));
+  left: calc(1147 * var(--fu));
+  top: calc(151.845703125 * var(--fu));
+  bottom: auto;
+  width: calc(566 * var(--fu));
   filter: blur(0);
   opacity: 1;
   pointer-events: auto;
@@ -424,12 +531,29 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   pointer-events: none;
 }
 
+body.is-semantic-questions .pagmar__request-artboard.is-advancing .figma-q {
+  opacity: 1;
+  filter: none;
+  pointer-events: auto;
+}
+
+/* Q1–Q3: hide question panel while new vector layers render */
+body.is-vector-frame-loading .pagmar__request-artboard > .figma-q {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .figma-q__panel {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: calc(24 * var(--fu));
+  gap: var(--figma-q-block-gap);
   width: 100%;
+}
+
+.figma-q__panel:has(.intro__choice-grid--stack) {
+  gap: calc(32 * var(--fu));
 }
 
 .figma-q__head {
@@ -437,7 +561,11 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  gap: calc(5 * var(--fu));
+  gap: calc(16 * var(--fu));
+}
+
+.figma-q__actions {
+  display: contents;
 }
 
 .figma-q__tag {
@@ -445,9 +573,9 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   align-items: center;
   justify-content: center;
   align-self: flex-start;
-  padding: calc(4 * var(--fu));
-  background: #F5F5F5;
-  color: #030303;
+  padding: 0;
+  background: transparent;
+  color: var(--request-ink, #ffffff);
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -456,53 +584,17 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   white-space: nowrap;
 }
 
-.figma-q--slot-0.is-title-offset-slot .figma-q__tag {
-  color: #000000;
-}
-
-.figma-q__copy {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: 100%;
-  gap: calc(24 * var(--fu));
-  text-align: right;
-  color: #F5F5F5;
-}
-
-.figma-q__copy.is-title-offset {
-  gap: calc(30 * var(--fu));
-}
-
-.figma-q__copy.is-title-offset .figma-q__title {
-  padding-top: calc(30 * var(--fu));
-  min-height: calc(77 * var(--fu));
-  font-family: "Romema Spitzer TRIAL", serif;
-  font-weight: 300;
-  letter-spacing: calc(-0.75 * var(--fu));
-  line-height: 1;
-}
-
-.figma-q__copy.is-title-offset .figma-q__desc {
-  width: calc(560.414 * var(--fu));
-  margin-left: 0;
-  min-height: calc(53 * var(--fu));
-  letter-spacing: calc(-0.24 * var(--fu));
-  line-height: 1.1;
-}
-
-/* Figma 2258:20218 — כותרת Romema 75 בכל השאלות (כמו שאלה 1) */
+/* Figma 2481:24053 — TheBasics Display Thin 75 */
 .figma-q__title {
   margin: 0;
   padding: 0;
   width: calc(560.414 * var(--fu));
-  min-height: calc(75.955 * var(--fu));
-  color: #F5F5F5;
+  color: var(--request-ink, #1500E1);
   direction: rtl;
   text-align: right;
-  font-family: "Romema Spitzer TRIAL", serif;
+  font-family: "TheBasics Display Thin", "TheBasics", serif;
   font-size: calc(75 * var(--fu));
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: calc(-0.75 * var(--fu));
   line-height: normal;
 }
@@ -510,27 +602,26 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 .figma-q__desc {
   margin: 0;
   padding: 0;
-  width: calc(536.825 * var(--fu));
-  min-height: calc(86 * var(--fu));
+  width: calc(540.664 * var(--fu));
   margin-left: auto;
-  color: #F5F5F5;
+  color: var(--request-ink, #1500E1);
   direction: rtl;
   text-align: right;
-  font-family: "Romema Spitzer TRIAL", serif;
-  font-size: calc(24 * var(--fu));
-  font-weight: 300;
-  letter-spacing: calc(0.72 * var(--fu));
+  font-family: "DavidLibre", "David", serif;
+  font-size: calc(32 * var(--fu));
+  font-weight: 500;
+  letter-spacing: calc(0.96 * var(--fu));
   line-height: 1.2;
 }
 
 .figma-q__desc[hidden] { display: none; }
 
-/* Frame 306 — padding 20px all sides */
+/* Frame 306 — typing fields (q1Wish size for all text/textarea questions) */
 .figma-q__field-box {
   box-sizing: border-box;
   width: 100%;
-  height: calc(97 * var(--fu));
-  border: calc(2 * var(--fu)) solid rgba(255, 255, 255, 0.3);
+  height: calc(326 * var(--fu));
+  border: calc(2 * var(--fu)) solid var(--request-field-border, rgba(21, 0, 225, 0.5));
   padding: calc(20 * var(--fu));
   display: block;
 }
@@ -548,7 +639,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 
 .figma-q__field {
   width: 100%;
-  min-height: calc(57 * var(--fu));
+  min-height: calc(286 * var(--fu));
   display: block;
 }
 
@@ -556,18 +647,19 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 .figma-q__field .intro__question-input--single {
   box-sizing: border-box;
   width: 100%;
-  min-height: calc(22 * var(--fu));
-  height: calc(57 * var(--fu));
+  height: calc(286 * var(--fu));
+  min-height: calc(286 * var(--fu));
+  max-height: calc(286 * var(--fu));
   margin: 0;
   padding: 0;
   border: none;
   background: transparent;
-  color: #F5F5F5;
-  font-family: "TheBasics", serif;
-  font-size: calc(24 * var(--fu));
+  color: var(--request-ink, #1500E1);
+  font-family: "TheBasics Display Thin", "TheBasics", serif;
+  font-size: calc(75 * var(--fu));
   font-weight: 400;
-  line-height: 110%;
-  letter-spacing: calc(-0.96 * var(--fu));
+  letter-spacing: calc(-0.75 * var(--fu));
+  line-height: normal;
   text-align: right;
   resize: none;
   outline: none;
@@ -575,21 +667,18 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   appearance: none;
 }
 
-.figma-q__field .intro__question-input--single {
-  height: calc(22 * var(--fu));
-  min-height: calc(22 * var(--fu));
-}
-
 .figma-q__field textarea.intro__question-input {
-  height: calc(57 * var(--fu));
-  min-height: calc(57 * var(--fu));
-  max-height: calc(57 * var(--fu));
   overflow: hidden;
 }
 
 .figma-q__field .intro__question-input::placeholder {
-  color: #F5F5F5;
-  opacity: 0.4;
+  font-family: "TheBasics Display Thin", "TheBasics", serif;
+  font-size: calc(75 * var(--fu));
+  font-weight: 400;
+  letter-spacing: calc(-0.75 * var(--fu));
+  line-height: normal;
+  color: var(--request-muted-ink, rgba(21, 0, 225, 0.6));
+  opacity: 1;
 }
 
 .figma-q__field .intro__question-input:focus {
@@ -598,11 +687,57 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   box-shadow: none;
 }
 
+.figma-q__field:has(.intro__choice-grid--stack) {
+  min-height: 0;
+  width: 100%;
+}
+
 .figma-q__field .intro__choice-grid--figma {
   display: flex;
   flex-direction: column;
   width: 100%;
   overflow: visible;
+}
+
+.figma-q__field .intro__choice-grid--stack {
+  align-items: flex-start;
+  gap: calc(12 * var(--fu));
+  direction: rtl;
+}
+
+.figma-q__field .intro__choice-grid--stack .intro__choice-btn--figma {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  min-height: calc(40 * var(--fu));
+  height: auto;
+  padding: calc(8 * var(--fu)) calc(20 * var(--fu));
+  margin: 0;
+  border: calc(1 * var(--fu)) solid var(--request-field-border, rgba(21, 0, 225, 0.5));
+  border-radius: var(--pagmar-pill-radius, 999px);
+  background: transparent;
+  color: var(--request-ink, #1500E1);
+  font-family: "TheBasics", serif;
+  font-size: calc(24 * var(--fu));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: calc(-0.72 * var(--fu));
+  text-align: center;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.figma-q__field .intro__choice-grid--stack .intro__choice-btn--figma.is-selected {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: var(--request-field-border, rgba(21, 0, 225, 0.5));
+  color: var(--request-ink, #1500E1);
 }
 
 .figma-q__field .intro__choice-grid-row {
@@ -620,10 +755,10 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   height: calc(48 * var(--fu));
   padding: calc(12 * var(--fu)) calc(10 * var(--fu));
   margin: -0.5px;
-  border: calc(1 * var(--fu)) solid #7e7e7e;
+  border: calc(1 * var(--fu)) solid var(--request-field-border, rgba(21, 0, 225, 0.5));
   border-radius: 0;
   background: transparent;
-  color: #f8f8f7;
+  color: var(--request-ink, #1500E1);
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -636,9 +771,9 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__field .intro__choice-btn--figma.is-selected {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: #7e7e7e;
-  color: #f8f8f7;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: var(--request-field-border, rgba(21, 0, 225, 0.5));
+  color: var(--request-ink, #1500E1);
 }
 
 /* Figma 1744:23661 — row 2: gut + long option, same line, no wrap */
@@ -677,10 +812,14 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   display: none !important;
 }
 
-/* Component 17 — 2154:361 @ 227×55, left-aligned to field box */
+/* Component 17 — pill button, left-aligned to field box */
 .figma-q__btn-outer {
   position: relative;
-  width: calc(227 * var(--fu));
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: stretch;
+  width: auto;
+  min-width: 0;
   height: calc(55 * var(--fu));
   flex: 0 0 auto;
   margin-right: auto;
@@ -731,32 +870,40 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__btn {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(100% - 24.8 * var(--fu));
-  height: calc(100% - 10.48 * var(--fu));
-  transform: translate(-50%, calc(-50% + 0.43 * var(--fu)));
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  box-sizing: border-box;
+  width: auto;
+  height: 100%;
+  direction: rtl;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   padding: calc(10 * var(--fu)) calc(40 * var(--fu));
-  border: none;
-  border-radius: calc(60 * var(--fu));
+  border: 1px solid var(--pagmar-pill-border, rgba(255, 255, 255, 0.2));
+  border-radius: var(--pagmar-pill-radius, 999px);
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
-  color: #F5F5F5;
+  color: var(--request-ink, #1500E1);
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
   letter-spacing: calc(-0.72 * var(--fu));
   line-height: 110%;
+  white-space: nowrap;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: opacity var(--figma-transition);
+  transition:
+    background var(--figma-transition),
+    backdrop-filter var(--figma-transition),
+    -webkit-backdrop-filter var(--figma-transition),
+    opacity var(--figma-transition);
 }
 
 .figma-q--slot-0.is-title-offset-slot .figma-q__btn {
@@ -764,7 +911,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__btn-label {
-  color: #F5F5F5;
+  color: var(--request-ink, #1500E1);
 }
 
 .figma-q__btn:hover:not(:disabled),
@@ -780,12 +927,12 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__btn:disabled {
-  color: #9a9a9a;
+  color: var(--request-muted-ink, rgba(21, 0, 225, 0.6));
   cursor: default;
 }
 
 .figma-q__btn-outer:has(.figma-q__btn:disabled) .figma-q__btn-label {
-  color: #9a9a9a;
+  color: var(--request-muted-ink, rgba(21, 0, 225, 0.6));
 }
 
 .figma-panel .pagmar__index-create-amulet-actions {
@@ -836,46 +983,86 @@ body.pagmar-index.is-create-mode .pagmar__index-create.pagmar__request-flow.is-o
   overflow: hidden !important;
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma {
-  white-space: nowrap !important;
-  word-break: keep-all !important;
-  overflow-wrap: normal !important;
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__field .intro__choice-grid--stack .intro__choice-btn--figma,
+body.pagmar-create .pagmar__request-artboard .figma-q__field .intro__choice-grid--stack .intro__choice-btn--figma {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: calc(40 * var(--fu)) !important;
+  padding: calc(8 * var(--fu)) calc(20 * var(--fu)) !important;
+  margin: 0 !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
   font-family: "TheBasics", serif !important;
-  color: #f8f8f7 !important;
-  border-color: #7e7e7e !important;
+  font-size: calc(24 * var(--fu)) !important;
+  font-weight: 400 !important;
+  letter-spacing: calc(-0.72 * var(--fu)) !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  color: var(--request-ink, #1500E1) !important;
+  border-color: var(--request-field-border, rgba(21, 0, 225, 0.5)) !important;
+  border-radius: var(--pagmar-pill-radius, 999px) !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__title,
 body.pagmar-create .pagmar__request-artboard .figma-q__title {
-  font-family: "Romema Spitzer TRIAL", serif !important;
-  font-weight: 300 !important;
+  font-family: "TheBasics Display Thin", "TheBasics", serif !important;
+  font-weight: 400 !important;
   font-size: calc(75 * var(--fu)) !important;
   letter-spacing: calc(-0.75 * var(--fu)) !important;
-  color: #F5F5F5 !important;
+  color: var(--request-ink, #1500E1) !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__desc,
 body.pagmar-create .pagmar__request-artboard .figma-q__desc {
-  font-family: "Romema Spitzer TRIAL", serif !important;
-  font-weight: 300 !important;
-  color: #F5F5F5 !important;
+  font-family: "DavidLibre", "David", serif !important;
+  font-weight: 500 !important;
+  font-size: calc(32 * var(--fu)) !important;
+  letter-spacing: calc(0.96 * var(--fu)) !important;
+  color: var(--request-ink, #1500E1) !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__tag,
 body.pagmar-create .pagmar__request-artboard .figma-q__tag {
   font-family: "TheBasics", serif !important;
-  color: #030303 !important;
+  background: transparent !important;
+  color: var(--request-ink, #ffffff) !important;
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q--slot-0.is-title-offset-slot .figma-q__tag,
-body.pagmar-create .pagmar__request-artboard .figma-q--slot-0.is-title-offset-slot .figma-q__tag {
-  color: #000000 !important;
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-close img,
+body.pagmar-create .pagmar__request-artboard .figma-close img {
+  width: calc(16.119 * var(--fu)) !important;
+  height: calc(21.235 * var(--fu)) !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background-color: transparent !important;
+  filter: brightness(0) invert(1) !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__field .intro__question-input,
-body.pagmar-create .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-create .pagmar__request-artboard .figma-q__field .intro__question-input {
+  font-family: "TheBasics Display Thin", "TheBasics", serif !important;
+  font-size: calc(75 * var(--fu)) !important;
+  font-weight: 400 !important;
+  letter-spacing: calc(-0.75 * var(--fu)) !important;
+  line-height: normal !important;
+  color: var(--request-ink, #1500E1) !important;
+}
+
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__field .intro__question-input::placeholder,
+body.pagmar-create .pagmar__request-artboard .figma-q__field .intro__question-input::placeholder {
+  font-family: "TheBasics Display Thin", "TheBasics", serif !important;
+  font-size: calc(75 * var(--fu)) !important;
+  font-weight: 400 !important;
+  letter-spacing: calc(-0.75 * var(--fu)) !important;
+  line-height: normal !important;
+}
+
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn,
 body.pagmar-create .pagmar__request-artboard .figma-q__btn {
   font-family: "TheBasics", serif !important;
-  color: #F5F5F5 !important;
+  color: var(--request-ink, #1500E1) !important;
 }

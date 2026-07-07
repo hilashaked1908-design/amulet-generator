@@ -35,6 +35,14 @@
   border-color: #ffffff;
 }
 
+/* Hide K95 yellow companion dot in questionnaire / create flow */
+body.pagmar-index.is-create-mode .pagmar__k95-cursor,
+body.pagmar-create .pagmar__k95-cursor {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 /* Native system cursor stays visible — companion dot only */
 body.pagmar-index.is-create-mode .pagmar__request-artboard .intro__choice-btn--figma,
 body.pagmar-create .pagmar__request-artboard .intro__choice-btn--figma,
@@ -42,6 +50,11 @@ body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn:not(:di
 body.pagmar-create .pagmar__request-artboard .figma-q__btn:not(:disabled),
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-close,
 body.pagmar-create .pagmar__request-artboard .figma-close {
+  cursor: pointer;
+}
+
+body.pagmar-index .pagmar__index-filter-item,
+body.pagmar-index .pagmar__index-filter-active-tag {
   cursor: pointer;
 }
 

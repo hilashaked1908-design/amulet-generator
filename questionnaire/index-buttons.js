@@ -1,6 +1,6 @@
 /**
  * Index chrome buttons — Figma 2127:3662 (Frame 336).
- * Terminal-style typewriter on load for chrome labels; filter list types on panel open.
+ * Terminal-style typewriter on load for chrome labels; filter list shows immediately on open.
  */
 (function () {
   'use strict';
@@ -86,9 +86,32 @@
     const display = filterItemDisplayText(label);
     btn.dataset.typeText = display;
     btn.setAttribute('aria-label', display);
-    if (!btn.classList.contains('is-typing')) {
+    if (btn.classList.contains('is-typing')) return;
+    if (window.pagmarButtonRoll && window.pagmarButtonRoll.syncFilter) {
+      window.pagmarButtonRoll.syncFilter(btn, display);
+    } else {
       btn.textContent = display;
     }
+  }
+
+  function enhanceButtonRoll(root) {
+    if (!window.pagmarButtonRoll) return;
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.pagmar__index-type-target').forEach(function (el) {
+      if (!el.classList.contains('is-typing')) {
+        window.pagmarButtonRoll.enhanceTarget(el);
+      }
+    });
+    scope.querySelectorAll('.pagmar__index-filter-item, .pagmar__index-filter-active-tag').forEach(function (btn) {
+      if (btn.classList.contains('is-typing')) return;
+      const text =
+        btn.dataset.typeText ||
+        btn.dataset.label ||
+        (btn.textContent || '').trim();
+      if (text && window.pagmarButtonRoll.syncFilter) {
+        window.pagmarButtonRoll.syncFilter(btn, text);
+      }
+    });
   }
 
   function getTypeText(el) {
@@ -192,6 +215,9 @@
     el.textContent = fullText;
     el.classList.remove('is-typing');
     el.classList.add('is-typed');
+    if (window.pagmarButtonRoll) {
+      window.pagmarButtonRoll.enhanceTarget(el);
+    }
   }
 
   function resetTypeTargetForTyping(el) {
@@ -472,6 +498,7 @@
 
     if (token === filterTypingToken && filterList) {
       filterList.classList.remove('is-typing');
+      enhanceButtonRoll(filterList);
     }
   }
 
@@ -490,11 +517,7 @@
     } else {
       filterTypingToken += 1;
       updateFilterItemStates();
-      if (document.body.classList.contains('is-filter-page')) {
-        showAllFilterItems();
-      } else {
-        runFilterTypingAnimation();
-      }
+      showAllFilterItems();
     }
 
     filterSidebar.classList.toggle('is-expanded', expanded);
@@ -583,9 +606,11 @@
     }
     initialTypingPromise = runInitialChromeTyping().then(function () {
       markChromeTyped();
+      enhanceButtonRoll();
     });
   } else {
     restoreAllChromeText();
+    enhanceButtonRoll();
   }
 
   window.pagmarIndexChrome = {
@@ -658,12 +683,14 @@
     markChromeTyped();
     cancelInitialChromeTyping();
     restoreAllChromeText();
+    enhanceButtonRoll();
   });
 
   window.addEventListener('pageshow', function () {
     if (!hasChromeTypedBefore()) return;
     cancelInitialChromeTyping();
     restoreAllChromeText();
+    enhanceButtonRoll();
   });
 
   /* Hover typing removed — Figma buttons only shift corners on hover */

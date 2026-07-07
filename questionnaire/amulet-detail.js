@@ -102,6 +102,7 @@
   }
 
   var COMPONENT_ITEM_CLASSES = { 1: 'pagmar__detail-list-item--material' };
+  var resolvedDetailEntryId = null;
 
   function parseEntryId() {
     try {
@@ -127,18 +128,24 @@
   }
 
   async function preloadDetailContext(index) {
+    resolvedDetailEntryId = parseEntryId() || readNavEntryId();
+    if (resolvedDetailEntryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+      resolvedDetailEntryId = window.pagmarEntryIdForAmuletIndex(index);
+    }
+
     await import('./seed-bootstrap.js')
       .then(function (mod) {
         return mod.ensureSeedCollectionLoaded();
       })
       .catch(function () {});
 
-    var entryId = parseEntryId() || readNavEntryId();
-    if (entryId == null && typeof window.pagmarResolveCollectionEntry === 'function') {
+    if (resolvedDetailEntryId == null && typeof window.pagmarResolveCollectionEntry === 'function') {
       var resolved = window.pagmarResolveCollectionEntry(index);
-      if (resolved && resolved.id != null) entryId = resolved.id;
+      if (resolved && resolved.id != null) resolvedDetailEntryId = resolved.id;
     }
-    if (entryId == null) return;
+    if (resolvedDetailEntryId == null) return;
+
+    var entryId = resolvedDetailEntryId;
 
     window.__pagmarDetailAnswersByEntryId = window.__pagmarDetailAnswersByEntryId || {};
 
@@ -160,14 +167,41 @@
     } catch (_) {}
   }
 
-  function renderDetail(index) {
+  function resolveEntryForDetail() {
+    var entryId = resolvedDetailEntryId || parseEntryId() || readNavEntryId();
+    if (entryId == null) return null;
+    if (typeof window.pagmarFindCollectionEntryById === 'function') {
+      return window.pagmarFindCollectionEntryById(entryId);
+    }
+    return null;
+  }
+
+  function renderDetail(index, entry) {
     if (typeof window.getAmuletSpec !== 'function') return;
 
-    const spec = window.getAmuletSpec(index);
-    const imgSrc =
-      typeof window.getAmuletImageSrc === 'function'
-        ? window.getAmuletImageSrc(index)
-        : null;
+    var entryId = entry && entry.id != null ? entry.id : resolvedDetailEntryId || parseEntryId() || readNavEntryId();
+    var recordOverride =
+      entry && entry.answers
+        ? entry.answers
+        : entryId != null &&
+            window.__pagmarDetailAnswersByEntryId &&
+            window.__pagmarDetailAnswersByEntryId[entryId]
+          ? window.__pagmarDetailAnswersByEntryId[entryId]
+          : null;
+
+    const spec = window.getAmuletSpec(index, null, recordOverride || undefined);
+    var imgSrc = null;
+    if (
+      entryId != null &&
+      window.__pagmarDetailSnapshotByEntryId &&
+      window.__pagmarDetailSnapshotByEntryId[entryId]
+    ) {
+      imgSrc = window.__pagmarDetailSnapshotByEntryId[entryId];
+    } else if (entry && entry.snapshot) {
+      imgSrc = entry.snapshot;
+    } else if (typeof window.getAmuletImageSrc === 'function') {
+      imgSrc = window.getAmuletImageSrc(index);
+    }
 
     if (detailNumText) detailNumText.textContent = indexLabel(index);
     if (detailName) detailName.textContent = spec.name || '—';
@@ -217,11 +251,12 @@
       }
 
       await preloadDetailContext(index);
-      renderDetail(index);
-      await Promise.all([
+      renderDetail(index, resolveEntryForDetail());
+      if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('content');
+      Promise.all([
         waitForImage(detailAmuletImg),
         waitForImage(document.getElementById('detailAmuletImgBack')),
-      ]);
+      ]).catch(function () {});
     } catch (_) {
       /* fall through — always release loader */
     } finally {
@@ -232,7 +267,7 @@
   /* ── Vector rendering is handled by amulet-detail-vectors.js (module) ── */
 
   /* ── Navigation ── */
-  const NAV_GUARD_MS = 900;
+  const NAV_GUARD_MS = 350;
   let landedAt = Date.now();
   try {
     const stored = sessionStorage.getItem('pagmarAmuletNavAt');

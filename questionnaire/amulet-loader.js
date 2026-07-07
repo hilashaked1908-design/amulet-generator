@@ -15,7 +15,6 @@ let loaderFogBoot = null;
 let loaderFogResize = null;
 let loaderFogStop = null;
 let fullpageLoadProgress = 0;
-let fullpageLoaderResizeBound = false;
 
 function statusEl() {
   return (
@@ -30,31 +29,13 @@ function amuletFrameEl() {
 }
 
 function amuletLoaderHost() {
-  return (
-    document.querySelector('.pagmar__index-create-amulet-view, .pagmar__create-amulet-view') ||
-    amuletFrameEl()
-  );
+  /* Loader sits on the frame — not inside the view, which is hidden while loading. */
+  return amuletFrameEl();
 }
 
 function fullpageLoaderInner() {
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   return loader?.querySelector('.pagmar__create-fullpage-loader__inner') || null;
-}
-
-function syncFullpageLoaderPosition() {
-  const frame = amuletFrameEl();
-  const inner = fullpageLoaderInner();
-  const loader = document.getElementById('pagmarCreateFullpageLoader');
-  if (!frame || !inner || !loader || loader.hidden) return;
-
-  const rect = frame.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-
-  loader.classList.add('is-frame-anchored');
-  inner.style.position = 'fixed';
-  inner.style.left = rect.left + rect.width / 2 + 'px';
-  inner.style.top = rect.top + rect.height / 2 + 'px';
-  inner.style.transform = 'translate(-50%, -50%)';
 }
 
 function resetFullpageLoaderPosition() {
@@ -66,18 +47,6 @@ function resetFullpageLoaderPosition() {
   inner.style.left = '';
   inner.style.top = '';
   inner.style.transform = '';
-}
-
-function bindFullpageLoaderResize() {
-  if (fullpageLoaderResizeBound) return;
-  fullpageLoaderResizeBound = true;
-  window.addEventListener('resize', syncFullpageLoaderPosition);
-}
-
-function unbindFullpageLoaderResize() {
-  if (!fullpageLoaderResizeBound) return;
-  fullpageLoaderResizeBound = false;
-  window.removeEventListener('resize', syncFullpageLoaderPosition);
 }
 
 function appendVesselImages(parent, baseClass) {
@@ -220,7 +189,6 @@ function hideFullpageLoader(options) {
   setFullpageLoading(false);
   stopFullpageLoaderFog();
   resetFullpageLoaderPosition();
-  unbindFullpageLoaderResize();
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (loader) {
     loader.hidden = true;
@@ -266,9 +234,7 @@ export async function showAmuletLoader(text, options) {
       setAmuletLoaderProgress(opts.progress);
     }
 
-    syncFullpageLoaderPosition();
-    bindFullpageLoaderResize();
-    requestAnimationFrame(syncFullpageLoaderPosition);
+    resetFullpageLoaderPosition();
   } else {
     hideFullpageLoader();
     const loader = ensureFrameLoader();

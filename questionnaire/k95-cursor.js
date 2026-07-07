@@ -7,15 +7,30 @@
   const HOVER_SELECTOR =
     'a, button:not(:disabled), [data-hover], .intro__choice-btn--figma:not(:disabled), .figma-q__btn:not(:disabled), .figma-close';
 
+  const INDEX_FILTER_HOVER_SELECTOR =
+    '.pagmar__index-filter-item, .pagmar__index-filter-active-tag';
+
   let cursorEl = null;
   let meshHoverLock = false;
   let coarsePointer = window.matchMedia('(hover: none)').matches;
 
-  function isActive() {
+  function isCreateMode() {
     return (
       document.body.classList.contains('is-create-mode') ||
       document.body.classList.contains('pagmar-create')
     );
+  }
+
+  function isIndexPage() {
+    return document.body.classList.contains('pagmar-index');
+  }
+
+  function isOverIndexFilterHover(target) {
+    return target instanceof Element && Boolean(target.closest(INDEX_FILTER_HOVER_SELECTOR));
+  }
+
+  function shouldTrackPointer() {
+    return isCreateMode() || isIndexPage();
   }
 
   function getOffset() {
@@ -70,23 +85,43 @@
   }
 
   function onPointerMove(e) {
-    if (!isActive() || coarsePointer) return;
-    setVisible(true);
-    placeCursor(e.clientX, e.clientY);
+    if (!shouldTrackPointer() || coarsePointer) return;
+
+    if (isCreateMode()) {
+      setVisible(false);
+      return;
+    }
+
+    if (isIndexPage() && isOverIndexFilterHover(e.target)) {
+      setVisible(true);
+      placeCursor(e.clientX, e.clientY);
+      updateHoverFromTarget(e.target);
+      return;
+    }
+
+    if (isIndexPage()) {
+      setVisible(false);
+    }
   }
 
   function onPointerLeave() {
-    if (!isActive()) return;
+    if (!shouldTrackPointer()) return;
     setVisible(false);
   }
 
   function onPointerOver(e) {
-    if (!isActive() || coarsePointer) return;
-    updateHoverFromTarget(e.target);
+    if (coarsePointer) return;
+    if (isCreateMode()) {
+      updateHoverFromTarget(e.target);
+      return;
+    }
+    if (isIndexPage() && isOverIndexFilterHover(e.target)) {
+      updateHoverFromTarget(e.target);
+    }
   }
 
   function onMeshHover(e) {
-    if (!isActive() || coarsePointer) return;
+    if (!isCreateMode() || coarsePointer) return;
     meshHoverLock = Boolean(e.detail);
     setHovering(meshHoverLock);
   }
@@ -109,7 +144,7 @@
 
   function watchBody() {
     const observer = new MutationObserver(function () {
-      if (!isActive()) onCreateClose();
+      if (!shouldTrackPointer()) onCreateClose();
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }

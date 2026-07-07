@@ -2,7 +2,7 @@
  * Luca fog — detail page + result overlay.
  */
 import * as THREE from './vendor/three.module.js';
-import { createLucaFog } from './garden-fog.js?v=20250707-garden-loader-fog';
+import { createLucaFog } from './garden-fog.js';
 
 const GARDEN_CAMERA_FOV = 58;
 

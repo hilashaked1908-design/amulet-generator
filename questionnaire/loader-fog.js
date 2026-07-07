@@ -39,7 +39,7 @@ export async function bootCreateLoaderFog() {
   const host = document.getElementById(FOG_HOST_ID);
   if (!host) return null;
 
-  bootFogWebGL(host, { profile: 'garden' });
+  bootFogWebGL(host, { profile: 'loader' });
   const state = await waitForFogReady();
   resizeFogHost();
   requestAnimationFrame(resizeFogHost);

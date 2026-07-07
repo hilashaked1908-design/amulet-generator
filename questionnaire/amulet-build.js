@@ -87,12 +87,35 @@ function vectorAnswerKey(answers) {
   return [answers.q1Wish, answers.q2Name, answers.q3WhyNow].join('\0');
 }
 
-function canSkipVectorRender(answers, plan) {
-  return (
-    plan.type === 'vector' &&
-    plan.stage <= lastVectorStage &&
-    vectorAnswerKey(answers) === lastVectorAnswerKey
-  );
+/** True when answering will reveal a vector layer not already on screen. */
+export function willShowNewVectorLayer(answers) {
+  if (!answers?.q1Wish?.trim()) return false;
+  const container = document.getElementById('amuletContainer');
+  const plan = getCreateRenderPlan(answers, true);
+
+  if (plan.type === 'vector' && plan.stage) {
+    if (plan.stage > lastVectorStage) return true;
+    if (!containerHasPreview(container)) return true;
+    if (vectorAnswerKey(answers) !== lastVectorAnswerKey) return true;
+    return false;
+  }
+
+  if (plan.type === 'loading-textures') {
+    return lastVectorStage < 3 && !containerHasPreview(container);
+  }
+
+  return false;
+}
+
+/** Finish missing vector stage in the background (no new visible layer for the user). */
+export function needsVectorCatchup(answers) {
+  if (!answers?.q1Wish?.trim()) return false;
+  const plan = getCreateRenderPlan(answers, true);
+  return plan.type === 'loading-textures' && lastVectorStage < 3;
+}
+
+export function needsVectorFrameLoad(answers) {
+  return willShowNewVectorLayer(answers) || needsVectorCatchup(answers);
 }
 
 function scheduleBackgroundPrecompose(answers) {
@@ -146,7 +169,7 @@ export function scheduleAmuletPrecompose(answers) {
 }
 
 async function ensureVectorStage(answers, container, stage, signal, token) {
-  if (lastVectorStage >= stage && containerHasPreview(container)) return;
+  if (lastVectorStage >= stage && containerHasPreview(container)) return false;
 
   await renderQuestionnaireAmulet(answers, container, {
     partial: true,
@@ -155,10 +178,11 @@ async function ensureVectorStage(answers, container, stage, signal, token) {
     autoRotate: false,
   });
 
-  if (token !== buildToken || signal.aborted) return;
+  if (token !== buildToken || signal.aborted) return false;
   lastVectorStage = stage;
   lastVectorAnswerKey = vectorAnswerKey(answers);
   syncAmuletPosterState(container);
+  return true;
 }
 
 async function finishFrameLoader(startedAt, token, answers) {
@@ -195,6 +219,7 @@ export async function showTextureLoadingState() {
 
 export async function updateAmuletPreview(answers, options = {}) {
   const uiBlocking = options.uiBlocking !== false;
+  const showLoader = options.showLoader !== false;
   const container = document.getElementById('amuletContainer');
   if (!container) return;
 
@@ -215,15 +240,21 @@ export async function updateAmuletPreview(answers, options = {}) {
   }
 
   const plan = getCreateRenderPlan(answers, true);
+  const newLayerVisible = willShowNewVectorLayer(answers);
+  const catchupOnly = !newLayerVisible && needsVectorCatchup(answers);
 
   /* Q4–Q7: vectors already on screen — precompose PBR in the background, no loader. */
-  if (plan.type === 'loading-textures' && containerHasPreview(container)) {
+  if (
+    plan.type === 'loading-textures' &&
+    lastVectorStage >= 3 &&
+    containerHasPreview(container)
+  ) {
     scheduleBackgroundPrecompose(answers);
     return;
   }
 
-  /* Same vector stage + same Q1–Q3 answers — nothing new to draw. */
-  if (canSkipVectorRender(answers, plan) && containerHasPreview(container)) {
+  /* Nothing new to draw — skip loader and render entirely. */
+  if (!newLayerVisible && !catchupOnly) {
     return;
   }
 
@@ -233,28 +264,32 @@ export async function updateAmuletPreview(answers, options = {}) {
   const token = ++buildToken;
   const loaderStartedAt = performance.now();
   let didRenderWork = false;
+  const shouldShowLoader = showLoader && newLayerVisible;
 
-  if (!uiBlocking && typeof window.amuletUnlockSemanticQuestionUi === 'function') {
-    window.amuletUnlockSemanticQuestionUi();
+  if (shouldShowLoader) {
+    await showAmuletLoader('טוען קמע', { keepPreview: false });
   }
 
-  if (uiBlocking) {
+  if (uiBlocking && shouldShowLoader) {
     setTextureLoading(false);
     setZoneBuilding(true);
-    await showAmuletLoader('טוען קמע');
+  } else if (typeof window.amuletUnlockSemanticQuestionUi === 'function') {
+    window.amuletUnlockSemanticQuestionUi();
   }
 
   try {
     container.hidden = false;
 
     if (plan.type === 'loading-textures') {
-      await ensureVectorStage(answers, container, 3, signal, token);
+      didRenderWork = await ensureVectorStage(answers, container, 3, signal, token);
       if (token !== buildToken || signal.aborted) return;
-      didRenderWork = true;
       syncAmuletPosterState(container);
       scheduleBackgroundPrecompose(answers);
       return;
     }
+
+    const stageBefore = lastVectorStage;
+    const keyBefore = lastVectorAnswerKey;
 
     await renderQuestionnaireAmulet(answers, container, {
       partial: true,
@@ -263,11 +298,12 @@ export async function updateAmuletPreview(answers, options = {}) {
     });
 
     if (token !== buildToken || signal.aborted) return;
-    didRenderWork = true;
     if (plan.type === 'vector' && plan.stage) {
       lastVectorStage = plan.stage;
       lastVectorAnswerKey = vectorAnswerKey(answers);
     }
+    didRenderWork =
+      lastVectorStage > stageBefore || lastVectorAnswerKey !== keyBefore;
     syncAmuletPosterState(container);
   } catch (err) {
     if (token !== buildToken || signal.aborted) return;
@@ -282,15 +318,15 @@ export async function updateAmuletPreview(answers, options = {}) {
   } finally {
     const isCurrent = token === buildToken;
     if (isCurrent) {
-      if (didRenderWork && uiBlocking) {
+      if (didRenderWork && shouldShowLoader) {
         await finishFrameLoader(loaderStartedAt, token, answers);
       } else {
         hideAmuletFrameLoader();
       }
       if (uiBlocking) setZoneBuilding(false);
-    } else if (uiBlocking) {
+    } else {
       hideAmuletFrameLoader();
-      setZoneBuilding(false);
+      if (uiBlocking) setZoneBuilding(false);
     }
     if (!uiBlocking && typeof window.amuletUnlockSemanticQuestionUi === 'function') {
       window.amuletUnlockSemanticQuestionUi();
@@ -299,6 +335,9 @@ export async function updateAmuletPreview(answers, options = {}) {
 }
 
 window.amuletBuildUpdate = updateAmuletPreview;
+window.amuletWillShowNewVectorLayer = willShowNewVectorLayer;
+window.amuletNeedsVectorCatchup = needsVectorCatchup;
+window.amuletNeedsVectorFrameLoad = needsVectorFrameLoad;
 window.amuletBuildCancel = cancelAmuletBuild;
 window.amuletClearBuildUi = clearAmuletBuildUi;
 window.amuletShowTextureLoading = showTextureLoadingState;

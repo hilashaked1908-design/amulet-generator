@@ -20,21 +20,54 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 
+  function loadDetailCollection() {
+    if (typeof window.gardenLoadCollection === 'function') {
+      return window.gardenLoadCollection();
+    }
+    try {
+      const raw =
+        localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function parseEntryIdFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('entry');
+      if (raw == null || raw === '') return null;
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? n : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readNavEntryId() {
+    try {
+      const raw = sessionStorage.getItem('pagmarAmuletDetailNav');
+      if (!raw) return null;
+      const nav = JSON.parse(raw);
+      return nav && nav.entryId != null ? nav.entryId : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function getGlbKey(index) {
+    const entryId = resolvedSceneEntryId || parseEntryIdFromUrl() || readNavEntryId();
+    if (entryId != null) return 'collection-' + entryId;
+
     const questions = window.AMULET_QUESTIONS || [];
     const USER_AMULET_INDEX = questions.length;
     if (index < USER_AMULET_INDEX) return null;
 
-    if (typeof window.getAmuletCollectionEntry === 'function') {
-      const entry = window.getAmuletCollectionEntry(index);
-      if (entry && entry.id != null) return 'collection-' + entry.id;
-    }
-
     const collectionIndex = index - USER_AMULET_INDEX;
-    const collection =
-      typeof window.pagmarLoadMergedCollection === 'function'
-        ? window.pagmarLoadMergedCollection()
-        : [];
+    const collection = loadDetailCollection();
     if (collectionIndex < collection.length && collection[collectionIndex]?.id != null) {
       return 'collection-' + collection[collectionIndex].id;
     }
@@ -88,6 +121,10 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   }
 
   const amuletIndex = parseIndex();
+  let resolvedSceneEntryId = parseEntryIdFromUrl() || readNavEntryId();
+  if (resolvedSceneEntryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+    resolvedSceneEntryId = window.pagmarEntryIdForAmuletIndex(amuletIndex);
+  }
 
   import('./seed-bootstrap.js').then(function (seedMod) {
     return seedMod.ensureSeedCollectionLoaded();

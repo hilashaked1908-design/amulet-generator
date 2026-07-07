@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>קמע — מידע</title>
   <link rel="stylesheet" href="../css/fonts.css?v=20250706-detail-layout">
-  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250708-detail-chrome-right">
+  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250708-detail-bottom-margin">
   <link rel="stylesheet" href="../css/buttons.css?v=20250708-detail-chrome-right">
   <style>
     /* One keyframe + phased delays = seamless 1→2→3→4→1 loop */
@@ -40,11 +40,10 @@
   <script>
     (function () {
       document.documentElement.classList.add('pagmar-detail-booting');
-      var bootTag = '20250708-detail-vector-align';
       window.pagmarDetailBoot = {
         _startedAt: Date.now(),
-        MIN_MS: 1200,
-        _pending: { fog: 1, fonts: 1, content: 1, scene: 1, vectors: 1 },
+        MIN_MS: 350,
+        _pending: { fonts: 1, content: 1, scene: 1 },
         _finished: false,
         done: function (key) {
           if (this._finished || !this._pending[key]) return;
@@ -76,48 +75,29 @@
         },
       };
 
-      import('./amulet-detail-fog.js?v=' + bootTag)
+      import('./amulet-detail-fog.js')
         .then(function (mod) {
           var host = document.getElementById('detailFogHost');
-          if (!host || typeof mod.bootDetailFogWebGL !== 'function') {
-            window.pagmarDetailBoot.done('fog');
-            return;
-          }
+          if (!host || typeof mod.bootDetailFogWebGL !== 'function') return;
           mod.bootDetailFogWebGL(host);
-          var deadline = Date.now() + 8000;
-          (function waitForFog() {
-            var state = mod.getDetailFogState ? mod.getDetailFogState() : null;
-            if (state && state.lucaFog && host.classList.contains('pagmar__detail-fog--live')) {
-              window.pagmarDetailBoot.done('fog');
-              return;
-            }
-            if (Date.now() >= deadline) {
-              window.pagmarDetailBoot.done('fog');
-              return;
-            }
-            requestAnimationFrame(waitForFog);
-          })();
         })
         .catch(function (err) {
           console.warn('[amulet-detail] fog WebGL boot failed', err);
-          window.pagmarDetailBoot.done('fog');
         });
 
-      import('./amulet-detail-vectors.js?v=' + bootTag)
+      import('./amulet-detail-vectors.js?v=20250708-detail-vector-no-intersect')
         .then(function (mod) {
           if (typeof mod.bootDetailVectors === 'function') {
             return mod.bootDetailVectors();
           }
-          window.pagmarDetailBoot.done('vectors');
         })
         .catch(function (err) {
           console.warn('[amulet-detail] vectors boot failed', err);
-          window.pagmarDetailBoot.done('vectors');
         });
 
       window.setTimeout(function () {
         window.pagmarDetailBoot._finishNow();
-      }, 12000);
+      }, 6000);
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(function () {
           window.pagmarDetailBoot.done('fonts');
@@ -242,7 +222,7 @@
             </div>
           </section>
 
-          <!-- Frame 367 — 2436:11259 @ 50.431, 392.215 -->
+          <!-- Frame 367 @ (50.431, 392.215) -->
           <div class="pagmar__detail-criteria-block">
             <div class="pagmar__detail-criteria-row">
               <section class="pagmar__detail-timing" aria-label="תזמון">
@@ -253,12 +233,7 @@
                   </div>
                   <p class="pagmar__detail-field" id="detailTiming">—</p>
                 </div>
-                <div class="pagmar__detail-vector pagmar__detail-vector--timing" id="detailVectorTiming" aria-hidden="true">
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
-                </div>
+                <div class="pagmar__detail-vector pagmar__detail-vector--timing" id="detailVectorTiming" aria-hidden="true"></div>
               </section>
               <section class="pagmar__detail-belonging" aria-label="שייכות">
                 <div class="pagmar__detail-belonging-text">
@@ -268,12 +243,7 @@
                   </div>
                   <p class="pagmar__detail-field" id="detailName">—</p>
                 </div>
-                <div class="pagmar__detail-vector pagmar__detail-vector--belonging" id="detailVectorBelonging" aria-hidden="true">
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
-                </div>
+                <div class="pagmar__detail-vector pagmar__detail-vector--belonging" id="detailVectorBelonging" aria-hidden="true"></div>
               </section>
               <section class="pagmar__detail-request-criterion" aria-label="בקשה">
                 <div class="pagmar__detail-request-criterion-text">
@@ -283,12 +253,7 @@
                   </div>
                   <p class="pagmar__detail-field" id="detailRequestCriterion">—</p>
                 </div>
-                <div class="pagmar__detail-vector pagmar__detail-vector--request" id="detailVectorRequest" aria-hidden="true">
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--tr" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--bl" aria-hidden="true"></span>
-                  <span class="pagmar__detail-vector-corner pagmar__detail-vector-corner--br" aria-hidden="true"></span>
-                </div>
+                <div class="pagmar__detail-vector pagmar__detail-vector--request" id="detailVectorRequest" aria-hidden="true"></div>
               </section>
             </div>
           </div>
@@ -355,13 +320,14 @@
   </div>
 
   <script defer src="questions.js?v=20250704b"></script>
-  <script defer src="amulet-catalog.js?v=20250708-detail-entry-bind"></script>
+  <script defer src="amulet-catalog.js?v=20250708-detail-fast"></script>
   <script defer src="../connection-core.js"></script>
-  <script defer src="amulet-detail.js?v=20250708-detail-entry-bind"></script>
-  <script defer src="amulet-detail-hover.js?v=20250708-detail-360-deg"></script>
+  <script defer src="amulet-detail.js?v=20250708-detail-fast"></script>
+  <script defer src="amulet-detail-hover.js?v=20250708-detail-fast"></script>
   <script type="module">
-    import('./amulet-detail-scene.js?v=20250708-detail-loader-fog').catch(function (err) {
+    import('./amulet-detail-scene.js').catch(function (err) {
       console.warn('[amulet-detail] scene boot failed', err);
+      if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('scene');
     });
   </script>
 </body>

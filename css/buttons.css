@@ -324,7 +324,7 @@ body.pagmar-index .pagmar__index-filter-trigger__label.pagmar-btn__roll--chars {
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
-  display: none;
+  visibility: hidden;
 }
 
 /* ── Questionnaire submit (figma-q) ── */
@@ -663,11 +663,17 @@ body.pagmar-index .pagmar__index-filter-trigger__icon {
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
   display: block;
   width: calc(16.119 * var(--index-u, 1px));
   height: calc(21.235 * var(--index-u, 1px));
+  transform: translate(-50%, -50%);
   object-fit: contain;
-  object-position: right top;
+  object-position: center;
   filter: brightness(0) invert(1);
   -webkit-mask-image: none;
   mask-image: none;

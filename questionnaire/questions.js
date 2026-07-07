@@ -38,9 +38,12 @@ window.AMULET_QUESTIONS = [
   {
     key: 'q3WhyNow',
     label: 'שאלה 3',
-    tag: '[רגע]',
+    tag: '[תזמון]',
     text: 'למה דווקא עכשיו?',
-    type: 'textarea',
+    description:
+      'כתבו מה בחיים שלכם מסביר למה זה הזמן — מה השתנה, מה הסתיים, או מה גורם לכם להרגיש שעכשיו רגע מתאים.',
+    figmaTitleOffset: true,
+    type: 'text',
     placeholder: 'לדוגמה: סוף סוף מרגיש/ה מוכן/ה',
   },
   {
@@ -48,6 +51,9 @@ window.AMULET_QUESTIONS = [
     label: 'שאלה 4',
     tag: '[אמונה]',
     text: 'מה הכי גורם לך להאמין שזה אפשרי?',
+    description:
+      'בחרו את מה שהכי משפיע עליכם כשאתם חושבים שהבקשה יכולה להתגשם.',
+    figmaTitleOffset: true,
     type: 'choice',
     options: [
       { value: 'concrete_actions', label: 'המעשים שאני עושה' },
@@ -62,6 +68,9 @@ window.AMULET_QUESTIONS = [
     label: 'שאלה 5',
     tag: '[תחושה]',
     text: 'איזו תחושה הכי נוכחת סביב הבקשה?',
+    description:
+      'בחרו את התחושה שהכי נוכחת לכם כשאתם חושבים על הבקשה.',
+    figmaTitleOffset: true,
     type: 'choice',
     options: [
       { value: 'hope', label: 'תקווה' },
@@ -77,6 +86,9 @@ window.AMULET_QUESTIONS = [
     label: 'שאלה 6',
     tag: '[קושי]',
     text: 'מה הכי חסר לך כרגע?',
+    description:
+      'בחרו את מה שהכי חסר לכם כרגע ביחס לבקשה.',
+    figmaTitleOffset: true,
     type: 'choice',
     options: [
       { value: 'uncertainty', label: 'ביטחון' },
@@ -92,8 +104,10 @@ window.AMULET_QUESTIONS = [
     label: 'שאלה 7',
     tag: '[שינוי]',
     text: 'אם הבקשה תתגשם, מה באמת ישתנה?',
+    description:
+      'כתבו בקצרה מה באמת ישתנה בחיים שלכם אם הבקשה תתגשם.',
     figmaTitleOffset: true,
-    type: 'textarea',
+    type: 'text',
     placeholder: 'לדוגמה: אהיה פחות לבד בערבים',
   },
   {
@@ -103,7 +117,8 @@ window.AMULET_QUESTIONS = [
     text: 'מה נותן לך ביטחון?',
     description:
       'כתבו מה עוזר לך להאמין שהבקשה שלך אפשרית.',
-    type: 'textarea',
+    figmaTitleOffset: true,
+    type: 'text',
     placeholder: 'לדוגמה: כשאני רואה התקדמות קטנה',
   },
 ];
