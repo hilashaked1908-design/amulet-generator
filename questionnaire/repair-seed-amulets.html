@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>תיקון seed — רינדור מתשובות</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #0f1410; color: #e8e4dc; font-family: system-ui, sans-serif; }
+    .card { max-width: 720px; margin: 0 auto; background: #1a2118; border: 1px solid #3d4a38; border-radius: 12px; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; }
+    p { color: #b8b4aa; line-height: 1.6; }
+    button { border: none; border-radius: 8px; padding: 12px 16px; font-size: 1rem; cursor: pointer; background: #5a7a42; color: #f5f5f5; margin: 8px 8px 0 0; }
+    button:disabled { opacity: 0.45; cursor: wait; }
+    button.secondary { background: #3d4a38; }
+    #log { margin-top: 16px; font-size: 0.88rem; line-height: 1.65; white-space: pre-wrap; color: #c8e6a0; }
+    .err { color: #f88; }
+    .warn { color: #fc8; }
+    .ok { color: #9cf; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+    th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid #333; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>תיקון קמעות seed מחדש</h1>
+    <p>
+      מרנדר מחדש כל קמע מהתשובות ב-<code>collection.json</code>
+      (אבן לפי q4, מתכת לפי q5) ושומר GLB + snapshot ל-seed ול-IndexedDB.
+      <strong>דורש שרת עם API חדש</strong> — אם 8080 ישן, השתמשי בפורט 8095.
+    </p>
+    <button type="button" id="auditBtn">בדיקה בלבד</button>
+    <button type="button" id="repairBadBtn">תקן רק שגויים</button>
+    <button type="button" id="repairAllBtn">תקן הכל</button>
+    <table id="auditTable" hidden>
+      <thead><tr><th>קמע</th><th>q4</th><th>q5</th><th>סטטוס</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import {
+      auditSeedEntry,
+      repairAmuletFromAnswers,
+    } from './repair-seed-from-answers.js';
+
+    const USER_AMULET_INDEX = 8;
+    const SEED_URL = '/questionnaire/seed/collection.json';
+
+    function log(html) {
+      document.getElementById('log').innerHTML += html + '\n';
+    }
+
+    async function loadCollection() {
+      const res = await fetch(SEED_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error('collection.json missing');
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+
+    function labelForIndex(i) {
+      return '[' + String(USER_AMULET_INDEX + i + 1).padStart(3, '0') + ']';
+    }
+
+    async function runAudit(collection) {
+      const tbody = document.querySelector('#auditTable tbody');
+      tbody.innerHTML = '';
+      document.getElementById('auditTable').hidden = false;
+      const results = [];
+      for (let i = 0; i < collection.length; i += 1) {
+        const entry = collection[i];
+        if (!entry?.id) continue;
+        let audit;
+        try {
+          audit = await auditSeedEntry(entry);
+        } catch (err) {
+          audit = { ok: false, issues: [err.message || String(err)] };
+        }
+        results.push({ entry: entry, index: i, audit: audit });
+        const tr = document.createElement('tr');
+        const status = audit.ok
+          ? '<span class="ok">תקין</span>'
+          : '<span class="err">' + (audit.issues || []).join('; ') + '</span>';
+        tr.innerHTML =
+          '<td>' + labelForIndex(i) + '</td>' +
+          '<td>' + (entry.answers?.q4Belief || '—') + '</td>' +
+          '<td>' + (entry.answers?.q5Feeling || '—') + '</td>' +
+          '<td>' + status + '</td>';
+        tbody.appendChild(tr);
+      }
+      return results;
+    }
+
+    async function runRepair(collection, onlyBad, auditResults) {
+      const targets = onlyBad
+        ? auditResults.filter(function (r) {
+            return !r.audit.ok;
+          }).map(function (r) {
+            return r.entry;
+          })
+        : collection.filter(function (e) {
+            return e && e.id;
+          });
+
+      if (!targets.length) {
+        log('<span class="warn">אין קמעות לתיקון.</span>');
+        return;
+      }
+
+      for (let i = 0; i < targets.length; i += 1) {
+        const entry = targets[i];
+        const idx = collection.findIndex(function (e) {
+          return e && e.id === entry.id;
+        });
+        const label = idx >= 0 ? labelForIndex(idx) : String(entry.id);
+        log(label + ' מרנדר מחדש…');
+        try {
+          const result = await repairAmuletFromAnswers(entry, { targetPx: 2048 });
+          const warn = result.audit.ok
+            ? ''
+            : ' <span class="warn">(audit: ' + result.audit.issues.join('; ') + ')</span>';
+          log(
+            '<span class="ok">' + label + ' נשמר — GLB ' +
+            Math.round(result.glbBytes / 1024) + 'KB, snapshot ' +
+            result.snapshotPx + 'px</span>' + warn
+          );
+        } catch (err) {
+          log('<span class="err">' + label + ' ' + (err.message || err) + '</span>');
+        }
+      }
+      log('\n<span class="ok">סיום. רענני את הגן.</span>');
+      window.__seedRepairDone = true;
+    }
+
+    function setBusy(busy) {
+      ['auditBtn', 'repairBadBtn', 'repairAllBtn'].forEach(function (id) {
+        document.getElementById(id).disabled = busy;
+      });
+    }
+
+    let collection = [];
+    let lastAudit = [];
+
+    loadCollection().then(function (c) {
+      collection = c;
+      log('נטענו ' + collection.length + ' קמעות מ-seed.');
+    }).catch(function (err) {
+      log('<span class="err">' + err.message + '</span>');
+    });
+
+    document.getElementById('auditBtn').addEventListener('click', async function () {
+      setBusy(true);
+      document.getElementById('log').textContent = '';
+      try {
+        if (!collection.length) collection = await loadCollection();
+        lastAudit = await runAudit(collection);
+        const bad = lastAudit.filter(function (r) {
+          return !r.audit.ok;
+        }).length;
+        log('בדיקה: ' + bad + ' קמעות דורשות תיקון מתוך ' + lastAudit.length);
+      } catch (err) {
+        log('<span class="err">' + err.message + '</span>');
+      }
+      setBusy(false);
+    });
+
+    document.getElementById('repairBadBtn').addEventListener('click', async function () {
+      setBusy(true);
+      try {
+        if (!collection.length) collection = await loadCollection();
+        if (!lastAudit.length) lastAudit = await runAudit(collection);
+        await runRepair(collection, true, lastAudit);
+        lastAudit = await runAudit(collection);
+      } catch (err) {
+        log('<span class="err">' + err.message + '</span>');
+      }
+      setBusy(false);
+    });
+
+    document.getElementById('repairAllBtn').addEventListener('click', async function () {
+      setBusy(true);
+      try {
+        if (!collection.length) collection = await loadCollection();
+        await runRepair(collection, false, []);
+        lastAudit = await runAudit(collection);
+      } catch (err) {
+        log('<span class="err">' + err.message + '</span>');
+      }
+      setBusy(false);
+    });
+
+    if (new URLSearchParams(location.search).get('autorun') === 'bad') {
+      window.setTimeout(async function () {
+        if (!collection.length) collection = await loadCollection();
+        lastAudit = await runAudit(collection);
+        await runRepair(collection, true, lastAudit);
+      }, 500);
+    }
+  </script>
+</body>
+</html>

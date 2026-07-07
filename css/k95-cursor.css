@@ -1,0 +1,58 @@
+/* K95 companion cursor — offset beside native pointer (not replacing it) */
+
+.pagmar__k95-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483647;
+  width: 15px;
+  height: 15px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate3d(-100px, -100px, 0) translate(-50%, -50%);
+  transition:
+    width 0.3s ease,
+    height 0.3s ease,
+    background 0.3s ease,
+    border-color 0.3s ease;
+  background: #eaff1e;
+  mix-blend-mode: normal;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.pagmar__k95-cursor.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pagmar__k95-cursor.is-hovering {
+  width: 45px;
+  height: 45px;
+  background: transparent;
+  border-color: #ffffff;
+}
+
+/* Native system cursor stays visible — companion dot only */
+body.pagmar-index.is-create-mode .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-create .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn:not(:disabled),
+body.pagmar-create .pagmar__request-artboard .figma-q__btn:not(:disabled),
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-close,
+body.pagmar-create .pagmar__request-artboard .figma-close {
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .pagmar__k95-cursor {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__k95-cursor {
+    transition: none;
+  }
+}

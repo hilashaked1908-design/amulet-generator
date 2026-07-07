@@ -142,8 +142,8 @@ body.pagmar-create .pagmar__request-flow {
   overflow: visible;
   background: transparent;
   pointer-events: none;
-  /* Bottom horizontal of panel corners: panel top + height − corner inset (0.5fu) */
-  --figma-panel-bottom-line: calc((104 + 873 - 0.5) * var(--fu));
+  /* Bottom horizontal of panel corners: panel top + height − corner inset (0.5fu × scale) */
+  --figma-panel-bottom-line: calc((104 + 873 - 0.5 * var(--pagmar-corner-scale)) * var(--fu));
   --figma-q-bottom: calc(1080 * var(--fu) - var(--figma-panel-bottom-line));
 }
 
@@ -185,8 +185,8 @@ body.pagmar-create .pagmar__request-flow {
 
 .figma-corner {
   position: absolute;
-  width: calc(59.621 * var(--fu));
-  height: calc(59.613 * var(--fu));
+  width: calc(59.621 * var(--fu) * var(--pagmar-corner-scale));
+  height: calc(59.613 * var(--fu) * var(--pagmar-corner-scale));
   display: block;
   pointer-events: none;
   user-select: none;
@@ -194,10 +194,10 @@ body.pagmar-create .pagmar__request-flow {
   z-index: 3;
 }
 
-.figma-corner--tl { left: 0; top: calc(-0.5 * var(--fu)); }
-.figma-corner--tr { right: calc(1 * var(--fu)); top: calc(-0.5 * var(--fu)); transform: scaleY(-1) rotate(180deg); }
-.figma-corner--bl { left: 0; bottom: calc(0.5 * var(--fu)); transform: scaleY(-1); }
-.figma-corner--br { right: calc(1 * var(--fu)); bottom: calc(0.5 * var(--fu)); transform: rotate(180deg); }
+.figma-corner--tl { left: 0; top: calc(-0.5 * var(--fu) * var(--pagmar-corner-scale)); }
+.figma-corner--tr { right: calc(1 * var(--fu) * var(--pagmar-corner-scale)); top: calc(-0.5 * var(--fu) * var(--pagmar-corner-scale)); transform: scaleY(-1) rotate(180deg); }
+.figma-corner--bl { left: 0; bottom: calc(0.5 * var(--fu) * var(--pagmar-corner-scale)); transform: scaleY(-1); }
+.figma-corner--br { right: calc(1 * var(--fu) * var(--pagmar-corner-scale)); bottom: calc(0.5 * var(--fu) * var(--pagmar-corner-scale)); transform: rotate(180deg); }
 
 /* amulet slot — 2258:20202 @ 54.589,97.589 (panel-relative) */
 .figma-amulet {
@@ -298,7 +298,8 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   z-index: 9;
 }
 
-.figma-step-rail__line--137 {
+.figma-step-rail__line--137,
+.figma-step-rail__line--progress {
   left: calc(1855.097 * var(--fu));
   top: calc(187.489 * var(--fu));
   width: calc(2 * var(--fu));
@@ -369,7 +370,7 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   position: absolute;
   left: calc(9.904 * var(--fu));
   top: calc(4.294 * var(--fu));
-  color: #ffffff;
+  color: #F5F5F5;
   font-family: "TheBasics", "DavidLibre", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -393,7 +394,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   margin: 0;
   padding: 0;
   background: transparent;
-  color: #ffffff;
+  color: #F5F5F5;
 }
 
 /* Question card — bottom anchored to panel corner baseline (2258:20218 @ 1104.889) */
@@ -445,8 +446,8 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   justify-content: center;
   align-self: flex-start;
   padding: calc(4 * var(--fu));
-  background: #ffffff;
-  color: #161616;
+  background: #F5F5F5;
+  color: #030303;
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -466,7 +467,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   width: 100%;
   gap: calc(24 * var(--fu));
   text-align: right;
-  color: #ffffff;
+  color: #F5F5F5;
 }
 
 .figma-q__copy.is-title-offset {
@@ -496,7 +497,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   padding: 0;
   width: calc(560.414 * var(--fu));
   min-height: calc(75.955 * var(--fu));
-  color: #ffffff;
+  color: #F5F5F5;
   direction: rtl;
   text-align: right;
   font-family: "Romema Spitzer TRIAL", serif;
@@ -512,7 +513,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   width: calc(536.825 * var(--fu));
   min-height: calc(86 * var(--fu));
   margin-left: auto;
-  color: #ffffff;
+  color: #F5F5F5;
   direction: rtl;
   text-align: right;
   font-family: "Romema Spitzer TRIAL", serif;
@@ -561,7 +562,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   padding: 0;
   border: none;
   background: transparent;
-  color: #ffffff;
+  color: #F5F5F5;
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -587,7 +588,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__field .intro__question-input::placeholder {
-  color: #ffffff;
+  color: #F5F5F5;
   opacity: 0.4;
 }
 
@@ -746,7 +747,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
-  color: #ffffff;
+  color: #F5F5F5;
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--fu));
   font-weight: 400;
@@ -763,7 +764,7 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 }
 
 .figma-q__btn-label {
-  color: #ffffff;
+  color: #F5F5F5;
 }
 
 .figma-q__btn:hover:not(:disabled),
@@ -850,20 +851,20 @@ body.pagmar-create .pagmar__request-artboard .figma-q__title {
   font-weight: 300 !important;
   font-size: calc(75 * var(--fu)) !important;
   letter-spacing: calc(-0.75 * var(--fu)) !important;
-  color: #ffffff !important;
+  color: #F5F5F5 !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__desc,
 body.pagmar-create .pagmar__request-artboard .figma-q__desc {
   font-family: "Romema Spitzer TRIAL", serif !important;
   font-weight: 300 !important;
-  color: #ffffff !important;
+  color: #F5F5F5 !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__tag,
 body.pagmar-create .pagmar__request-artboard .figma-q__tag {
   font-family: "TheBasics", serif !important;
-  color: #161616 !important;
+  color: #030303 !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q--slot-0.is-title-offset-slot .figma-q__tag,
@@ -876,5 +877,5 @@ body.pagmar-create .pagmar__request-artboard .figma-q__field .intro__question-in
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn,
 body.pagmar-create .pagmar__request-artboard .figma-q__btn {
   font-family: "TheBasics", serif !important;
-  color: #ffffff !important;
+  color: #F5F5F5 !important;
 }

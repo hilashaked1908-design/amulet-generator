@@ -14,12 +14,14 @@
   ];
   const GRID_ROW_TOPS = [263.5, 754];
   const CARD_SIZE = 410;
+  const GRID_BOTTOM_PAD = 200;
 
   const filterActive = document.getElementById('indexFilterActive');
   const filterGrid = document.getElementById('indexFilterGrid');
-  const filterClose = document.getElementById('indexFilterClose');
+  const pagmarCanvas = document.getElementById('pagmarCanvas');
 
   let activeFilterLabels = [];
+  let filterGridResizeRaf = 0;
 
   function normalizeFilterLabels(input) {
     if (!input) return [];
@@ -40,17 +42,68 @@
     const row = Math.floor(index / GRID_COLS.length);
     return {
       left: GRID_COLS[col],
-      top: GRID_ROW_TOPS[row] != null ? GRID_ROW_TOPS[row] : GRID_ROW_TOPS[GRID_ROW_TOPS.length - 1] + (row - GRID_ROW_TOPS.length + 1) * (CARD_SIZE + 80.5),
+      top:
+        GRID_ROW_TOPS[row] != null
+          ? GRID_ROW_TOPS[row]
+          : GRID_ROW_TOPS[GRID_ROW_TOPS.length - 1] +
+            (row - GRID_ROW_TOPS.length + 1) * (CARD_SIZE + 80.5),
     };
+  }
+
+  function gridContentHeight(cardCount) {
+    if (cardCount <= 0) return 0;
+    const pos = cardPosition(cardCount - 1);
+    return pos.top + CARD_SIZE + GRID_BOTTOM_PAD;
+  }
+
+  function syncFilterGridFrame() {
+    if (!filterGrid || !pagmarCanvas || !document.body.classList.contains('is-filter-page')) {
+      return;
+    }
+    const rect = pagmarCanvas.getBoundingClientRect();
+    filterGrid.style.setProperty('--index-filter-grid-left', rect.left + 'px');
+    filterGrid.style.setProperty('--index-filter-grid-top', rect.top + 'px');
+    filterGrid.style.setProperty('--index-filter-grid-width', rect.width + 'px');
+    filterGrid.style.setProperty('--index-filter-grid-height', rect.height + 'px');
+  }
+
+  function updateFilterGridScrollHeight(cardCount) {
+    if (!filterGrid) return;
+
+    let spacer = filterGrid.querySelector('.pagmar__index-filter-grid-spacer');
+    if (cardCount <= 0) {
+      if (spacer) spacer.remove();
+      filterGrid.scrollTop = 0;
+      return;
+    }
+
+    if (!spacer) {
+      spacer = document.createElement('div');
+      spacer.className = 'pagmar__index-filter-grid-spacer';
+      spacer.setAttribute('aria-hidden', 'true');
+      filterGrid.appendChild(spacer);
+    }
+
+    spacer.style.height = 'calc(' + gridContentHeight(cardCount) + ' * var(--index-u))';
   }
 
   function renderActiveTags(filterLabels) {
     if (!filterActive) return;
     filterActive.innerHTML = '';
     filterLabels.forEach(function (filterLabel) {
-      const tag = document.createElement('span');
+      const tag = document.createElement('button');
+      tag.type = 'button';
       tag.className = 'pagmar__index-filter-active-tag';
       tag.textContent = '[' + filterLabel + ']';
+      tag.setAttribute('aria-label', 'הצג פילטרים נוספים — ' + filterLabel);
+      tag.setAttribute('aria-pressed', 'true');
+      tag.setAttribute('aria-expanded', 'false');
+      tag.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (typeof window.pagmarToggleIndexFilterList === 'function') {
+          window.pagmarToggleIndexFilterList();
+        }
+      });
       filterActive.appendChild(tag);
     });
   }
@@ -58,6 +111,9 @@
   function loadCollection() {
     if (typeof window.gardenLoadCollection === 'function') {
       return window.gardenLoadCollection();
+    }
+    if (typeof window.pagmarLoadMergedCollection === 'function') {
+      return window.pagmarLoadMergedCollection();
     }
     try {
       var raw =
@@ -119,6 +175,9 @@
       window.pagmarNavigateToAmuletDetail(amuletIndex);
       return;
     }
+    if (typeof window.gardenStashIndexReturnState === 'function') {
+      window.gardenStashIndexReturnState();
+    }
     if (typeof window.pagmarIndexChrome !== 'undefined' && window.pagmarIndexChrome.markTyped) {
       window.pagmarIndexChrome.markTyped();
     }
@@ -169,33 +228,42 @@
 
   function renderGrid(filterLabels) {
     if (!filterGrid) return;
-    filterGrid.innerHTML = '';
+    filterGrid.querySelectorAll('.pagmar__index-filter-card').forEach(function (card) {
+      card.remove();
+    });
+    const spacer = filterGrid.querySelector('.pagmar__index-filter-grid-spacer');
+    if (spacer) spacer.remove();
 
     const indices =
       typeof window.getMatchingAmuletIndices === 'function'
         ? window.getMatchingAmuletIndices(filterLabels)
         : [];
 
+    syncFilterGridFrame();
+
     indices.forEach(function (amuletIndex, gridIndex) {
       filterGrid.appendChild(createGridCard(amuletIndex, gridIndex));
     });
+    updateFilterGridScrollHeight(indices.length);
+    filterGrid.scrollTop = 0;
   }
 
   function setFiltered(filterLabels) {
-    activeFilterLabels = normalizeFilterLabels(filterLabels);
+    const normalized = normalizeFilterLabels(filterLabels);
+    activeFilterLabels = normalized.length ? [normalized[0]] : [];
     const isFiltered = activeFilterLabels.length > 0;
 
     document.body.classList.toggle('is-filter-page', isFiltered);
 
     if (filterGrid) filterGrid.hidden = !isFiltered;
     if (filterActive) filterActive.hidden = !isFiltered;
-    if (filterClose) filterClose.hidden = !isFiltered;
 
     if (isFiltered) {
       renderActiveTags(activeFilterLabels);
       renderGrid(activeFilterLabels);
     } else if (filterGrid) {
       filterGrid.innerHTML = '';
+      updateFilterGridScrollHeight(0);
     }
 
     window.dispatchEvent(
@@ -228,12 +296,11 @@
     });
   });
 
-  if (filterClose) {
-    filterClose.addEventListener('click', function (e) {
-      e.stopPropagation();
-      setFiltered([]);
-    });
-  }
+  window.addEventListener('resize', function () {
+    if (!document.body.classList.contains('is-filter-page')) return;
+    cancelAnimationFrame(filterGridResizeRaf);
+    filterGridResizeRaf = requestAnimationFrame(syncFilterGridFrame);
+  });
 
   window.pagmarFilterPage = {
     getActiveFilters: function () {
@@ -243,6 +310,10 @@
       return activeFilterLabels[0] || null;
     },
     clear: function () {
+      if (typeof window.pagmarExitFilterPage === 'function') {
+        window.pagmarExitFilterPage();
+        return;
+      }
       setFiltered([]);
     },
     setFilter: function (filterLabels) {
@@ -251,4 +322,17 @@
   };
 
   window.pagmarIndexFilter = window.pagmarFilterPage;
+
+  function restorePendingFilterViewEarly() {
+    try {
+      var raw = sessionStorage.getItem('pagmarIndexReturnState');
+      if (!raw) return;
+      var state = JSON.parse(raw);
+      if (state && state.view === 'filter' && state.filters && state.filters.length) {
+        setFiltered(normalizeFilterLabels(state.filters));
+      }
+    } catch (_) {}
+  }
+
+  restorePendingFilterViewEarly();
 })();

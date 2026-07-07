@@ -2,7 +2,7 @@
  * Luca fog — detail page + result overlay.
  */
 import * as THREE from './vendor/three.module.js';
-import { createLucaFog } from './garden-fog.js?v=20250705-fog-match';
+import { createLucaFog } from './garden-fog.js?v=20250707-garden-loader-fog';
 
 const GARDEN_CAMERA_FOV = 58;
 
@@ -64,6 +64,8 @@ export function bootFogWebGL(host, options) {
     .then(function (fog) {
       fogState.lucaFog = fog;
       host.classList.add('pagmar__detail-fog--live');
+      resizeFogHost();
+      requestAnimationFrame(resizeFogHost);
     })
     .catch(function (err) {
       console.error('[fog] Luca fog failed', err);

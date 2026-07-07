@@ -7,6 +7,9 @@
   const USER_AMULET_INDEX = questions.length;
 
   const detailNum = document.getElementById('detailNum');
+  const detailNumText = detailNum
+    ? detailNum.querySelector('.pagmar__glass-pill__text')
+    : null;
   const detailName = document.getElementById('detailName');
   const detailStory = document.getElementById('detailStory');
   const detailTiming = document.getElementById('detailTiming');
@@ -41,82 +44,143 @@
     });
   }
 
-  var COMPONENT_ITEM_CLASSES = { 1: 'pagmar__detail-list-item--material' };
+  var INDEX_RETURN_KEY = 'pagmarIndexReturnState';
 
-  function loadCollectionForDetail() {
-    try {
-      var raw = localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
-      if (!raw) return [];
-      var arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    } catch (_) { return []; }
+  var TAG_DISPLAY_TO_FILTER = {
+    אהבה: 'זוגיות',
+    'המעשים שאני עושה': 'מעשים שאני עושה',
+    'תמיכה מאנשים סביבי': 'תמיכה מהסביבה שלי',
+    'אני עדיין לא מאמין שזה אפשרי': 'לא מאמין שזה יקרה',
+  };
+
+  function resolveFilterLabelForTag(tag, amuletIndex) {
+    if (!tag) return null;
+    if (TAG_DISPLAY_TO_FILTER[tag]) return TAG_DISPLAY_TO_FILTER[tag];
+    var filters =
+      typeof window.getAmuletFilterLabels === 'function'
+        ? window.getAmuletFilterLabels(amuletIndex)
+        : [];
+    if (filters.indexOf(tag) !== -1) return tag;
+    return tag;
   }
 
-  function loadUserAnswers() {
+  function navigateToFilterPage(filterLabel) {
+    if (!filterLabel) return;
     try {
-      const raw =
-        sessionStorage.getItem('amuletUserAnswers') ||
-        localStorage.getItem('amuletUserAnswers') ||
-        sessionStorage.getItem('amuletQuestionnaire') ||
-        localStorage.getItem('amuletQuestionnaire');
-      if (!raw) return null;
-      const data = JSON.parse(raw);
-      return data && typeof data === 'object' ? data : null;
+      sessionStorage.setItem(
+        INDEX_RETURN_KEY,
+        JSON.stringify({
+          view: 'filter',
+          filters: [filterLabel],
+          filterScrollTop: 0,
+        })
+      );
+    } catch (_) {}
+    window.location.href = 'index.html';
+  }
+
+  function fillTagList(el, items, amuletIndex) {
+    if (!el) return;
+    el.innerHTML = '';
+    (items || []).forEach(function (text) {
+      var filterLabel = resolveFilterLabelForTag(text, amuletIndex);
+      var li = document.createElement('li');
+      li.className = 'pagmar__detail-list-item';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pagmar__detail-tag-btn';
+      btn.textContent = text;
+      btn.setAttribute('aria-label', 'סינון לפי ' + text);
+      if (filterLabel) {
+        btn.addEventListener('click', function () {
+          navigateToFilterPage(filterLabel);
+        });
+      }
+      li.appendChild(btn);
+      el.appendChild(li);
+    });
+  }
+
+  var COMPONENT_ITEM_CLASSES = { 1: 'pagmar__detail-list-item--material' };
+
+  function parseEntryId() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var raw = params.get('entry');
+      if (raw == null || raw === '') return null;
+      var n = parseInt(raw, 10);
+      return Number.isFinite(n) ? n : null;
     } catch (_) {
       return null;
     }
   }
 
-  function getRecordForIndex(index, recordOverride) {
-    if (typeof window.getAmuletRecord === 'function') {
-      return window.getAmuletRecord(index, null, recordOverride);
+  function readNavEntryId() {
+    try {
+      var raw = sessionStorage.getItem('pagmarAmuletDetailNav');
+      if (!raw) return null;
+      var nav = JSON.parse(raw);
+      return nav && nav.entryId != null ? nav.entryId : null;
+    } catch (_) {
+      return null;
     }
-    const isUser = index >= USER_AMULET_INDEX;
-    if (isUser) {
-      var collectionIndex = index - USER_AMULET_INDEX;
-      var collection = loadCollectionForDetail();
-      if (collectionIndex < collection.length) {
-        return collection[collectionIndex].answers;
+  }
+
+  async function preloadDetailContext(index) {
+    await import('./seed-bootstrap.js')
+      .then(function (mod) {
+        return mod.ensureSeedCollectionLoaded();
+      })
+      .catch(function () {});
+
+    var entryId = parseEntryId() || readNavEntryId();
+    if (entryId == null && typeof window.pagmarResolveCollectionEntry === 'function') {
+      var resolved = window.pagmarResolveCollectionEntry(index);
+      if (resolved && resolved.id != null) entryId = resolved.id;
+    }
+    if (entryId == null) return;
+
+    window.__pagmarDetailAnswersByEntryId = window.__pagmarDetailAnswersByEntryId || {};
+
+    try {
+      var store = await import('./amulet-glb-store.js');
+      var answersRaw = await store.loadSnapshot('answers-collection-' + entryId);
+      if (answersRaw) {
+        window.__pagmarDetailAnswersByEntryId[entryId] = JSON.parse(answersRaw);
       }
-      return loadUserAnswers();
-    }
-    return null;
+    } catch (_) {}
+
+    try {
+      var storeMod = await import('./amulet-glb-store.js');
+      var snapRaw = await storeMod.loadSnapshot('collection-' + entryId);
+      if (snapRaw) {
+        window.__pagmarDetailSnapshotByEntryId = window.__pagmarDetailSnapshotByEntryId || {};
+        window.__pagmarDetailSnapshotByEntryId[entryId] = snapRaw;
+      }
+    } catch (_) {}
   }
 
   function renderDetail(index) {
-    const isUser = index >= USER_AMULET_INDEX;
-    let recordOverride = null;
-    let collectionImgSrc = null;
-    if (isUser) {
-      var collectionIndex = index - USER_AMULET_INDEX;
-      var collection = loadCollectionForDetail();
-      if (collectionIndex < collection.length) {
-        recordOverride = collection[collectionIndex].answers;
-        collectionImgSrc = collection[collectionIndex].snapshot;
-      } else {
-        recordOverride = loadUserAnswers();
-      }
-    }
-
     if (typeof window.getAmuletSpec !== 'function') return;
 
-    const spec = window.getAmuletSpec(index, null, recordOverride);
+    const spec = window.getAmuletSpec(index);
+    const imgSrc =
+      typeof window.getAmuletImageSrc === 'function'
+        ? window.getAmuletImageSrc(index)
+        : null;
 
-    if (detailNum) detailNum.textContent = indexLabel(index);
+    if (detailNumText) detailNumText.textContent = indexLabel(index);
     if (detailName) detailName.textContent = spec.name || '—';
-    if (detailStory) detailStory.textContent = spec.story || spec.wish || '—';
+    if (detailStory) {
+      detailStory.textContent = spec.story || spec.wish || '—';
+    }
     if (detailTiming) detailTiming.textContent = spec.whyNow || '—';
     if (detailRequestCriterion) {
       var wishText = (spec.wish || '').replace(/^[״"]|[״"]$/g, '').trim();
       detailRequestCriterion.textContent = wishText || '—';
     }
     fillList(detailComponents, spec.components, COMPONENT_ITEM_CLASSES);
-    fillList(detailTags, spec.tags);
-
-    const imgSrc = collectionImgSrc
-      || (typeof window.getAmuletImageSrc === 'function'
-        ? window.getAmuletImageSrc(index)
-        : null);
+    fillTagList(detailTags, spec.tags, index);
 
     if (detailAmuletImg && imgSrc) {
       detailAmuletImg.src = imgSrc;
@@ -152,6 +216,7 @@
         return;
       }
 
+      await preloadDetailContext(index);
       renderDetail(index);
       await Promise.all([
         waitForImage(detailAmuletImg),
@@ -190,7 +255,7 @@
       }
       return;
     }
-    window.location.href = './';
+    window.location.href = 'index.html';
   }
 
   if (detailCloseBtn) {

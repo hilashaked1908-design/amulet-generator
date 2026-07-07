@@ -2011,12 +2011,13 @@ function readParams() {
   }
 
   /** שכבת כוונה: אות ראשונה מכל מילה; כפילות → האות השנייה במילה (ואז הבאה) */
-  function getSentenceLetters(str) {
+  function pickSentenceLetterWords(str, maxLetters) {
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
     const used = new Set();
-    const out = [];
-    for (const word of str.split(/\s+/).filter((w) => w.length > 0)) {
-      if (out.length >= MAX_LETTERS_LAYER3) break;
+    const letters = [];
+    const words = [];
+    for (const word of String(str || '').split(/\s+/).filter((w) => w.length > 0)) {
+      if (letters.length >= maxLetters) break;
       const chars = [...word];
       let picked = null;
       for (let i = 0; i < chars.length; i++) {
@@ -2033,10 +2034,15 @@ function readParams() {
       }
       if (picked) {
         used.add(picked);
-        out.push(picked);
+        letters.push(picked);
+        words.push(word);
       }
     }
-    return out;
+    return { words, letters, summary: words.join(' ') };
+  }
+
+  function getSentenceLetters(str) {
+    return pickSentenceLetterWords(str, MAX_LETTERS_LAYER3).letters;
   }
 
   /** שכבת Q1 (קרמיקה) — עד 2 אותיות: ראשונה מכל מילה, עם גיבוי לאות שנייה במילה הראשונה */
@@ -3612,6 +3618,12 @@ export async function composeFullAmuletForPbr(answers) {
   const q4Letters = lettersFromBelief(params.q4Belief);
   const q7Letters = params.q7Change ? lettersFromQ7Change(params.q7Change) : [];
   const metalEmbossLetters = metalLetters.slice();
+  const wishWordSummary = params.q1Wish
+    ? pickSentenceLetterWords(params.q1Wish, MAX_LETTERS_LAYER3).summary
+    : '';
+  const timingWordSummary = params.q3WhyNow
+    ? pickSentenceLetterWords(params.q3WhyNow, MAX_LETTERS_LAYER3).summary
+    : '';
 
   const shapeDerived = deriveAmuletShapeParams(
     params.q1Wish,
@@ -3640,6 +3652,9 @@ export async function composeFullAmuletForPbr(answers) {
     embossedText: params.q1Wish,
     engravedText: params.q3WhyNow,
     embossedLetters: metalEmbossLetters,
+    nameLetters,
+    wishSummary: wishWordSummary,
+    timingSummary: timingWordSummary,
     engravedLetters: q3StoneEngraveLetters,
     q7Change: params.q7Change,
     q7Letters,

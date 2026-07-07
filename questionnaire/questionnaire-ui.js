@@ -59,6 +59,8 @@
   let requestTransitionTimer = null;
   const PANEL_MS = 300;
   const INDEX_TRANSITION_MS = 520;
+  let createHistoryPushed = false;
+  let createPopstateIgnore = 0;
   const REQUEST_TRANSITION_MS = 220;
 
   const CHOICE_TITLES = {
@@ -285,47 +287,112 @@
       if (numEl) numEl.textContent = String(step);
       if (isActive) activeMarker = marker;
     });
-    applyRequestStepRailGap(activeMarker);
+    applyRequestStepRailLines(activeMarker, activeStep);
   }
 
-  function applyRequestStepRailGap(activeMarker) {
-    if (!requestArtboard) return;
-    const lines = requestArtboard.querySelectorAll('.figma-step-rail__line');
-    if (!activeMarker || !lines.length) {
-      lines.forEach(function (line) {
-        line.style.removeProperty('-webkit-mask-image');
-        line.style.removeProperty('mask-image');
-      });
+  function getRequestStepMarker(step) {
+    return requestStepMarkers.find(function (marker) {
+      return Number(marker.dataset.step) === step;
+    }) || null;
+  }
+
+  function subtractRailSegment(segment, hole) {
+    if (hole.end <= segment.start || hole.start >= segment.end) {
+      return [segment];
+    }
+    const out = [];
+    if (hole.start > segment.start + 0.5) {
+      out.push({ start: segment.start, end: hole.start });
+    }
+    if (hole.end < segment.end - 0.5) {
+      out.push({ start: hole.end, end: segment.end });
+    }
+    return out;
+  }
+
+  function applyStepRailMask(lineEl, height, segments) {
+    if (!lineEl || !height) return;
+    if (!segments.length) {
+      const hidden = 'linear-gradient(to bottom, transparent 0%, transparent 100%)';
+      lineEl.style.setProperty('-webkit-mask-image', hidden);
+      lineEl.style.setProperty('mask-image', hidden);
       return;
     }
+    const stops = ['transparent 0%'];
+    segments.forEach(function (seg) {
+      const startPct = ((seg.start / height) * 100).toFixed(2);
+      const endPct = ((seg.end / height) * 100).toFixed(2);
+      stops.push(
+        'transparent ' + startPct + '%',
+        '#000 ' + startPct + '%',
+        '#000 ' + endPct + '%',
+        'transparent ' + endPct + '%'
+      );
+    });
+    stops.push('transparent 100%');
+    const mask = 'linear-gradient(to bottom, ' + stops.join(', ') + ')';
+    lineEl.style.setProperty('-webkit-mask-image', mask);
+    lineEl.style.setProperty('mask-image', mask);
+  }
+
+  function applyRequestStepRailLines(activeMarker, activeStep) {
+    if (!requestArtboard) return;
+    const grayLine = requestArtboard.querySelector('.figma-step-rail__line--137');
+    const whiteLine = requestArtboard.querySelector('.figma-step-rail__line--progress');
+    if (!grayLine) return;
 
     requestAnimationFrame(function () {
-      const markerRect = activeMarker.getBoundingClientRect();
-      lines.forEach(function (line) {
-        const lineRect = line.getBoundingClientRect();
-        if (!lineRect.height) return;
+      const lineRect = grayLine.getBoundingClientRect();
+      if (!lineRect.height) return;
+
+      let gap = null;
+      if (activeMarker) {
+        const markerRect = activeMarker.getBoundingClientRect();
         const gapTop = Math.max(0, markerRect.top - lineRect.top);
         const gapBottom = Math.min(lineRect.height, markerRect.bottom - lineRect.top);
-        if (gapBottom <= gapTop + 1) {
-          line.style.removeProperty('-webkit-mask-image');
-          line.style.removeProperty('mask-image');
-          return;
+        if (gapBottom > gapTop + 1) {
+          gap = { start: gapTop, end: gapBottom };
         }
-        const startPct = ((gapTop / lineRect.height) * 100).toFixed(2);
-        const endPct = ((gapBottom / lineRect.height) * 100).toFixed(2);
-        const mask =
-          'linear-gradient(to bottom, #000 0, #000 ' +
-          startPct +
-          '%, transparent ' +
-          startPct +
-          '%, transparent ' +
-          endPct +
-          '%, #000 ' +
-          endPct +
-          '%, #000 100%)';
-        line.style.setProperty('-webkit-mask-image', mask);
-        line.style.setProperty('mask-image', mask);
-      });
+      }
+
+      const graySegments = gap
+        ? subtractRailSegment({ start: 0, end: lineRect.height }, gap)
+        : [{ start: 0, end: lineRect.height }];
+      applyStepRailMask(grayLine, lineRect.height, graySegments);
+
+      if (!whiteLine) return;
+
+      if (activeStep <= 1) {
+        applyStepRailMask(whiteLine, lineRect.height, []);
+        return;
+      }
+
+      const topMarker = getRequestStepMarker(activeStep);
+      const bottomMarker = getRequestStepMarker(1);
+      if (!topMarker || !bottomMarker) {
+        applyStepRailMask(whiteLine, lineRect.height, []);
+        return;
+      }
+
+      const topRect = topMarker.getBoundingClientRect();
+      const bottomRect = bottomMarker.getBoundingClientRect();
+      const progress = {
+        start: Math.max(0, topRect.bottom - lineRect.top),
+        end: Math.min(lineRect.height, bottomRect.top - lineRect.top),
+      };
+
+      if (progress.end <= progress.start + 1) {
+        applyStepRailMask(whiteLine, lineRect.height, []);
+        return;
+      }
+
+      let whiteSegments = [progress];
+      if (gap) {
+        whiteSegments = whiteSegments.flatMap(function (segment) {
+          return subtractRailSegment(segment, gap);
+        });
+      }
+      applyStepRailMask(whiteLine, lineRect.height, whiteSegments);
     });
   }
 
@@ -579,6 +646,54 @@
       document.body.classList.contains('is-create-amulet-ready') ||
       document.body.classList.contains('is-result-overlay-open')
     );
+  }
+
+  function pushCreateHistory() {
+    try {
+      history.pushState({ pagmarView: 'create' }, '');
+      createHistoryPushed = true;
+    } catch (_) {}
+  }
+
+  function pushResultHistory() {
+    try {
+      history.pushState({ pagmarView: 'result' }, '');
+      createHistoryPushed = true;
+    } catch (_) {}
+  }
+
+  function resetCreateHistoryAfterSave() {
+    createHistoryPushed = false;
+    createPopstateIgnore = 2;
+    try {
+      history.go(-2);
+    } catch (_) {
+      createPopstateIgnore = 0;
+      try {
+        history.replaceState(null, '');
+      } catch (_e) {}
+    }
+  }
+
+  function cancelCreateBuildIfNeeded() {
+    if (
+      !document.body.classList.contains('is-building') &&
+      !document.body.classList.contains('is-amulet-rendering')
+    ) {
+      return;
+    }
+    if (typeof window.amuletBuildCancel === 'function') {
+      window.amuletBuildCancel();
+    }
+    document.body.classList.remove(
+      'is-building',
+      'is-amulet-rendering',
+      'is-amulet-ready',
+      'is-create-amulet-ready'
+    );
+    if (typeof window.amuletHideLoader === 'function') {
+      window.amuletHideLoader();
+    }
   }
 
   function goToResult() {
@@ -1421,11 +1536,13 @@
     }
 
     indexCreateExitTimer = null;
+    createHistoryPushed = false;
   }
 
   function exitIndexCreateFlow() {
     if (!isIndexCreateMode() || !indexCreateWorkspace) return;
-    if (isCreateFlowBusy()) return;
+    if (document.body.classList.contains('is-result-overlay-open')) return;
+    cancelCreateBuildIfNeeded();
 
     window.clearTimeout(indexCreateExitTimer);
     closePanel();
@@ -1510,18 +1627,43 @@
         openModal(0);
       });
     });
+
+    pushCreateHistory();
   }
 
   function exitCreatePage() {
     if (!isCreatePage) return;
     sessionStorage.removeItem(STORAGE_KEY);
+    if (createHistoryPushed && history.length > 1) {
+      createHistoryPushed = false;
+      try {
+        history.back();
+        return;
+      } catch (_) {}
+    }
+    createHistoryPushed = false;
     window.location.href = 'index.html';
   }
 
   function handleRequestClose() {
     stopPlaceholderCycle();
-    if (isCreateFlowBusy()) return;
+    if (document.body.classList.contains('is-result-overlay-open')) return;
+    cancelCreateBuildIfNeeded();
+    if (
+      document.body.classList.contains('is-amulet-ready') ||
+      document.body.classList.contains('is-create-amulet-ready')
+    ) {
+      return;
+    }
     if (isIndexCreateMode()) {
+      if (createHistoryPushed && history.length > 1) {
+        createHistoryPushed = false;
+        try {
+          history.back();
+        } catch (_) {}
+        return;
+      }
+      createHistoryPushed = false;
       exitIndexCreateFlow();
       return;
     }
@@ -1682,7 +1824,53 @@
     window.setTimeout(function () {
       openModal(0);
     }, 120);
+    pushCreateHistory();
   }
+
+  window.addEventListener('popstate', function () {
+    if (createPopstateIgnore > 0) {
+      createPopstateIgnore -= 1;
+      return;
+    }
+
+    const state = history.state;
+
+    if (isCreatePage) {
+      if (state && state.pagmarView === 'create') {
+        createHistoryPushed = true;
+        return;
+      }
+      createHistoryPushed = false;
+      sessionStorage.removeItem(STORAGE_KEY);
+      window.location.href = 'index.html';
+      return;
+    }
+
+    if (!isIndexPage) return;
+
+    if (state && state.pagmarView === 'result') {
+      createHistoryPushed = true;
+      return;
+    }
+
+    if (document.body.classList.contains('is-result-overlay-open')) {
+      createHistoryPushed = Boolean(state && state.pagmarView === 'create');
+      if (typeof window.pagmarHideResultOverlay === 'function') {
+        window.pagmarHideResultOverlay();
+      }
+      return;
+    }
+
+    if (state && state.pagmarView === 'create') {
+      createHistoryPushed = true;
+      return;
+    }
+
+    if (isIndexCreateMode()) {
+      createHistoryPushed = false;
+      exitIndexCreateFlow();
+    }
+  });
 
   buildProgressDots();
   restoreCompletedSession();
@@ -1693,4 +1881,7 @@
   if (isIndexPage) {
     window.startIndexCreateFlow = startIndexCreateFlow;
   }
+
+  window.pagmarPushResultHistory = pushResultHistory;
+  window.pagmarResetCreateHistoryAfterSave = resetCreateHistoryAfterSave;
 })();

@@ -1,9 +1,9 @@
 /**
  * Amulet garden — Cyber Garden style (ground-plane pan + low camera + sprites).
  */
-console.log('%c[garden-three] v20250705-meadow-focus loaded', 'color:lime;font-size:14px');
+console.log('%c[garden-three] v20250707-white-fog-v2 loaded', 'color:lime;font-size:14px');
 import * as THREE from './vendor/three.module.js';
-import { createLucaFog } from './garden-fog.js?v=20250702-figma-index-bg';
+import { createLucaFog } from './garden-fog.js';
 
 function glbStore() { return import('./amulet-glb-store.js'); }
 
@@ -295,16 +295,10 @@ const SCALE_LERP = 0.18;
 const FOCUS_FADE_LERP = 0.22;
 /** Tighter screen bounds for hit tests and spec-panel anchoring (opaque content, not full quad). */
 const VISUAL_HIT_FACTOR = 0.38;
-/** Continuous depth falloff — near bright, far darken into page bg (opaque, no see-through). */
-const DARK_DIST_START = 5;
-const DARK_DIST_FULL = 40;
-/** Match --page-bg (#080808); distant sprites stay fully opaque but dim toward this. */
-const DARK_BG_LUMINANCE = 8 / 255;
-const DARK_AMOUNT_LERP = 0.16;
-/** Neutral tint — show snapshot colors as captured (detail-page fidelity). */
-const SPRITE_BOOST_R = 1;
-const SPRITE_BOOST_G = 1;
-const SPRITE_BOOST_B = 1;
+/** Cyber Garden–style blue depth sheet — sprites pass through while scrolling. */
+const FOG_VEIL_AHEAD = 42;
+const SPRITE_ORDER_BEHIND_VEIL = 2;
+const SPRITE_ORDER_IN_FRONT = 8;
 const MAX_PIXEL_RATIO = 2;
 
 const mount = document.getElementById('questionGarden');
@@ -323,6 +317,7 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 renderer.sortObjects = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0);
 renderer.domElement.style.background = 'transparent';
 mount.appendChild(renderer.domElement);
@@ -2336,6 +2331,9 @@ function restoreCollectionFromStorage() {
       : Promise.resolve(null)
     ).then(function (hiResUrl) {
       var dataUrl = hiResUrl || entry.snapshot;
+      if (!dataUrl && entry.id != null) {
+        dataUrl = '/questionnaire/seed/snapshots/' + entry.id + '.png';
+      }
       if (!dataUrl) {
         console.warn('[garden-three] missing snapshot for collection entry', index, entry.id);
         return;
@@ -2453,7 +2451,7 @@ function makeSprite(layout, texture, questionIndex) {
   const seed = typeof layout.tex === 'number' ? layout.tex : questionIndex;
   initSpriteFloat(sprite, layout.x, layout.z, seed);
   applySpriteFloat(sprite);
-  sprite.renderOrder = 2;
+  sprite.renderOrder = SPRITE_ORDER_IN_FRONT;
   sprite.userData.questionIndex = questionIndex;
   sprite.userData.tex = layout.tex;
   scene.add(sprite);
@@ -2515,19 +2513,13 @@ function targetScaleMulForSprite(sprite) {
   return 1;
 }
 
-function depthDarknessForSprite(sprite) {
-  let target = 0;
-  if (
-    isDepthShadeEnabled() &&
-    !(isAmuletFocusMode() && indexMatchesSprite(selectedIndex, sprite))
-  ) {
-    const dist = camera.position.distanceTo(sprite.position);
-    target = THREE.MathUtils.smoothstep(dist, DARK_DIST_START, DARK_DIST_FULL);
-  }
-  const current = sprite.userData.depthDark ?? 0;
-  const next = current + (target - current) * DARK_AMOUNT_LERP;
-  sprite.userData.depthDark = next;
-  return next;
+function fogVeilZ() {
+  return camera.position.z - FOG_VEIL_AHEAD;
+}
+
+function spriteRenderOrderForVeil(sprite) {
+  const anchorZ = sprite.userData.floatAnchorZ ?? sprite.position.z;
+  return anchorZ < fogVeilZ() ? SPRITE_ORDER_BEHIND_VEIL : SPRITE_ORDER_IN_FRONT;
 }
 
 function updateCursorFromPointer(clientX, clientY) {
@@ -2637,15 +2629,9 @@ function updateDepthFade(now) {
     const worldSize = base * nextMul;
     sprite.scale.set(worldSize * spinScaleX, worldSize, 1);
 
-    const darkT = depthDarknessForSprite(sprite);
-    const depthT = darkT * darkT;
-    const shade = THREE.MathUtils.lerp(1, DARK_BG_LUMINANCE, depthT);
+    sprite.renderOrder = spriteRenderOrderForVeil(sprite);
     sprite.material.opacity = focusMul;
-    sprite.material.color.setRGB(
-      shade * SPRITE_BOOST_R,
-      shade * SPRITE_BOOST_G,
-      shade * SPRITE_BOOST_B
-    );
+    sprite.material.color.set(0xffffff);
     sprite.visible = focusMul > 0.02 && !sprite.userData.spin3dHidden;
     applySpriteFloat(sprite);
   }
@@ -3076,19 +3062,50 @@ window.addEventListener('questionnaire:answered', () => {
   updateFocusVisuals();
 });
 
+let preFilterGardenState = null;
+
+function stashPreFilterGardenState() {
+  if (preFilterGardenState) return;
+  preFilterGardenState = {
+    x: camera.position.x,
+    z: camera.position.z,
+    gridTravelZ: gridTravelZ,
+  };
+}
+
+function restorePreFilterGardenState() {
+  if (!preFilterGardenState) return;
+  const state = preFilterGardenState;
+  camera.position.x = state.x;
+  camera.position.z = state.z;
+  lookForward();
+  gridTravelZ = state.gridTravelZ;
+  lastCameraZ = state.z;
+  window.dispatchEvent(
+    new CustomEvent('questionnaire:camera-move', {
+      detail: { travel: gridTravelZ, sync: 'pan' },
+    })
+  );
+  preFilterGardenState = null;
+}
+
 window.addEventListener('questionnaire:index-filter-change', (evt) => {
   const active = evt.detail && evt.detail.active;
-  controlsEnabled = !active;
   if (active) {
+    stashPreFilterGardenState();
+    controlsEnabled = false;
     pointerDown = null;
     document.body.style.cursor = 'default';
-  } else if (
-    !document.body.classList.contains('is-panel-open') &&
-    !document.body.classList.contains('is-spec-panel-open') &&
-    !document.body.classList.contains('is-site-intro-open')
-  ) {
-    controlsEnabled = true;
-    updateCursorFromPointer(lastPointer.x, lastPointer.y);
+  } else {
+    restorePreFilterGardenState();
+    if (
+      !document.body.classList.contains('is-panel-open') &&
+      !document.body.classList.contains('is-spec-panel-open') &&
+      !document.body.classList.contains('is-site-intro-open')
+    ) {
+      controlsEnabled = true;
+      updateCursorFromPointer(lastPointer.x, lastPointer.y);
+    }
   }
   updateFocusVisuals();
 });
@@ -3198,6 +3215,34 @@ Promise.resolve()
   .catch((err) => {
     console.error('[garden-three] failed to load amulets', err);
   });
+
+window.gardenStashPreFilterState = stashPreFilterGardenState;
+window.gardenRestorePreFilterState = restorePreFilterGardenState;
+
+window.gardenGetViewState = function gardenGetViewState() {
+  return {
+    x: camera.position.x,
+    z: camera.position.z,
+    gridTravelZ: gridTravelZ,
+  };
+};
+
+window.gardenRestoreViewState = function gardenRestoreViewState(state) {
+  if (!state || typeof state.x !== 'number' || typeof state.z !== 'number') return;
+  camera.position.x = state.x;
+  camera.position.z = state.z;
+  lookForward();
+  if (typeof state.gridTravelZ === 'number') {
+    gridTravelZ = state.gridTravelZ;
+  }
+  lastCameraZ = state.z;
+  window.dispatchEvent(
+    new CustomEvent('questionnaire:camera-move', {
+      detail: { travel: gridTravelZ, sync: 'pan' },
+    })
+  );
+  updateFocusVisuals();
+};
 
 window.gardenAddUserAmulet = function (sourceCanvas, options) {
   return addUserAmuletSprite(sourceCanvas, options);

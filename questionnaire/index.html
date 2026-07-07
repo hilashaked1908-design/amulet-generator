@@ -8,9 +8,11 @@
   <meta http-equiv="Expires" content="0">
   <title>קמע — אינדקס</title>
   <link rel="stylesheet" href="../css/fonts.css?v=20250702-white">
-  <link rel="stylesheet" href="../css/questionnaire.css?v=20250705-loader-fog">
-  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250705-romema-title">
-  <link rel="stylesheet" href="../css/result-overlay.css?v=20250705-loader-fog">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250708-safari-garden">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250708-safari-garden">
+  <link rel="stylesheet" href="../css/k95-cursor.css?v=20250708-safari-garden">
+  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250708-safari-garden">
+  <link rel="stylesheet" href="../css/result-overlay.css?v=20250708-safari-garden">
 </head>
 <body class="pagmar-index">
 
@@ -18,33 +20,34 @@
     <div class="pagmar-canvas" id="pagmarCanvas" aria-label="פתיחת שאלון קמע">
 
       <!-- Figma 2127:3662 — index chrome buttons -->
+      <button type="button" class="pagmar__index-about" id="indexAboutBtn" aria-label="אודות">
+        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
+      </button>
+
       <aside class="pagmar__index-filter-sidebar" id="indexFilterSidebar" aria-label="סינון">
         <div class="pagmar__index-filter-head">
-          <button
-            type="button"
-            class="pagmar__index-filter-trigger"
-            id="indexFilterTrigger"
-            aria-expanded="false"
-            aria-controls="indexFilterWrap"
-            aria-label="סינון קמעות"
-          >
-            <img
-              class="pagmar__index-filter-trigger__art"
-              src="assets/index-figma-2127/filter-trigger.svg"
-              alt=""
-              decoding="async"
-              draggable="false"
+          <div class="pagmar__index-filter-toolbar">
+            <button
+              type="button"
+              class="pagmar__index-filter-trigger"
+              id="indexFilterTrigger"
+              aria-expanded="false"
+              aria-controls="indexFilterWrap"
+              aria-label="סנן"
             >
-          </button>
-          <button
-            type="button"
-            class="pagmar__index-filter-close"
-            id="indexFilterClose"
-            aria-label="חזרה לגן הקמעות"
-            hidden
-          >
-            <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
-          </button>
+              <img
+                class="pagmar__index-filter-trigger__icon"
+                src="assets/detail/close-icon.svg"
+                width="16.119"
+                height="21.235"
+                alt=""
+                decoding="async"
+                draggable="false"
+                aria-hidden="true"
+              >
+              <span class="pagmar__index-filter-trigger__label pagmar__index-type-target" data-type-text="סנן">סנן</span>
+            </button>
+          </div>
           <div
             class="pagmar__index-filter-active"
             id="indexFilterActive"
@@ -58,10 +61,6 @@
       </aside>
 
       <button type="button" class="pagmar__index-cta-pill" id="indexCreateCta">
-        <img class="pagmar__index-cta__corner pagmar__index-cta__corner--tl" src="assets/index-figma-2127/cta-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-        <img class="pagmar__index-cta__corner pagmar__index-cta__corner--tr" src="assets/index-figma-2127/cta-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-        <img class="pagmar__index-cta__corner pagmar__index-cta__corner--bl" src="assets/index-figma-2127/cta-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-        <img class="pagmar__index-cta__corner pagmar__index-cta__corner--br" src="assets/index-figma-2127/cta-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
         <span class="pagmar__index-cta-pill__body">
           <img class="pagmar__index-cta__arrow" src="assets/index-figma-2127/cta-arrow.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
           <span class="pagmar__index-type-target pagmar__index-cta-pill__label" data-type-text="צור קמע משלך">צור קמע משלך</span>
@@ -140,56 +139,40 @@
             <img src="assets/create/figma-2120/close-2127-3640.svg" alt="" decoding="async" draggable="false">
           </button>
 
-          <img class="figma-layer figma-step-rail__line figma-step-rail__line--137" src="assets/create/figma-2120/step-rail-line.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-          <img class="figma-layer figma-step-rail__line figma-step-rail__line--136" src="assets/create/figma-2120/step-rail-v136.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+          <div class="figma-layer figma-step-rail__line figma-step-rail__line--137" aria-hidden="true"></div>
+          <div class="figma-layer figma-step-rail__line figma-step-rail__line--progress" aria-hidden="true"></div>
 
           <div class="figma-layer figma-step-marker figma-step-marker--8" data-step="8" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">8</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--7" data-step="7" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">7</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--6" data-step="6" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">6</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--5" data-step="5" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">5</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--4" data-step="4" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">4</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--3" data-step="3" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">3</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--2" data-step="2" aria-hidden="true">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">2</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
           <div class="figma-layer figma-step-marker figma-step-marker--1 is-active" data-step="1" aria-current="step">
-            <span class="figma-step-marker__pill" aria-hidden="true"></span>
-            <img class="figma-step-marker__frame-active" src="assets/create/figma-2120/step-bracket-active.svg" alt="">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
             <span class="figma-step-marker__num">1</span>
-            <img class="figma-step-marker__bracket" src="assets/create/figma-2120/step-bracket.svg" alt="">
           </div>
 
           <div class="figma-layer figma-q figma-q--slot-0" id="requestActiveCard">
@@ -368,11 +351,22 @@
   <script src="../connection-core.js"></script>
   <script src="questions.js?v=20250704-2258-fonts"></script>
   <script src="amulet-catalog.js?v=20250705-multi-filter"></script>
-  <script src="garden-atmosphere.js?v=20250704b"></script>
-  <script src="garden-stars.js?v=20250704b"></script>
-  <script type="module" src="garden-three.js?v=20250705-meadow-focus"></script>
-  <script src="questionnaire-ui.js?v=20250705-q4-instant"></script>
-  <script src="index-buttons.js?v=20250705-multi-filter"></script>
-  <script src="index-filter-view.js?v=20250705-multi-filter"></script>
+  <script src="garden-atmosphere.js?v=20250708-safari-garden"></script>
+  <script src="garden-stars.js?v=20250708-safari-garden"></script>
+  <script src="garden-amulet-hover.js?v=20250708-safari-garden"></script>
+  <script type="module">
+    import('./garden-three.js').catch(function (err) {
+      console.error('[garden-three] failed to load', err);
+      var mount = document.getElementById('questionGarden');
+      if (mount) {
+        mount.setAttribute('data-garden-load-error', '1');
+      }
+    });
+  </script>
+  <script src="k95-cursor.js?v=20250707-k95-cursor-offset"></script>
+  <script src="questionnaire-ui.js?v=20250708-your-design"></script>
+  <script src="button-roll.js?v=20250707-k95-cursor"></script>
+  <script src="index-buttons.js?v=20250708-your-design"></script>
+  <script src="index-filter-view.js?v=20250708-your-design"></script>
 </body>
 </html>

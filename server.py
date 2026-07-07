@@ -17,6 +17,8 @@ CONNECTIONS_PATH = os.path.join(ROOT, "connections.json")
 GLYPHS_DIR = os.path.join(ROOT, "glyphs")
 LETTERS_DIR = os.path.join(ROOT, "אותיות")
 PORT = int(os.environ.get("PORT", "8080"))
+_default_legacy = "8765" if PORT == 8080 else ("8080" if PORT == 8765 else "0")
+LEGACY_PORT = int(os.environ.get("LEGACY_PORT", _default_legacy or "0"))
 GLYPH_FILE_RE = re.compile(r"^.\d+\.svg$", re.UNICODE)
 SERVER_VERSION = 2
 
@@ -178,6 +180,12 @@ def build_entry(conn):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    extensions_map = {
+        **getattr(SimpleHTTPRequestHandler, "extensions_map", {}),
+        ".js": "application/javascript",
+        ".mjs": "application/javascript",
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
 
@@ -251,6 +259,18 @@ class Handler(SimpleHTTPRequestHandler):
             data = read_connections()
             print(f"[API] GET /api/connections -> {len(data.get('connections', []))} entries")
             self._send_json(data)
+            return
+
+        if parsed_path in ("/go", "/go/"):
+            self.send_response(302)
+            self.send_header("Location", "/questionnaire/index.html")
+            self.end_headers()
+            return
+
+        if parsed_path in ("/questionnaire/index", "/questionnaire"):
+            self.send_response(301)
+            self.send_header("Location", "/questionnaire/index.html")
+            self.end_headers()
             return
 
         if parsed_path.startswith("/glyphs/") and parsed_path.endswith(".svg"):
@@ -391,36 +411,63 @@ if __name__ == "__main__":
     print_glyphs_startup_info()
     print("Glyph files are read from glyphs/ only. Use editor upload or save directly there.")
     print(f"Serving at http://localhost:{PORT}", flush=True)
+    if LEGACY_PORT and LEGACY_PORT != PORT:
+        print(f"Legacy port: http://localhost:{LEGACY_PORT} (same site — old bookmarks)", flush=True)
     print(f"Open editor: http://localhost:{PORT}/editor.html", flush=True)
     print(f"Open prototype: http://localhost:{PORT}/prototype-v2-thick.html", flush=True)
+    print(f"Open garden: http://localhost:{PORT}/questionnaire/index.html", flush=True)
     print("All paths URL-decoded (unquote) for Hebrew filenames", flush=True)
+
+    servers = []
+
+    def bind_server(port):
+        for attempt in range(6):
+            try:
+                httpd = ThreadingHTTPServer(("", port), Handler)
+                servers.append(httpd)
+                return httpd
+            except OSError as err:
+                if getattr(err, "errno", None) in (48, 98, 10048) and attempt < 5:
+                    print(f"Port {port} busy, retrying in 2s ({attempt + 1}/5)...", flush=True)
+                    time.sleep(2)
+                    continue
+                if getattr(err, "errno", None) in (48, 98, 10048):
+                    print(f"\nPort {port} is already in use.")
+                    print(f"If another server is running, open: http://localhost:{port}/questionnaire/index.html")
+                    print("To stop the old server: bash start-server.sh stop")
+                    sys.exit(1)
+                raise
+
     def shutdown(signum, _frame):
         print(f"\nReceived signal {signum}, shutting down...", flush=True)
-        httpd.shutdown()
+        for httpd in servers:
+            httpd.shutdown()
 
-    httpd = None
-    for attempt in range(6):
+    bind_server(PORT)
+    if LEGACY_PORT and LEGACY_PORT != PORT:
         try:
-            httpd = ThreadingHTTPServer(("", PORT), Handler)
-            break
-        except OSError as err:
-            if getattr(err, "errno", None) in (48, 98, 10048) and attempt < 5:
-                print(f"Port {PORT} busy, retrying in 2s ({attempt + 1}/5)...", flush=True)
-                time.sleep(2)
-                continue
-            if getattr(err, "errno", None) in (48, 98, 10048):
-                print(f"\nPort {PORT} is already in use.")
-                print(f"If another server is running, open: http://localhost:{PORT}/prototype-v2-thick.html")
-                print("To stop the old server: bash start-server.sh stop")
-                sys.exit(1)
+            bind_server(LEGACY_PORT)
+        except SystemExit:
             raise
+        except OSError as err:
+            print(f"Warning: legacy port {LEGACY_PORT} unavailable ({err})", flush=True)
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
 
+    import threading
+
+    threads = []
+    for httpd in servers:
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        threads.append(thread)
+
     try:
-        httpd.serve_forever()
+        for thread in threads:
+            thread.join()
     except KeyboardInterrupt:
         print("\nServer stopped.", flush=True)
     finally:
-        httpd.server_close()
+        for httpd in servers:
+            httpd.server_close()

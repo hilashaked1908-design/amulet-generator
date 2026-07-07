@@ -22,6 +22,7 @@ let buildAbort = null;
 let lastVectorStage = 0;
 let lastVectorAnswerKey = '';
 let precomposeToken = 0;
+let deferredBuildToken = 0;
 
 function amuletFrameSelector() {
   if (document.querySelector('.pagmar__request-amulet-build')) {
@@ -120,6 +121,25 @@ function scheduleBackgroundPrecompose(answers) {
   }, 400);
 }
 
+function scheduleDeferredPreviewUpdate(answers, options) {
+  const token = ++deferredBuildToken;
+
+  function runDeferred() {
+    if (token !== deferredBuildToken) return;
+    const nextOptions = Object.assign({}, options, { defer: false });
+    void updateAmuletPreview(answers, nextOptions);
+  }
+
+  window.requestAnimationFrame(function () {
+    if (token !== deferredBuildToken) return;
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(runDeferred, { timeout: 2500 });
+    } else {
+      window.setTimeout(runDeferred, 0);
+    }
+  });
+}
+
 export function scheduleAmuletPrecompose(answers) {
   if (!answers?.q1Wish?.trim()) return;
   scheduleBackgroundPrecompose(answers);
@@ -151,12 +171,19 @@ async function finishFrameLoader(startedAt, token, answers) {
 }
 
 export function cancelAmuletBuild() {
+  deferredBuildToken += 1;
   if (buildAbort) buildAbort.abort();
   buildAbort = null;
   buildToken += 1;
   setZoneBuilding(false);
   hideAmuletFrameLoader();
   resetAmuletLoaderCache();
+}
+
+/** Drop loader/build chrome without aborting an in-flight background render. */
+export function clearAmuletBuildUi() {
+  setZoneBuilding(false);
+  hideAmuletFrameLoader();
 }
 
 export async function showTextureLoadingState() {
@@ -166,9 +193,15 @@ export async function showTextureLoadingState() {
   await showFull('טוען קמע', { fullscreen: true, progress: 0 });
 }
 
-export async function updateAmuletPreview(answers) {
+export async function updateAmuletPreview(answers, options = {}) {
+  const uiBlocking = options.uiBlocking !== false;
   const container = document.getElementById('amuletContainer');
   if (!container) return;
+
+  if (options.defer) {
+    scheduleDeferredPreviewUpdate(answers, options);
+    return;
+  }
 
   if (!answers.q1Wish?.trim()) {
     container.innerHTML = '';
@@ -201,10 +234,15 @@ export async function updateAmuletPreview(answers) {
   const loaderStartedAt = performance.now();
   let didRenderWork = false;
 
-  setTextureLoading(false);
-  setZoneBuilding(true);
+  if (!uiBlocking && typeof window.amuletUnlockSemanticQuestionUi === 'function') {
+    window.amuletUnlockSemanticQuestionUi();
+  }
 
-  await showAmuletLoader('טוען קמע');
+  if (uiBlocking) {
+    setTextureLoading(false);
+    setZoneBuilding(true);
+    await showAmuletLoader('טוען קמע');
+  }
 
   try {
     container.hidden = false;
@@ -242,19 +280,27 @@ export async function updateAmuletPreview(answers) {
       statusEl.hidden = false;
     }
   } finally {
-    if (token === buildToken) {
-      if (didRenderWork) {
+    const isCurrent = token === buildToken;
+    if (isCurrent) {
+      if (didRenderWork && uiBlocking) {
         await finishFrameLoader(loaderStartedAt, token, answers);
       } else {
         hideAmuletFrameLoader();
       }
+      if (uiBlocking) setZoneBuilding(false);
+    } else if (uiBlocking) {
+      hideAmuletFrameLoader();
       setZoneBuilding(false);
+    }
+    if (!uiBlocking && typeof window.amuletUnlockSemanticQuestionUi === 'function') {
+      window.amuletUnlockSemanticQuestionUi();
     }
   }
 }
 
 window.amuletBuildUpdate = updateAmuletPreview;
 window.amuletBuildCancel = cancelAmuletBuild;
+window.amuletClearBuildUi = clearAmuletBuildUi;
 window.amuletShowTextureLoading = showTextureLoadingState;
 window.amuletSchedulePrecompose = scheduleAmuletPrecompose;
 window.amuletPreloadCompose = initAmuletCompose;

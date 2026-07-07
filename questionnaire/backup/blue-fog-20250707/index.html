@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>קמע — אינדקס</title>
+  <link rel="stylesheet" href="../css/fonts.css?v=20250702-white">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250707-filter-grid-margins">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250707-close-color">
+  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250705-romema-title">
+  <link rel="stylesheet" href="../css/result-overlay.css?v=20250705-loader-fog">
+</head>
+<body class="pagmar-index">
+
+  <div class="pagmar-viewport">
+    <div class="pagmar-canvas" id="pagmarCanvas" aria-label="פתיחת שאלון קמע">
+
+      <!-- Figma 2127:3662 — index chrome buttons -->
+      <button type="button" class="pagmar__index-about" id="indexAboutBtn" aria-label="אודות">
+        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
+      </button>
+
+      <aside class="pagmar__index-filter-sidebar" id="indexFilterSidebar" aria-label="סינון">
+        <div class="pagmar__index-filter-head">
+          <div class="pagmar__index-filter-toolbar">
+            <button
+              type="button"
+              class="pagmar__index-filter-trigger"
+              id="indexFilterTrigger"
+              aria-expanded="false"
+              aria-controls="indexFilterWrap"
+              aria-label="סנן"
+            >
+              <img
+                class="pagmar__index-filter-trigger__icon"
+                src="assets/detail/close-icon.svg"
+                width="16.119"
+                height="21.235"
+                alt=""
+                decoding="async"
+                draggable="false"
+                aria-hidden="true"
+              >
+              <span class="pagmar__index-filter-trigger__label pagmar__index-type-target" data-type-text="סנן">סנן</span>
+            </button>
+          </div>
+          <div
+            class="pagmar__index-filter-active"
+            id="indexFilterActive"
+            hidden
+            aria-label="תגיות סינון פעילות"
+          ></div>
+        </div>
+        <div class="pagmar__index-filter-wrap" id="indexFilterWrap">
+          <div class="pagmar__index-filter-list" id="indexFilterList"></div>
+        </div>
+      </aside>
+
+      <button type="button" class="pagmar__index-cta-pill" id="indexCreateCta">
+        <span class="pagmar__index-cta-pill__body">
+          <img class="pagmar__index-cta__arrow" src="assets/index-figma-2127/cta-arrow.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+          <span class="pagmar__index-type-target pagmar__index-cta-pill__label" data-type-text="צור קמע משלך">צור קמע משלך</span>
+        </span>
+      </button>
+
+      <div class="pagmar__stage" id="questionStage">
+        <div
+          class="pagmar__index-filter-grid"
+          id="indexFilterGrid"
+          hidden
+          aria-label="קמעות מסוננות"
+        ></div>
+
+        <div
+          class="pagmar__garden"
+          id="questionGarden"
+          aria-label="מרחב קמעים — גררי לניווט, לחצי על קמע למפרט"
+        ></div>
+        <div
+          id="amuletContainer"
+          class="result__amulet"
+          role="img"
+          aria-label="קמע — גררי לסיבוב"
+          hidden
+        ></div>
+        <p id="amuletStatus" class="result__status" aria-live="polite" hidden>מכין את הקמע…</p>
+      </div>
+
+      <!-- בקשות — שאלון יצירת קמע (Figma 2258:19215) -->
+      <div class="pagmar__index-create pagmar__request-flow" id="indexCreateWorkspace" hidden>
+        <div class="pagmar__request-artboard" id="requestArtboard">
+
+          <div class="figma-layer figma-panel" aria-hidden="true">
+            <div class="figma-panel__inner">
+              <img class="figma-corner figma-corner--tl" src="assets/create/figma-2120/panel-corner-tl.svg" alt="" decoding="async" draggable="false">
+              <img class="figma-corner figma-corner--tr" src="assets/create/figma-2120/panel-corner-br.svg" alt="" decoding="async" draggable="false">
+              <img class="figma-corner figma-corner--bl" src="assets/create/figma-2120/panel-corner-tl.svg" alt="" decoding="async" draggable="false">
+              <img class="figma-corner figma-corner--br" src="assets/create/figma-2120/panel-corner-br.svg" alt="" decoding="async" draggable="false">
+              <div class="figma-amulet pagmar__request-amulet-build pagmar__index-create-amulet-frame">
+                <div id="createAmuletSlot" class="pagmar__index-create-amulet-view"></div>
+                <p id="createAmuletStatus" class="pagmar__index-create-status" aria-live="polite" hidden>טוען קמע</p>
+                <div class="pagmar__index-create-amulet-actions" id="createAmuletActions" hidden>
+                  <button type="button" class="pagmar__action-btn pagmar__create-amulet-action" id="exportAmuletBtn">
+                    <span class="pagmar__action-btn__inner">
+                      <svg class="pagmar__action-btn__art" viewBox="0 0 224 83" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 4H94.9347C99.2114 4 103.521 4.31092 107.591 5.62449C107.759 5.67877 107.923 5.73326 108.081 5.78775C110.321 6.55938 113.736 9 113.736 9C113.736 9 117.251 6.56165 119.537 5.78775C123.822 4.33697 128.388 4 132.912 4H215.473V12.7004C215.473 16.0268 215.108 19.3585 214.014 22.5C213.414 24.2262 212.666 26.0993 211.849 27.53C209.883 30.9692 205.473 35.4189 205.473 35.4189C205.473 35.4189 209.895 39.6822 211.849 43.0328C212.779 44.6295 213.594 46.7824 214.214 48.6899C215.162 51.6062 215.473 54.6769 215.473 57.7434V66.8379H133.451C128.564 66.8379 123.511 66.6911 118.925 65.0014C116.886 64.2502 113.736 61.8379 113.736 61.8379C113.736 61.8379 110.735 64.248 108.634 65.0014C103.938 66.6856 98.857 66.8379 93.8678 66.8379H12V59.7401C12 55.362 12.6434 50.98 14.3971 46.9685C15.0254 45.5311 15.724 44.0769 16.4239 42.8954C18.2804 39.7617 22 35.4189 22 35.4189C22 35.4189 18.2622 31.2683 16.4239 28.2266C15.6057 26.8727 14.8109 25.1547 14.126 23.5016C12.5602 19.7226 12 15.6279 12 11.5374V4Z" fill="#F8F8F7" shape-rendering="geometricPrecision"/>
+                      </svg>
+                      <span class="pagmar__action-btn__label" aria-hidden="true">
+                        <span class="pagmar__action-btn__label-track">
+                          <span class="pagmar__action-btn__label-line">ייצא כתמונה</span>
+                          <span class="pagmar__action-btn__label-line">ייצא כתמונה</span>
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                  <button type="button" class="pagmar__action-btn pagmar__create-amulet-action" id="saveAmuletBtn">
+                    <span class="pagmar__action-btn__inner">
+                      <svg class="pagmar__action-btn__art" viewBox="0 0 224 83" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 4H94.9347C99.2114 4 103.521 4.31092 107.591 5.62449C107.759 5.67877 107.923 5.73326 108.081 5.78775C110.321 6.55938 113.736 9 113.736 9C113.736 9 117.251 6.56165 119.537 5.78775C123.822 4.33697 128.388 4 132.912 4H215.473V12.7004C215.473 16.0268 215.108 19.3585 214.014 22.5C213.414 24.2262 212.666 26.0993 211.849 27.53C209.883 30.9692 205.473 35.4189 205.473 35.4189C205.473 35.4189 209.895 39.6822 211.849 43.0328C212.779 44.6295 213.594 46.7824 214.214 48.6899C215.162 51.6062 215.473 54.6769 215.473 57.7434V66.8379H133.451C128.564 66.8379 123.511 66.6911 118.925 65.0014C116.886 64.2502 113.736 61.8379 113.736 61.8379C113.736 61.8379 110.735 64.248 108.634 65.0014C103.938 66.6856 98.857 66.8379 93.8678 66.8379H12V59.7401C12 55.362 12.6434 50.98 14.3971 46.9685C15.0254 45.5311 15.724 44.0769 16.4239 42.8954C18.2804 39.7617 22 35.4189 22 35.4189C22 35.4189 18.2622 31.2683 16.4239 28.2266C15.6057 26.8727 14.8109 25.1547 14.126 23.5016C12.5602 19.7226 12 15.6279 12 11.5374V4Z" fill="#F8F8F7" shape-rendering="geometricPrecision"/>
+                      </svg>
+                      <span class="pagmar__action-btn__label" aria-hidden="true">
+                        <span class="pagmar__action-btn__label-track">
+                          <span class="pagmar__action-btn__label-line">שמור קמע</span>
+                          <span class="pagmar__action-btn__label-line">שמור קמע</span>
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" class="figma-layer figma-close" id="requestCloseBtn" aria-label="סגור">
+            <img src="assets/create/figma-2120/close-2127-3640.svg" alt="" decoding="async" draggable="false">
+          </button>
+
+          <div class="figma-layer figma-step-rail__line figma-step-rail__line--137" aria-hidden="true"></div>
+          <div class="figma-layer figma-step-rail__line figma-step-rail__line--progress" aria-hidden="true"></div>
+
+          <div class="figma-layer figma-step-marker figma-step-marker--8" data-step="8" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">8</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--7" data-step="7" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">7</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--6" data-step="6" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">6</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--5" data-step="5" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">5</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--4" data-step="4" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">4</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--3" data-step="3" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">3</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--2" data-step="2" aria-hidden="true">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">2</span>
+          </div>
+          <div class="figma-layer figma-step-marker figma-step-marker--1 is-active" data-step="1" aria-current="step">
+            <div class="figma-step-marker__pill" aria-hidden="true"></div>
+            <span class="figma-step-marker__num">1</span>
+          </div>
+
+          <div class="figma-layer figma-q figma-q--slot-0" id="requestActiveCard">
+            <div
+              class="figma-q__panel"
+              id="questionFrame"
+              role="region"
+              aria-labelledby="questionText"
+            >
+              <div class="figma-q__head">
+                <span class="figma-q__tag" id="questionTag">[בקשה]</span>
+                <div class="figma-q__copy">
+                  <p class="figma-q__title" id="questionText"></p>
+                  <p class="figma-q__desc" id="questionDesc" hidden></p>
+                </div>
+              </div>
+              <div class="figma-q__field-box">
+                <div class="figma-q__field" id="questionField"></div>
+              </div>
+              <div class="figma-q__btn-outer">
+                <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+                <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+                <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+                <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+                <button type="button" class="figma-q__btn" id="questionSubmit" disabled>
+                  <span class="figma-q__btn-label">לשאלה הבאה</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <span class="pagmar__create-question-num" id="questionLabel" hidden aria-hidden="true"></span>
+      </div>
+
+      <!-- Result overlay — Figma 2276:23589 (questionnaire result) -->
+      <div class="pagmar__result-overlay" id="resultOverlay" hidden>
+        <div class="pagmar__result-fog" id="resultFogHost" aria-hidden="true"></div>
+
+        <div class="pagmar-canvas pagmar-canvas--result">
+
+          <button type="button" class="pagmar__result-close" id="resultCloseBtn" aria-label="סגור">
+            <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
+          </button>
+
+          <main class="pagmar__result-main">
+
+            <section class="pagmar__result-belonging" aria-label="שייכות">
+              <div class="pagmar__result-field">
+                <span class="pagmar__result-tag">[שייכות]</span>
+                <p class="pagmar__result-field-text" id="resultName">—</p>
+              </div>
+            </section>
+
+            <div class="pagmar__result-vector pagmar__result-vector--belonging" id="resultVectorBelonging" aria-hidden="true">
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--tl" aria-hidden="true"></span>
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--tr" aria-hidden="true"></span>
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--bl" aria-hidden="true"></span>
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--br" aria-hidden="true"></span>
+            </div>
+
+            <section class="pagmar__result-timing pagmar__result-section--ruled" aria-label="תזמון">
+              <div class="pagmar__result-field">
+                <span class="pagmar__result-tag">[תזמון]</span>
+                <p class="pagmar__result-field-text" id="resultTiming">—</p>
+              </div>
+            </section>
+
+            <div class="pagmar__result-vector pagmar__result-vector--timing" id="resultVectorTiming" aria-hidden="true">
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--tr" aria-hidden="true"></span>
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--bl" aria-hidden="true"></span>
+            </div>
+
+            <section class="pagmar__result-tags pagmar__result-section--ruled" aria-labelledby="resultTagsLabel">
+              <span class="pagmar__result-tag" id="resultTagsLabel">[תגיות]</span>
+              <ul class="pagmar__result-tags-list" id="resultTags"></ul>
+            </section>
+
+            <figure class="pagmar__result-amulet" aria-label="קמע מסתובב">
+              <span class="pagmar__result-num" id="resultNum">[001]</span>
+              <div class="pagmar__result-amulet-frame">
+                <div class="pagmar__result-corner pagmar__result-corner--tl" aria-hidden="true"></div>
+                <div class="pagmar__result-corner pagmar__result-corner--tr" aria-hidden="true"></div>
+                <div class="pagmar__result-corner pagmar__result-corner--bl" aria-hidden="true"></div>
+                <div class="pagmar__result-corner pagmar__result-corner--br" aria-hidden="true"></div>
+                <div id="resultAmulet3D" class="pagmar__result-amulet-3d"></div>
+              </div>
+            </figure>
+
+            <section class="pagmar__result-request" aria-label="בקשה">
+              <span class="pagmar__result-tag">[בקשה]</span>
+              <p class="pagmar__result-story" id="resultStory">—</p>
+            </section>
+
+            <div class="pagmar__result-vector pagmar__result-vector--request" id="resultVectorRequest" aria-hidden="true">
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--tl" aria-hidden="true"></span>
+              <span class="pagmar__result-vector-corner pagmar__result-vector-corner--br" aria-hidden="true"></span>
+            </div>
+
+            <section class="pagmar__result-components pagmar__result-section--ruled" aria-labelledby="resultComponentsLabel">
+              <div class="pagmar__result-components-inner">
+                <span class="pagmar__result-tag" id="resultComponentsLabel">[מרכיבים]</span>
+                <ul class="pagmar__result-components-list" id="resultComponents"></ul>
+              </div>
+            </section>
+
+          </main>
+
+          <div class="pagmar__result-action-btn pagmar__result-action-btn--export figma-q__btn-outer" id="resultExportBtnWrap">
+            <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <button type="button" class="figma-q__btn" id="resultExportBtn">ייצא קמע</button>
+          </div>
+
+          <div class="pagmar__result-action-btn pagmar__result-action-btn--save figma-q__btn-outer" id="resultSaveBtnWrap">
+            <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+            <button type="button" class="figma-q__btn" id="resultSaveBtn">שמור קמע</button>
+          </div>
+
+        </div>
+      </div>
+
+      <aside
+        class="pagmar__spec-panel"
+        id="amuletSpecPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="amuletSpecIndex"
+        hidden
+      >
+        <div class="pagmar__spec-panel__rule" aria-hidden="true">
+          <span class="pagmar__spec-panel__notch"></span>
+        </div>
+        <p class="pagmar__spec-panel__title" id="amuletSpecIndex"></p>
+      </aside>
+
+      <aside
+        class="pagmar__choice-panel"
+        id="choicePanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="choiceTitle"
+        hidden
+      >
+        <h2 class="pagmar__choice-title" id="choiceTitle"></h2>
+        <p class="pagmar__choice-question" id="choiceQuestion" hidden></p>
+        <div class="pagmar__choice-options" id="choiceOptions"></div>
+      </aside>
+
+      <div
+        class="pagmar__text-panel"
+        id="textPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="textQuestion"
+        hidden
+      >
+        <span class="pagmar__text-num" id="textLabel">[ 01 ]</span>
+        <p class="pagmar__text-question" id="textQuestion"></p>
+        <div class="pagmar__text-field" id="textField"></div>
+        <div class="pagmar__text-actions">
+          <button type="button" class="pagmar__text-save" id="textSubmit" disabled>שמור תשובה</button>
+          <button type="button" class="pagmar__text-close" id="textClose" aria-label="סגירה">×</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../connection-core.js"></script>
+  <script src="questions.js?v=20250704-2258-fonts"></script>
+  <script src="amulet-catalog.js?v=20250705-multi-filter"></script>
+  <script src="garden-atmosphere.js?v=20250707-fog-visible"></script>
+  <script src="garden-stars.js?v=20250704b"></script>
+  <script type="module" src="garden-three.js?v=20250707-filter-restore"></script>
+  <script src="questionnaire-ui.js?v=20250705-q4-instant"></script>
+  <script src="button-roll.js?v=20250707-no-q-roll"></script>
+  <script src="index-buttons.js?v=20250707-chrome-roll"></script>
+  <script src="index-filter-view.js?v=20250707-filter-grid-margins"></script>
+</body>
+</html>

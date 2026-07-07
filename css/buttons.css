@@ -1,0 +1,737 @@
+/* Shared pill buttons — K95-style outline / glass + label roll hover */
+
+:root {
+  --pagmar-pill-radius: 999px;
+  --pagmar-pill-border: hsla(0, 0%, 100%, 0.2);
+  --pagmar-pill-glass-bg: rgba(28, 28, 28, 0.1);
+  --pagmar-pill-glass-blur: 10px;
+  --pagmar-btn-roll-duration: 0.35s;
+  --pagmar-btn-roll-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --pagmar-btn-roll-stagger: 40ms;
+  --pagmar-close-on-dark: #f5f5f5;
+  --pagmar-close-on-light: #1500e1;
+  --pagmar-close-border-dark: hsla(0, 0%, 100%, 0.2);
+  --pagmar-close-border-light: rgba(21, 0, 225, 0.25);
+  --pagmar-close-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 50' fill='none'%3E%3Cpath d='M16.836 17.118L33.164 32.882M33.164 17.118L16.836 32.882' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  --pagmar-glass-pill-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13' fill='none'%3E%3Cpath d='M2.5 10.5L10.5 2.5M10.5 2.5H4.2M10.5 2.5V8.8' stroke='white' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* K95 glass pill — garden hover + detail amulet number */
+.pagmar__glass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 12px;
+  border-radius: var(--pagmar-pill-radius);
+  border: 1px solid hsla(0, 0%, 100%, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(14px) saturate(165%);
+  backdrop-filter: blur(14px) saturate(165%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+
+.pagmar__glass-pill__arrow {
+  display: block;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  background: var(--pagmar-glass-pill-arrow) no-repeat center / contain;
+  opacity: 0.92;
+}
+
+.pagmar__glass-pill__text {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+/* Remove legacy bracket / corner decorations on buttons */
+.pagmar__index-chrome-corner,
+.pagmar__index-cta__corner,
+.figma-q__btn-corner,
+.pagmar__detail-scan-btn-bracket,
+.pagmar__action-btn__art,
+.pagmar__create-save-bg,
+.pagmar__create-save-shape {
+  display: none !important;
+}
+
+/* ── Per-character label roll (K95 nav) ── */
+.pagmar-btn__roll--chars {
+  display: inline-flex;
+  align-items: center;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.pagmar-btn__roll-row {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(10 * var(--index-u, 0px));
+  direction: ltr;
+}
+
+.pagmar-btn__char {
+  display: inline-block;
+  height: 1em;
+  line-height: 1;
+  overflow: hidden;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.pagmar-btn__char-top,
+.pagmar-btn__char-bot {
+  display: block;
+  color: inherit;
+}
+
+.pagmar-btn__char-bot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(100%);
+}
+
+.pagmar-btn__char-top,
+.pagmar-btn__char-bot {
+  transition: transform var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+  transition-delay: calc(var(--i, 0) * var(--pagmar-btn-roll-stagger));
+}
+
+.pagmar-btn__roll-row .pagmar__index-cta__arrow {
+  display: block;
+  flex: 0 0 auto;
+  width: calc(14.593 * var(--index-u, 1px));
+  height: calc(14.593 * var(--index-u, 1px));
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Legacy whole-line roll (action buttons) */
+.pagmar-btn__roll,
+.figma-q__btn-label.pagmar-btn__roll {
+  display: block;
+  height: 1.1em;
+  line-height: 1.1;
+  overflow: hidden;
+  position: relative;
+}
+
+.figma-q__btn-label.pagmar-btn__roll--chars,
+.figma-q__btn .pagmar-btn__roll--chars {
+  display: inline-flex !important;
+  align-items: center;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  height: auto;
+  overflow: visible;
+}
+
+.pagmar-btn__roll-track,
+.pagmar__action-btn__label-track,
+.pagmar__create-save-label-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  transition: transform var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+  will-change: transform;
+}
+
+.pagmar-btn__roll-line,
+.pagmar__action-btn__label-line,
+.pagmar__create-save-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 1.1em;
+  line-height: 1.1;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.pagmar__action-btn__label-track {
+  gap: var(--action-btn-text-gap, 0.35em);
+  margin-top: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
+  body.pagmar-create.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
+  body.pagmar-index.is-create-mode.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top {
+    transform: none;
+  }
+
+  body.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
+  body.pagmar-create.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
+  body.pagmar-index.is-create-mode.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot {
+    transform: translateY(100%);
+  }
+
+  body.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
+  body.pagmar-create.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
+  body.pagmar-index.is-create-mode.is-choice-question .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track {
+    transform: none;
+  }
+
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
+  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-top,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-top,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-top,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-top {
+    transform: translateY(-100%);
+  }
+
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
+  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-bot,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-bot,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-bot,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-bot {
+    transform: translateY(0);
+  }
+
+  .pagmar-btn__roll:hover .pagmar-btn__roll-track,
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__roll-track,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__roll-track,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__roll-track {
+    transform: translateY(-50%);
+  }
+
+  .pagmar__action-btn:hover:not(:disabled) .pagmar__action-btn__label-track,
+  .pagmar__create-save:hover:not(:disabled) .pagmar__create-save-label-track {
+    transform: translateY(var(--action-btn-text-roll, -50%));
+  }
+}
+
+/* ── Index CTA pill ── */
+body.pagmar-index .pagmar__index-cta-pill {
+  width: auto;
+  min-width: calc(244 * var(--index-u));
+  height: calc(55 * var(--index-u));
+}
+
+body.pagmar-index .pagmar__index-cta-pill__body {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 100%;
+  height: 100%;
+  gap: calc(10 * var(--index-u));
+  direction: ltr;
+  border: 1px solid hsla(0, 0%, 100%, 0.3);
+  border-radius: var(--pagmar-pill-radius);
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(14px) saturate(165%);
+  backdrop-filter: blur(14px) saturate(165%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  padding: calc(10 * var(--index-u)) calc(40 * var(--index-u));
+  color: var(--index-chrome-accent);
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(24 * var(--index-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.1;
+  letter-spacing: calc(-0.72 * var(--index-u));
+  white-space: nowrap;
+}
+
+body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll-row {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10 * var(--index-u));
+  min-width: 0;
+}
+
+body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll--chars {
+  flex: 0 0 auto;
+}
+
+body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner,
+body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner,
+body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner {
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+}
+
+/* ── Index chrome text buttons (about, filter) — no frame ── */
+body.pagmar-index .pagmar__index-about,
+body.pagmar-index .pagmar__index-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: calc(50 * var(--index-u));
+  height: calc(50 * var(--index-u));
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+}
+
+body.pagmar-index .pagmar__index-about.is-over-content,
+body.pagmar-index .pagmar__index-filter-trigger.is-over-content {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--pagmar-close-on-light);
+}
+
+body.pagmar-index .pagmar__index-filter-trigger__label {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  pointer-events: none;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger__label.pagmar-btn__roll--chars {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
+  display: none;
+}
+
+/* ── Questionnaire submit (figma-q) ── */
+.figma-q__btn-outer {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: stretch;
+  width: auto;
+  min-width: 0;
+  height: calc(55 * var(--index-u, var(--fu, var(--u))));
+}
+
+.figma-q__btn-outer.is-hovered .figma-q__btn-corner,
+.figma-q__btn-outer:has(.figma-q__btn:not(:disabled)):hover .figma-q__btn-corner {
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+}
+
+.figma-q__btn {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  box-sizing: border-box;
+  width: auto;
+  height: 100%;
+  direction: rtl;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid var(--pagmar-pill-border);
+  border-radius: var(--pagmar-pill-radius);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  box-sizing: border-box;
+  padding: calc(10 * var(--index-u, var(--fu, var(--u)))) calc(40 * var(--index-u, var(--fu, var(--u))));
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(24 * var(--index-u, var(--fu, var(--u))));
+  font-weight: 400;
+  letter-spacing: calc(-0.72 * var(--index-u, var(--fu, var(--u))));
+  line-height: 1.1;
+  white-space: nowrap;
+  transition:
+    background var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    -webkit-backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+.figma-q__btn-label {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.figma-q__btn.is-over-content,
+.figma-q__btn-outer.is-over-content .figma-q__btn {
+  background: var(--pagmar-pill-glass-bg);
+  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+}
+
+.figma-q__btn:hover:not(:disabled),
+.figma-q__btn:focus-visible:not(:disabled) {
+  opacity: 1;
+  background: transparent;
+}
+
+.figma-q__btn-outer.is-over-content .figma-q__btn:hover:not(:disabled),
+.figma-q__btn.is-over-content:hover:not(:disabled) {
+  background: var(--pagmar-pill-glass-bg);
+}
+
+/* Result overlay buttons inherit figma-q — always over content */
+.pagmar-canvas--result .figma-q__btn {
+  background: var(--pagmar-pill-glass-bg);
+  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+}
+
+.pagmar-canvas--result .figma-q__btn:hover:not(:disabled),
+.pagmar-canvas--result .figma-q__btn:focus-visible:not(:disabled) {
+  background: var(--pagmar-pill-glass-bg);
+  opacity: 1;
+}
+
+/* ── Action buttons (save / export over amulet) ── */
+body.pagmar-index .pagmar__action-btn__inner,
+body.pagmar-create .pagmar__action-btn__inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: calc(160 * var(--u, var(--index-u)));
+  height: var(--action-btn-h, calc(55 * var(--u)));
+  padding: 0 calc(32 * var(--u, var(--index-u)));
+  border: 1px solid var(--pagmar-pill-border);
+  border-radius: var(--pagmar-pill-radius);
+  background: var(--pagmar-pill-glass-bg);
+  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  filter: none;
+}
+
+body.pagmar-index .pagmar__action-btn__label,
+body.pagmar-create .pagmar__action-btn__label {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: 1.1em;
+  display: block;
+  overflow: hidden;
+}
+
+body.pagmar-index .pagmar__action-btn__label-line,
+body.pagmar-create .pagmar__action-btn__label-line {
+  height: 1.1em;
+  color: #f8f8f7;
+}
+
+body.pagmar-index .pagmar__action-btn:hover .pagmar__action-btn__inner,
+body.pagmar-create .pagmar__action-btn:hover .pagmar__action-btn__inner {
+  filter: none;
+  background: var(--pagmar-pill-glass-bg);
+}
+
+body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn__inner {
+  min-width: calc(140 * var(--u));
+  height: calc(39 * var(--u));
+  padding: 0 calc(24 * var(--u));
+}
+
+/* ── Choice grid buttons ── */
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma,
+.figma-q__field .intro__choice-btn--figma {
+  border-radius: var(--pagmar-pill-radius);
+  margin: calc(2 * var(--u, var(--fu)));
+}
+
+/* ── Export + text panel save ── */
+body.pagmar-create .pagmar__export-btn,
+body.pagmar-index .pagmar__text-save {
+  border: 1px solid var(--pagmar-pill-border);
+  border-radius: var(--pagmar-pill-radius);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body.pagmar-create .pagmar__export-btn:hover,
+body.pagmar-index .pagmar__text-save:hover:not(:disabled) {
+  background: var(--pagmar-pill-glass-bg);
+  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+}
+
+body.pagmar-index .pagmar__text-save {
+  border-radius: var(--pagmar-pill-radius);
+  background: transparent;
+  color: #f4f4f4;
+  border-color: var(--pagmar-pill-border);
+}
+
+body.pagmar-index .pagmar__text-close {
+  border-radius: 50%;
+  border-color: var(--pagmar-close-border-light);
+}
+
+/* ── Close / icon-only buttons — clean pill, no label roll ── */
+.pagmar__result-close,
+body.pagmar-index .pagmar__text-close {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition:
+    opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    background var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    -webkit-backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    border-color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+/* Dark background — white X */
+.figma-close,
+.pagmar__result-close {
+  color: var(--pagmar-close-on-dark);
+  border: 1px solid var(--pagmar-close-border-dark);
+}
+
+/* Light background — blue X */
+body.pagmar-index .pagmar__text-close {
+  color: var(--pagmar-close-on-light);
+  border: 1px solid var(--pagmar-close-border-light);
+}
+
+/* Detail page — white X, no glass frame (matches index chrome) */
+body.pagmar-amulet-detail .pagmar__detail-close {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--pagmar-close-on-dark);
+  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+/* Questionnaire / request-flow close — white X on black, no frame */
+.figma-close {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--pagmar-close-on-dark);
+  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
+  color: var(--pagmar-close-on-dark);
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger.is-over-content {
+  color: var(--pagmar-close-on-light);
+}
+
+.figma-close.is-over-content,
+.pagmar__result-close.is-over-content,
+body.pagmar-index .pagmar__text-close.is-over-content,
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.figma-close.is-over-content,
+.pagmar__result-close.is-over-content {
+  color: var(--pagmar-close-on-light);
+  border-color: var(--pagmar-close-border-light);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-close:hover,
+body.pagmar-amulet-detail .pagmar__detail-close:focus-visible {
+  opacity: 0.72;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.figma-close:hover,
+.figma-close:focus-visible {
+  opacity: 0.72;
+  background: transparent;
+}
+
+.figma-close img,
+.pagmar__result-close img {
+  display: block;
+  object-fit: none;
+  object-position: -9999px;
+  overflow: hidden;
+  background-color: currentColor;
+  -webkit-mask-image: var(--pagmar-close-glyph);
+  mask-image: var(--pagmar-close-glyph);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+.figma-close img {
+  width: 100%;
+  height: 100%;
+}
+
+.pagmar__result-close img {
+  width: 100%;
+  height: 100%;
+}
+
+body.pagmar-amulet-detail .pagmar__detail-close img {
+  width: calc(16.119 * var(--u, 1px));
+  height: calc(21.235 * var(--u, 1px));
+  object-fit: contain;
+  object-position: right top;
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+  filter: brightness(0) invert(1);
+}
+
+body.pagmar-index .pagmar__index-filter-trigger__icon {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  display: none;
+  width: 42%;
+  height: 42%;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
+  display: block;
+  width: calc(16.119 * var(--index-u, 1px));
+  height: calc(21.235 * var(--index-u, 1px));
+  object-fit: contain;
+  object-position: right top;
+  filter: brightness(0) invert(1);
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+}
+
+.figma-close:hover img,
+.pagmar__result-close:hover img,
+body.pagmar-amulet-detail .pagmar__detail-close:hover img,
+body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-filter-trigger__icon,
+body.pagmar-index .pagmar__text-close:hover {
+  opacity: 0.72;
+}
+
+body.pagmar-index .pagmar__text-close {
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  font-size: 0;
+  line-height: 0;
+  color: var(--pagmar-close-on-light);
+  background-color: currentColor;
+  -webkit-mask-image: var(--pagmar-close-glyph);
+  mask-image: var(--pagmar-close-glyph);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 42%;
+  mask-size: 42%;
+}
+
+body.pagmar-index .pagmar__text-close:focus-visible {
+  outline: 1px solid rgba(21, 0, 225, 0.45);
+  outline-offset: calc(2 * var(--u));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --pagmar-btn-roll-duration: 0.01ms;
+  }
+
+  .pagmar-btn__roll:hover .pagmar-btn__roll-track,
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__roll-track,
+  .pagmar__action-btn:hover:not(:disabled) .pagmar__action-btn__label-track,
+  .pagmar__create-save:hover:not(:disabled) .pagmar__create-save-label-track,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__roll-track,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__roll-track,
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
+  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-top,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-top,
+  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-top,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-top,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-top,
+  .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
+  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-bot,
+  .pagmar__index-filter-trigger:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-bot,
+  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-bot,
+  .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-bot,
+  .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-bot {
+    transform: none;
+  }
+}

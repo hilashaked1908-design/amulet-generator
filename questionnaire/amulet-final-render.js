@@ -158,5 +158,6 @@ export async function renderFinalAmuletLikePrototype(answers, container, onProgr
     console.warn('[amulet-final-render] GLB save failed (non-fatal)', err);
   }
 
+  onProgress?.(1, 'הושלם');
   return result;
 }

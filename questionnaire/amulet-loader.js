@@ -11,6 +11,11 @@ const VESSEL_SRC = [
 ];
 
 let vesselsPreloaded = false;
+let loaderFogBoot = null;
+let loaderFogResize = null;
+let loaderFogStop = null;
+let fullpageLoadProgress = 0;
+let fullpageLoaderResizeBound = false;
 
 function statusEl() {
   return (
@@ -22,6 +27,57 @@ function amuletFrameEl() {
   return document.querySelector(
     '.pagmar__index-create-amulet-frame, .pagmar__create-amulet-frame, .pagmar__request-amulet-build'
   );
+}
+
+function amuletLoaderHost() {
+  return (
+    document.querySelector('.pagmar__index-create-amulet-view, .pagmar__create-amulet-view') ||
+    amuletFrameEl()
+  );
+}
+
+function fullpageLoaderInner() {
+  const loader = document.getElementById('pagmarCreateFullpageLoader');
+  return loader?.querySelector('.pagmar__create-fullpage-loader__inner') || null;
+}
+
+function syncFullpageLoaderPosition() {
+  const frame = amuletFrameEl();
+  const inner = fullpageLoaderInner();
+  const loader = document.getElementById('pagmarCreateFullpageLoader');
+  if (!frame || !inner || !loader || loader.hidden) return;
+
+  const rect = frame.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  loader.classList.add('is-frame-anchored');
+  inner.style.position = 'fixed';
+  inner.style.left = rect.left + rect.width / 2 + 'px';
+  inner.style.top = rect.top + rect.height / 2 + 'px';
+  inner.style.transform = 'translate(-50%, -50%)';
+}
+
+function resetFullpageLoaderPosition() {
+  const loader = document.getElementById('pagmarCreateFullpageLoader');
+  const inner = fullpageLoaderInner();
+  loader?.classList.remove('is-frame-anchored');
+  if (!inner) return;
+  inner.style.position = '';
+  inner.style.left = '';
+  inner.style.top = '';
+  inner.style.transform = '';
+}
+
+function bindFullpageLoaderResize() {
+  if (fullpageLoaderResizeBound) return;
+  fullpageLoaderResizeBound = true;
+  window.addEventListener('resize', syncFullpageLoaderPosition);
+}
+
+function unbindFullpageLoaderResize() {
+  if (!fullpageLoaderResizeBound) return;
+  fullpageLoaderResizeBound = false;
+  window.removeEventListener('resize', syncFullpageLoaderPosition);
 }
 
 function appendVesselImages(parent, baseClass) {
@@ -37,10 +93,10 @@ function appendVesselImages(parent, baseClass) {
 }
 
 function ensureFrameLoader() {
-  const frame = amuletFrameEl();
-  if (!frame) return null;
+  const host = amuletLoaderHost();
+  if (!host) return null;
 
-  let loader = frame.querySelector('.pagmar__amulet-frame-loader');
+  let loader = host.querySelector('.pagmar__amulet-frame-loader');
   if (loader) return loader;
 
   loader = document.createElement('div');
@@ -60,13 +116,40 @@ function ensureFrameLoader() {
 
   loader.appendChild(vessels);
   loader.appendChild(sr);
-  frame.appendChild(loader);
+  host.appendChild(loader);
   return loader;
+}
+
+async function ensureLoaderFogModule() {
+  if (loaderFogBoot) return;
+  const mod = await import('./loader-fog.js?v=20250707-garden-loader-fog');
+  loaderFogBoot = mod.bootCreateLoaderFog;
+  loaderFogResize = mod.resizeCreateLoaderFog;
+  loaderFogStop = mod.stopCreateLoaderFog;
+}
+
+function stopFullpageLoaderFog() {
+  if (loaderFogStop) loaderFogStop();
+}
+
+async function startFullpageLoaderFog() {
+  await ensureLoaderFogModule();
+  if (loaderFogBoot) await loaderFogBoot();
 }
 
 function ensureFullpageLoader() {
   let loader = document.getElementById('pagmarCreateFullpageLoader');
-  if (loader) return loader;
+  if (loader) {
+    if (!loader.querySelector('#createFullpageLoaderFog')) {
+      const fog = document.createElement('div');
+      fog.id = 'createFullpageLoaderFog';
+      fog.className = 'pagmar__create-fullpage-loader__fog pagmar__detail-fog';
+      fog.setAttribute('aria-hidden', 'true');
+      loader.insertBefore(fog, loader.firstChild);
+    }
+    loader.querySelector('.pagmar__create-fullpage-loader__label')?.remove();
+    return loader;
+  }
 
   loader = document.createElement('div');
   loader.id = 'pagmarCreateFullpageLoader';
@@ -74,6 +157,11 @@ function ensureFullpageLoader() {
   loader.hidden = true;
   loader.setAttribute('role', 'status');
   loader.setAttribute('aria-live', 'polite');
+
+  const fog = document.createElement('div');
+  fog.id = 'createFullpageLoaderFog';
+  fog.className = 'pagmar__create-fullpage-loader__fog pagmar__detail-fog';
+  fog.setAttribute('aria-hidden', 'true');
 
   const inner = document.createElement('div');
   inner.className = 'pagmar__create-fullpage-loader__inner';
@@ -90,12 +178,7 @@ function ensureFullpageLoader() {
   percent.className = 'pagmar__create-fullpage-loader__percent';
   percent.textContent = '0%';
 
-  const label = document.createElement('span');
-  label.className = 'pagmar__create-fullpage-loader__label';
-  label.textContent = DEFAULT_LOADER_TEXT;
-
   caption.appendChild(percent);
-  caption.appendChild(label);
 
   const sr = document.createElement('span');
   sr.className = 'pagmar__create-fullpage-loader__sr';
@@ -103,6 +186,7 @@ function ensureFullpageLoader() {
 
   inner.appendChild(vessels);
   inner.appendChild(caption);
+  loader.appendChild(fog);
   loader.appendChild(inner);
   loader.appendChild(sr);
   document.body.appendChild(loader);
@@ -130,27 +214,33 @@ function hideFrameLoader() {
   }
 }
 
-function hideFullpageLoader() {
+function hideFullpageLoader(options) {
+  const opts = options || {};
+  if (!opts.force && fullpageLoadProgress < 1) return false;
   setFullpageLoading(false);
+  stopFullpageLoaderFog();
+  resetFullpageLoaderPosition();
+  unbindFullpageLoaderResize();
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (loader) {
     loader.hidden = true;
     loader.removeAttribute('aria-busy');
   }
+  fullpageLoadProgress = 0;
+  return true;
 }
 
 export function setAmuletLoaderProgress(frac) {
   const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+  fullpageLoadProgress = Math.max(fullpageLoadProgress, pct / 100);
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (!loader) return;
 
   const percentEl = loader.querySelector('.pagmar__create-fullpage-loader__percent');
-  const labelEl = loader.querySelector('.pagmar__create-fullpage-loader__label');
   const sr = loader.querySelector('.pagmar__create-fullpage-loader__sr');
-  const label = labelEl?.textContent || DEFAULT_LOADER_TEXT;
 
   if (percentEl) percentEl.textContent = pct + '%';
-  if (sr) sr.textContent = pct + '% ' + label;
+  if (sr) sr.textContent = pct + '% ' + DEFAULT_LOADER_TEXT;
 }
 
 export async function showAmuletLoader(text, options) {
@@ -163,18 +253,22 @@ export async function showAmuletLoader(text, options) {
     setFullpageLoading(true);
     loader.hidden = false;
     loader.setAttribute('aria-busy', 'true');
-
-    const labelEl = loader.querySelector('.pagmar__create-fullpage-loader__label');
-    if (labelEl) labelEl.textContent = label;
+    fullpageLoadProgress =
+      typeof opts.progress === 'number' ? Math.max(0, Math.min(1, opts.progress)) : 0;
+    await startFullpageLoaderFog();
 
     const sr = loader.querySelector('.pagmar__create-fullpage-loader__sr');
     const percentEl = loader.querySelector('.pagmar__create-fullpage-loader__percent');
     const pct = percentEl?.textContent || '0%';
-    if (sr) sr.textContent = pct + ' ' + label;
+    if (sr) sr.textContent = pct + ' ' + DEFAULT_LOADER_TEXT;
 
     if (typeof opts.progress === 'number') {
       setAmuletLoaderProgress(opts.progress);
     }
+
+    syncFullpageLoaderPosition();
+    bindFullpageLoaderResize();
+    requestAnimationFrame(syncFullpageLoaderPosition);
   } else {
     hideFullpageLoader();
     const loader = ensureFrameLoader();
@@ -196,9 +290,9 @@ export function hideAmuletFrameLoader() {
   hideFrameLoader();
 }
 
-export function hideAmuletLoader() {
+export function hideAmuletLoader(options) {
   hideFrameLoader();
-  hideFullpageLoader();
+  hideFullpageLoader(options);
 
   const frame = amuletFrameEl();
   if (frame) frame.classList.remove('is-amulet-loading-keep-preview');

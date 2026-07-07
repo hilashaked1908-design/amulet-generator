@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>רענון snapshots — sage</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1410;
+      color: #e8e4dc;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    .card {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #1a2118;
+      border: 1px solid #3d4a38;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 500; }
+    p { color: #b8b4aa; line-height: 1.6; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #5a7a42;
+      color: #f5f5f5;
+      width: 100%;
+      margin-top: 12px;
+    }
+    button:disabled { opacity: 0.45; cursor: wait; }
+    #log {
+      margin-top: 16px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      color: #c8e6a0;
+    }
+    .err { color: #f88; }
+    .ok { color: #9cf; }
+    ul { padding-right: 20px; margin: 12px 0 0; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>רענון תמונות גן — אבן sage</h1>
+    <p>
+      מרנדר snapshot באיכות גבוהה מה-GLB (אותו pipeline כמו עמוד הקמע)
+      ושומר ל-<code>questionnaire/seed/snapshots/</code> דרך השרת המקומי.
+    </p>
+    <ul id="targets"></ul>
+    <button type="button" id="runBtn" disabled>התחל רענון</button>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import { captureGardenSnapshotFromGlb } from './garden-snapshot-from-glb.js';
+
+    const SAGE_Q4 = 'concrete_actions';
+    const COLLECTION_KEY = 'amuletCollection';
+    const SEED_URL = '/questionnaire/seed/collection.json';
+    const USER_AMULET_INDEX = (window.AMULET_QUESTIONS || []).length || 8;
+
+    function logLine(html) {
+      const el = document.getElementById('log');
+      el.innerHTML += html + '\n';
+    }
+
+    async function loadCollection() {
+      let local = [];
+      try {
+        const raw = localStorage.getItem(COLLECTION_KEY) || sessionStorage.getItem(COLLECTION_KEY);
+        local = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(local)) local = [];
+      } catch (_) {}
+      try {
+        const res = await fetch(SEED_URL, { cache: 'no-store' });
+        if (res.ok) {
+          const seed = await res.json();
+          if (Array.isArray(seed) && seed.length) {
+            const byId = new Map(local.filter((e) => e && e.id != null).map((e) => [e.id, e]));
+            for (const entry of seed) {
+              if (entry && entry.id != null) byId.set(entry.id, { ...byId.get(entry.id), ...entry });
+            }
+            local = Array.from(byId.values());
+          }
+        }
+      } catch (_) {}
+      return local;
+    }
+
+    function sageEntries(collection) {
+      return collection
+        .map(function (entry, index) {
+          return { entry: entry, index: index, label: USER_AMULET_INDEX + index + 1 };
+        })
+        .filter(function (row) {
+          return row.entry && row.entry.id != null && row.entry.answers?.q4Belief === SAGE_Q4;
+        });
+    }
+
+    async function saveSeedSnapshot(id, canvas) {
+      const dataUrl = canvas.toDataURL('image/png');
+      const res = await fetch('/api/seed-snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, snapshot: dataUrl }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || ('HTTP ' + res.status));
+      }
+      return res.json();
+    }
+
+    async function run() {
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      document.getElementById('log').textContent = '';
+
+      const rows = sageEntries(await loadCollection());
+      if (!rows.length) {
+        logLine('<span class="err">לא נמצאו קמעות sage (concrete_actions).</span>');
+        btn.disabled = false;
+        return;
+      }
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        const id = row.entry.id;
+        const label = String(row.label).padStart(3, '0');
+        logLine('[' + label + '] מרנדר GLB ' + id + '…');
+        try {
+          const canvas = await captureGardenSnapshotFromGlb('collection-' + id, { targetPx: 2048 });
+          if (!canvas?.width) throw new Error('snapshot ריק');
+          const saved = await saveSeedSnapshot(id, canvas);
+          logLine(
+            '<span class="ok">[' + label + '] נשמר ' +
+            canvas.width + '×' + canvas.height + ' → ' + saved.snapshot + '</span>'
+          );
+        } catch (err) {
+          logLine('<span class="err">[' + label + '] ' + (err.message || err) + '</span>');
+        }
+      }
+
+      logLine('\n<span class="ok">סיום. רענני את הגן (F5) כדי לראות.</span>');
+      btn.disabled = false;
+      btn.textContent = 'הרץ שוב';
+      window.__sageSnapshotBakeDone = true;
+    }
+
+    loadCollection().then(function (collection) {
+      const rows = sageEntries(collection);
+      const list = document.getElementById('targets');
+      if (!rows.length) {
+        list.innerHTML = '<li>אין קמעות sage באוסף.</li>';
+        return;
+      }
+      list.innerHTML = rows
+        .map(function (row) {
+          return '<li>[' + String(row.label).padStart(3, '0') + '] id ' + row.entry.id + '</li>';
+        })
+        .join('');
+      const btn = document.getElementById('runBtn');
+      btn.disabled = false;
+      btn.addEventListener('click', run);
+      if (new URLSearchParams(location.search).get('autorun') === '1') {
+        window.setTimeout(run, 400);
+      }
+    });
+  </script>
+</body>
+</html>

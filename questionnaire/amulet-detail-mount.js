@@ -21,6 +21,7 @@ const state = {
   loopStarted: false,
   userRotX: 0.2,
   userRotY: 0,
+  spinAnim: null,
 };
 
 export function getDetailAmuletRenderState() {
@@ -33,8 +34,25 @@ export function getDetailAmuletRenderState() {
 
 function applyAmuletRotation() {
   if (!state.group) return;
+  if (state.spinAnim) {
+    const now = performance.now();
+    const t = Math.min(1, (now - state.spinAnim.start) / state.spinAnim.duration);
+    const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    state.userRotY = state.spinAnim.fromY + eased * Math.PI * 2;
+    if (t >= 1) state.spinAnim = null;
+  }
   state.group.rotation.x = state.userRotX;
   state.group.rotation.y = state.userRotY;
+}
+
+export function spinDetailAmulet360() {
+  if (!state.group || state.spinAnim) return false;
+  state.spinAnim = {
+    start: performance.now(),
+    duration: 1400,
+    fromY: state.userRotY,
+  };
+  return true;
 }
 
 function setupDragRotation(canvas) {
@@ -215,6 +233,7 @@ export function disposeDetailAmuletMount() {
   state.group = null;
   state.userRotX = 0.2;
   state.userRotY = 0;
+  state.spinAnim = null;
 }
 
 export function captureDetailAmuletSnapshot(options) {

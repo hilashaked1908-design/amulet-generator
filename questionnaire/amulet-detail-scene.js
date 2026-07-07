@@ -7,7 +7,7 @@ import {
 } from './amulet-detail-mount.js';
 import { exportRendererTransparentPng, exportAmuletCanvasPng } from './amulet-export.js';
 
-console.log('%c[detail-scene] v20250705-loader-until-ready loaded', 'color:lime;font-size:14px');
+console.log('%c[detail-scene] v20250708-detail-loader-fog loaded', 'color:lime;font-size:14px');
 
 if (document.body.classList.contains('pagmar-amulet-detail')) {
 
@@ -25,16 +25,19 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     const USER_AMULET_INDEX = questions.length;
     if (index < USER_AMULET_INDEX) return null;
 
+    if (typeof window.getAmuletCollectionEntry === 'function') {
+      const entry = window.getAmuletCollectionEntry(index);
+      if (entry && entry.id != null) return 'collection-' + entry.id;
+    }
+
     const collectionIndex = index - USER_AMULET_INDEX;
-    try {
-      const raw = localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
-      if (!raw) return 'user-amulet';
-      const collection = JSON.parse(raw);
-      if (!Array.isArray(collection)) return 'user-amulet';
-      if (collectionIndex < collection.length) {
-        return 'collection-' + collection[collectionIndex].id;
-      }
-    } catch (_) {}
+    const collection =
+      typeof window.pagmarLoadMergedCollection === 'function'
+        ? window.pagmarLoadMergedCollection()
+        : [];
+    if (collectionIndex < collection.length && collection[collectionIndex]?.id != null) {
+      return 'collection-' + collection[collectionIndex].id;
+    }
     return 'user-amulet';
   }
 
@@ -49,7 +52,6 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   let amuletGroup = null;
 
   function setExportReady(ready) {
-    if (exportBtnWrap) exportBtnWrap.hidden = !ready;
     if (exportBtn) exportBtn.disabled = !ready;
   }
 
@@ -74,6 +76,7 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
 
   setExportReady(false);
   bindExportButton();
+  if (exportBtnWrap) exportBtnWrap.hidden = false;
 
   function markAmulet3DReady() {
     setExportReady(true);
@@ -95,26 +98,9 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   });
 
   function getAnswersForIndex(index) {
-    var questions = window.AMULET_QUESTIONS || [];
-    var USER_AMULET_INDEX = questions.length;
-    if (index < USER_AMULET_INDEX) return null;
-    var collectionIndex = index - USER_AMULET_INDEX;
-    try {
-      var raw = localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
-      if (raw) {
-        var collection = JSON.parse(raw);
-        if (Array.isArray(collection) && collectionIndex < collection.length) {
-          return collection[collectionIndex].answers || null;
-        }
-      }
-    } catch (_) {}
-    try {
-      var uRaw = sessionStorage.getItem('amuletUserAnswers') ||
-                 localStorage.getItem('amuletUserAnswers') ||
-                 sessionStorage.getItem('amuletQuestionnaire') ||
-                 localStorage.getItem('amuletQuestionnaire');
-      if (uRaw) return JSON.parse(uRaw);
-    } catch (_) {}
+    if (typeof window.getAmuletRecord === 'function') {
+      return window.getAmuletRecord(index);
+    }
     return null;
   }
 
@@ -164,7 +150,9 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
 
   if (glbKeyNow && container3D) {
     import('./amulet-glb-store.js')
-      .then(function (store) { return store.loadGlb(glbKeyNow); })
+      .then(function (store) {
+        return store.loadGlb(glbKeyNow);
+      })
       .then(function (result) {
         if (!result) {
           var answers = getAnswersForIndex(amuletIndex);
