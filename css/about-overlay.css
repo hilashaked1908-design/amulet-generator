@@ -1,0 +1,231 @@
+/* About overlay — Figma 2537:30533 @ 1920×1080 */
+
+body.is-about-overlay-open {
+  overflow: hidden;
+}
+
+.pagmar__about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  box-sizing: border-box;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  --about-w: 1920;
+  --about-h: 1080;
+  --about-ink: #1500e1;
+  --about-u: min(calc(100vw / var(--about-w)), calc(100dvh / var(--about-h)));
+  --pagmar-close-u: var(--about-u);
+}
+
+.pagmar__about-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pagmar__about-overlay[hidden] {
+  display: none !important;
+}
+
+.pagmar__about-overlay .pagmar-canvas--about {
+  container-type: size;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #ffffff;
+  direction: ltr;
+  --u: var(--about-u);
+}
+
+.pagmar__about-stage {
+  position: absolute;
+  inset: 0;
+  color: var(--about-ink);
+  pointer-events: none;
+}
+
+.pagmar__about-stage * {
+  pointer-events: none !important;
+}
+
+/* ── Close — body level, big hit target, always on top ── */
+.pagmar__about-dismiss {
+  position: fixed;
+  z-index: 100000;
+  top: 20px;
+  right: 20px;
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1500e1;
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: 52px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pagmar__about-dismiss[hidden] {
+  display: none !important;
+}
+
+.pagmar__about-dismiss:hover {
+  opacity: 0.65;
+}
+
+.pagmar__about-dismiss:focus-visible {
+  outline: 2px solid rgba(21, 0, 225, 0.45);
+  outline-offset: 4px;
+}
+
+body.is-about-overlay-open .pagmar__garden,
+body.is-about-overlay-open .pagmar__garden canvas {
+  pointer-events: none !important;
+}
+
+/* ── Kickers (David Libre Bold 40) ── */
+.pagmar__about-kicker {
+  position: absolute;
+  margin: 0;
+  max-width: calc(253 * var(--u));
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-weight: 700;
+  font-size: calc(40 * var(--u));
+  line-height: calc(123 * var(--u));
+  letter-spacing: calc(-0.4 * var(--u));
+  text-align: right;
+  color: var(--about-ink);
+  transform: translateX(-100%);
+  white-space: nowrap;
+}
+
+.pagmar__about-kicker--security {
+  left: calc(1205.6 * var(--u));
+  top: calc(75.93 * var(--u));
+}
+
+.pagmar__about-kicker--meaning {
+  left: calc(303 * var(--u));
+  top: calc(301.04 * var(--u));
+}
+
+.pagmar__about-kicker--answer {
+  left: calc(1136.54 * var(--u));
+  top: calc(576.25 * var(--u));
+}
+
+/* ── Display words (TheBasics Display Thin 240) ── */
+.pagmar__about-display {
+  position: absolute;
+  margin: 0;
+  font-family: "TheBasics Display Thin", "TheBasics", monospace;
+  font-weight: 400;
+  font-size: calc(240 * var(--u));
+  line-height: calc(123 * var(--u));
+  letter-spacing: calc(-2.4 * var(--u));
+  text-align: right;
+  color: var(--about-ink);
+  transform: translateX(-100%);
+  white-space: nowrap;
+}
+
+.pagmar__about-display--security {
+  left: calc(1859.87 * var(--u));
+  top: calc(124.7 * var(--u));
+}
+
+.pagmar__about-display--meaning {
+  left: calc(1087 * var(--u));
+  top: calc(351.1 * var(--u));
+}
+
+.pagmar__about-display--answer {
+  left: calc(1810.11 * var(--u));
+  top: calc(626.26 * var(--u));
+}
+
+/* ── Body copy (David Libre 32) ── */
+.pagmar__about-body {
+  position: absolute;
+  left: calc(1863.59 * var(--u));
+  top: calc(907 * var(--u));
+  width: calc(709.5 * var(--u));
+  transform: translateX(-100%);
+  font-family: "DavidLibre", "Ratzif22", serif;
+  font-weight: 400;
+  font-size: calc(32 * var(--u));
+  line-height: 1.2;
+  letter-spacing: calc(0.32 * var(--u));
+  text-align: right;
+  color: var(--about-ink);
+}
+
+.pagmar__about-body p {
+  margin: 0 0 calc(12 * var(--u));
+}
+
+.pagmar__about-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Hide index chrome while about is open */
+body.is-about-overlay-open .pagmar__index-create,
+body.is-about-overlay-open .pagmar__index-cta-pill,
+body.is-about-overlay-open .pagmar__index-about,
+body.is-about-overlay-open .pagmar__index-filter-sidebar,
+body.is-about-overlay-open .pagmar__index-filter-trigger,
+body.is-about-overlay-open .pagmar__create-flow,
+body.is-about-overlay-open .pagmar__export-btn {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 1100px) {
+  .pagmar__about-display {
+    font-size: calc(160 * var(--u));
+    line-height: 1;
+  }
+
+  .pagmar__about-kicker {
+    font-size: calc(28 * var(--u));
+    line-height: 1.2;
+  }
+
+  .pagmar__about-body {
+    font-size: calc(24 * var(--u));
+    width: calc(520 * var(--u));
+  }
+}
+
+@media (max-width: 760px) {
+  .pagmar__about-display,
+  .pagmar__about-kicker {
+    white-space: normal;
+  }
+
+  .pagmar__about-body {
+    left: 50%;
+    top: auto;
+    bottom: calc(48 * var(--u));
+    width: min(calc(680 * var(--u)), calc(100vw - 32px));
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__about-overlay {
+    transition-duration: 0.15s;
+  }
+}

@@ -11,6 +11,7 @@ function isDepthShadeEnabled() {
   const body = document.body;
   return (
     !body.classList.contains('is-site-intro-open') &&
+    !body.classList.contains('is-about-overlay-open') &&
     !body.classList.contains('is-create-mode') &&
     !body.classList.contains('pagmar-create') &&
     !body.classList.contains('is-amulet-ready') &&
@@ -375,7 +376,9 @@ notifyCameraMove();
 
 const sprites = [];
 const _proj = new THREE.Vector3();
-let controlsEnabled = !document.body.classList.contains('is-site-intro-open');
+let controlsEnabled =
+  !document.body.classList.contains('is-site-intro-open') &&
+  !document.body.classList.contains('is-about-overlay-open');
 let selectedIndex = null;
 let pointerDown = null;
 let lastPointer = {
@@ -2948,7 +2951,7 @@ function shouldIgnoreGardenWheel(target) {
   if (!target || !(target instanceof Element)) return false;
   return Boolean(
     target.closest(
-      '.pagmar__site-intro, .pagmar__index-filter-sidebar, .pagmar__index-filter-trigger, ' +
+      '.pagmar__site-intro, .pagmar__about-overlay, .pagmar__index-filter-sidebar, .pagmar__index-filter-trigger, ' +
         '.pagmar__index-filter-close, .pagmar__index-about, .pagmar__index-cta-pill, ' +
         '.pagmar__choice-panel, ' +
         '.pagmar__text-panel, .pagmar__index-create, .pagmar__spec-panel'
@@ -3278,7 +3281,8 @@ window.addEventListener('questionnaire:index-filter-change', (evt) => {
     if (
       !document.body.classList.contains('is-panel-open') &&
       !document.body.classList.contains('is-spec-panel-open') &&
-      !document.body.classList.contains('is-site-intro-open')
+      !document.body.classList.contains('is-site-intro-open') &&
+      !document.body.classList.contains('is-about-overlay-open')
     ) {
       controlsEnabled = true;
       updateCursorFromPointer(lastPointer.x, lastPointer.y);
@@ -3313,10 +3317,31 @@ window.addEventListener('questionnaire:intro-close', () => {
 
 window.addEventListener('questionnaire:panel-close', () => {
   selectedIndex = null;
-  if (document.body.classList.contains('is-site-intro-open')) return;
+  if (
+    document.body.classList.contains('is-site-intro-open') ||
+    document.body.classList.contains('is-about-overlay-open')
+  ) {
+    return;
+  }
   controlsEnabled = true;
   updateCursorFromPointer(lastPointer.x, lastPointer.y);
   updateFocusVisuals();
+});
+
+window.addEventListener('questionnaire:about-opened', () => {
+  controlsEnabled = false;
+});
+
+window.addEventListener('questionnaire:about-closed', () => {
+  if (
+    document.body.classList.contains('is-panel-open') ||
+    document.body.classList.contains('is-spec-panel-open') ||
+    document.body.classList.contains('is-site-intro-open')
+  ) {
+    return;
+  }
+  controlsEnabled = true;
+  updateCursorFromPointer(lastPointer.x, lastPointer.y);
 });
 
 function tick(now) {

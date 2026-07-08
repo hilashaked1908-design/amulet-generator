@@ -166,6 +166,7 @@ body.pagmar-create .pagmar__request-flow {
   overflow: visible;
   background: transparent;
   pointer-events: none;
+  --pagmar-close-u: var(--fu);
 }
 
 .pagmar__request-artboard > * {
@@ -322,22 +323,10 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   display: none !important;
 }
 
-/* Close — centered on step rail (same axis as progress slider) */
+/* Close — shared chrome inset (see buttons.css --pagmar-close-*) */
 .figma-close {
-  left: calc(var(--figma-step-rail-x) * var(--fu));
-  right: auto;
-  top: calc(55 * var(--fu));
-  width: calc(50 * var(--fu));
-  height: calc(50 * var(--fu));
-  transform: translateX(-50%);
   z-index: 20;
-  padding: 0;
-  border: none;
-  background: transparent;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: auto;
   -webkit-appearance: none;
   appearance: none;
@@ -345,10 +334,6 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
 
 .figma-close img {
   display: block;
-  width: calc(16.119 * var(--fu));
-  height: calc(21.235 * var(--fu));
-  object-fit: contain;
-  object-position: center;
   pointer-events: none;
   user-select: none;
   -webkit-mask-image: none;
@@ -1032,10 +1017,8 @@ body.pagmar-create .pagmar__request-artboard .figma-q__tag {
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-close img,
 body.pagmar-create .pagmar__request-artboard .figma-close img {
-  width: calc(16.119 * var(--fu)) !important;
-  height: calc(21.235 * var(--fu)) !important;
   object-fit: contain !important;
-  object-position: center center !important;
+  object-position: right top !important;
   -webkit-mask-image: none !important;
   mask-image: none !important;
   background-color: transparent !important;

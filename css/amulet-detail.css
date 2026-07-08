@@ -29,10 +29,10 @@ body.pagmar-amulet-detail {
   --detail-divider: rgba(255, 255, 255, 0.3);
   --detail-font: "TheBasics", "TheBasics Mono", monospace;
   --pagmar-content-margin: 0px;
-  --detail-margin: 50;
-  --detail-chrome-margin: var(--detail-margin);
-  --detail-chrome-right: var(--detail-margin);
-  --detail-chrome-top: 55;
+  --detail-margin: var(--pagmar-close-right);
+  --detail-chrome-margin: var(--pagmar-close-right);
+  --detail-chrome-right: var(--pagmar-close-right);
+  --detail-chrome-top: var(--pagmar-close-top);
   --detail-num-top: 133.1;
   --detail-request-left: var(--detail-margin);
   --detail-content-w: 1030.906;
@@ -665,7 +665,7 @@ body.pagmar-amulet-detail .pagmar__detail-tags {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: calc(24 * var(--u));
+  gap: calc(8 * var(--u));
   width: 100%;
 }
 
@@ -691,7 +691,7 @@ body.pagmar-amulet-detail .pagmar__detail-components {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: calc(24 * var(--u));
+  gap: calc(8 * var(--u));
   width: 100%;
 }
 

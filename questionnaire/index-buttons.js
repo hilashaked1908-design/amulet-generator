@@ -723,7 +723,9 @@
 
   if (aboutBtn) {
     aboutBtn.addEventListener('click', function () {
-      window.dispatchEvent(new CustomEvent('questionnaire:about-open'));
+      if (typeof window.openAboutShell === 'function') {
+        window.openAboutShell();
+      }
     });
   }
 

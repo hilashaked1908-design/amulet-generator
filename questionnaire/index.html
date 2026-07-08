@@ -8,10 +8,11 @@
   <meta http-equiv="Expires" content="0">
   <title>קמע — אינדקס</title>
   <link rel="stylesheet" href="../css/fonts.css?v=20250702-white">
-  <link rel="stylesheet" href="../css/questionnaire.css?v=20250707-fog-restore">
-  <link rel="stylesheet" href="../css/buttons.css?v=20250708-restore">
-  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250707-fog-restore">
-  <link rel="stylesheet" href="../css/result-overlay.css?v=20250708-result-align">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250708-close-align">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250708-close-align">
+  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250708-close-align">
+  <link rel="stylesheet" href="../css/result-overlay.css?v=20250708-close-align">
+  <link rel="stylesheet" href="../css/about-overlay.css?v=20250708-about-now">
 </head>
 <body class="pagmar-index">
 
@@ -345,6 +346,49 @@
     </div>
   </div>
 
+  <!-- About overlay — Figma 2537:30533 (body-level so fixed layout covers viewport) -->
+  <div
+    class="pagmar__about-overlay"
+    id="aboutOverlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="אודות"
+    hidden
+    aria-hidden="true"
+  >
+    <div class="pagmar-canvas pagmar-canvas--about">
+      <div class="pagmar__about-stage">
+        <p class="pagmar__about-kicker pagmar__about-kicker--security">בחוסר וודאות</p>
+        <p class="pagmar__about-display pagmar__about-display--security">ביטחון</p>
+
+        <p class="pagmar__about-kicker pagmar__about-kicker--meaning">בכאוס</p>
+        <p class="pagmar__about-display pagmar__about-display--meaning">משמעות</p>
+
+        <p class="pagmar__about-kicker pagmar__about-kicker--answer">בנסתר</p>
+        <p class="pagmar__about-display pagmar__about-display--answer">תשובה</p>
+
+        <div class="pagmar__about-body">
+          <p>
+            מאז ומתמיד בני האדם חיפשו דרכים להבין את העולם ולהרגיש שיש להם השפעה על מה שעתיד לקרות.
+            מול חוסר ודאות, הם יצרו טקסים, פנו לנביאים, התייעצו עם אסטרולוגים, נשאו קמעות ופיתחו מערכות אמונה שונות.
+          </p>
+          <p>
+            אף שהאמצעים השתנו לאורך ההיסטוריה, הצורך נשאר זהה – למצוא אחיזה במציאות כאוטית שאינה ניתנת לחיזוי.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="pagmar__about-dismiss"
+    id="aboutCloseBtn"
+    aria-label="סגור"
+    hidden
+    onclick="if(window.closeAboutOverlay){window.closeAboutOverlay();} return false;"
+  >×</button>
+
   <script src="../connection-core.js"></script>
   <script src="questions.js?v=20250704-2258-fonts"></script>
   <script src="amulet-catalog.js?v=20250705-multi-filter"></script>
@@ -362,7 +406,8 @@
   </script>
   <script src="questionnaire-ui.js?v=20250708-result-2436"></script>
   <script src="button-roll.js?v=20250708-restore"></script>
-  <script src="index-buttons.js?v=20250708-filter-instant"></script>
+  <script src="index-buttons.js?v=20250708-about-now"></script>
   <script src="index-filter-view.js?v=20250708-restore"></script>
+  <script src="about-close.js?v=20250708-about-now"></script>
 </body>
 </html>

@@ -9,21 +9,21 @@ import {
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
 import { captureLiveAmuletSnapshot } from '../three-pbr-amulet.js';
-import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-result-align';
+import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-result-answers';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
 const SNAPSHOT_KEY = 'amuletUserSnapshot';
 const RESULT_VIEW_KEY = 'pagmarResultViewActive';
 
 export const DEMO_RESULT_ANSWERS = {
-  q1Wish: '״שאהיה בטוחה בעצמי. כי מגיע לי. אהיה מאושרת יותר״',
-  q2Name: 'שם היוצר',
-  q3WhyNow: 'האותיות שכתובות',
+  q1Wish: 'שאהיה בטוחה בעצמי. כי מגיע לי. אהיה מאושרת יותר',
+  q2Name: 'מאיה',
+  q3WhyNow: 'סוף סוף מרגישה מוכנה לפתוח את הלב',
   q4Belief: 'signs',
   q5Feeling: 'hope',
   q6Difficulty: 'uncertainty',
-  q7Change: 'self_confidence',
-  q8Motivation: 'happiness',
+  q7Change: 'אהיה פחות לבד בערבים',
+  q8Motivation: 'כשאני רואה התקדמות קטנה',
   completedAt: Date.now(),
 };
 
@@ -220,6 +220,21 @@ function getNextAmuletIndex() {
 
 var RESULT_COMPONENT_ITEM_CLASSES = { 1: 'pagmar__result-list-item--material' };
 
+function formatResultWish(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return '—';
+  if (trimmed.charAt(0) === '״' || trimmed.charAt(0) === '"') return trimmed;
+  return '״' + trimmed + '״';
+}
+
+function resolveResultSpec(answers) {
+  const a = answers || loadAnswers();
+  if (typeof window.getAmuletSpec === 'function') {
+    return window.getAmuletSpec(liveUserAmuletIndex(), a);
+  }
+  return null;
+}
+
 function fillResultList(el, items, extraClassesByIndex) {
   if (!el) return;
   el.innerHTML = '';
@@ -242,9 +257,8 @@ function populateResultOverlay(answers) {
   const overlay = document.getElementById('resultOverlay');
   if (!overlay) return;
 
-  const spec = typeof window.getAmuletSpec === 'function'
-    ? window.getAmuletSpec(liveUserAmuletIndex(), answers)
-    : null;
+  const a = answers || loadAnswers();
+  const spec = resolveResultSpec(a);
 
   const nameEl = document.getElementById('resultName');
   const numEl = document.getElementById('resultNum');
@@ -260,12 +274,20 @@ function populateResultOverlay(answers) {
     else numEl.textContent = label;
   }
 
+  const name = (a.q2Name || '').trim() || spec?.name || '—';
+  const timing = (a.q3WhyNow || '').trim() || spec?.whyNow || '—';
+  const wish = formatResultWish(a.q1Wish) || spec?.wish || '—';
+
+  if (nameEl) nameEl.textContent = name;
+  if (timingEl) timingEl.textContent = timing;
+  if (storyEl) storyEl.textContent = wish;
+
   if (spec) {
-    if (nameEl) nameEl.textContent = spec.name || '—';
-    if (storyEl) storyEl.textContent = spec.wish || '—';
-    if (timingEl) timingEl.textContent = spec.whyNow || '—';
     fillResultList(tagsEl, spec.tags);
     fillResultList(componentsEl, spec.components, RESULT_COMPONENT_ITEM_CLASSES);
+  } else {
+    fillResultList(tagsEl, []);
+    fillResultList(componentsEl, []);
   }
 
   fitResultStoryTypography();

@@ -206,7 +206,7 @@
     if (amuletModulesReady) return amuletModulesReady;
     amuletModulesReady = Promise.all([
       import('./amulet-build.js?v=20250705-q4-instant'),
-      import('./amulet-show.js?v=20250708-result-align'),
+      import('./amulet-show.js?v=20250708-result-answers'),
     ]).catch(function (err) {
       amuletModulesReady = null;
       throw err;
@@ -646,7 +646,7 @@
     }
 
     try {
-      const mod = await import('./amulet-show.js?v=20250708-result-align');
+      const mod = await import('./amulet-show.js?v=20250708-result-answers');
       await mod.showFinishedAmulet(answers);
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
@@ -1889,7 +1889,7 @@
     let answers = loadAnswers();
     if (forcePreview && !allAnswered(answers)) {
       try {
-        const mod = await import('./amulet-show.js?v=20250708-result-align');
+        const mod = await import('./amulet-show.js?v=20250708-result-answers');
         answers = mod.DEMO_RESULT_ANSWERS;
         saveAnswers(answers);
       } catch (err) {

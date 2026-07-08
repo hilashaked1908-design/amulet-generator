@@ -282,12 +282,17 @@ export async function renderResultOverlayVectors(answers) {
       composed.style3
     );
 
-    if (composed.questionnaire) {
-      applyQuestionnaireFieldLabels(composed.questionnaire, {
+    applyQuestionnaireFieldLabels(
+      composed.questionnaire || {
+        requesterName: answers.q2Name,
+        timingReason: answers.q3WhyNow,
+        wishText: answers.q1Wish,
+      },
+      {
         name: 'resultName',
         timing: 'resultTiming',
-      });
-    }
+      }
+    );
   } catch (err) {
     console.warn('[result-vectors] failed:', err);
   }
