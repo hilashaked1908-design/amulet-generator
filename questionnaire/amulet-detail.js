@@ -8,7 +8,7 @@
 
   const detailNum = document.getElementById('detailNum');
   const detailNumText = detailNum
-    ? detailNum.querySelector('.pagmar__glass-pill__text')
+    ? detailNum.querySelector('.pagmar__detail-num__text')
     : null;
   const detailName = document.getElementById('detailName');
   const detailStory = document.getElementById('detailStory');
@@ -18,6 +18,7 @@
   const detailTags = document.getElementById('detailTags');
   const detailAmuletImg = document.getElementById('detailAmuletImg');
   const detailCloseBtn = document.getElementById('detailCloseBtn');
+  const detailCreateCta = document.getElementById('detailCreateCta');
 
   function parseIndex() {
     const params = new URLSearchParams(window.location.search);
@@ -176,6 +177,14 @@
     return null;
   }
 
+  function formatStoryQuote(text) {
+    var raw = window.pagmarNormalizeDashes ? window.pagmarNormalizeDashes(text) : text;
+    var t = String(raw || '').trim();
+    if (!t || t === '-') return '-';
+    t = t.replace(/^[\u05F4"\u201C\u05F3]+|[\u05F4"\u201D\u05F3]+$/g, '').trim();
+    return '\u05F4' + t + '\u05F4';
+  }
+
   function renderDetail(index, entry) {
     if (typeof window.getAmuletSpec !== 'function') return;
 
@@ -204,17 +213,35 @@
     }
 
     if (detailNumText) detailNumText.textContent = indexLabel(index);
-    if (detailName) detailName.textContent = spec.name || '—';
+    if (detailName) detailName.textContent = spec.name || '-';
     if (detailStory) {
-      detailStory.textContent = spec.story || spec.wish || '—';
+      detailStory.textContent = formatStoryQuote(spec.story || spec.wish || '-');
+      var storyTest = new URLSearchParams(window.location.search).get('storyTest');
+      if (storyTest === 'short') {
+        detailStory.textContent = '״קו קצר לבדיקת פריסה.״';
+      } else if (storyTest === 'long') {
+        detailStory.textContent =
+          '״הלוואי שאצליח למצוא עבודה אחרי התואר. השתדלתי הרבה הסמסטר הזה והשקעתי כל מה שיכלתי. ' +
+          'ואני חושב שמגיע לי אחרי כל ההשקעה הקשה. אם זה יקרה אהיה מאושר וגאה בעצמי.״';
+      }
     }
-    if (detailTiming) detailTiming.textContent = spec.whyNow || '—';
+    if (detailTiming) {
+      var timing = window.pagmarNormalizeDashes
+        ? window.pagmarNormalizeDashes(spec.whyNow)
+        : spec.whyNow;
+      detailTiming.textContent = timing || '-';
+    }
     if (detailRequestCriterion) {
       var wishText = (spec.wish || '').replace(/^[״"]|[״"]$/g, '').trim();
-      detailRequestCriterion.textContent = wishText || '—';
+      if (window.pagmarNormalizeDashes) wishText = window.pagmarNormalizeDashes(wishText).trim();
+      detailRequestCriterion.textContent = wishText || '-';
     }
     fillList(detailComponents, spec.components, COMPONENT_ITEM_CLASSES);
     fillTagList(detailTags, spec.tags, index);
+
+    try {
+      window.dispatchEvent(new CustomEvent('pagmar:detail-rendered'));
+    } catch (_) {}
 
     if (detailAmuletImg && imgSrc) {
       detailAmuletImg.src = imgSrc;
@@ -252,13 +279,12 @@
 
       await preloadDetailContext(index);
       renderDetail(index, resolveEntryForDetail());
-      if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('content');
-      Promise.all([
+      await Promise.all([
         waitForImage(detailAmuletImg),
         waitForImage(document.getElementById('detailAmuletImgBack')),
-      ]).catch(function () {});
+      ]);
     } catch (_) {
-      /* fall through — always release loader */
+      /* fall through - always release loader */
     } finally {
       if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('content');
     }
@@ -267,34 +293,26 @@
   /* ── Vector rendering is handled by amulet-detail-vectors.js (module) ── */
 
   /* ── Navigation ── */
-  const NAV_GUARD_MS = 350;
-  let landedAt = Date.now();
-  try {
-    const stored = sessionStorage.getItem('pagmarAmuletNavAt');
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (Number.isFinite(parsed)) landedAt = parsed;
-      sessionStorage.removeItem('pagmarAmuletNavAt');
-    }
-  } catch (_) {}
-
-  function canLeaveDetailPage() {
-    return Date.now() - landedAt >= NAV_GUARD_MS;
-  }
-
   function leaveDetailPage(e) {
-    if (!canLeaveDetailPage()) {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      return;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
     window.location.href = 'index.html';
   }
 
   if (detailCloseBtn) {
     detailCloseBtn.addEventListener('click', leaveDetailPage);
+  }
+
+  if (detailCreateCta) {
+    detailCreateCta.addEventListener('click', function (e) {
+      e.preventDefault();
+      try {
+        sessionStorage.setItem('pagmarOpenCreateOnLoad', '1');
+      } catch (_) {}
+      window.location.href = 'index.html';
+    });
   }
 
   bootContent().catch(function () {

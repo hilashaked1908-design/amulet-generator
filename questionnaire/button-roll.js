@@ -1,11 +1,10 @@
 /**
- * K95-style per-character label roll — staggered char-top / char-bot on hover.
+ * K95-style per-character label roll - staggered char-top / char-bot on hover.
  */
 (function () {
   'use strict';
 
-  const ROLL_SELECTOR =
-    '.pagmar__index-about__label, .pagmar__index-filter-trigger__label, .pagmar__index-cta-pill__label';
+  const ROLL_SELECTOR = '';
 
   function escapeHtml(text) {
     return String(text)
@@ -49,6 +48,22 @@
     return html;
   }
 
+  function buildLineRollInner(text) {
+    const inner = escapeHtml(text);
+    return (
+      '<span class="pagmar-btn__roll pagmar-btn__roll--lines">' +
+      '<span class="pagmar-btn__roll-track" role="presentation">' +
+      '<span class="pagmar-btn__roll-line">' +
+      inner +
+      '</span>' +
+      '<span class="pagmar-btn__roll-line" aria-hidden="true">' +
+      inner +
+      '</span>' +
+      '</span>' +
+      '</span>'
+    );
+  }
+
   function enhanceCharLabel(el, textOverride) {
     if (!el || el.classList.contains('is-typing')) return;
 
@@ -69,49 +84,47 @@
   function enhanceCtaBody(body, textOverride) {
     if (!body) return;
 
-    const label = body.querySelector('.pagmar__index-cta-pill__label');
-    if (!label || label.classList.contains('is-typing')) return;
+    const existingRoll = body.querySelector('.pagmar-btn__roll--lines');
+    let label = body.querySelector('.pagmar__index-cta-pill__label');
+    if (label && label.classList.contains('is-typing')) return;
 
     const text = String(
-      textOverride != null ? textOverride : label.dataset.typeText || label.textContent || ''
+      textOverride != null
+        ? textOverride
+        : (label && (label.dataset.typeText || label.textContent)) ||
+            (existingRoll && existingRoll.textContent) ||
+            ''
     ).trim();
     if (!text) return;
 
-    const arrow = body.querySelector('.pagmar__index-cta__arrow');
-    const arrowSrc = arrow
-      ? arrow.getAttribute('src')
-      : 'assets/index-figma-2127/cta-arrow.svg';
-    const arrowHtml =
-      '<img class="pagmar__index-cta__arrow" src="' +
-      escapeHtml(arrowSrc) +
-      '" alt="" decoding="async" draggable="false" aria-hidden="true">';
-
-    const textCells = buildCharRollInner(text, 0);
+    if (!label) {
+      label = document.createElement('span');
+      label.className = 'pagmar__index-cta-pill__label pagmar__index-type-target';
+      body.appendChild(label);
+    }
 
     label.dataset.typeText = text;
     label.setAttribute('aria-label', text);
     label.classList.add('pagmar__index-type-target');
     label.dataset.rollEnhanced = '1';
-    label.hidden = true;
+    label.hidden = false;
     label.textContent = text;
 
+    if (existingRoll) existingRoll.remove();
+
     body.dataset.rollEnhanced = '1';
-    body.innerHTML =
-      '<span class="pagmar-btn__roll-row" role="presentation">' +
-      arrowHtml +
-      '<span class="pagmar-btn__roll--chars">' +
-      textCells +
-      '</span>' +
-      '</span>' +
-      label.outerHTML;
   }
 
   function enhanceRollTarget(el) {
     if (!el || el.classList.contains('is-typing')) return;
 
+    if (el.classList.contains('pagmar__index-filter-trigger__label')) {
+      return;
+    }
+
     if (el.classList.contains('pagmar__index-cta-pill__label')) {
       const body = el.closest('.pagmar__index-cta-pill__body');
-      if (body && body.dataset.rollEnhanced === '1' && body.querySelector('.pagmar-btn__roll-row')) {
+      if (body && body.dataset.rollEnhanced === '1') {
         return;
       }
       enhanceCtaBody(body);
@@ -146,8 +159,7 @@
     btn.dataset.typeText = text;
     btn.setAttribute('aria-label', text);
     btn.dataset.rollEnhanced = '1';
-    btn.innerHTML =
-      '<span class="pagmar-btn__roll pagmar-btn__roll--chars">' + buildCharRollInner(text) + '</span>';
+    btn.textContent = text;
   }
 
   function syncFilterButton(btn, text) {
@@ -168,13 +180,8 @@
       return;
     }
 
-    if (btn.dataset.rollEnhanced === '1' || btn.querySelector('.pagmar-btn__char')) {
-      delete btn.dataset.rollEnhanced;
-      enhanceFilterButton(btn, value);
-      return;
-    }
-
-    btn.textContent = value;
+    delete btn.dataset.rollEnhanced;
+    enhanceFilterButton(btn, value);
   }
 
   function enhanceFigmaQButton(btn) {

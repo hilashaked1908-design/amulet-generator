@@ -7,13 +7,13 @@ const gc = gridCanvas.getContext('2d');
 const lineCanvas = document.createElement('canvas');
 const lc = lineCanvas.getContext('2d');
 
-/** Figma @ 1920×1080 — centre band: flat background only. */
+/** Figma @ 1920×1080 - centre band: flat background only. */
 const DESIGN_W = 1920;
 const DESIGN_H = 1080;
 const CLEAR_Y_START = 358.18;
 const CLEAR_Y_END = 743;
 const EDGE_FADE_DESIGN = 96;
-const PAGE_BG = '#F8F8F7';
+const PAGE_BG = '#F4F4E8';
 const PAGE_BG_DARK = '#000000';
 const GRID_LINE_LIGHT = '#B5B0AB';
 const GRID_LINE_DARK = '#CCC8C0';
@@ -179,7 +179,7 @@ function drawVPThroughPoint(ctx, vx, vy, px, py, yMin, yMax) {
   );
 }
 
-/** Original grid geometry — clip optional (bottom mirror supplies its own). */
+/** Original grid geometry - clip optional (bottom mirror supplies its own). */
 function drawTopGridLines(ctx, W, y1, vx, vy, scrollInv, clip) {
   const horizontals =
     scrollInv === 0
@@ -217,7 +217,7 @@ function drawTopGrid(ctx, W, y1, vx, vy, scrollInv) {
   drawTopGridLines(ctx, W, y1, vx, vy, scrollInv, true);
 }
 
-/** Bottom grid — exact vertical mirror of the top grid raster. */
+/** Bottom grid - exact vertical mirror of the top grid raster. */
 function drawBottomGridFromTop(ctx, W, H, y1, y2, vx, vy, scrollInv) {
   const bottomH = H - y2;
 
@@ -270,7 +270,7 @@ function drawPerspectiveGridAtBlend(blend) {
   gc.fillRect(0, 0, W, H);
 
   lc.clearRect(0, 0, W, H);
-  lc.lineWidth = 0.5;
+  lc.lineWidth = 1.5;
 
   const { y1, y2 } = clearBandScreen(H);
   const fade = designToScreenY(EDGE_FADE_DESIGN, H);

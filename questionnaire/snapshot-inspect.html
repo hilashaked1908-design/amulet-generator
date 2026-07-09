@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>בדיקת snapshot — קמע</title>
+  <title>בדיקת snapshot - קמע</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -58,7 +58,7 @@
     const labelParam = params.get('label');
     const indexParam = params.get('index');
 
-    const QUESTIONS = 8; // AMULET_QUESTIONS length — gallery removed
+    const QUESTIONS = 8; // AMULET_QUESTIONS length - gallery removed
     const base = QUESTIONS;
 
     let index;
@@ -71,7 +71,7 @@
     }
 
     const label = String(index + 1).padStart(3, '0');
-    document.getElementById('title').textContent = 'בדיקת snapshot — קמע ' + label;
+    document.getElementById('title').textContent = 'בדיקת snapshot - קמע ' + label;
 
     function loadCollection() {
       try {
@@ -125,7 +125,7 @@
       const dl = document.getElementById('download');
 
       if (!Number.isFinite(index) || index < base) {
-        meta.innerHTML = '<span class="err">index=' + index + ' — קמעות משתמש מתחילות מ-' + String(base + 1).padStart(3, '0') + ' (index ' + base + ')</span>';
+        meta.innerHTML = '<span class="err">index=' + index + ' - קמעות משתמש מתחילות מ-' + String(base + 1).padStart(3, '0') + ' (index ' + base + ')</span>';
         return;
       }
 
@@ -169,7 +169,7 @@
         dl.href = best;
         dl.download = 'amulet-' + label + '-snapshot.png';
       } else {
-        meta.innerHTML += '<br><span class="err">לא נמצא snapshot — פתחי את העמוד מאותו דפדפן שבו יצרת את הקמעות (localhost:8080)</span>';
+        meta.innerHTML += '<br><span class="err">לא נמצא snapshot - פתחי את העמוד מאותו דפדפן שבו יצרת את הקמעות (localhost:8080)</span>';
       }
     }
 

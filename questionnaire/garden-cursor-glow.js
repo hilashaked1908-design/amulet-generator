@@ -50,11 +50,13 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  const YELLOW_WHITE_RGB = '244, 244, 232';
+
   function drawGlowDot(x, y, radius, alpha) {
     const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    g.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
-    g.addColorStop(0.4, 'rgba(255,255,255,' + alpha * 0.22 + ')');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, 'rgba(' + YELLOW_WHITE_RGB + ',' + alpha + ')');
+    g.addColorStop(0.4, 'rgba(' + YELLOW_WHITE_RGB + ',' + alpha * 0.22 + ')');
+    g.addColorStop(1, 'rgba(' + YELLOW_WHITE_RGB + ',0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -72,7 +74,7 @@
     ctx.globalCompositeOperation = 'source-over';
     ctx.beginPath();
     ctx.arc(sx, sy, CORE_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,' + fade * 0.96 + ')';
+    ctx.fillStyle = 'rgba(' + YELLOW_WHITE_RGB + ',' + fade * 0.96 + ')';
     ctx.fill();
   }
 

@@ -1,30 +1,77 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he" dir="rtl" data-pagmar-build="20250709-full-site">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>קמע — אינדקס</title>
-  <link rel="stylesheet" href="../css/fonts.css?v=20250702-white">
-  <link rel="stylesheet" href="../css/questionnaire.css?v=20250708-close-align">
-  <link rel="stylesheet" href="../css/buttons.css?v=20250708-close-align">
-  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250708-close-align">
-  <link rel="stylesheet" href="../css/result-overlay.css?v=20250708-close-align">
-  <link rel="stylesheet" href="../css/about-overlay.css?v=20250708-about-now">
+  <title>קמע - אינדקס</title>
+  <link rel="stylesheet" href="../css/fonts.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/glass-lens.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250709-choice-fix">
+  <link rel="stylesheet" href="../css/result-overlay.css?v=20250709-result-layout">
+  <link rel="stylesheet" href="../css/about-overlay.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250709-full-site">
 </head>
 <body class="pagmar-index">
+
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter
+        id="glass-distortion"
+        x="-20%"
+        y="-20%"
+        width="140%"
+        height="140%"
+        color-interpolation-filters="sRGB"
+      >
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.008 0.008"
+          numOctaves="2"
+          seed="5"
+          result="noise"
+        />
+        <feGaussianBlur in="noise" stdDeviation="2" result="blurredNoise" />
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="blurredNoise"
+          scale="55"
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+    </defs>
+  </svg>
 
   <div class="pagmar-viewport">
     <div class="pagmar-canvas" id="pagmarCanvas" aria-label="פתיחת שאלון קמע">
 
-      <!-- Figma 2127:3662 — index chrome buttons -->
-      <button type="button" class="pagmar__index-about" id="indexAboutBtn" aria-label="אודות">
-        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
+      <!-- Figma 2601:40649 - Frame 397 about icon -->
+      <button type="button" class="pagmar__index-about pagmar-chrome__about" id="indexAboutBtn" aria-label="אודות">
+        <img
+          class="pagmar__index-about__icon"
+          src="assets/index-figma-2127/about-icon-2601.svg"
+          width="60"
+          height="60"
+          alt=""
+          decoding="async"
+          draggable="false"
+          aria-hidden="true"
+        >
       </button>
 
       <aside class="pagmar__index-filter-sidebar" id="indexFilterSidebar" aria-label="סינון">
+        <div class="pagmar__index-filter-glass-lens glass-lens" data-glass-source="garden" aria-hidden="true">
+          <div class="glass-clone" aria-hidden="true">
+            <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
+          </div>
+          <div class="glass-lens__tint" aria-hidden="true"></div>
+          <div class="glass-chrome" aria-hidden="true"></div>
+        </div>
         <div class="pagmar__index-filter-head">
           <div class="pagmar__index-filter-toolbar">
             <button
@@ -35,9 +82,10 @@
               aria-controls="indexFilterWrap"
               aria-label="סנן"
             >
+              <span class="pagmar__index-filter-trigger__label pagmar__index-type-target" data-type-text="סנן">סנן</span>
               <img
                 class="pagmar__index-filter-trigger__icon"
-                src="assets/detail/close-icon.svg"
+                src="assets/detail/close-icon.svg?v=20250708-white"
                 width="16.119"
                 height="21.235"
                 alt=""
@@ -45,7 +93,6 @@
                 draggable="false"
                 aria-hidden="true"
               >
-              <span class="pagmar__index-filter-trigger__label pagmar__index-type-target" data-type-text="סנן">סנן</span>
             </button>
           </div>
           <div
@@ -60,9 +107,9 @@
         </div>
       </aside>
 
+      <!-- Figma 2601:40649 - cream CTA pill -->
       <button type="button" class="pagmar__index-cta-pill" id="indexCreateCta">
         <span class="pagmar__index-cta-pill__body">
-          <img class="pagmar__index-cta__arrow" src="assets/index-figma-2127/cta-arrow.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
           <span class="pagmar__index-type-target pagmar__index-cta-pill__label" data-type-text="צור קמע משלך">צור קמע משלך</span>
         </span>
       </button>
@@ -78,29 +125,30 @@
         <div
           class="pagmar__garden"
           id="questionGarden"
-          aria-label="מרחב קמעים — גררי לניווט, לחצי על קמע למפרט"
+          aria-label="מרחב קמעים - גררי לניווט, לחצי על קמע למפרט"
         ></div>
         <div
           id="amuletContainer"
           class="result__amulet"
           role="img"
-          aria-label="קמע — גררי לסיבוב"
+          aria-label="קמע - גררי לסיבוב"
           hidden
         ></div>
         <p id="amuletStatus" class="result__status" aria-live="polite" hidden>מכין את הקמע…</p>
       </div>
 
-      <!-- בקשות — שאלון יצירת קמע (Figma 2481:23049) -->
+      <!-- בקשות - שאלון יצירת קמע (Figma 2481:23049) -->
       <div class="pagmar__index-create pagmar__request-flow" id="indexCreateWorkspace" hidden>
         <div class="pagmar__request-artboard" id="requestArtboard">
 
-          <div class="figma-layer figma-panel" aria-hidden="true">
-            <div class="figma-panel__inner">
-              <div class="figma-amulet pagmar__request-amulet-build pagmar__index-create-amulet-frame">
-                <img class="figma-amulet__ellipse" src="assets/detail/amulet-ellipse.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-                <div id="createAmuletSlot" class="pagmar__index-create-amulet-view"></div>
-                <p id="createAmuletStatus" class="pagmar__index-create-status" aria-live="polite" hidden>טוען קמע</p>
-                <div class="pagmar__index-create-amulet-actions" id="createAmuletActions" hidden>
+          <div class="pagmar__request-fog" id="requestFogHost" aria-hidden="true"></div>
+
+          <div class="figma-layer figma-amulet-stage">
+            <div class="figma-amulet pagmar__request-amulet-build pagmar__index-create-amulet-frame">
+              <div id="createAmuletMorphHost" class="figma-amulet-stage__morph" aria-hidden="true"></div>
+              <div id="createAmuletSlot" class="pagmar__index-create-amulet-view"></div>
+              <p id="createAmuletStatus" class="pagmar__index-create-status" aria-live="polite" hidden>טוען קמע</p>
+              <div class="pagmar__index-create-amulet-actions" id="createAmuletActions" hidden>
                   <button type="button" class="pagmar__action-btn pagmar__create-amulet-action" id="exportAmuletBtn">
                     <span class="pagmar__action-btn__inner">
                       <svg class="pagmar__action-btn__art" viewBox="0 0 224 83" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -128,75 +176,76 @@
                     </span>
                   </button>
                 </div>
+            </div>
+            <p class="figma-amulet-stage-caption" id="amuletStageCaption" hidden aria-live="polite"></p>
+          </div>
+
+          <div
+            class="pagmar__garden-amulet-hover pagmar__request-vector-tip"
+            id="questionVectorCopy"
+            hidden
+            aria-live="polite"
+          >
+            <div
+              class="pagmar__garden-amulet-hover__surface glass-tooltip glass-lens"
+              data-glass-source="request-fog"
+            >
+              <div class="glass-clone" aria-hidden="true">
+                <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
               </div>
+              <div class="glass-lens__tint" aria-hidden="true"></div>
+              <div class="glass-chrome" aria-hidden="true"></div>
+              <p class="pagmar__garden-amulet-hover__request figma-q__vector-copy-text"></p>
             </div>
           </div>
 
-          <button type="button" class="figma-layer figma-close" id="requestCloseBtn" aria-label="סגור">
+          <button type="button" class="figma-layer figma-request-about pagmar-chrome__about" id="requestAboutBtn" aria-label="אודות">
+            <img
+              src="assets/index-figma-2127/about-icon-2601.svg"
+              width="60"
+              height="60"
+              alt=""
+              decoding="async"
+              draggable="false"
+            >
+          </button>
+
+          <button type="button" class="figma-layer figma-close pagmar-chrome__close" id="requestCloseBtn" aria-label="סגור">
             <img src="assets/detail/close-icon.svg" alt="" decoding="async" draggable="false">
           </button>
 
-          <div class="figma-layer figma-step-rail__line figma-step-rail__line--137" aria-hidden="true"></div>
-          <div class="figma-layer figma-step-rail__line figma-step-rail__line--progress" aria-hidden="true"></div>
-
-          <div class="figma-layer figma-step-marker figma-step-marker--8" data-step="8" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">8</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--7" data-step="7" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">7</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--6" data-step="6" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">6</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--5" data-step="5" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">5</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--4" data-step="4" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">4</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--3" data-step="3" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">3</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--2" data-step="2" aria-hidden="true">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">2</span>
-          </div>
-          <div class="figma-layer figma-step-marker figma-step-marker--1 is-active" data-step="1" aria-current="step">
-            <div class="figma-step-marker__pill" aria-hidden="true"></div>
-            <span class="figma-step-marker__num">1</span>
-          </div>
-
-          <div class="figma-layer figma-q figma-q--slot-0" id="requestActiveCard">
-            <div
-              class="figma-q__panel"
-              id="questionFrame"
-              role="region"
-              aria-labelledby="questionText"
-            >
-              <div class="figma-q__head">
-                <span class="figma-q__tag" id="questionTag">[בקשה]</span>
-                <p class="figma-q__title" id="questionText"></p>
-              </div>
+          <div
+            class="figma-layer figma-q figma-q--slot-0"
+            id="requestActiveCard"
+            role="region"
+            aria-labelledby="questionText"
+          >
+            <div class="figma-q__copy" id="questionCopyFrame">
+              <span class="figma-q__tag" id="questionTag" aria-label="תג שאלה">
+                <span class="figma-q__tag-step" id="questionTagStep">1/8</span>
+                <span class="figma-q__tag-category" id="questionTagCategory">[בקשה]</span>
+              </span>
+              <p class="figma-q__title" id="questionText"></p>
               <p class="figma-q__desc" id="questionDesc" hidden></p>
-              <div class="figma-q__actions">
-                <div class="figma-q__field-box">
-                  <div class="figma-q__field" id="questionField"></div>
-                </div>
-                <div class="figma-q__btn-outer">
-                <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-                <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-                <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-                <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
+              <div class="figma-q-vector-grid" id="questionVectorGrid" aria-hidden="true">
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q3" id="vectorThumbQ3" data-question="3" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q2" id="vectorThumbQ2" data-question="2" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q1" id="vectorThumbQ1" data-question="1" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q6" id="vectorThumbQ6" data-question="6" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q5" id="vectorThumbQ5" data-question="5" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q4" id="vectorThumbQ4" data-question="4" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q8" id="vectorThumbQ8" data-question="8" hidden></div>
+                <div class="figma-q-vector-thumb figma-q-vector-thumb--q7" id="vectorThumbQ7" data-question="7" hidden></div>
+              </div>
+            </div>
+            <div class="figma-q__dock">
+              <div class="figma-q__btn-outer" id="questionSubmitWrap">
                 <button type="button" class="figma-q__btn" id="questionSubmit" disabled>
                   <span class="figma-q__btn-label">לשאלה הבאה</span>
                 </button>
               </div>
+              <div class="figma-q__field-box">
+                <div class="figma-q__field" id="questionField"></div>
               </div>
             </div>
           </div>
@@ -206,37 +255,84 @@
         <span class="pagmar__create-question-num" id="questionLabel" hidden aria-hidden="true"></span>
       </div>
 
-      <!-- Result overlay — Figma 2436:9214 (questionnaire result) -->
+      <!-- Result overlay - Figma 2604:41701 (questionnaire result) -->
       <div class="pagmar__result-overlay" id="resultOverlay" hidden>
         <div class="pagmar__result-fog" id="resultFogHost" aria-hidden="true"></div>
 
         <div class="pagmar-canvas pagmar-canvas--result">
 
-          <button type="button" class="pagmar__result-close" id="resultCloseBtn" aria-label="סגור">
-            <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
-          </button>
-
           <main class="pagmar__result-main">
 
+            <header class="pagmar__result-chrome">
+              <a class="pagmar__result-logo pagmar-chrome__about" href="index.html" aria-label="דף הבית">
+                <img
+                  src="assets/index-figma-2127/about-icon-2601.svg"
+                  width="60"
+                  height="60"
+                  alt=""
+                  decoding="async"
+                  draggable="false"
+                >
+              </a>
+              <button type="button" class="pagmar__result-close pagmar-chrome__close" id="resultCloseBtn" aria-label="סגור">
+                <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
+              </button>
+            </header>
+
             <aside class="pagmar__result-sidebar" aria-label="מפרט קמע">
-              <div class="pagmar__result-spec-row pagmar__result-spec-row--belonging">
-                <section class="pagmar__result-belonging" aria-label="שייכות">
+              <div class="pagmar__result-spec-block">
+                <section class="pagmar__result-belonging pagmar__result-section--ruled" aria-label="שייכות">
                   <div class="pagmar__result-field">
                     <span class="pagmar__result-tag">[שייכות]</span>
-                    <p class="pagmar__result-field-text" id="resultName">—</p>
+                    <p class="pagmar__result-field-text" id="resultName">-</p>
                   </div>
                 </section>
-                <div class="pagmar__result-vector pagmar__result-vector--belonging" id="resultVectorBelonging" aria-hidden="true"></div>
+                <div class="pagmar__result-vector" id="resultVectorBelonging" aria-hidden="true"></div>
               </div>
 
-              <div class="pagmar__result-spec-row pagmar__result-spec-row--timing">
+              <div class="pagmar__result-spec-block">
                 <section class="pagmar__result-timing pagmar__result-section--ruled" aria-label="תזמון">
                   <div class="pagmar__result-field">
                     <span class="pagmar__result-tag">[תזמון]</span>
-                    <p class="pagmar__result-field-text" id="resultTiming">—</p>
+                    <p class="pagmar__result-field-text" id="resultTiming">-</p>
                   </div>
                 </section>
-                <div class="pagmar__result-vector pagmar__result-vector--timing" id="resultVectorTiming" aria-hidden="true"></div>
+                <div class="pagmar__result-vector" id="resultVectorTiming" aria-hidden="true"></div>
+              </div>
+
+              <section class="pagmar__result-tags pagmar__result-section--ruled" aria-labelledby="resultTagsLabel">
+                <div class="pagmar__result-tags-inner">
+                  <span class="pagmar__result-tag" id="resultTagsLabel">[תגיות]</span>
+                  <ul class="pagmar__result-tags-list" id="resultTags"></ul>
+                </div>
+              </section>
+            </aside>
+
+            <div class="pagmar__result-center">
+              <span class="pagmar__result-num" id="resultNum" aria-label="מספר קמע">
+                <span class="pagmar__result-num__bracket">[</span><span class="pagmar__result-num__digits">001</span><span class="pagmar__result-num__bracket">]</span>
+              </span>
+
+              <figure class="pagmar__result-amulet" aria-label="קמע מסתובב">
+                <div class="pagmar__result-amulet-frame">
+                  <div id="resultAmulet3D" class="pagmar__result-amulet-3d"></div>
+                </div>
+              </figure>
+
+              <div class="pagmar__result-actions">
+                <button type="button" class="pagmar__result-pill pagmar__result-pill--outline" id="resultExportBtn">ייצא קמע</button>
+                <button type="button" class="pagmar__result-pill pagmar__result-pill--outline" id="resultSaveBtn">שמור קמע</button>
+                <button type="button" class="pagmar__result-pill pagmar__result-pill--filled" id="resultCreateAnotherBtn">צור קמע נוסף</button>
+              </div>
+            </div>
+
+            <aside class="pagmar__result-right" aria-label="בקשה">
+              <div class="pagmar__result-request-block">
+                <section class="pagmar__result-request">
+                  <span class="pagmar__result-tag">[בקשה]</span>
+                  <p class="pagmar__result-story" id="resultStory">-</p>
+                </section>
+                <div class="pagmar__result-vector" id="resultVectorRequest" aria-hidden="true"></div>
               </div>
 
               <section class="pagmar__result-components pagmar__result-section--ruled" aria-labelledby="resultComponentsLabel">
@@ -245,56 +341,9 @@
                   <ul class="pagmar__result-components-list" id="resultComponents"></ul>
                 </div>
               </section>
-
-              <section class="pagmar__result-tags pagmar__result-section--ruled" aria-labelledby="resultTagsLabel">
-                <span class="pagmar__result-tag" id="resultTagsLabel">[תגיות]</span>
-                <ul class="pagmar__result-tags-list" id="resultTags"></ul>
-              </section>
-            </aside>
-
-            <span class="pagmar__result-num pagmar__glass-pill" id="resultNum">
-              <span class="pagmar__glass-pill__text">[001]</span>
-            </span>
-
-            <figure class="pagmar__result-amulet" aria-label="קמע מסתובב">
-              <div class="pagmar__result-amulet-frame">
-                <div id="resultAmulet3D" class="pagmar__result-amulet-3d"></div>
-              </div>
-              <img
-                class="pagmar__result-amulet-ellipse"
-                src="assets/detail/amulet-ellipse.svg"
-                alt=""
-                decoding="async"
-                draggable="false"
-                aria-hidden="true"
-              >
-            </figure>
-
-            <aside class="pagmar__result-right" aria-label="בקשה">
-              <section class="pagmar__result-request">
-                <span class="pagmar__result-tag">[בקשה]</span>
-                <p class="pagmar__result-story" id="resultStory">—</p>
-              </section>
-              <div class="pagmar__result-vector pagmar__result-vector--request" id="resultVectorRequest" aria-hidden="true"></div>
             </aside>
 
           </main>
-
-          <div class="pagmar__result-action-btn pagmar__result-action-btn--export figma-q__btn-outer" id="resultExportBtnWrap">
-            <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <button type="button" class="figma-q__btn" id="resultExportBtn">ייצא קמע</button>
-          </div>
-
-          <div class="pagmar__result-action-btn pagmar__result-action-btn--save figma-q__btn-outer" id="resultSaveBtnWrap">
-            <img class="figma-q__btn-corner figma-q__btn-corner--tl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--tr" src="assets/create/figma-2120/btn-corner-tr.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--bl" src="assets/create/figma-2120/btn-corner-tl.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <img class="figma-q__btn-corner figma-q__btn-corner--br" src="assets/create/figma-2120/btn-corner-br.svg" alt="" decoding="async" draggable="false" aria-hidden="true">
-            <button type="button" class="figma-q__btn" id="resultSaveBtn">שמור קמע</button>
-          </div>
 
         </div>
       </div>
@@ -346,7 +395,7 @@
     </div>
   </div>
 
-  <!-- About overlay — Figma 2537:30533 (body-level so fixed layout covers viewport) -->
+  <!-- About overlay - Figma 2537:30533 (body-level so fixed layout covers viewport) -->
   <div
     class="pagmar__about-overlay"
     id="aboutOverlay"
@@ -373,7 +422,7 @@
             מול חוסר ודאות, הם יצרו טקסים, פנו לנביאים, התייעצו עם אסטרולוגים, נשאו קמעות ופיתחו מערכות אמונה שונות.
           </p>
           <p>
-            אף שהאמצעים השתנו לאורך ההיסטוריה, הצורך נשאר זהה – למצוא אחיזה במציאות כאוטית שאינה ניתנת לחיזוי.
+            אף שהאמצעים השתנו לאורך ההיסטוריה, הצורך נשאר זהה - למצוא אחיזה במציאות כאוטית שאינה ניתנת לחיזוי.
           </p>
         </div>
       </div>
@@ -382,7 +431,7 @@
 
   <button
     type="button"
-    class="pagmar__about-dismiss"
+    class="pagmar__about-dismiss pagmar-chrome__close"
     id="aboutCloseBtn"
     aria-label="סגור"
     hidden
@@ -390,24 +439,22 @@
   >×</button>
 
   <script src="../connection-core.js"></script>
-  <script src="questions.js?v=20250704-2258-fonts"></script>
-  <script src="amulet-catalog.js?v=20250705-multi-filter"></script>
-  <script src="garden-atmosphere.js?v=20250708-restore"></script>
-  <script src="garden-stars.js?v=20250708-restore"></script>
-  <script src="garden-amulet-hover.js?v=20250708-restore"></script>
+  <script src="questions.js?v=20250709-full-site"></script>
+  <script src="amulet-catalog.js?v=20250709-full-site"></script>
+  <script src="garden-atmosphere.js?v=20250709-full-site"></script>
+  <script src="garden-stars.js?v=20250709-full-site"></script>
+  <script src="glass-lens.js?v=20250709-full-site"></script>
+  <script src="garden-amulet-hover.js?v=20250709-full-site"></script>
+  <script src="questionnaire-q1-vector-tip.js?v=20250709-q1-tip"></script>
   <script type="module">
     import('./garden-three.js').catch(function (err) {
       console.error('[garden-three] failed to load', err);
-      var mount = document.getElementById('questionGarden');
-      if (mount) {
-        mount.setAttribute('data-garden-load-error', '1');
-      }
     });
   </script>
-  <script src="questionnaire-ui.js?v=20250708-result-2436"></script>
-  <script src="button-roll.js?v=20250708-restore"></script>
-  <script src="index-buttons.js?v=20250708-about-now"></script>
-  <script src="index-filter-view.js?v=20250708-restore"></script>
-  <script src="about-close.js?v=20250708-about-now"></script>
+  <script src="questionnaire-ui.js?v=20250709-choice-fix"></script>
+  <script src="button-roll.js?v=20250709-full-site"></script>
+  <script src="index-buttons.js?v=20250709-full-site"></script>
+  <script src="index-filter-view.js?v=20250709-full-site"></script>
+  <script src="about-close.js?v=20250709-full-site"></script>
 </body>
 </html>

@@ -69,7 +69,7 @@
 <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1370_65755" result="shape"/>
 </filter>
 <clipPath id="clip0_1370_65755">
-<rect width="118" height="24" fill="white" transform="translate(739.289 236.571)"/>
+<rect width="118" height="24" fill="#F4F4E8" transform="translate(739.289 236.571)"/>
 </clipPath>
 </defs>
 </svg>

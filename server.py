@@ -21,6 +21,7 @@ _default_legacy = "8765" if PORT == 8080 else ("8080" if PORT == 8765 else "0")
 LEGACY_PORT = int(os.environ.get("LEGACY_PORT", _default_legacy or "0"))
 GLYPH_FILE_RE = re.compile(r"^.\d+\.svg$", re.UNICODE)
 SERVER_VERSION = 2
+PAGMAR_BUILD = "20250709-full-site"
 
 
 def read_connections():
@@ -211,7 +212,9 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         path = urlparse(self.path).path
         if path.endswith((".js", ".html", ".css")):
-            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
         elif (
             "/questionnaire/seed/" in path
             or path.startswith("/fonts/")
@@ -248,7 +251,7 @@ class Handler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path).path
 
         if parsed_path == "/api/server-info":
-            self._send_json({"ok": True, "version": SERVER_VERSION, "glyphUpload": True})
+            self._send_json({"ok": True, "version": SERVER_VERSION, "glyphUpload": True, "build": PAGMAR_BUILD})
             return
         if parsed_path == "/api/glyphs":
             data = self._list_glyphs()
@@ -261,15 +264,51 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(data)
             return
 
-        if parsed_path in ("/go", "/go/"):
+        if parsed_path in ("/design", "/design/", "/questionnaire/design", "/questionnaire/design.html"):
             self.send_response(302)
-            self.send_header("Location", "/questionnaire/index.html")
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:8080/questionnaire/index.html?create=1&pagmarFresh={PAGMAR_BUILD}",
+            )
+            self.end_headers()
+            return
+
+        if parsed_path in ("/open", "/open/", "/questionnaire/open", "/questionnaire/open.html"):
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:8080/questionnaire/index.html?pagmarFresh={PAGMAR_BUILD}",
+            )
+            self.end_headers()
+            return
+
+        if parsed_path in (
+            "/questionnaire/create",
+            "/questionnaire/create.html",
+        ):
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:8080/questionnaire/index.html?create=1&pagmarFresh={PAGMAR_BUILD}",
+            )
+            self.end_headers()
+            return
+
+        if parsed_path in ("/go", "/go/", "/site", "/site/"):
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:8080/questionnaire/index.html?pagmarFresh={PAGMAR_BUILD}",
+            )
             self.end_headers()
             return
 
         if parsed_path in ("/questionnaire/index", "/questionnaire"):
             self.send_response(301)
-            self.send_header("Location", "/questionnaire/index.html")
+            self.send_header(
+                "Location",
+                f"/questionnaire/index.html?pagmarFresh={PAGMAR_BUILD}",
+            )
             self.end_headers()
             return
 

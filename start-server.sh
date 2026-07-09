@@ -61,7 +61,8 @@ wait_for_server() {
 }
 
 print_open() {
-  echo "Open: http://localhost:$PORT/questionnaire/index.html"
+  echo "Site:     http://127.0.0.1:$PORT/questionnaire/index.html"
+  echo "Create:   http://127.0.0.1:$PORT/questionnaire/index.html?create=1"
 }
 
 needs_terminal_start() {
@@ -180,7 +181,9 @@ show_status() {
   if server_responding; then
     sync_pidfile_from_port
     pid="$(read_pid)"
-    echo "running (pid ${pid:-unknown}) — http://localhost:$PORT/questionnaire/index.html"
+    echo "running (pid ${pid:-unknown})"
+    echo "  http://127.0.0.1:$PORT/questionnaire/index.html"
+    echo "  build: 20250709-full-site (check html[data-pagmar-build])"
     return 0
   fi
   if [ -n "$(port_pids)" ]; then

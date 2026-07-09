@@ -1,7 +1,11 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --pagmar-line-weight: 1.5px;
+}
+
 body {
-  background: #e0e0e0;
+  background: #F4F4E8;
   font-family: monospace, "Courier New", Courier, monospace;
   color: #222;
   font-size: 13px;
@@ -9,7 +13,7 @@ body {
 
 #topbar {
   background: #f8f8f8;
-  border-bottom: 1px solid #ccc;
+  border-bottom: var(--pagmar-line-weight) solid #ccc;
   padding: 8px 14px;
   display: flex;
   align-items: center;
@@ -21,11 +25,11 @@ input[type="password"],
 input[type="text"] {
   height: 28px;
   padding: 0 8px;
-  border: 1px solid #bbb;
+  border: var(--pagmar-line-weight) solid #bbb;
   border-radius: 3px;
   font-family: inherit;
   font-size: 12px;
-  background: #fff;
+  background: #F4F4E8;
 }
 
 input[type="text"] {
@@ -43,7 +47,7 @@ input[type="text"] {
 .btn {
   height: 28px;
   padding: 0 12px;
-  border: 1px solid #bbb;
+  border: var(--pagmar-line-weight) solid #bbb;
   border-radius: 3px;
   cursor: pointer;
   background: #efefef;
@@ -52,7 +56,7 @@ input[type="text"] {
   white-space: nowrap;
 }
 
-.btn:hover { background: #e0e0e0; }
+.btn:hover { background: #F4F4E8; }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
 .sep { color: #ccc; }
@@ -74,8 +78,8 @@ input[type="text"] {
 #keyStatus.ok { color: #2a7; }
 
 #catbar {
-  background: #ececec;
-  border-bottom: 1px solid #ddd;
+  background: #F4F4E8;
+  border-bottom: var(--pagmar-line-weight) solid #ddd;
   padding: 6px 14px;
   display: flex;
   gap: 6px;
@@ -90,17 +94,17 @@ input[type="text"] {
 .catbtn {
   padding: 5px 16px;
   border-radius: 3px;
-  border: 1px solid #bbb;
+  border: var(--pagmar-line-weight) solid #bbb;
   cursor: pointer;
   font-size: 11px;
   font-family: inherit;
-  background: #fff;
+  background: #F4F4E8;
   color: #666;
 }
 
 .catbtn.active {
   background: #111;
-  color: #fff;
+  color: #F4F4E8;
   border-color: #111;
 }
 
@@ -111,8 +115,8 @@ input[type="text"] {
 
 #sidebar {
   width: 210px;
-  background: #f5f5f5;
-  border-left: 1px solid #ddd;
+  background: #F4F4E8;
+  border-left: var(--pagmar-line-weight) solid #ddd;
   padding: 12px;
   flex-shrink: 0;
   overflow-y: auto;
@@ -133,8 +137,8 @@ input[type="text"] {
 }
 
 .extracted-preview {
-  background: #fff;
-  border: 1px solid #ddd;
+  background: #F4F4E8;
+  border: var(--pagmar-line-weight) solid #ddd;
   border-radius: 3px;
   padding: 10px;
   min-height: 36px;
@@ -160,12 +164,12 @@ input[type="text"] {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid #ddd;
+  border: var(--pagmar-line-weight) solid #ddd;
   border-radius: 3px;
   cursor: pointer;
   font-size: 13px;
   color: #ccc;
-  background: #fff;
+  background: #F4F4E8;
   transition: 0.1s;
   position: relative;
   gap: 1px;
@@ -190,8 +194,8 @@ input[type="text"] {
 .lc.analysed .badge { display: block; }
 
 .geo-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: #F4F4E8;
+  border: var(--pagmar-line-weight) solid #F4F4E8;
   border-radius: 3px;
   padding: 8px;
   font-size: 10px;
@@ -232,14 +236,14 @@ input[type="text"] {
 }
 
 #svgWrap {
-  background: #fff;
+  background: #F4F4E8;
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* TEMP: remove when placement debugging is done */
 .compose-debug {
-  background: #fff;
-  border: 1px dashed #888;
+  background: #F4F4E8;
+  border: var(--pagmar-line-weight) dashed #888;
   padding: 8px 14px;
   font-family: monospace, "Courier New", Courier, monospace;
   font-size: 12px;
@@ -273,7 +277,7 @@ input[type="text"] {
   left: 50%;
   transform: translateX(-50%);
   background: #111;
-  color: #eee;
+  color: #F4F4E8;
   padding: 6px 18px;
   border-radius: 3px;
   font-size: 11px;

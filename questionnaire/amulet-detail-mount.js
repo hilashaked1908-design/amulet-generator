@@ -1,5 +1,5 @@
 /**
- * 3D amulet mount — copied from amulet-detail-scene.js setup3DAmulet (detail page is source of truth).
+ * 3D amulet mount - copied from amulet-detail-scene.js setup3DAmulet (detail page is source of truth).
  * Used by the questionnaire result overlay only; detail page keeps its inline implementation.
  */
 import * as THREE from './vendor/three.module.js';
@@ -102,6 +102,7 @@ function startDetailAmuletRenderLoop() {
     if (state.renderer && state.scene && state.camera) {
       applyAmuletRotation();
       state.renderer.render(state.scene, state.camera);
+      if (window.pagmarGlassLens) window.pagmarGlassLens.tick();
     }
   }
   frame();
@@ -173,7 +174,8 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 1);
   const fov = 40;
-  const dist = (maxDim / 2) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * 1.05;
+  const fitMargin = useDetailPresentation ? 1.34 : 1.05;
+  const dist = (maxDim / 2) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * fitMargin;
 
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, dist * 4);
   camera.position.set(0, 0, dist);

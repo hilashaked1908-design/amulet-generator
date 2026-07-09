@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>תיקון seed — רינדור מתשובות</title>
+  <title>תיקון seed - רינדור מתשובות</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; padding: 24px; background: #0f1410; color: #e8e4dc; font-family: system-ui, sans-serif; }
@@ -27,7 +27,7 @@
     <p>
       מרנדר מחדש כל קמע מהתשובות ב-<code>collection.json</code>
       (אבן לפי q4, מתכת לפי q5) ושומר GLB + snapshot ל-seed ול-IndexedDB.
-      <strong>דורש שרת עם API חדש</strong> — אם 8080 ישן, השתמשי בפורט 8095.
+      <strong>דורש שרת עם API חדש</strong> - אם 8080 ישן, השתמשי בפורט 8095.
     </p>
     <button type="button" id="auditBtn">בדיקה בלבד</button>
     <button type="button" id="repairBadBtn">תקן רק שגויים</button>
@@ -84,8 +84,8 @@
           : '<span class="err">' + (audit.issues || []).join('; ') + '</span>';
         tr.innerHTML =
           '<td>' + labelForIndex(i) + '</td>' +
-          '<td>' + (entry.answers?.q4Belief || '—') + '</td>' +
-          '<td>' + (entry.answers?.q5Feeling || '—') + '</td>' +
+          '<td>' + (entry.answers?.q4Belief || '-') + '</td>' +
+          '<td>' + (entry.answers?.q5Feeling || '-') + '</td>' +
           '<td>' + status + '</td>';
         tbody.appendChild(tr);
       }
@@ -121,7 +121,7 @@
             ? ''
             : ' <span class="warn">(audit: ' + result.audit.issues.join('; ') + ')</span>';
           log(
-            '<span class="ok">' + label + ' נשמר — GLB ' +
+            '<span class="ok">' + label + ' נשמר - GLB ' +
             Math.round(result.glbBytes / 1024) + 'KB, snapshot ' +
             result.snapshotPx + 'px</span>' + warn
           );

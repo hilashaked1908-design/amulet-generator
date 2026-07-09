@@ -30,27 +30,104 @@
   const amuletStageParent = document.getElementById('questionStage');
   const pagmarCanvas = document.getElementById('pagmarCanvas');
   const questionGarden = document.getElementById('questionGarden');
+  let createAmuletMorph = null;
+
+  function stopCreateAmuletMorph() {
+    if (createAmuletMorph) {
+      createAmuletMorph.stop();
+      createAmuletMorph.destroy();
+      createAmuletMorph = null;
+    }
+    const host = document.getElementById('createAmuletMorphHost');
+    if (host) {
+      host.classList.add('is-hidden');
+      host.textContent = '';
+      host.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function resetCreateAmuletPreview() {
+    const container = document.getElementById('amuletContainer');
+    if (container) {
+      container.innerHTML = '';
+      container.hidden = false;
+    }
+    if (requestArtboard) {
+      requestArtboard.classList.remove('is-amulet-live');
+    }
+  }
+
+  function startCreateAmuletMorph() {
+    if (!isCreateFlow()) return;
+    const host = document.getElementById('createAmuletMorphHost');
+    if (!host) return;
+    const container = document.getElementById('amuletContainer');
+    if (
+      container &&
+      (container.querySelector('canvas') ||
+        container.querySelector('.pagmar__questionnaire-stage-vector'))
+    ) {
+      return;
+    }
+
+    host.classList.remove('is-hidden');
+    host.setAttribute('aria-hidden', 'false');
+
+    if (createAmuletMorph) {
+      createAmuletMorph.start();
+      return;
+    }
+
+    void import('./loader-vessel-morph.js?v=20250709-q-loader')
+      .then(function (mod) {
+        return mod.preloadVesselMorph().then(function () {
+          if (!isCreateFlow() || !host.isConnected) return;
+          if (createAmuletMorph) {
+            createAmuletMorph.start();
+            return;
+          }
+          const morph = mod.mountVesselMorph(host);
+          morph.start();
+          createAmuletMorph = morph;
+        });
+      })
+      .catch(function (err) {
+        console.error('[questionnaire] vessel morph failed', err);
+      });
+  }
+
+  window.pagmarHideCreateAmuletMorph = stopCreateAmuletMorph;
+  window.pagmarStartCreateAmuletMorph = startCreateAmuletMorph;
 
   const requestProgressCurrent = document.getElementById('requestProgressCurrent');
   const requestProgressTotal = document.getElementById('requestProgressTotal');
   const requestArtboard = document.getElementById('requestArtboard');
   const requestActiveCard = document.getElementById('requestActiveCard');
   const requestCloseBtn = document.getElementById('requestCloseBtn');
+  const requestAboutBtn = document.getElementById('requestAboutBtn');
   const requestStepMarkers = requestArtboard
     ? Array.from(requestArtboard.querySelectorAll('.figma-step-marker'))
     : [];
 
-  const frame = document.getElementById('questionFrame');
+  const frame = document.getElementById('requestActiveCard') || document.getElementById('questionFrame');
   const frameStar = document.getElementById('questionFrameStar');
   const fieldWrap = document.getElementById('questionField');
   const submitBtn = document.getElementById('questionSubmit');
   const saveWrap =
-    submitBtn &&
-    (submitBtn.closest('.figma-q__btn-outer') || submitBtn.closest('.pagmar__create-save-wrap'));
+    document.getElementById('questionSubmitWrap') ||
+    (submitBtn &&
+      (submitBtn.closest('.figma-q__btn-outer') || submitBtn.closest('.pagmar__create-save-wrap')));
   const labelEl = document.getElementById('questionLabel');
   const textEl = document.getElementById('questionText');
   const descEl = document.getElementById('questionDesc');
   const tagEl = document.getElementById('questionTag');
+  const tagStepEl = document.getElementById('questionTagStep');
+  const tagCategoryEl = document.getElementById('questionTagCategory');
+  const vectorCopyEl = document.getElementById('questionVectorCopy');
+  const vectorCopyTextEl = vectorCopyEl
+    ? vectorCopyEl.querySelector('.figma-q__vector-copy-text')
+    : null;
+  const amuletStageCaptionEl = document.getElementById('amuletStageCaption');
 
   let activeIndex = null;
   let activeSpecIndex = null;
@@ -71,6 +148,29 @@
 
   const CREATE_SAVE_LABEL_NEXT = 'לשאלה הבאה';
   const CREATE_SAVE_LABEL_FINAL = 'צור קמע';
+
+  const VECTOR_TIP_DEFAULT =
+    'הצורה נוצרת מהמילים שכתבתם.\nהאותיות מתחברות ויוצרות את קווי המתאר הראשונים של הקמע.';
+
+  const VECTOR_TIP_BY_QUESTION = {
+    1: 'האותיות מהבקשה מתחברות ויוצרות את קווי המתאר הראשונים של הקמע.',
+    2: 'שכבת השם מתווספת למתאר - האותיות שלכם נרשמות על הקמע.',
+    3: 'נחרט על האבן למה דווקא עכשיו.\nבשאלה הזאת תבחרו את חומריות שכבת האבן.',
+    4: 'חומריות האבן נקבעת מהאמונה שלכם.\nבשאלה הזאת תבחרו את חומריות שכבת המתכת או הפולימר.',
+    5: 'חומריות המתכת או הפולימר נקבעת מהתחושה.\nבשאלה הזאת תבחרו את מידת הקוצניות של הקמע.',
+    6: 'מידת הקוצניות נקבעת לפי מה שחסר לכם.\nבשאלה הזאת תכתבו אילו צורות יוטבעו על פני הקמע.',
+    7: 'צורות מיוחדות מוטבעות על האבן לפי מה שישתנה.\nכעת הבקשה כמעט שלמה.',
+  };
+
+  function getVectorTipText(questionIndex) {
+    if (typeof questionIndex !== 'number' || questionIndex < 1) return '';
+    return VECTOR_TIP_BY_QUESTION[questionIndex] || VECTOR_TIP_DEFAULT;
+  }
+
+  function isDockChoiceQuestionAt(index) {
+    const question = questions[index];
+    return Boolean(question && question.type === 'choice' && isRequestFlowActive());
+  }
 
   const PLACEHOLDER_CHAR_MS = 46;
   const PLACEHOLDER_HOLD_MS = 2600;
@@ -117,6 +217,163 @@
     return token === placeholderCycleToken;
   }
 
+  let dockLiftObserver = null;
+
+  function resetDockAmuletLift() {
+    if (requestArtboard) {
+      requestArtboard.style.removeProperty('--figma-amulet-lift');
+    }
+  }
+
+  function syncAmuletStageCaptionPosition() {
+    if (!requestArtboard || !amuletStageCaptionEl) return;
+    if (amuletStageCaptionEl.hidden) {
+      requestArtboard.style.removeProperty('--figma-amulet-caption-top');
+      return;
+    }
+
+    const stage = document.querySelector('.figma-amulet-stage');
+    const dock = document.querySelector('.figma-q__dock');
+    if (!stage || !dock) return;
+
+    const stageRect = stage.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    if (!stageRect.height || !dockRect.height) return;
+
+    const captionRect = amuletStageCaptionEl.getBoundingClientRect();
+    const captionH = captionRect.height || 0;
+    const midY = (stageRect.bottom + dockRect.top) / 2;
+    const top = midY - captionH / 2;
+
+    requestArtboard.style.setProperty('--figma-amulet-caption-top', top + 'px');
+  }
+
+  /** Q3–Q5: keep amulet at fixed Y — dock growth must not push it up. */
+  function isDockAmuletLiftDisabled() {
+    return activeIndex !== null && activeIndex >= 2 && activeIndex <= 4;
+  }
+
+  function syncDockAmuletLift() {
+    if (!requestArtboard || !isRequestFlowActive()) {
+      resetDockAmuletLift();
+      return;
+    }
+
+    if (isDockAmuletLiftDisabled()) {
+      resetDockAmuletLift();
+      syncAmuletStageCaptionPosition();
+      syncRequestQuestionTextLayout();
+      return;
+    }
+
+    const dock = document.querySelector('.figma-q__dock');
+    if (!dock) {
+      resetDockAmuletLift();
+      return;
+    }
+
+    const styles = window.getComputedStyle(dock);
+    const baseline = parseFloat(styles.minHeight) || 0;
+    const current = dock.getBoundingClientRect().height;
+    const extra = Math.max(0, current - baseline);
+
+    if (extra > 0.5) {
+      requestArtboard.style.setProperty('--figma-amulet-lift', extra + 'px');
+    } else {
+      resetDockAmuletLift();
+    }
+    syncAmuletStageCaptionPosition();
+    syncRequestQuestionTextLayout();
+  }
+
+  function ensureDockLiftObserver() {
+    const dock = document.querySelector('.figma-q__dock');
+    if (!dock) return;
+    if (dockLiftObserver) {
+      syncDockAmuletLift();
+      return;
+    }
+    dockLiftObserver = new ResizeObserver(function () {
+      syncDockAmuletLift();
+    });
+    dockLiftObserver.observe(dock);
+    syncDockAmuletLift();
+  }
+
+  function stopDockLiftObserver() {
+    if (dockLiftObserver) {
+      dockLiftObserver.disconnect();
+      dockLiftObserver = null;
+    }
+    resetDockAmuletLift();
+  }
+
+  function getDockInputOneLineHeightPx(field) {
+    const styles = window.getComputedStyle(field);
+    const fontSize = parseFloat(styles.fontSize);
+    if (!Number.isFinite(fontSize)) return 55;
+    const lineHeight = styles.lineHeight;
+    if (lineHeight === 'normal') return fontSize;
+    const parsed = parseFloat(lineHeight);
+    if (Number.isFinite(parsed) && String(lineHeight).endsWith('px')) return parsed;
+    return fontSize;
+  }
+
+  function resizeDockQuestionInput(field) {
+    if (!field || field.tagName !== 'TEXTAREA' || !isRequestFlowActive()) return;
+    if (document.body.classList.contains('is-choice-question')) return;
+
+    const fieldWrap = field.closest('.figma-q__field');
+    const oneLineHeight = getDockInputOneLineHeightPx(field);
+    const styles = window.getComputedStyle(field);
+    const maxHeight = parseFloat(styles.maxHeight);
+    const hasMax = Number.isFinite(maxHeight) && maxHeight > 0;
+
+    field.style.setProperty('min-height', '0');
+    field.style.setProperty('height', 'auto');
+    field.style.overflow = 'hidden';
+
+    const contentHeight = field.scrollHeight;
+    const growsPastDock = hasMax && contentHeight > maxHeight;
+    const isMultiLine = !growsPastDock && contentHeight > oneLineHeight + 2;
+
+    field.style.removeProperty('min-height');
+
+    if (growsPastDock) {
+      field.style.setProperty('height', maxHeight + 'px', 'important');
+      field.style.overflow = 'auto';
+      field.classList.add('is-dock-scrollable');
+      if (fieldWrap) fieldWrap.classList.add('is-dock-multiline');
+    } else if (isMultiLine) {
+      field.style.setProperty('height', contentHeight + 'px', 'important');
+      field.style.overflow = 'hidden';
+      field.classList.remove('is-dock-scrollable');
+      if (fieldWrap) fieldWrap.classList.add('is-dock-multiline');
+    } else {
+      field.style.setProperty('height', oneLineHeight + 'px', 'important');
+      field.style.overflow = 'hidden';
+      field.classList.remove('is-dock-scrollable');
+      if (fieldWrap) fieldWrap.classList.remove('is-dock-multiline');
+    }
+    syncDockAmuletLift();
+  }
+
+  function bindDockQuestionInputGrow(field) {
+    if (!field || field.tagName !== 'TEXTAREA' || !isRequestFlowActive()) return;
+    if (field.dataset.dockGrowBound === '1') return;
+    field.dataset.dockGrowBound = '1';
+
+    const onResize = function () {
+      resizeDockQuestionInput(field);
+    };
+
+    field.addEventListener('input', onResize);
+    field.addEventListener('change', onResize);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(onResize);
+    });
+  }
+
   async function runPlaceholderCycle(field, examples, token) {
     if (!examples.length || !isPlaceholderSession(token)) return;
 
@@ -134,9 +391,11 @@
       const text = examples[index % examples.length];
       field.classList.add('is-typing-placeholder');
 
+      const cursorChar = isRequestFlowActive() ? '' : PLACEHOLDER_CURSOR;
+
       for (let i = 0; i <= text.length; i += 1) {
         if (!isPlaceholderSession(token) || !isPlaceholderFieldIdle(field)) return;
-        field.placeholder = i < text.length ? text.slice(0, i) + PLACEHOLDER_CURSOR : text;
+        field.placeholder = i < text.length ? text.slice(0, i) + cursorChar : text;
         if (i < text.length) await placeholderSleep(PLACEHOLDER_CHAR_MS);
       }
 
@@ -145,7 +404,7 @@
 
       for (let i = text.length; i >= 0; i -= 1) {
         if (!isPlaceholderSession(token) || !isPlaceholderFieldIdle(field)) return;
-        field.placeholder = i > 0 ? text.slice(0, i) + PLACEHOLDER_CURSOR : '';
+        field.placeholder = i > 0 ? text.slice(0, i) + cursorChar : '';
         if (i > 0) await placeholderSleep(PLACEHOLDER_ERASE_MS);
       }
 
@@ -205,8 +464,8 @@
   function ensureAmuletModules() {
     if (amuletModulesReady) return amuletModulesReady;
     amuletModulesReady = Promise.all([
-      import('./amulet-build.js?v=20250705-q4-instant'),
-      import('./amulet-show.js?v=20250708-result-answers'),
+      import('./amulet-build.js?v=20250709-full-site'),
+      import('./amulet-show.js?v=20250709-full-site'),
     ]).catch(function (err) {
       amuletModulesReady = null;
       throw err;
@@ -235,27 +494,27 @@
   }
 
   function setCreateSaveLabel(index) {
-    if (!submitBtn) return;
-    const isLast = index === questions.length - 1;
-    const text = isLast ? CREATE_SAVE_LABEL_FINAL : CREATE_SAVE_LABEL_NEXT;
+    if (submitBtn) {
+      const isLast = index === questions.length - 1;
+      const text = isLast ? CREATE_SAVE_LABEL_FINAL : CREATE_SAVE_LABEL_NEXT;
 
-    const requestLabel = submitBtn.querySelector('.figma-q__btn-label, .pagmar__request-next__label');
-    if (requestLabel) {
-      requestLabel.textContent = text;
-      return;
+      const requestLabel = submitBtn.querySelector('.figma-q__btn-label, .pagmar__request-next__label');
+      if (requestLabel) {
+        requestLabel.textContent = text;
+      } else {
+        const labels = submitBtn.querySelectorAll('.pagmar__create-save-label');
+        labels.forEach(function (el) {
+          el.textContent = text;
+        });
+      }
+
+      const labelRoot =
+        document.getElementById('questionSubmitWrap') ||
+        submitBtn.closest('.figma-q__btn-outer') ||
+        submitBtn.closest('.pagmar__create-save-wrap') ||
+        submitBtn;
+      labelRoot.style.setProperty('--create-save-label-w', isLast ? '118' : '134');
     }
-
-    const labels = submitBtn.querySelectorAll('.pagmar__create-save-label');
-    if (!labels.length) return;
-    labels.forEach(function (el) {
-      el.textContent = text;
-    });
-
-    const labelRoot =
-      submitBtn.closest('.figma-q__btn-outer') ||
-      submitBtn.closest('.pagmar__create-save-wrap') ||
-      submitBtn;
-    labelRoot.style.setProperty('--create-save-label-w', isLast ? '118' : '134');
   }
 
   function padQuestionNum(index) {
@@ -284,7 +543,7 @@
       marker.setAttribute('aria-hidden', isActive ? 'false' : 'true');
       marker.setAttribute('aria-current', isActive ? 'step' : 'false');
       const numEl = marker.querySelector('.figma-step-marker__num');
-      if (numEl) numEl.textContent = String(step);
+      if (numEl) numEl.textContent = String(step).padStart(2, '0');
       if (isActive) activeMarker = marker;
     });
     applyRequestStepRailLines(activeMarker, activeStep);
@@ -389,18 +648,18 @@
         return;
       }
 
-      const topMarker = getRequestStepMarker(activeStep);
-      const bottomMarker = getRequestStepMarker(1);
-      if (!topMarker || !bottomMarker) {
+      const firstMarker = getRequestStepMarker(1);
+      const activeStepMarker = getRequestStepMarker(activeStep);
+      if (!firstMarker || !activeStepMarker) {
         applyStepRailMask(whiteLine, lineRect.height, []);
         return;
       }
 
-      const topRect = topMarker.getBoundingClientRect();
-      const bottomRect = bottomMarker.getBoundingClientRect();
+      const firstRect = firstMarker.getBoundingClientRect();
+      const activeRect = activeStepMarker.getBoundingClientRect();
       const progress = {
-        start: Math.max(0, topRect.bottom - lineRect.top),
-        end: Math.min(lineRect.height, bottomRect.top - lineRect.top),
+        start: Math.max(0, firstRect.top + firstRect.height * 0.5 - lineRect.top),
+        end: Math.min(lineRect.height, activeRect.top + activeRect.height * 0.5 - lineRect.top),
       };
 
       if (progress.end <= progress.start + 1) {
@@ -448,7 +707,14 @@
     return 1;
   }
 
-  function getChoiceRowIndices(optionCount) {
+  function getChoiceRowIndices(optionCount, singleColumn) {
+    if (singleColumn) {
+      const rows = [];
+      for (let i = 0; i < optionCount; i += 1) {
+        rows.push([i]);
+      }
+      return rows;
+    }
     if (optionCount === 5) return [[0, 3, 1], [2, 4]];
     const rows = [];
     for (let i = 0; i < optionCount; i += 3) {
@@ -578,6 +844,30 @@
     return Boolean(document.querySelector('.pagmar__request-flow'));
   }
 
+  let requestFogBootToken = 0;
+
+  function bootRequestFlowFogIfNeeded() {
+    if (!isRequestFlowActive()) return;
+    const token = ++requestFogBootToken;
+    import('./request-flow-fog.js?v=20250709-full-site')
+      .then(function (mod) {
+        if (token !== requestFogBootToken) return;
+        return mod.bootRequestFlowFog();
+      })
+      .catch(function (err) {
+        console.warn('[questionnaire] request fog failed', err);
+      });
+  }
+
+  function stopRequestFlowFogIfNeeded() {
+    requestFogBootToken += 1;
+    import('./request-flow-fog.js?v=20250709-full-site')
+      .then(function (mod) {
+        mod.stopRequestFlowFog();
+      })
+      .catch(function () {});
+  }
+
   function isRequestFlowActive() {
     return isIndexCreateMode() || (isCreatePage && isRequestFlow());
   }
@@ -646,7 +936,7 @@
     }
 
     try {
-      const mod = await import('./amulet-show.js?v=20250708-result-answers');
+      const mod = await import('./amulet-show.js?v=20250708-figma-2604');
       await mod.showFinishedAmulet(answers);
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
@@ -812,7 +1102,7 @@
 
   window.amuletUnlockSemanticQuestionUi = unlockSemanticQuestionUi;
 
-  /** Q4–Q7: vectors already visible — only warm PBR compose when browser is idle. */
+  /** Q4-Q7: vectors already visible - only warm PBR compose when browser is idle. */
   function schedulePostVectorPrecompose(answers, answeredIndex) {
     if (answeredIndex < 3 || answeredIndex > 6) return;
     if (typeof window.amuletSchedulePrecompose === 'function') {
@@ -845,6 +1135,7 @@
     const el = fieldWrap.querySelector('.intro__question-input');
     return el && 'value' in el ? el.value.trim() : '';
   }
+
 
   function saveAnswer(index, value) {
     const question = questions[index];
@@ -879,43 +1170,112 @@
           return;
         }
         const nextIndex = nextUnansweredIndex(answers);
-        const willShowNewLayer =
-          typeof window.amuletWillShowNewVectorLayer === 'function' &&
-          window.amuletWillShowNewVectorLayer(answers);
-        const needsCatchup =
-          typeof window.amuletNeedsVectorCatchup === 'function' &&
-          window.amuletNeedsVectorCatchup(answers);
+        const isQuestionTransition =
+          isRequestFlowActive() && activeIndex !== null && activeIndex !== nextIndex;
 
         mountAmuletInCreateSlot();
 
-        if (willShowNewLayer) {
-          document.body.classList.add('is-vector-frame-loading');
+        if (nextIndex >= 3) {
+          document.body.classList.add('is-semantic-questions');
+        }
+
+        async function buildVectorIfNeeded(allowUiBlock) {
           try {
-            if (typeof window.amuletShowLoader === 'function') {
-              await window.amuletShowLoader('טוען קמע', { keepPreview: false });
-            }
-            await runAmuletBuild(answers, {
-              uiBlocking: true,
-              showLoader: true,
-            });
+            await ensureAmuletModules();
           } catch (err) {
-            console.error('[questionnaire] vector build failed', err);
-          } finally {
-            document.body.classList.remove('is-vector-frame-loading');
+            console.error('[questionnaire] failed to load amulet build', err);
+            return;
           }
-        } else if (needsCatchup) {
-          void runAmuletBuild(answers, {
-            uiBlocking: false,
-            showLoader: false,
+
+          const willShowNewLayer =
+            typeof window.amuletWillShowNewVectorLayer === 'function' &&
+            window.amuletWillShowNewVectorLayer(answers);
+          const needsCatchup =
+            typeof window.amuletNeedsVectorCatchup === 'function' &&
+            window.amuletNeedsVectorCatchup(answers);
+
+          if (!willShowNewLayer) {
+            if (needsCatchup) {
+              await runAmuletBuild(answers, {
+                uiBlocking: allowUiBlock !== false,
+                showLoader: false,
+              });
+            }
+            return;
+          }
+
+          await runAmuletBuild(answers, {
+            uiBlocking: allowUiBlock !== false,
+            showLoader: true,
           });
         }
 
-        if (nextIndex >= 3) {
-          document.body.classList.add('is-semantic-questions');
-          unlockSemanticQuestionUi();
+        async function transitionNeedsLoader(answeredIndex, data) {
+          const needsChoiceVector =
+            (answeredIndex === 3 && data.q4Belief) ||
+            (answeredIndex === 4 && data.q5Feeling);
+          try {
+            await ensureAmuletModules();
+          } catch (_err) {
+            return needsChoiceVector;
+          }
+          const willShowNewLayer =
+            typeof window.amuletWillShowNewVectorLayer === 'function' &&
+            window.amuletWillShowNewVectorLayer(data);
+          const needsCatchup =
+            typeof window.amuletNeedsVectorCatchup === 'function' &&
+            window.amuletNeedsVectorCatchup(data);
+          return Boolean(willShowNewLayer || needsCatchup || needsChoiceVector);
         }
 
-        openModal(nextIndex);
+        const needsLoader = await transitionNeedsLoader(index, answers);
+        const nextIsDockChoice = isDockChoiceQuestionAt(nextIndex);
+
+        function revealNextQuestion() {
+          populateCreateQuestion(nextIndex);
+          document.body.classList.remove('is-question-transition-loading');
+          if (requestArtboard) requestArtboard.classList.remove('is-advancing');
+        }
+
+        async function runTransitionBuild() {
+          try {
+            if (!needsLoader) return;
+            await buildVectorIfNeeded(!nextIsDockChoice);
+            await syncChoicePresetVectorsFromAnswers(answers);
+            if (!nextIsDockChoice && typeof window.amuletWaitFrameLoaderIdle === 'function') {
+              await window.amuletWaitFrameLoaderIdle();
+            }
+            if (!nextIsDockChoice) {
+              await new Promise(function (resolve) {
+                requestAnimationFrame(function () {
+                  requestAnimationFrame(resolve);
+                });
+              });
+            }
+          } catch (err) {
+            console.error('[questionnaire] question transition build failed', err);
+          }
+        }
+
+        if (isQuestionTransition) {
+          if (nextIsDockChoice) {
+            if (needsLoader) {
+              revealNextQuestion();
+              void runTransitionBuild();
+            } else {
+              animateRequestQuestionChange(revealNextQuestion);
+            }
+          } else if (needsLoader) {
+            document.body.classList.add('is-question-transition-loading');
+            await runTransitionBuild();
+            revealNextQuestion();
+          } else {
+            animateRequestQuestionChange(revealNextQuestion);
+          }
+        } else {
+          revealNextQuestion();
+          if (needsLoader) void runTransitionBuild();
+        }
 
         if (index >= 3 && index <= 6) {
           schedulePostVectorPrecompose(answers, index);
@@ -938,16 +1298,60 @@
     }, PANEL_MS);
   }
 
+  function questionHasChoiceDividers(question) {
+    return Boolean(question && question.choiceDividers);
+  }
+
+  function appendChoiceDivider(parent) {
+    const divider = document.createElement('div');
+    divider.className = 'intro__choice-divider';
+    divider.setAttribute('role', 'presentation');
+    divider.setAttribute('aria-hidden', 'true');
+    parent.appendChild(divider);
+    return divider;
+  }
+
+  function appendChoiceOption(parent, opt, selectedValue, bindChoiceButton) {
+    const btn = createChoiceButton(opt, selectedValue);
+    bindChoiceButton(btn, opt);
+    parent.appendChild(btn);
+    return btn;
+  }
+
+  function createChoiceButton(opt, selectedValue) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className =
+      'intro__choice-btn intro__choice-btn--figma' +
+      (selectedValue === opt.value ? ' is-selected' : '') +
+      (opt.fitWidth ? ' is-fit-width' : '');
+    btn.dataset.value = opt.value;
+
+    const label = document.createElement('span');
+    label.className = 'intro__choice-btn__label';
+    label.textContent = opt.label;
+
+    const radio = document.createElement('span');
+    radio.className = 'intro__choice-btn__radio';
+    radio.setAttribute('aria-hidden', 'true');
+
+    btn.appendChild(label);
+    btn.appendChild(radio);
+    return btn;
+  }
+
   function renderCreateField(question, answers, index) {
     fieldWrap.innerHTML = '';
     delete fieldWrap.dataset.choiceValue;
     const value = answers[question.key] || '';
-    const useSaveForChoice =
-      question.type === 'choice' && (isRequestFlowActive() || index >= 3);
+    const useDockChoiceGrid =
+      question.type === 'choice' && isRequestFlowActive();
+    const useSaveForChoice = useDockChoiceGrid;
+    const hideChoiceSubmit = useDockChoiceGrid && !useSaveForChoice;
 
     if (question.type === 'choice') {
-      if (submitBtn) submitBtn.hidden = !useSaveForChoice;
-      if (saveWrap) saveWrap.hidden = !useSaveForChoice;
+      if (submitBtn) submitBtn.hidden = hideChoiceSubmit;
+      if (saveWrap) saveWrap.hidden = hideChoiceSubmit;
 
       let selectedValue = value;
       if (useSaveForChoice && selectedValue) {
@@ -957,68 +1361,55 @@
       const grid = document.createElement('div');
       grid.className = 'intro__choice-grid intro__choice-grid--figma';
       grid.dataset.choiceCount = String(question.options.length);
+      const useChoiceDividers = questionHasChoiceDividers(question);
 
-      if (isRequestFlowActive()) {
-        grid.classList.add('intro__choice-grid--stack');
-        question.options.forEach(function (opt) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className =
-            'intro__choice-btn intro__choice-btn--figma' +
-            (selectedValue === opt.value ? ' is-selected' : '');
-          btn.textContent = opt.label;
-          btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (useSaveForChoice) {
-              selectedValue = opt.value;
-              fieldWrap.dataset.choiceValue = opt.value;
-              grid.querySelectorAll('.intro__choice-btn--figma').forEach(function (b) {
-                b.classList.toggle('is-selected', b === btn);
-              });
-              if (submitBtn) submitBtn.disabled = !validate(question, opt.value);
-              return;
-            }
-            saveAnswer(index, opt.value);
-          });
-          grid.appendChild(btn);
-        });
-        fieldWrap.appendChild(grid);
-        return null;
+      if (useDockChoiceGrid) {
+        grid.classList.add('intro__choice-grid--dock');
+      }
+      if (useChoiceDividers) {
+        grid.classList.add('intro__choice-grid--divided');
       }
 
-      const rowPlan = getChoiceRowIndices(question.options.length);
-      rowPlan.forEach(function (indices, rowIndex) {
-        const row = document.createElement('div');
-        row.className = 'intro__choice-grid-row';
-        if (indices.length < 3) {
-          row.classList.add('intro__choice-grid-row--partial');
-        }
-        indices.forEach(function (optIndex) {
-          const opt = question.options[optIndex];
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className =
-            'intro__choice-btn intro__choice-btn--figma' +
-            (selectedValue === opt.value ? ' is-selected' : '') +
-            (opt.fitWidth ? ' is-fit-width' : '');
-          btn.textContent = opt.label;
-          btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (useSaveForChoice) {
-              selectedValue = opt.value;
-              fieldWrap.dataset.choiceValue = opt.value;
-              grid.querySelectorAll('.intro__choice-btn--figma').forEach(function (b) {
-                b.classList.toggle('is-selected', b === btn);
-              });
+      function bindChoiceButton(btn, opt) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (useSaveForChoice) {
+            selectedValue = opt.value;
+            fieldWrap.dataset.choiceValue = opt.value;
+            grid.querySelectorAll('.intro__choice-btn--figma').forEach(function (b) {
+              b.classList.toggle('is-selected', b === btn);
+            });
               if (submitBtn) submitBtn.disabled = !validate(question, opt.value);
               return;
-            }
-            saveAnswer(index, opt.value);
-          });
-          row.appendChild(btn);
+          }
+          saveAnswer(index, opt.value);
         });
-        grid.appendChild(row);
-      });
+      }
+
+      if (useDockChoiceGrid) {
+        question.options.forEach(function (opt, optIndex) {
+          if (useChoiceDividers && optIndex > 0) {
+            appendChoiceDivider(grid);
+          }
+          appendChoiceOption(grid, opt, selectedValue, bindChoiceButton);
+        });
+      } else {
+        const rowPlan = getChoiceRowIndices(question.options.length, false);
+        rowPlan.forEach(function (indices) {
+          const row = document.createElement('div');
+          row.className = 'intro__choice-grid-row';
+          if (indices.length < 3) {
+            row.classList.add('intro__choice-grid-row--partial');
+          }
+          indices.forEach(function (optIndex) {
+            const opt = question.options[optIndex];
+            const btn = createChoiceButton(opt, selectedValue);
+            bindChoiceButton(btn, opt);
+            row.appendChild(btn);
+          });
+          grid.appendChild(row);
+        });
+      }
       fieldWrap.appendChild(grid);
       return null;
     }
@@ -1026,14 +1417,12 @@
     submitBtn.hidden = false;
     if (saveWrap) saveWrap.hidden = false;
 
-    const useTextareaField =
-      question.type === 'textarea' ||
-      (question.type === 'text' && isRequestFlowActive());
+    const useTextareaField = question.type === 'textarea';
 
     if (useTextareaField) {
       const el = document.createElement('textarea');
       el.className = 'intro__question-input';
-      el.rows = 2;
+      el.rows = 1;
       el.placeholder = '';
       el.value = value;
       if (question.type === 'text') {
@@ -1042,6 +1431,7 @@
         });
       }
       fieldWrap.appendChild(el);
+      bindDockQuestionInputGrow(el);
       return el;
     }
 
@@ -1061,31 +1451,93 @@
         Boolean(question.figmaTitleOffset)
       );
     }
+    if (textEl) {
+      textEl.classList.toggle('is-title-offset', Boolean(question.figmaTitleOffset));
+    }
   }
 
-  function setCreateQuestionText(question) {
-    if (tagEl) {
-      tagEl.textContent = question.tag || '[בקשה]';
+  function syncRequestQuestionTextLayout() {
+    if (!isRequestFlowActive() || !requestArtboard) return;
+    requestArtboard.style.removeProperty('--figma-q-desc-top');
+  }
+
+  function getAnsweredVectorStage() {
+    const answers = loadAnswers();
+    if (!answers.q1Wish || !String(answers.q1Wish).trim()) return 0;
+    if (!answers.q2Name || !String(answers.q2Name).trim()) return 1;
+    if (!answers.q3WhyNow || !String(answers.q3WhyNow).trim()) return 2;
+    return 3;
+  }
+
+  async function syncChoicePresetVectorsFromAnswers(answers) {
+    if (!isRequestFlowActive()) return;
+    const data = answers || loadAnswers();
+    const mod = await import('./choice-preset-vectors.js?v=20250709-choice-vectors');
+    await mod.syncChoicePresetThumbVectors(data);
+  }
+
+  function hideVectorTip() {
+    if (vectorCopyEl) vectorCopyEl.hidden = true;
+  }
+
+  function syncVectorCopy(_explicitStage, questionIndex) {
+    if (!vectorCopyEl || !isRequestFlowActive()) return;
+    const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
+
+    syncAmuletStageCaption(0);
+
+    if (qIndex === null || qIndex < 1) {
+      hideVectorTip();
+      return;
+    }
+
+    if (vectorCopyTextEl) {
+      vectorCopyTextEl.textContent = getVectorTipText(qIndex);
+    }
+    vectorCopyEl.hidden = false;
+  }
+
+  function syncAmuletStageCaption(_stage) {
+    if (!amuletStageCaptionEl || !isRequestFlowActive()) return;
+    amuletStageCaptionEl.textContent = '';
+    amuletStageCaptionEl.hidden = true;
+    if (requestArtboard) {
+      requestArtboard.style.removeProperty('--figma-amulet-caption-top');
+    }
+  }
+
+  function setCreateQuestionText(question, index) {
+    const stepNum =
+      typeof index === 'number' ? index + 1 : activeIndex !== null ? activeIndex + 1 : 1;
+    const category = question.tag || '[בקשה]';
+    if (tagStepEl) tagStepEl.textContent = stepNum + '/8';
+    if (tagCategoryEl) tagCategoryEl.textContent = category;
+    if (tagEl && !tagStepEl && !tagCategoryEl) {
+      tagEl.textContent = stepNum + '/8 ' + category;
     }
     applyRequestQuestionLayout(question);
-    const headEl = requestActiveCard && requestActiveCard.querySelector('.figma-q__head');
-    if (headEl) {
-      headEl.classList.toggle('is-title-offset', Boolean(question.figmaTitleOffset));
+    if (textEl) {
+      textEl.classList.toggle('is-title-offset', Boolean(question.figmaTitleOffset));
     }
     if (!textEl) return;
     textEl.textContent = question.text;
     if (descEl) {
       if (question.description) {
-        descEl.textContent = question.description;
+        descEl.textContent = window.pagmarNormalizeDashes
+          ? window.pagmarNormalizeDashes(question.description)
+          : question.description;
         descEl.hidden = false;
       } else {
         descEl.textContent = '';
         descEl.hidden = true;
       }
     }
+    requestAnimationFrame(function () {
+      syncRequestQuestionTextLayout();
+    });
   }
 
-  function ensureCreateSaveVisible() {
+  function ensureCreateSaveVisible(question, index) {
     if (typeof window.restoreCreateQuestionInput === 'function') {
       window.restoreCreateQuestionInput();
     }
@@ -1094,7 +1546,10 @@
     if (workspace) {
       workspace.classList.remove('is-create-complete');
     }
-    const saveWrapEl = document.querySelector('.figma-q__btn-outer, .pagmar__create-save-wrap');
+    const hideDockChoiceSubmit = false;
+    const saveWrapEl =
+      document.getElementById('questionSubmitWrap') ||
+      document.querySelector('.figma-q__btn-outer, .pagmar__create-save-wrap');
     const submitEl = document.getElementById('questionSubmit');
     const questionBox = document.querySelector('.figma-q__field-box, .pagmar__create-question-box');
     if (questionBox) {
@@ -1102,11 +1557,16 @@
       questionBox.style.removeProperty('display');
     }
     if (saveWrapEl) {
-      saveWrapEl.hidden = false;
-      saveWrapEl.style.removeProperty('display');
+      saveWrapEl.hidden = hideDockChoiceSubmit;
+      if (!hideDockChoiceSubmit) {
+        saveWrapEl.style.removeProperty('display');
+      }
     }
     if (submitEl) {
-      submitEl.hidden = false;
+      submitEl.hidden = hideDockChoiceSubmit;
+      if (!hideDockChoiceSubmit) {
+        submitEl.hidden = false;
+      }
     }
   }
 
@@ -1118,7 +1578,12 @@
       unlockSemanticQuestionUi();
     }
 
-    ensureCreateSaveVisible();
+    const isDockChoiceQuestion =
+      question.type === 'choice' && isRequestFlowActive();
+    const isChoiceSaveQuestion =
+      question.type === 'choice' && isRequestFlowActive();
+
+    ensureCreateSaveVisible(question, index);
 
     if (typeof window.gardenCapturePlacementAnchor === 'function') {
       window.gardenCapturePlacementAnchor();
@@ -1126,30 +1591,40 @@
 
     applyCreateLayout(question);
 
-    document.body.classList.toggle('is-choice-question', question.type === 'choice');
+    document.body.classList.toggle('is-choice-question', isDockChoiceQuestion);
+    document.body.classList.toggle('is-choice-save', isChoiceSaveQuestion);
     document.body.classList.toggle('is-semantic-questions', index >= 3);
     if (indexCreateWorkspace) {
-      indexCreateWorkspace.classList.toggle('is-choice-question', question.type === 'choice');
+      indexCreateWorkspace.classList.toggle('is-choice-question', isDockChoiceQuestion);
+      indexCreateWorkspace.classList.toggle('is-choice-save', isChoiceSaveQuestion);
+    }
+    if (requestArtboard) {
+      requestArtboard.classList.toggle('is-choice-question', isDockChoiceQuestion);
+      requestArtboard.classList.toggle('is-choice-save', isChoiceSaveQuestion);
     }
 
     const answers = loadAnswers();
     if (labelEl) labelEl.textContent = questionNumber(index);
-    setCreateQuestionText(question);
+    setCreateQuestionText(question, index);
     updateRequestProgress(index);
 
     const fieldEl = renderCreateField(question, answers, index);
     setCreateSaveLabel(index);
+    syncVectorCopy(getAnsweredVectorStage(), index);
+    syncChoicePresetVectorsFromAnswers(answers);
 
     if (fieldEl) {
       startPlaceholderCycle(fieldEl, question);
       submitBtn.disabled = !validate(question, fieldEl.value.trim());
+      resizeDockQuestionInput(fieldEl);
       fieldEl.addEventListener('input', function () {
         if (document.body.classList.contains('is-building') && index < 3) return;
         submitBtn.disabled = !validate(question, fieldEl.value.trim());
+        resizeDockQuestionInput(fieldEl);
       });
     } else {
       stopPlaceholderCycle();
-      if (question.type === 'choice' && (isRequestFlowActive() || index >= 3)) {
+      if (question.type === 'choice' && isRequestFlowActive()) {
         submitBtn.disabled = !validate(question, getCreateInputValue());
       } else {
         submitBtn.disabled = true;
@@ -1161,6 +1636,12 @@
     document.body.classList.add('is-panel-open');
     window.dispatchEvent(new CustomEvent('questionnaire:panel-open'));
     bindFigmaSubmitButtonHover();
+
+    ensureDockLiftObserver();
+    requestAnimationFrame(function () {
+      syncDockAmuletLift();
+      syncRequestQuestionTextLayout();
+    });
 
     requestAnimationFrame(function () {
       if (!fieldEl) return;
@@ -1178,15 +1659,10 @@
     const question = questions[index];
     if (!question || !frame) return;
 
-    const isAdvance =
+    const isTransition =
       isRequestFlowActive() && activeIndex !== null && activeIndex !== index;
 
-    if (isAdvance) {
-      /* Q4–Q8: no vector work — show next question immediately. */
-      if (index >= 3) {
-        populateCreateQuestion(index);
-        return;
-      }
+    if (isTransition) {
       animateRequestQuestionChange(function () {
         populateCreateQuestion(index);
       });
@@ -1230,13 +1706,13 @@
     choiceQuestion.textContent = question.text;
     choiceOptions.innerHTML = '';
 
-    question.options.forEach(function (opt) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className =
-        'pagmar__choice-pill' + (current === opt.value ? ' is-selected' : '');
-      btn.dataset.value = opt.value;
-      btn.textContent = opt.label;
+    const useChoiceDividers = questionHasChoiceDividers(question);
+    question.options.forEach(function (opt, optIndex) {
+      if (useChoiceDividers && optIndex > 0) {
+        appendChoiceDivider(choiceOptions);
+      }
+      const btn = createChoiceButton(opt, current);
+      btn.classList.add('pagmar__choice-pill');
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         saveAnswer(index, opt.value);
@@ -1354,7 +1830,7 @@
     top = Math.max(margin, Math.min(vh - panelH - margin, top));
     left = Math.max(margin, Math.min(vw - panelW - margin, left));
 
-    /* Figma Frame 265 — label anchored to physical left of amulet */
+    /* Figma Frame 265 - label anchored to physical left of amulet */
     left = amuletLeft - panelW * 0.92;
     top = amuletTop + visualHalfH * 0.15;
     left = Math.max(margin, Math.min(vw - panelW - margin, left));
@@ -1383,8 +1859,9 @@
   }
 
   function plainWishText(wish) {
-    const trimmed = (wish || '').trim();
-    if (!trimmed || trimmed === '—') return '—';
+    const raw = window.pagmarNormalizeDashes ? window.pagmarNormalizeDashes(wish) : wish;
+    const trimmed = (raw || '').trim();
+    if (!trimmed || trimmed === '-') return '-';
     return trimmed.replace(/^[\u05F4"\u201C]+|[\u05F4"\u201D]+$/g, '').trim() || trimmed;
   }
 
@@ -1562,7 +2039,7 @@
   }
 
   function positionIndexCreateWindow() {
-    /* מיקום מרכזי דרך CSS — רק מעדכן גובה דינמי לשאלות בחירה */
+    /* מיקום מרכזי דרך CSS - רק מעדכן גובה דינמי לשאלות בחירה */
     if (!indexCreateWorkspace) return;
     indexCreateWorkspace.style.removeProperty('--index-create-x');
     indexCreateWorkspace.style.removeProperty('--index-create-y');
@@ -1586,6 +2063,9 @@
 
     indexCreateWorkspace.hidden = true;
     indexCreateWorkspace.classList.remove('is-create-complete');
+    if (requestArtboard) {
+      requestArtboard.classList.remove('is-choice-question', 'is-choice-save');
+    }
     if (typeof window.restoreCreateQuestionInput === 'function') {
       window.restoreCreateQuestionInput();
     }
@@ -1594,10 +2074,13 @@
       'is-create-mode',
       'is-panel-open',
       'is-building',
+      'is-vector-frame-loading',
+      'is-question-transition-loading',
       'is-amulet-ready',
       'is-create-amulet-ready',
       'is-amulet-rendering',
       'is-choice-question',
+      'is-choice-save',
       'is-semantic-questions',
       'is-result-overlay-open'
     );
@@ -1608,6 +2091,10 @@
     }
     window.dispatchEvent(new CustomEvent('questionnaire:create-close'));
 
+    stopRequestFlowFogIfNeeded();
+    stopCreateAmuletMorph();
+    stopDockLiftObserver();
+    hideVectorTip();
     restoreAmuletToStage();
 
     const status = document.getElementById('amuletStatus');
@@ -1648,7 +2135,6 @@
 
   function exitIndexCreateFlow() {
     if (!isIndexCreateMode() || !indexCreateWorkspace) return;
-    if (document.body.classList.contains('is-result-overlay-open')) return;
     cancelCreateBuildIfNeeded();
 
     window.clearTimeout(indexCreateExitTimer);
@@ -1660,6 +2146,110 @@
       finishExitIndexCreateFlow,
       INDEX_TRANSITION_MS
     );
+  }
+
+  function restartQuestionnaireFromResult() {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem('amuletUserPlacementAnchor');
+    sessionStorage.removeItem('amuletUserAnswers');
+    sessionStorage.removeItem('amuletComposed3D');
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('amuletUserAnswers');
+      localStorage.removeItem('amuletComposed3D');
+    } catch (_) {}
+
+    if (typeof window.amuletBuildCancel === 'function') {
+      window.amuletBuildCancel();
+    }
+    resetCreateAmuletPreview();
+    if (typeof window.amuletInvalidateComposeCache === 'function') {
+      window.amuletInvalidateComposeCache();
+    }
+    if (typeof window.amuletInvalidateDetailComposeCache === 'function') {
+      window.amuletInvalidateDetailComposeCache();
+    }
+
+    updateStepIndicators({});
+
+    if (isIndexPage && indexCreateWorkspace) {
+      document.body.classList.add('is-create-mode');
+      document.body.classList.remove(
+        'is-create-exiting',
+        'is-create-complete',
+        'is-amulet-rendering',
+        'is-result-overlay-open',
+        'is-amulet-ready',
+        'is-create-amulet-ready'
+      );
+      indexCreateWorkspace.hidden = false;
+      indexCreateWorkspace.classList.remove('is-create-complete');
+      indexCreateWorkspace.classList.add('is-open');
+      if (requestArtboard) {
+        requestArtboard.classList.remove('is-choice-question', 'is-choice-save');
+      }
+      if (typeof window.restoreCreateQuestionInput === 'function') {
+        window.restoreCreateQuestionInput();
+      }
+      const questionBox = document.querySelector('.figma-q__field-box, .pagmar__create-question-box');
+      const saveWrap =
+        document.getElementById('questionSubmitWrap') ||
+        document.getElementById('questionSubmitWrap') ||
+        document.querySelector('.figma-q__btn-outer, .pagmar__create-save-wrap');
+      if (questionBox) {
+        questionBox.hidden = false;
+        questionBox.style.removeProperty('display');
+      }
+      if (saveWrap) {
+        saveWrap.hidden = false;
+        saveWrap.style.removeProperty('display');
+      }
+      if (requestProgressTotal) {
+        requestProgressTotal.textContent = '/ 08';
+      }
+      mountAmuletInCreateSlot();
+      startCreateAmuletMorph();
+      ensureDockLiftObserver();
+      activeIndex = null;
+      openModal(0);
+      requestAnimationFrame(function () {
+        updateRequestProgress(0);
+      });
+      window.dispatchEvent(new CustomEvent('questionnaire:create-open'));
+      bootRequestFlowFogIfNeeded();
+      return;
+    }
+
+    if (isCreatePage) {
+      document.body.classList.remove(
+        'is-amulet-rendering',
+        'is-result-overlay-open',
+        'is-create-complete',
+        'is-amulet-ready',
+        'is-create-amulet-ready'
+      );
+      const createFlow = document.getElementById('createFlow');
+      if (createFlow) {
+        createFlow.hidden = false;
+      }
+      if (requestArtboard) {
+        requestArtboard.classList.remove('is-choice-question', 'is-choice-save');
+      }
+      if (typeof window.restoreCreateQuestionInput === 'function') {
+        window.restoreCreateQuestionInput();
+      }
+      if (requestProgressTotal) {
+        requestProgressTotal.textContent = '/ 08';
+      }
+      startCreateAmuletMorph();
+      ensureDockLiftObserver();
+      activeIndex = null;
+      openModal(0);
+      requestAnimationFrame(function () {
+        updateRequestProgress(0);
+      });
+      bootRequestFlowFogIfNeeded();
+    }
   }
 
   function startIndexCreateFlow() {
@@ -1678,6 +2268,7 @@
     if (typeof window.amuletBuildCancel === 'function') {
       window.amuletBuildCancel();
     }
+    resetCreateAmuletPreview();
     if (typeof window.amuletInvalidateComposeCache === 'function') {
       window.amuletInvalidateComposeCache();
     }
@@ -1701,7 +2292,9 @@
       window.restoreCreateQuestionInput();
     }
     const questionBox = document.querySelector('.figma-q__field-box, .pagmar__create-question-box');
-    const saveWrap = document.querySelector('.figma-q__btn-outer, .pagmar__create-save-wrap');
+    const saveWrap =
+      document.getElementById('questionSubmitWrap') ||
+      document.querySelector('.figma-q__btn-outer, .pagmar__create-save-wrap');
     if (questionBox) {
       questionBox.hidden = false;
       questionBox.style.removeProperty('display');
@@ -1716,6 +2309,8 @@
     }
 
     mountAmuletInCreateSlot();
+    startCreateAmuletMorph();
+    ensureDockLiftObserver();
 
     void ensureAmuletModules()
       .then(function () {
@@ -1739,41 +2334,45 @@
     });
 
     pushCreateHistory();
+    bootRequestFlowFogIfNeeded();
+  }
+
+  function rewindCreateHistory() {
+    let steps = 0;
+    const view = history.state && history.state.pagmarView;
+    if (view === 'result') {
+      steps = history.length > 1 ? Math.min(2, history.length - 1) : 0;
+    } else if (view === 'create' || createHistoryPushed) {
+      steps = history.length > 1 ? 1 : 0;
+    }
+    createHistoryPushed = false;
+    if (steps <= 0) return;
+    createPopstateIgnore += 1;
+    try {
+      history.go(-steps);
+    } catch (_) {
+      createPopstateIgnore = Math.max(0, createPopstateIgnore - 1);
+    }
   }
 
   function exitCreatePage() {
     if (!isCreatePage) return;
+    stopRequestFlowFogIfNeeded();
     sessionStorage.removeItem(STORAGE_KEY);
-    if (createHistoryPushed && history.length > 1) {
-      createHistoryPushed = false;
-      try {
-        history.back();
-        return;
-      } catch (_) {}
-    }
-    createHistoryPushed = false;
+    const view = history.state && history.state.pagmarView;
+    const canRewind =
+      history.length > 1 &&
+      (createHistoryPushed || view === 'create' || view === 'result');
+    rewindCreateHistory();
+    if (canRewind) return;
     window.location.href = 'index.html';
   }
 
   function handleRequestClose() {
     stopPlaceholderCycle();
-    if (document.body.classList.contains('is-result-overlay-open')) return;
     cancelCreateBuildIfNeeded();
-    if (
-      document.body.classList.contains('is-amulet-ready') ||
-      document.body.classList.contains('is-create-amulet-ready')
-    ) {
-      return;
-    }
     if (isIndexCreateMode()) {
-      if (createHistoryPushed && history.length > 1) {
-        createHistoryPushed = false;
-        try {
-          history.back();
-        } catch (_) {}
-        return;
-      }
-      createHistoryPushed = false;
+      rewindCreateHistory();
       exitIndexCreateFlow();
       return;
     }
@@ -1784,6 +2383,14 @@
 
   if (requestCloseBtn) {
     requestCloseBtn.addEventListener('click', handleRequestClose);
+  }
+
+  if (requestAboutBtn) {
+    requestAboutBtn.addEventListener('click', function () {
+      if (typeof window.openAboutShell === 'function') {
+        window.openAboutShell();
+      }
+    });
   }
 
   if (textClose) {
@@ -1824,9 +2431,14 @@
   window.addEventListener('resize', function () {
     if (document.body.classList.contains('is-create-mode')) {
       positionIndexCreateWindow();
-      if (activeIndex !== null && isRequestFlowActive()) {
-        updateRequestStepRail(activeIndex);
-      }
+    }
+    if (activeIndex !== null && isRequestFlowActive()) {
+      updateRequestStepRail(activeIndex);
+      const dockInput = fieldWrap && fieldWrap.querySelector('.intro__question-input');
+      if (dockInput) resizeDockQuestionInput(dockInput);
+      else syncDockAmuletLift();
+      syncRequestQuestionTextLayout();
+      syncAmuletStageCaptionPosition();
     }
     if (isSpecPanelOpen() && activeSpecAnchorTex != null) {
       const anchor = resolveSpecAnchor(activeSpecAnchorTex, null);
@@ -1877,6 +2489,7 @@
   async function restoreResultViewIfNeeded() {
     const params = new URLSearchParams(location.search);
     const forcePreview = params.get('result') === '1';
+    const answers = loadAnswers();
     const shouldRestore =
       forcePreview ||
       (typeof window.pagmarShouldRestoreResultView === 'function' &&
@@ -1886,17 +2499,17 @@
     if (!shouldRestore) return;
     if (!isIndexPage && !isCreatePage) return;
 
-    let answers = loadAnswers();
-    if (forcePreview && !allAnswered(answers)) {
+    let resolvedAnswers = answers;
+    if (forcePreview && !allAnswered(resolvedAnswers)) {
       try {
-        const mod = await import('./amulet-show.js?v=20250708-result-answers');
-        answers = mod.DEMO_RESULT_ANSWERS;
-        saveAnswers(answers);
+        const mod = await import('./amulet-show.js?v=20250709-full-site');
+        resolvedAnswers = mod.DEMO_RESULT_ANSWERS;
+        saveAnswers(resolvedAnswers);
       } catch (err) {
         console.warn('[questionnaire] demo result answers unavailable', err);
         return;
       }
-    } else if (!allAnswered(answers)) {
+    } else if (!allAnswered(resolvedAnswers)) {
       return;
     }
 
@@ -1909,6 +2522,11 @@
       mountAmuletInCreateSlot();
     }
 
+    document.body.classList.add('is-amulet-rendering');
+    if (typeof window.amuletShowLoader === 'function') {
+      await window.amuletShowLoader('טוען קמע', { fullscreen: true, gallery: true });
+    }
+
     try {
       await ensureAmuletModules();
     } catch (err) {
@@ -1917,11 +2535,11 @@
     }
 
     if (typeof window.pagmarRestoreResultView === 'function') {
-      await window.pagmarRestoreResultView(answers);
+      await window.pagmarRestoreResultView(resolvedAnswers);
       return;
     }
 
-    await showFinishedAmuletNow(answers);
+    await showFinishedAmuletNow(resolvedAnswers);
   }
 
   function restoreCompletedSession() {
@@ -1977,6 +2595,7 @@
         localStorage.removeItem('amuletUserAnswers');
         localStorage.removeItem('amuletComposed3D');
       } catch (_) {}
+      resetCreateAmuletPreview();
     }
     if (typeof window.amuletInvalidateComposeCache === 'function') {
       window.amuletInvalidateComposeCache();
@@ -1988,10 +2607,16 @@
     if (requestProgressTotal) {
       requestProgressTotal.textContent = '/ 08';
     }
+    startCreateAmuletMorph();
+    ensureDockLiftObserver();
+    void ensureAmuletModules().catch(function (err) {
+      console.error('[questionnaire] failed to load create modules', err);
+    });
     window.setTimeout(function () {
       openModal(0);
     }, 120);
     pushCreateHistory();
+    bootRequestFlowFogIfNeeded();
   }
 
   window.addEventListener('popstate', function () {
@@ -2039,7 +2664,33 @@
     }
   });
 
+  window.addEventListener('questionnaire:vector-ready', function (evt) {
+    const stage = evt.detail && evt.detail.stage;
+    syncVectorCopy(stage, activeIndex);
+  });
+
+  function resetStuckIndexFlowState() {
+    if (!isIndexPage) return;
+    document.body.classList.remove('is-vector-frame-loading', 'is-question-transition-loading');
+    if (!document.body.classList.contains('is-create-mode')) {
+      document.body.classList.remove(
+        'is-building',
+        'is-amulet-rendering',
+        'is-create-exiting',
+        'is-choice-question',
+        'is-choice-save',
+        'is-semantic-questions'
+      );
+      if (indexCreateWorkspace) {
+        indexCreateWorkspace.classList.remove('is-open');
+      }
+      const garden = document.getElementById('questionGarden');
+      if (garden) garden.hidden = false;
+    }
+  }
+
   buildProgressDots();
+  resetStuckIndexFlowState();
   restoreCompletedSession();
   updateStepIndicators(loadAnswers());
   initCreatePage();
@@ -2053,8 +2704,26 @@
 
   if (isIndexPage) {
     window.startIndexCreateFlow = startIndexCreateFlow;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const openCreateFromUrl =
+        urlParams.get('create') === '1' ||
+        urlParams.get('questionnaire') === '1' ||
+        urlParams.get('q') === '1';
+      if (openCreateFromUrl) {
+        window.setTimeout(function () {
+          startIndexCreateFlow();
+        }, 0);
+      } else if (sessionStorage.getItem('pagmarOpenCreateOnLoad') === '1') {
+        sessionStorage.removeItem('pagmarOpenCreateOnLoad');
+        window.setTimeout(function () {
+          startIndexCreateFlow();
+        }, 0);
+      }
+    } catch (_) {}
   }
 
   window.pagmarPushResultHistory = pushResultHistory;
   window.pagmarResetCreateHistoryAfterSave = resetCreateHistoryAfterSave;
+  window.pagmarRestartQuestionnaire = restartQuestionnaireFromResult;
 })();

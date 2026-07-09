@@ -1,5 +1,5 @@
 /**
- * Luca fog — back: autonomous only. Front (over amulets): mouse shifts fog, no hole.
+ * Luca fog - back: autonomous only. Front (over amulets): mouse gently repels fog.
  */
 import * as THREE from './vendor/three.module.js';
 
@@ -28,9 +28,26 @@ uniform vec2 uMouse;
 uniform vec2 uMouseVel;
 uniform float uMouseRadius;
 uniform float uMousePush;
+uniform float uMouseRepel;
 uniform float uTopFadeLo;
 uniform float uTopFadeHi;
 uniform float uBottomBoost;
+uniform float uTexMaskLoDeep;
+uniform float uTexMaskLoLift;
+uniform float uBaseFogLo;
+uniform float uSmFogLo;
+uniform float uColorLift;
+uniform float uBaseNoiseLo;
+uniform float uBaseNoiseHi;
+uniform float uSmNoiseLo;
+uniform float uSmNoiseHi;
+uniform float uTexNoiseLoDeep;
+uniform float uTexNoiseHiDeep;
+uniform float uTexNoiseLoLift;
+uniform float uTexNoiseHiLift;
+uniform float uFogBandLo;
+uniform float uFogBandHi;
+uniform vec2 uMouseParallax;
 varying vec2 vUv;
 
 float hash(vec2 p) {
@@ -64,6 +81,7 @@ float fbm(vec2 p) {
 void main() {
   float t = (uTime + uTimeOffset) * uSpeed;
 
+  // Gentle repel: UV shifts away from cursor so fog drifts aside, disturbed by movement.
   vec2 mouseOffset = vec2(0.0);
   if (uMouse.x < 9000.0 && uMousePush > 0.0) {
     vec2 diff = vUv - uMouse;
@@ -87,14 +105,14 @@ void main() {
 
   vec2 baseP = fogUvDeep * uNoiseScale + vec2(t * 0.08, -t * 0.04);
   float baseN = fbm(baseP);
-  baseN = smoothstep(0.22, 0.82, baseN);
+  baseN = smoothstep(uBaseNoiseLo, uBaseNoiseHi, baseN);
   float baseVertical =
-    smoothstep(0.0, 0.2, fogUvDeep.y) *
-    (1.0 - smoothstep(0.75, 1.0, fogUvDeep.y));
+    smoothstep(0.0, 0.06, fogUvDeep.y) *
+    (1.0 - smoothstep(0.78, 1.0, fogUvDeep.y));
   float baseHorizontal =
     smoothstep(0.0, 0.1, fogUvDeep.x) *
     (1.0 - smoothstep(0.9, 1.0, fogUvDeep.x));
-  float baseFog = baseVertical * baseHorizontal * mix(0.65, 1.0, baseN);
+  float baseFog = baseVertical * baseHorizontal * mix(uBaseFogLo, 1.0, baseN);
 
   vec2 smP = fogUvLift * (uNoiseScale * 1.1) + vec2(0.17, -0.09);
   float smQx = fbm(smP + vec2(0.0, t * 0.14));
@@ -104,14 +122,14 @@ void main() {
   smR.x = fbm(smP + smQ + vec2(1.7, 9.2) + t * 0.11);
   smR.y = fbm(smP + smQ + vec2(8.3, 2.8) - t * 0.08);
   float smRawN = fbm(smP + smR * 2.2);
-  float smShapedN = smoothstep(0.32, 0.88, smRawN);
+  float smShapedN = smoothstep(uSmNoiseLo, uSmNoiseHi, smRawN);
   float smVertical =
-    smoothstep(0.0, 0.18, fogUvLift.y) *
-    (1.0 - smoothstep(0.72, 1.0, fogUvLift.y));
+    smoothstep(0.0, 0.06, fogUvLift.y) *
+    (1.0 - smoothstep(0.76, 1.0, fogUvLift.y));
   float smHorizontal =
     smoothstep(0.0, 0.08, fogUvLift.x) *
     (1.0 - smoothstep(0.92, 1.0, fogUvLift.x));
-  float smFog = smVertical * smHorizontal * mix(0.68, 1.0, smShapedN);
+  float smFog = smVertical * smHorizontal * mix(uSmFogLo, 1.0, smShapedN);
 
   float topFade = 1.0 - smoothstep(uTopFadeLo, uTopFadeHi, vUv.y);
   float bottomPool = smoothstep(uTopFadeLo + 0.06, 0.0, vUv.y);
@@ -122,10 +140,10 @@ void main() {
   vec2 texUvLift = fogUvLift * 1.42 + vec2(-t * 0.018, t * 0.014);
   float texDeep = texture2D(uSmokeTex, texUvDeep).r;
   float texLift = texture2D(uSmokeTex, texUvLift).r;
-  texDeep = smoothstep(0.32, 0.72, texDeep);
-  texLift = smoothstep(0.38, 0.78, texLift);
-  float texMaskDeep = mix(0.32, 1.0, texDeep);
-  float texMaskLift = mix(0.36, 1.0, texLift);
+  texDeep = smoothstep(uTexNoiseLoDeep, uTexNoiseHiDeep, texDeep);
+  texLift = smoothstep(uTexNoiseLoLift, uTexNoiseHiLift, texLift);
+  float texMaskDeep = mix(uTexMaskLoDeep, 1.0, texDeep);
+  float texMaskLift = mix(uTexMaskLoLift, 1.0, texLift);
 
   float aDeep = baseFog * texMaskDeep * uDensity * uOpacity * uLayerDeep;
   float aLift = smFog * texMaskLift * uDensity * uOpacity * uLayerLift;
@@ -135,9 +153,13 @@ void main() {
   aLift = clamp(aLift, 0.0, 1.0);
   float alpha = 1.0 - (1.0 - aDeep) * (1.0 - aLift);
   alpha = clamp(alpha, 0.0, 1.0);
+  float bottomBand = uFogBandHi > uFogBandLo
+    ? 1.0 - smoothstep(uFogBandLo, uFogBandHi, vUv.y)
+    : 1.0;
+  alpha *= bottomBand;
 
   float colorMask = mix(baseN, smShapedN, 0.55) * mix(0.85, 1.0, max(texDeep, texLift));
-  vec3 fogColor = mix(uColorDark, uColorLight, clamp(colorMask, 0.0, 1.0));
+  vec3 fogColor = mix(uColorDark, uColorLight, clamp(colorMask * uColorLift, 0.0, 1.0));
   gl_FragColor = vec4(fogColor, alpha);
 }
 `;
@@ -195,8 +217,8 @@ const GARDEN_FOG_PARAMS = {
   z: 0.35,
   width: 15,
   height: 10,
-  mouseRadius: 0.22,
-  mousePush: 0.068,
+  mouseRadius: 0.28,
+  mousePush: 0.085,
   useFrontLayer: true,
   veil: {
     renderOrder: 5,
@@ -206,54 +228,125 @@ const GARDEN_FOG_PARAMS = {
     speed: 0.055,
     noiseScale: 1.65,
     timeOffset: 0,
-    colorDark: '#1500E1',
-    colorLight: '#1a08e6',
+    colorDark: '#000000',
+    colorLight: '#1a1a1a',
   },
   back: {
     renderOrder: 0,
     distance: 5.6,
     scale: 1.38,
-    opacity: 0.96,
-    density: 0.74,
-    speed: 0.118,
-    noiseScale: 2.15,
+    opacity: 0.36,
+    density: 0.32,
+    speed: 0.062,
+    noiseScale: 2.35,
     timeOffset: 0,
-    layerDeep: 0.98,
-    layerLift: 0.7,
+    layerDeep: 0.55,
+    layerLift: 0.22,
     colorDark: '#c4c8d4',
-    colorLight: '#ffffff',
-    topFadeLo: 0.16,
-    topFadeHi: 0.98,
-    bottomBoost: 2.2,
+    colorLight: '#F4F4E8',
+    topFadeLo: 0.46,
+    topFadeHi: 0.62,
+    bottomBoost: 1.1,
+    texMaskLoDeep: 0,
+    texMaskLoLift: 0,
+    baseFogLo: 0,
+    smFogLo: 0,
+    colorLift: 0.9,
+    baseNoiseLo: 0.4,
+    baseNoiseHi: 0.9,
+    smNoiseLo: 0.45,
+    smNoiseHi: 0.92,
+    texNoiseLoDeep: 0.38,
+    texNoiseHiDeep: 0.78,
+    texNoiseLoLift: 0.42,
+    texNoiseHiLift: 0.82,
   },
   front: {
     renderOrder: 7,
     distance: 2.8,
     scale: 1.28,
-    opacity: 0.88,
-    density: 0.74,
+    opacity: 0.58,
+    density: 0.5,
     speed: 0.118,
     noiseScale: 2.45,
     timeOffset: 8.6,
     layerDeep: 0.76,
-    layerLift: 1.14,
+    layerLift: 0.85,
     colorDark: '#c8ccd8',
-    colorLight: '#ffffff',
-    topFadeLo: 0.0,
-    topFadeHi: 0.92,
-    bottomBoost: 2.15,
+    colorLight: '#F4F4E8',
+    topFadeLo: 0.5,
+    topFadeHi: 0.66,
+    bottomBoost: 1.4,
+    mousePush: 0.1,
+    texMaskLoDeep: 0.12,
+    texMaskLoLift: 0.16,
+    baseFogLo: 0.08,
+    smFogLo: 0.12,
+    colorLift: 1,
   },
 };
 
-/** Loader — strong white fog on opaque blue (detail + create full-page). */
+/** Questionnaire vector preview - soft cloudy veil over amulet frame only. */
+const VECTOR_PREVIEW_FOG_PARAMS = {
+  x: 0,
+  y: -0.06,
+  z: 0.24,
+  width: 13,
+  height: 13,
+  mouseRadius: 0.22,
+  mousePush: 0.045,
+  useFrontLayer: true,
+  back: {
+    renderOrder: 0,
+    distance: 5.4,
+    scale: 1.28,
+    opacity: 0.62,
+    density: 0.66,
+    speed: 0.088,
+    noiseScale: 2.25,
+    timeOffset: 0,
+    layerDeep: 0.9,
+    layerLift: 0.72,
+    colorDark: '#000000',
+    colorLight: '#F4F4E8',
+    topFadeLo: 0.0,
+    topFadeHi: 1.0,
+    bottomBoost: 1.65,
+    texMaskLoDeep: 0.16,
+    texMaskLoLift: 0.2,
+    baseFogLo: 0.1,
+    smFogLo: 0.14,
+    colorLift: 1,
+  },
+  front: {
+    renderOrder: 2,
+    distance: 1.65,
+    scale: 1.06,
+    opacity: 0.42,
+    density: 0.58,
+    speed: 0.102,
+    noiseScale: 2.35,
+    timeOffset: 4.8,
+    layerDeep: 0.66,
+    layerLift: 1.02,
+    colorDark: '#000000',
+    colorLight: '#F4F4E8',
+    topFadeLo: 0.0,
+    topFadeHi: 1.0,
+    bottomBoost: 1.9,
+    mousePush: 0.035,
+  },
+};
+
+/** Loader - strong white fog on black (detail + create full-page). */
 const LOADER_FOG_PARAMS = {
   x: 0,
   y: -0.18,
   z: 0.35,
   width: 15,
   height: 10,
-  mouseRadius: 0.22,
-  mousePush: 0.068,
+  mouseRadius: 0.28,
+  mousePush: 0.085,
   back: {
     renderOrder: 0,
     distance: 5.0,
@@ -265,8 +358,8 @@ const LOADER_FOG_PARAMS = {
     timeOffset: 0,
     layerDeep: 1.0,
     layerLift: 0.76,
-    colorDark: '#1500E1',
-    colorLight: '#ffffff',
+    colorDark: '#000000',
+    colorLight: '#F4F4E8',
     topFadeLo: 0.0,
     topFadeHi: 1.0,
     bottomBoost: 2.2,
@@ -282,21 +375,63 @@ const LOADER_FOG_PARAMS = {
     timeOffset: 8.6,
     layerDeep: 0.72,
     layerLift: 1.12,
-    colorDark: '#1500E1',
-    colorLight: '#ffffff',
+    colorDark: '#000000',
+    colorLight: '#F4F4E8',
     topFadeLo: 0.0,
     topFadeHi: 1.0,
     bottomBoost: 2.9,
   },
 };
 
-/** Detail page — full fog strength; lives behind UI (z-index 0). */
+/** Detail page - full fog strength; lives behind UI (z-index 0). */
 const DETAIL_FOG_PARAMS = {
   ...GARDEN_FOG_PARAMS,
   useFrontLayer: true,
+  veil: {
+    renderOrder: 5,
+    distance: 14.2,
+    scale: 2.12,
+    opacity: 0.992,
+    speed: 0.055,
+    noiseScale: 1.65,
+    timeOffset: 0,
+    colorDark: '#000000',
+    colorLight: '#1a1a1a',
+  },
+  back: {
+    ...GARDEN_FOG_PARAMS.back,
+    opacity: 0.96,
+    density: 0.74,
+    layerDeep: 0.98,
+    layerLift: 0.7,
+    colorDark: '#c4c8d4',
+    colorLight: '#F4F4E8',
+    bottomBoost: 2.2,
+    texMaskLoDeep: 0.32,
+    texMaskLoLift: 0.36,
+    baseFogLo: 0.65,
+    smFogLo: 0.68,
+    colorLift: 1,
+  },
+  front: {
+    ...GARDEN_FOG_PARAMS.front,
+    renderOrder: 7,
+    opacity: 0.88,
+    density: 0.74,
+    layerDeep: 0.76,
+    layerLift: 1.14,
+    colorDark: '#c8ccd8',
+    colorLight: '#F4F4E8',
+    bottomBoost: 2.15,
+    texMaskLoDeep: 0.32,
+    texMaskLoLift: 0.36,
+    baseFogLo: 0.65,
+    smFogLo: 0.68,
+    colorLift: 1,
+  },
 };
 
-/** Result overlay — stronger lift on black background */
+/** Result overlay - stronger lift on black background */
 const RESULT_FOG_PARAMS = {
   ...GARDEN_FOG_PARAMS,
   y: -0.12,
@@ -306,6 +441,11 @@ const RESULT_FOG_PARAMS = {
     opacity: 0.94,
     density: 0.62,
     layerLift: 0.58,
+    texMaskLoDeep: 0.32,
+    texMaskLoLift: 0.36,
+    baseFogLo: 0.65,
+    smFogLo: 0.68,
+    colorLift: 1,
   },
   front: {
     ...GARDEN_FOG_PARAMS.front,
@@ -313,6 +453,11 @@ const RESULT_FOG_PARAMS = {
     density: 0.68,
     layerLift: 1.08,
     bottomBoost: 3.1,
+    texMaskLoDeep: 0.32,
+    texMaskLoLift: 0.36,
+    baseFogLo: 0.65,
+    smFogLo: 0.68,
+    colorLift: 1,
   },
 };
 
@@ -336,9 +481,26 @@ function makeFogMaterial(smokeTex, opts, interactive, mouseRadius, mousePush) {
       uMouseVel: { value: new THREE.Vector2(0, 0) },
       uMouseRadius: { value: mouseRadius },
       uMousePush: { value: interactive ? mousePush : 0 },
+      uMouseRepel: { value: interactive ? (opts.mouseRepel ?? 0) : 0 },
       uTopFadeLo: { value: opts.topFadeLo },
       uTopFadeHi: { value: opts.topFadeHi },
       uBottomBoost: { value: opts.bottomBoost },
+      uTexMaskLoDeep: { value: opts.texMaskLoDeep ?? 0.32 },
+      uTexMaskLoLift: { value: opts.texMaskLoLift ?? 0.36 },
+      uBaseFogLo: { value: opts.baseFogLo ?? 0.65 },
+      uSmFogLo: { value: opts.smFogLo ?? 0.68 },
+      uColorLift: { value: opts.colorLift ?? 1 },
+      uBaseNoiseLo: { value: opts.baseNoiseLo ?? 0.22 },
+      uBaseNoiseHi: { value: opts.baseNoiseHi ?? 0.82 },
+      uSmNoiseLo: { value: opts.smNoiseLo ?? 0.32 },
+      uSmNoiseHi: { value: opts.smNoiseHi ?? 0.88 },
+      uTexNoiseLoDeep: { value: opts.texNoiseLoDeep ?? 0.32 },
+      uTexNoiseHiDeep: { value: opts.texNoiseHiDeep ?? 0.72 },
+      uTexNoiseLoLift: { value: opts.texNoiseLoLift ?? 0.38 },
+      uTexNoiseHiLift: { value: opts.texNoiseHiLift ?? 0.78 },
+      uFogBandLo: { value: opts.fogBandLo ?? 0 },
+      uFogBandHi: { value: opts.fogBandHi ?? 0 },
+      uMouseParallax: { value: new THREE.Vector2(0, 0) },
     },
     transparent: true,
     depthWrite: false,
@@ -403,11 +565,13 @@ export async function createLucaFog({ scene, camera, domElement, profile = 'gard
   const fogParams =
     profile === 'result'
       ? RESULT_FOG_PARAMS
-      : profile === 'loader'
-        ? LOADER_FOG_PARAMS
-        : profile === 'detail'
-          ? DETAIL_FOG_PARAMS
-          : GARDEN_FOG_PARAMS;
+      : profile === 'vector-preview'
+        ? VECTOR_PREVIEW_FOG_PARAMS
+        : profile === 'loader'
+          ? LOADER_FOG_PARAMS
+          : profile === 'detail'
+            ? DETAIL_FOG_PARAMS
+            : GARDEN_FOG_PARAMS;
   const useVeilLayer = profile === 'garden' && !!fogParams.veil;
   const useFrontLayer = !!fogParams.front && (
     fogParams.useFrontLayer === true ||
@@ -428,8 +592,9 @@ export async function createLucaFog({ scene, camera, domElement, profile = 'gard
   let frontMaterial = null;
   let frontMesh = null;
   if (useFrontLayer) {
-    const frontPush = fogParams.mousePush ?? GARDEN_FOG_PARAMS.mousePush;
-    frontMaterial = makeFogMaterial(smokeTex, fogParams.front, true, fogParams.mouseRadius, frontPush);
+    const frontPush = fogParams.front.mousePush ?? fogParams.mousePush ?? GARDEN_FOG_PARAMS.mousePush;
+    const frontRadius = fogParams.front.mouseRadius ?? fogParams.mouseRadius ?? GARDEN_FOG_PARAMS.mouseRadius;
+    frontMaterial = makeFogMaterial(smokeTex, fogParams.front, true, frontRadius, frontPush);
     frontMaterial.uniforms.uMouse.value = frontMouse;
     frontMesh = new THREE.Mesh(geometry.clone(), frontMaterial);
     frontMesh.scale.setScalar(fogParams.front.scale);
@@ -456,8 +621,8 @@ export async function createLucaFog({ scene, camera, domElement, profile = 'gard
   if (frontMesh) group.add(frontMesh);
   scene.add(group);
 
-  const raycaster = new THREE.Raycaster();
   const mouseNdc = new THREE.Vector2(9999, 9999);
+  const raycaster = new THREE.Raycaster();
   const camPos = new THREE.Vector3();
   let pointerOnScreen = false;
 
@@ -479,15 +644,22 @@ export async function createLucaFog({ scene, camera, domElement, profile = 'gard
   }
 
   function updateFrontMouse() {
-    if (!frontMaterial || !frontMesh) return;
+    if (!frontMaterial) return;
     if (!pointerOnScreen) return;
-    raycaster.setFromCamera(mouseNdc, camera);
-    const hits = raycaster.intersectObject(frontMesh, false);
-    if (hits.length > 0 && hits[0].uv) {
-      frontMouse.set(hits[0].uv.x, hits[0].uv.y);
-    } else {
-      frontMouse.set(9999, 9999);
+
+    let uvX = (mouseNdc.x + 1) * 0.5;
+    let uvY = (mouseNdc.y + 1) * 0.5;
+
+    if (frontMesh) {
+      raycaster.setFromCamera(mouseNdc, camera);
+      const hits = raycaster.intersectObject(frontMesh, false);
+      if (hits.length > 0 && hits[0].uv) {
+        uvX = hits[0].uv.x;
+        uvY = hits[0].uv.y;
+      }
     }
+
+    frontMouse.set(uvX, uvY);
   }
 
   function onPointerMove(e) {
@@ -510,6 +682,12 @@ export async function createLucaFog({ scene, camera, domElement, profile = 'gard
 
   return {
     group,
+    setPointer(clientX, clientY) {
+      if (!useFrontLayer) return;
+      pointerOnScreen = true;
+      pointerToNdc(clientX, clientY);
+      updateFrontMouse();
+    },
     update(timeSec) {
       backMaterial.uniforms.uTime.value = timeSec;
       if (frontMaterial) frontMaterial.uniforms.uTime.value = timeSec;

@@ -8588,6 +8588,8 @@ function sceneExtentHalf(scene) {
 
 /** מרווח מהמסגרת (פנימה) ומהקנבס (חוצה) */
 const FRAME_INSET_PX = 25;
+/** Extra inset on interactive detail so orbit rotation stays inside the canvas. */
+const ROTATION_FIT_INSET_PX = 72;
 
 function frameTubeBaseRadius(style3) {
   const gender = style3?.gender || 'female';
@@ -8644,12 +8646,13 @@ function centerSceneOnCanvas(scene) {
  * ממרכז, מקטין רק אם התוכן בורח מהפריים, ומקרב מצלמה לפריים+20px (גודל טוב).
  * @returns {number} חצי-קנבס למצלמה
  */
-function fitSceneInsideFrame(scene, mount, style2, style3) {
+function fitSceneInsideFrame(scene, mount, style2, style3, opts = {}) {
   const canvasHalf = W / 2;
   const rough = style2 ? occupationRoughness(style2) : 0.35;
   const l3R = l3TubeRadius(style3);
   const frameTube = frameTubeRadius(style3);
   const contentPad = combinedContentStrokePad(style2, style3) + rough * 5;
+  const rotationInset = opts.allowRotationOverflow ? ROTATION_FIT_INSET_PX : 0;
 
   scene.updateMatrixWorld(true);
   centerSceneOnCanvas(scene);
@@ -8664,8 +8667,8 @@ function fitSceneInsideFrame(scene, mount, style2, style3) {
       contentPad
     ) ?? frameHalf;
 
-  const maxFrame = canvasHalf - FRAME_INSET_PX;
-  const maxContent = Math.max(60, frameHalf - FRAME_INSET_PX);
+  const maxFrame = canvasHalf - FRAME_INSET_PX - rotationInset;
+  const maxContent = Math.max(60, frameHalf - FRAME_INSET_PX - rotationInset);
 
   let scale = 1;
   if (frameHalf > maxFrame) scale = Math.min(scale, maxFrame / frameHalf);
@@ -8687,6 +8690,40 @@ function fitSceneInsideFrame(scene, mount, style2, style3) {
 
   const viewHalf = Math.max(frameHalf + FRAME_INSET_PX, sceneExt + spikePad);
   return Math.min(canvasHalf, viewHalf);
+}
+
+/**
+ * Vector questionnaire preview — no frame layer yet.
+ * Fit camera tightly to tube bounds so the sigil fills the stage (avoids
+ * fitSceneInsideFrame shrinking content vs a missing .layer-frame).
+ * @returns {number} camera half-extent
+ */
+function fitVectorPreviewScene(scene, style2, style3) {
+  const canvasHalf = W / 2;
+  const rough = style2 ? occupationRoughness(style2) : 0.35;
+  const pad =
+    10 +
+    rough * 8 +
+    tubeBaseRadius(style3) * 0.55 +
+    l3TubeRadius(style3) * 0.45;
+
+  scene.updateMatrixWorld(true);
+  centerSceneOnCanvas(scene);
+
+  let sceneExt = sceneExtentHalf(scene);
+  if (sceneExt <= 0) return canvasHalf;
+
+  /* Scale up to use most of the canvas; only shrink if still overflowing. */
+  const targetFill = canvasHalf * 0.9;
+  const scale = targetFill / (sceneExt + pad);
+  if (Math.abs(scale - 1) > 0.01) {
+    scene.scale.multiplyScalar(scale);
+    scene.updateMatrixWorld(true);
+    centerSceneOnCanvas(scene);
+    sceneExt = sceneExtentHalf(scene);
+  }
+
+  return Math.min(canvasHalf, sceneExt + pad);
 }
 
 function makeCanvasCamera(half) {
@@ -8975,7 +9012,7 @@ async function renderPbrCore(svg, opts) {
   if (opts.darkerShadows) {
     deepenSceneShadows(scene, renderer);
   }
-  const cameraHalf = fitSceneInsideFrame(scene, mount, style2, style3);
+  const cameraHalf = fitSceneInsideFrame(scene, mount, style2, style3, opts);
   const camera = makeCanvasCamera(cameraHalf);
   renderer.render(scene, camera);
   active.scene = scene;
@@ -9048,7 +9085,7 @@ export async function renderThreePbrAmuletInteractive(opts) {
   let mount = null;
   try {
     if (opts?.container) opts.container.innerHTML = '';
-    const core = await renderPbrCore(opts.svg, { ...opts, darkerShadows: true });
+    const core = await renderPbrCore(opts.svg, { ...opts, darkerShadows: true, allowRotationOverflow: true });
     mount = core.mount;
 
     const canvas = core.renderer.domElement;
@@ -9121,13 +9158,30 @@ export async function renderVectorPreviewInteractive(opts) {
 
     renderer.setClearColor(0x000000, 0);
     renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    /* Match PBR sharpness — vectors looked pixelated under 1.5 on Retina when
+       the CSS stage is smaller than the 680px render buffer. */
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     active.renderer = renderer;
 
     const scene = new THREE.Scene();
-    const matWish = new THREE.MeshBasicMaterial({ color: 0xc8c0b2 });
-    const matName = new THREE.MeshBasicMaterial({ color: 0x9da3ab });
-    const matQ3 = new THREE.MeshBasicMaterial({ color: 0x6f737a });
+    const matWish = new THREE.MeshBasicMaterial({
+      color: 0xd8d2c8,
+      transparent: true,
+      opacity: 0.58,
+      depthWrite: false,
+    });
+    const matName = new THREE.MeshBasicMaterial({
+      color: 0xa8aeb6,
+      transparent: true,
+      opacity: 0.52,
+      depthWrite: false,
+    });
+    const matQ3 = new THREE.MeshBasicMaterial({
+      color: 0x7a7f86,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+    });
 
     const zName = L2_SURFACE_Z - 4;
     const zQ3 = L2_SURFACE_Z;
@@ -9159,7 +9213,7 @@ export async function renderVectorPreviewInteractive(opts) {
     scene.rotation.y = rotationY;
     scene.updateMatrixWorld(true);
 
-    const cameraHalf = fitSceneInsideFrame(scene, mount, style2, style3);
+    const cameraHalf = fitVectorPreviewScene(scene, style2, style3);
     const camera = makeCanvasCamera(cameraHalf);
     renderer.render(scene, camera);
     active.scene = scene;

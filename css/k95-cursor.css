@@ -1,4 +1,4 @@
-/* K95 companion cursor — offset beside native pointer (not replacing it) */
+/* K95 companion cursor - offset beside native pointer (not replacing it) */
 
 .pagmar__k95-cursor {
   position: fixed;
@@ -32,7 +32,7 @@
   width: 45px;
   height: 45px;
   background: transparent;
-  border-color: #ffffff;
+  border-color: var(--pagmar-yellow-white);
 }
 
 /* Hide K95 yellow companion dot in questionnaire / create flow */
@@ -43,7 +43,7 @@ body.pagmar-create .pagmar__k95-cursor {
   visibility: hidden !important;
 }
 
-/* Native system cursor stays visible — companion dot only */
+/* Native system cursor stays visible - companion dot only */
 body.pagmar-index.is-create-mode .pagmar__request-artboard .intro__choice-btn--figma,
 body.pagmar-create .pagmar__request-artboard .intro__choice-btn--figma,
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn:not(:disabled),

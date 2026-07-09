@@ -1,5 +1,5 @@
 /**
- * Interactive 3D amulet viewer — separate page (will merge into final flow later).
+ * Interactive 3D amulet viewer - separate page (will merge into final flow later).
  */
 import { renderThreePbrAmuletInteractive } from '../three-pbr-amulet.js';
 import {

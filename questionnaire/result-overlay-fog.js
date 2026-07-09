@@ -37,7 +37,7 @@ export async function bootResultOverlayFog() {
   const host = document.getElementById('resultFogHost');
   if (!host) return null;
 
-  bootFogWebGL(host, { profile: 'result' });
+  bootFogWebGL(host, { profile: 'garden' });
   const state = await waitForFogReady();
   resizeFogHost();
   requestAnimationFrame(resizeFogHost);

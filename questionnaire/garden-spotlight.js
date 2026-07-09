@@ -1,5 +1,5 @@
 /**
- * PHQ-style spotlight veil — dramatic black + visible film grain (https://phq.nz).
+ * PHQ-style spotlight veil - dramatic black + visible film grain (https://phq.nz).
  */
 (function () {
   'use strict';

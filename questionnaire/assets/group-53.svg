@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 143.47 62.84" fill="none" aria-hidden="true">
-  <!-- Group_53  143.47�62.84 @ 1920 artboard, 1px #F1F1F1, fill #1B1613 -->
+  <!-- Group_53  143.47�62.84 @ 1920 artboard, 1px #F4F4E8, fill #1B1613 -->
   <path
     d="M 22.2 0.5
        H 121.27
@@ -15,8 +15,8 @@
        Z"
     transform="translate(0.5 0) scale(1 0.7965)"
     fill="#1B1613"
-    stroke="#F4F4F4"
-    stroke-width="1"
+    stroke="#F4F4E8"
+    stroke-width="1.5"
     vector-effect="non-scaling-stroke"
     shape-rendering="geometricPrecision"
   />

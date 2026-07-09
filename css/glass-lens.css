@@ -1,0 +1,65 @@
+/* Shared liquid glass - clone layer + CSS distortion (no backdrop-filter) */
+:root {
+  --liquid-glass-fill: rgba(30, 30, 30, 0.35);
+  --liquid-glass-clone-filter: url(#glass-distortion) blur(4px) saturate(150%);
+}
+
+.glass-lens {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.glass-clone {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  filter: var(--liquid-glass-clone-filter);
+  -webkit-filter: var(--liquid-glass-clone-filter);
+  transform: translateZ(0);
+  will-change: filter;
+}
+
+.glass-clone__capture {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.glass-lens__tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: var(--liquid-glass-fill);
+  pointer-events: none;
+}
+
+.glass-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}

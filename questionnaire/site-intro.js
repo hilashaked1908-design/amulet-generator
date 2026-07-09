@@ -1,6 +1,6 @@
 /**
- * Site intro overlay — Cyber Garden style click-anywhere-to-enter.
- * Figma Frame 225 (1763:26756) — אינדקס.
+ * Site intro overlay - Cyber Garden style click-anywhere-to-enter.
+ * Figma Frame 225 (1763:26756) - אינדקס.
  */
 (function () {
   'use strict';

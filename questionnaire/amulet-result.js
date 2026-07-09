@@ -1,5 +1,5 @@
 /**
- * Full amulet render — questionnaire result page only (not prototype).
+ * Full amulet render - questionnaire result page only (not prototype).
  */
 import { renderThreePbrAmulet } from '../three-pbr-amulet.js';
 import {

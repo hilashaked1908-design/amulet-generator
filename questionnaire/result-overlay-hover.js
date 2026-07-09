@@ -1,5 +1,5 @@
 /**
- * K95-style glass pill — "360°" follows cursor on result overlay amulet hover.
+ * K95-style glass pill - "360°" follows cursor on result overlay amulet hover.
  */
 export function bootResultAmuletHover() {
   if (window.__pagmarResultHoverBooted) return;

@@ -1,9 +1,10 @@
 /**
- * Amulet loaders — frame-scoped vessel spin (Q1–Q3) and full-page overlay (final PBR).
+ * Amulet loaders - gallery vessel spin between questions, morph for idle Q1 / full-page PBR.
  */
-const DEFAULT_LOADER_TEXT = 'טוען קמע';
+import { mountVesselMorph, preloadVesselMorph } from './loader-vessel-morph.js?v=20250709-q-loader';
 
-const VESSEL_SRC = [
+const DEFAULT_LOADER_TEXT = 'טוען קמע';
+const GALLERY_VESSEL_ASSETS = [
   'assets/detail/loader-vessel-1.svg',
   'assets/detail/loader-vessel-2.svg',
   'assets/detail/loader-vessel-3.svg',
@@ -15,6 +16,7 @@ let loaderFogBoot = null;
 let loaderFogResize = null;
 let loaderFogStop = null;
 let fullpageLoadProgress = 0;
+let galleryFullpageActive = false;
 
 function statusEl() {
   return (
@@ -29,7 +31,7 @@ function amuletFrameEl() {
 }
 
 function amuletLoaderHost() {
-  /* Loader sits on the frame — not inside the view, which is hidden while loading. */
+  /* Loader sits on the frame - not inside the view, which is hidden while loading. */
   return amuletFrameEl();
 }
 
@@ -49,16 +51,84 @@ function resetFullpageLoaderPosition() {
   inner.style.transform = '';
 }
 
-function appendVesselImages(parent, baseClass) {
-  VESSEL_SRC.forEach(function (src, index) {
+function appendGalleryVesselSpin(parent, baseClass) {
+  const vessels = document.createElement('div');
+  vessels.className = baseClass + '__vessels';
+  vessels.setAttribute('aria-hidden', 'true');
+
+  GALLERY_VESSEL_ASSETS.forEach(function (src, index) {
     const img = document.createElement('img');
     img.className = baseClass + '__vessel ' + baseClass + '__vessel--' + (index + 1);
     img.src = src;
     img.alt = '';
-    img.decoding = 'async';
+    img.decoding = 'sync';
     img.draggable = false;
-    parent.appendChild(img);
+    vessels.appendChild(img);
   });
+
+  parent.appendChild(vessels);
+  return vessels;
+}
+
+function appendVesselMorph(parent, baseClass) {
+  const vessels = document.createElement('div');
+  vessels.className = baseClass + '__vessels';
+  vessels.setAttribute('aria-hidden', 'true');
+  const morph = mountVesselMorph(vessels);
+  vessels._vesselMorph = morph;
+  parent.appendChild(vessels);
+  return vessels;
+}
+
+function startFrameLoaderMotion(root) {
+  /* Gallery spin uses CSS animation - no JS start needed. */
+}
+
+function stopFrameLoaderMotion(root) {
+  /* Gallery spin uses CSS animation - no JS stop needed. */
+}
+
+function frameHasVectorPreview() {
+  const container = document.getElementById('amuletContainer');
+  return Boolean(
+    container?.querySelector('canvas') ||
+      container?.querySelector('.pagmar__questionnaire-stage-vector')
+  );
+}
+
+function showQuestionnaireFrameLoader(label) {
+  /* Q1 - no vector yet: keep the idle stage morph running (don't tear it down). */
+  if (!frameHasVectorPreview()) {
+    if (typeof window.pagmarStartCreateAmuletMorph === 'function') {
+      window.pagmarStartCreateAmuletMorph();
+      return true;
+    }
+  } else {
+    stopIdleMorph();
+  }
+
+  const loader = ensureFrameLoader();
+  if (!loader) return false;
+
+  loader.hidden = false;
+  loader.setAttribute('aria-busy', 'true');
+  startFrameLoaderMotion(loader);
+  const sr = loader.querySelector('.pagmar__amulet-frame-loader__sr');
+  if (sr) sr.textContent = label;
+  return true;
+}
+
+function startVesselMorph(root) {
+  const vessels = root?.querySelector('[class$="__vessels"]');
+  const morph = vessels?._vesselMorph;
+  if (!morph) return;
+  morph.stop();
+  morph.start();
+}
+
+function stopVesselMorph(root) {
+  const vessels = root?.querySelector('[class$="__vessels"]');
+  vessels?._vesselMorph?.stop();
 }
 
 function ensureFrameLoader() {
@@ -66,7 +136,13 @@ function ensureFrameLoader() {
   if (!host) return null;
 
   let loader = host.querySelector('.pagmar__amulet-frame-loader');
-  if (loader) return loader;
+  if (loader) {
+    if (!loader.querySelector('.pagmar__amulet-frame-loader__vessel')) {
+      loader.querySelector('.pagmar__amulet-frame-loader__vessels')?.remove();
+      appendGalleryVesselSpin(loader, 'pagmar__amulet-frame-loader');
+    }
+    return loader;
+  }
 
   loader = document.createElement('div');
   loader.className = 'pagmar__amulet-frame-loader';
@@ -74,16 +150,12 @@ function ensureFrameLoader() {
   loader.setAttribute('role', 'status');
   loader.setAttribute('aria-live', 'polite');
 
-  const vessels = document.createElement('div');
-  vessels.className = 'pagmar__amulet-frame-loader__vessels';
-  vessels.setAttribute('aria-hidden', 'true');
-  appendVesselImages(vessels, 'pagmar__amulet-frame-loader');
+  appendGalleryVesselSpin(loader, 'pagmar__amulet-frame-loader');
 
   const sr = document.createElement('span');
   sr.className = 'pagmar__amulet-frame-loader__sr';
   sr.textContent = DEFAULT_LOADER_TEXT;
 
-  loader.appendChild(vessels);
   loader.appendChild(sr);
   host.appendChild(loader);
   return loader;
@@ -91,7 +163,7 @@ function ensureFrameLoader() {
 
 async function ensureLoaderFogModule() {
   if (loaderFogBoot) return;
-  const mod = await import('./loader-fog.js?v=20250707-garden-loader-fog');
+  const mod = await import('./loader-fog.js?v=20250708-loader-black');
   loaderFogBoot = mod.bootCreateLoaderFog;
   loaderFogResize = mod.resizeCreateLoaderFog;
   loaderFogStop = mod.stopCreateLoaderFog;
@@ -104,6 +176,51 @@ function stopFullpageLoaderFog() {
 async function startFullpageLoaderFog() {
   await ensureLoaderFogModule();
   if (loaderFogBoot) await loaderFogBoot();
+}
+
+function ensureGalleryFullpageLoader() {
+  let loader = document.getElementById('pagmarGalleryFullpageLoader');
+  if (loader) return loader;
+
+  loader = document.createElement('div');
+  loader.id = 'pagmarGalleryFullpageLoader';
+  loader.className = 'pagmar__detail-page-loader pagmar__detail-page-loader--create';
+  loader.hidden = true;
+  loader.setAttribute('role', 'status');
+  loader.setAttribute('aria-live', 'polite');
+
+  const vessels = document.createElement('div');
+  vessels.className = 'pagmar__detail-page-loader__vessels';
+  vessels.setAttribute('aria-hidden', 'true');
+
+  GALLERY_VESSEL_ASSETS.forEach(function (src, index) {
+    const img = document.createElement('img');
+    img.className =
+      'pagmar__detail-page-loader__vessel pagmar__detail-page-loader__vessel--' + (index + 1);
+    img.src = src;
+    img.alt = '';
+    img.decoding = 'sync';
+    img.draggable = false;
+    vessels.appendChild(img);
+  });
+
+  const sr = document.createElement('span');
+  sr.className = 'pagmar__detail-page-loader__sr';
+  sr.textContent = DEFAULT_LOADER_TEXT;
+
+  loader.appendChild(vessels);
+  loader.appendChild(sr);
+  document.body.appendChild(loader);
+  return loader;
+}
+
+function hideGalleryFullpageLoader() {
+  galleryFullpageActive = false;
+  const loader = document.getElementById('pagmarGalleryFullpageLoader');
+  if (!loader) return;
+  loader.classList.remove('is-leaving');
+  loader.hidden = true;
+  loader.removeAttribute('aria-busy');
 }
 
 function ensureFullpageLoader() {
@@ -135,10 +252,7 @@ function ensureFullpageLoader() {
   const inner = document.createElement('div');
   inner.className = 'pagmar__create-fullpage-loader__inner';
 
-  const vessels = document.createElement('div');
-  vessels.className = 'pagmar__create-fullpage-loader__vessels';
-  vessels.setAttribute('aria-hidden', 'true');
-  appendVesselImages(vessels, 'pagmar__create-fullpage-loader');
+  appendVesselMorph(inner, 'pagmar__create-fullpage-loader');
 
   const caption = document.createElement('p');
   caption.className = 'pagmar__create-fullpage-loader__caption';
@@ -153,7 +267,6 @@ function ensureFullpageLoader() {
   sr.className = 'pagmar__create-fullpage-loader__sr';
   sr.textContent = '0% ' + DEFAULT_LOADER_TEXT;
 
-  inner.appendChild(vessels);
   inner.appendChild(caption);
   loader.appendChild(fog);
   loader.appendChild(inner);
@@ -162,35 +275,101 @@ function ensureFullpageLoader() {
   return loader;
 }
 
+let frameLoaderIdleResolvers = [];
+
+function isFrameLoaderActive() {
+  const frame = amuletFrameEl();
+  if (frame?.classList.contains('is-amulet-loading')) return true;
+  const loader = frame?.querySelector('.pagmar__amulet-frame-loader');
+  return Boolean(loader && !loader.hidden);
+}
+
+function resolveFrameLoaderIdle() {
+  const pending = frameLoaderIdleResolvers.slice();
+  frameLoaderIdleResolvers = [];
+  pending.forEach(function (resolve) {
+    resolve();
+  });
+}
+
+export function waitForAmuletFrameLoaderIdle() {
+  if (!isFrameLoaderActive()) return Promise.resolve();
+  return new Promise(function (resolve) {
+    frameLoaderIdleResolvers.push(resolve);
+    window.setTimeout(resolve, 1400);
+  });
+}
+
 function setFrameLoading(active, keepPreview) {
   const frame = amuletFrameEl();
   if (!frame) return;
   frame.classList.toggle('is-amulet-loading', Boolean(active));
   frame.classList.toggle('is-amulet-loading-keep-preview', Boolean(active && keepPreview));
+  if (!active) resolveFrameLoaderIdle();
 }
 
 function setFullpageLoading(active) {
   document.body.classList.toggle('is-create-fullpage-loading', Boolean(active));
 }
 
-function hideFrameLoader() {
+function maybeRestartIdleMorph() {
+  if (typeof window.pagmarStartCreateAmuletMorph !== 'function') return;
+  if (document.body.classList.contains('is-amulet-rendering')) return;
+  if (
+    !document.body.classList.contains('is-create-mode') &&
+    !document.body.classList.contains('pagmar-create')
+  ) {
+    return;
+  }
+  const artboard = document.getElementById('requestArtboard');
+  if (artboard?.classList.contains('is-amulet-live')) return;
+  const container = document.getElementById('amuletContainer');
+  if (
+    container?.querySelector('canvas') ||
+    container?.querySelector('.pagmar__questionnaire-stage-vector')
+  ) {
+    return;
+  }
+  window.pagmarStartCreateAmuletMorph();
+}
+
+function stopIdleMorph() {
+  if (typeof window.pagmarHideCreateAmuletMorph === 'function') {
+    window.pagmarHideCreateAmuletMorph();
+  }
+}
+
+function hideFrameLoader(options) {
+  const opts = options || {};
   setFrameLoading(false, false);
   const frame = amuletFrameEl();
   const loader = frame?.querySelector('.pagmar__amulet-frame-loader');
   if (loader) {
+    stopFrameLoaderMotion(loader);
     loader.hidden = true;
     loader.removeAttribute('aria-busy');
   }
+  if (!opts.skipIdleMorph) {
+    maybeRestartIdleMorph();
+  }
+  resolveFrameLoaderIdle();
 }
 
 function hideFullpageLoader(options) {
   const opts = options || {};
+  if (galleryFullpageActive) {
+    hideGalleryFullpageLoader();
+    setFullpageLoading(false);
+    fullpageLoadProgress = 0;
+    return true;
+  }
   if (!opts.force && fullpageLoadProgress < 1) return false;
   setFullpageLoading(false);
   stopFullpageLoaderFog();
   resetFullpageLoaderPosition();
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (loader) {
+    stopVesselMorph(loader);
     loader.hidden = true;
     loader.removeAttribute('aria-busy');
   }
@@ -199,6 +378,7 @@ function hideFullpageLoader(options) {
 }
 
 export function setAmuletLoaderProgress(frac) {
+  if (galleryFullpageActive) return;
   const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
   fullpageLoadProgress = Math.max(fullpageLoadProgress, pct / 100);
   const loader = document.getElementById('pagmarCreateFullpageLoader');
@@ -215,12 +395,34 @@ export async function showAmuletLoader(text, options) {
   const opts = options || {};
   const label = text || DEFAULT_LOADER_TEXT;
 
-  if (opts.fullscreen) {
-    hideFrameLoader();
+  if (opts.fullscreen && !opts.gallery) {
+    await preloadVesselMorph();
+  } else {
+    await preloadLoaderGallerySpin();
+  }
+
+  if (opts.fullscreen && opts.gallery) {
+    stopIdleMorph();
+    hideFrameLoader({ skipIdleMorph: true });
+    hideFullpageLoader({ force: true });
+    galleryFullpageActive = true;
+    fullpageLoadProgress = 0;
+    const loader = ensureGalleryFullpageLoader();
+    setFullpageLoading(true);
+    loader.hidden = false;
+    loader.classList.remove('is-leaving');
+    loader.setAttribute('aria-busy', 'true');
+    const sr = loader.querySelector('.pagmar__detail-page-loader__sr');
+    if (sr) sr.textContent = label;
+  } else if (opts.fullscreen) {
+    galleryFullpageActive = false;
+    stopIdleMorph();
+    hideFrameLoader({ skipIdleMorph: true });
     const loader = ensureFullpageLoader();
     setFullpageLoading(true);
     loader.hidden = false;
     loader.setAttribute('aria-busy', 'true');
+    startVesselMorph(loader);
     fullpageLoadProgress =
       typeof opts.progress === 'number' ? Math.max(0, Math.min(1, opts.progress)) : 0;
     await startFullpageLoaderFog();
@@ -236,16 +438,9 @@ export async function showAmuletLoader(text, options) {
 
     resetFullpageLoaderPosition();
   } else {
-    hideFullpageLoader();
-    const loader = ensureFrameLoader();
+    hideFullpageLoader({ force: true });
     setFrameLoading(true, Boolean(opts.keepPreview));
-
-    if (loader) {
-      loader.hidden = false;
-      loader.setAttribute('aria-busy', 'true');
-      const sr = loader.querySelector('.pagmar__amulet-frame-loader__sr');
-      if (sr) sr.textContent = label;
-    }
+    showQuestionnaireFrameLoader(label);
   }
 
   const el = statusEl();
@@ -283,7 +478,7 @@ export function preloadLoaderGallerySpin() {
   if (vesselsPreloaded) return Promise.resolve();
   vesselsPreloaded = true;
   return Promise.all(
-    VESSEL_SRC.map(function (src) {
+    GALLERY_VESSEL_ASSETS.map(function (src) {
       return new Promise(function (resolve) {
         const img = new Image();
         img.onload = resolve;
@@ -291,9 +486,12 @@ export function preloadLoaderGallerySpin() {
         img.src = src;
       });
     })
-  );
+  ).then(function () {
+    return preloadVesselMorph();
+  });
 }
 
 window.amuletShowLoader = showAmuletLoader;
 window.amuletHideLoader = hideAmuletLoader;
+window.amuletWaitFrameLoaderIdle = waitForAmuletFrameLoaderIdle;
 window.amuletSetLoaderProgress = setAmuletLoaderProgress;

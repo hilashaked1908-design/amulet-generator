@@ -1,39 +1,109 @@
-/* Shared pill buttons — K95-style outline / glass + label roll hover */
+/* Shared pill buttons - K95-style outline / glass + label roll hover */
 
 :root {
+  --pagmar-line-weight: 1.5px;
   --pagmar-pill-radius: 999px;
-  --pagmar-pill-border: hsla(0, 0%, 100%, 0.2);
-  --pagmar-pill-glass-bg: rgba(28, 28, 28, 0.1);
-  --pagmar-pill-glass-blur: 10px;
+  /* Figma Glass - tint #F4F4E8, Light −45° 80%, Frost 15, Refraction 80, Depth 54 */
+  --pagmar-glass-tint: #F4F4E8;
+  --pagmar-glass-tint-rgb: 244, 244, 232;
+  --pagmar-glass-light-angle: 135deg;
+  --pagmar-glass-light-opacity: 0.8;
+  --pagmar-glass-frost: 15px;
+  --pagmar-glass-refraction: 80;
+  --pagmar-glass-depth: 54;
+  --pagmar-glass-saturate: calc(100% + var(--pagmar-glass-refraction) * 1%);
+  --pagmar-glass-brightness: calc(1 + var(--pagmar-glass-light-opacity) * 0.1);
+  --pagmar-glass-contrast: 102%;
+  --pagmar-glass-border: rgba(var(--pagmar-glass-tint-rgb), 0.22);
+  --pagmar-glass-fill: rgba(var(--pagmar-glass-tint-rgb), 0.05);
+  --pagmar-glass-fill-gradient: linear-gradient(
+    var(--pagmar-glass-light-angle),
+    rgba(var(--pagmar-glass-tint-rgb), calc(var(--pagmar-glass-light-opacity) * 0.18)) 0%,
+    rgba(var(--pagmar-glass-tint-rgb), calc(var(--pagmar-glass-light-opacity) * 0.08)) 32%,
+    rgba(var(--pagmar-glass-tint-rgb), 0.03) 58%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  --pagmar-glass-rim:
+    inset 1px 1px 0 rgba(var(--pagmar-glass-tint-rgb), calc(var(--pagmar-glass-light-opacity) * 0.5)),
+    inset 0 1px 0 rgba(var(--pagmar-glass-tint-rgb), calc(var(--pagmar-glass-light-opacity) * 0.2)),
+    inset 1px 0 0 rgba(var(--pagmar-glass-tint-rgb), calc(var(--pagmar-glass-light-opacity) * 0.16)),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.12),
+    inset -0.5px -0.5px 0 rgba(var(--pagmar-glass-tint-rgb), 0.06);
+  --pagmar-glass-shadow-pill:
+    var(--pagmar-glass-rim),
+    0 calc(var(--pagmar-glass-depth) * 0.17 * 1px) calc(var(--pagmar-glass-depth) * 0.48 * 1px)
+      rgba(0, 0, 0, 0.24);
+  --pagmar-glass-shadow-card:
+    var(--pagmar-glass-rim),
+    0 calc(var(--pagmar-glass-depth) * 0.3 * 1px) calc(var(--pagmar-glass-depth) * 0.95 * 1px)
+      rgba(0, 0, 0, 0.3);
+  --pagmar-glass-backdrop: blur(var(--pagmar-glass-frost)) saturate(var(--pagmar-glass-saturate))
+    brightness(var(--pagmar-glass-brightness)) contrast(var(--pagmar-glass-contrast));
+  --pagmar-pill-glass-bg: var(--pagmar-glass-fill-gradient), var(--pagmar-glass-fill);
+  --pagmar-pill-glass-blur: var(--pagmar-glass-frost);
+  --pagmar-glass-bg: var(--pagmar-pill-glass-bg);
+  --pagmar-glass-blur: var(--pagmar-glass-frost);
+  --pagmar-glass-shadow: var(--pagmar-glass-shadow-pill);
+  --pagmar-pill-border: var(--pagmar-glass-border);
   --pagmar-btn-roll-duration: 0.35s;
   --pagmar-btn-roll-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --pagmar-btn-roll-stagger: 40ms;
-  /* Chrome close — shared inset @ 1920×1080 (detail, filter, create, result, about) */
+  /* Chrome slot @ 1920×1080 - filter, X, about mirror (Figma inset 50 from top + right/left) */
   --pagmar-close-right: 50;
-  --pagmar-close-top: 55;
+  --pagmar-close-top: 50;
+  --pagmar-chrome-u: var(--pagmar-viewport-u);
+  --pagmar-chrome-top: calc(var(--pagmar-close-top) * var(--pagmar-chrome-u));
+  --pagmar-chrome-right: calc(var(--pagmar-close-right) * var(--pagmar-chrome-u));
+  --pagmar-chrome-left: var(--pagmar-chrome-right);
+  --pagmar-chrome-hit: calc(var(--pagmar-close-hit, 50) * var(--pagmar-chrome-u));
+  /* Physical site margins - 30px on all sides (garden amulets may bleed) */
+  --pagmar-margin-top: 30px;
+  --pagmar-margin-bottom: 30px;
+  --pagmar-margin-left: 30px;
+  --pagmar-margin-right: 30px;
+  --pagmar-w: 1920;
+  --pagmar-h: 1080;
+  --pagmar-design-inset: 30;
+  --pagmar-content-w: max(0px, calc(100vw - var(--pagmar-margin-left) - var(--pagmar-margin-right)));
+  --pagmar-content-h: max(0px, calc(100dvh - var(--pagmar-margin-top) - var(--pagmar-margin-bottom)));
+  --pagmar-margin-u: min(
+    calc(var(--pagmar-content-w) / var(--pagmar-w)),
+    calc(var(--pagmar-content-h) / var(--pagmar-h))
+  );
+  --pagmar-viewport-u: min(
+    calc(100vw / var(--pagmar-w)),
+    calc(100dvh / var(--pagmar-h))
+  );
+  --pagmar-close-u: var(--pagmar-viewport-u);
   --pagmar-close-icon-w: 16.119;
   --pagmar-close-icon-h: 21.235;
   --pagmar-close-hit: 50;
-  --pagmar-close-on-dark: #f5f5f5;
-  --pagmar-close-on-light: #1500e1;
+  --pagmar-close-on-dark: var(--pagmar-yellow-white);
+  --pagmar-close-on-light: var(--pagmar-yellow-white);
   --pagmar-close-border-dark: hsla(0, 0%, 100%, 0.2);
-  --pagmar-close-border-light: rgba(21, 0, 225, 0.25);
-  --pagmar-close-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 50' fill='none'%3E%3Cpath d='M16.836 17.118L33.164 32.882M33.164 17.118L16.836 32.882' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-  --pagmar-glass-pill-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13' fill='none'%3E%3Cpath d='M2.5 10.5L10.5 2.5M10.5 2.5H4.2M10.5 2.5V8.8' stroke='white' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --pagmar-close-border-light: hsla(0, 0%, 100%, 0.2);
+  --pagmar-close-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 50' fill='none'%3E%3Cpath d='M16.836 17.118L33.164 32.882M33.164 17.118L16.836 32.882' stroke='%23000' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  --pagmar-glass-pill-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13' fill='none'%3E%3Cpath d='M2.5 10.5L10.5 2.5M10.5 2.5H4.2M10.5 2.5V8.8' stroke='#F4F4E8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* K95 glass pill — garden hover + detail amulet number */
+/* Figma Glass surface - shared by pills, cards, chrome overlays */
+.pagmar-glass-surface,
+.pagmar__glass-pill {
+  border: var(--pagmar-line-weight) solid var(--pagmar-glass-border);
+  background: var(--pagmar-glass-fill-gradient), var(--pagmar-glass-fill);
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow);
+  transform: translateZ(0);
+}
+
+/* K95 glass pill - detail / result hover (not garden Frame 402) */
 .pagmar__glass-pill {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   padding: 9px 16px 9px 12px;
   border-radius: var(--pagmar-pill-radius);
-  border: 1px solid hsla(0, 0%, 100%, 0.3);
-  background: rgba(255, 255, 255, 0.16);
-  -webkit-backdrop-filter: blur(14px) saturate(165%);
-  backdrop-filter: blur(14px) saturate(165%);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
   white-space: nowrap;
 }
 
@@ -52,7 +122,7 @@
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.04em;
-  color: #fff;
+  color: var(--pagmar-yellow-white);
 }
 
 /* Remove legacy bracket / corner decorations on buttons */
@@ -111,12 +181,7 @@
 }
 
 .pagmar-btn__roll-row .pagmar__index-cta__arrow {
-  display: block;
-  flex: 0 0 auto;
-  width: calc(14.593 * var(--index-u, 1px));
-  height: calc(14.593 * var(--index-u, 1px));
-  pointer-events: none;
-  user-select: none;
+  display: none !important;
 }
 
 /* Legacy whole-line roll (action buttons) */
@@ -189,22 +254,12 @@
   }
 
   .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
-  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-top,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-top,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-top,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-top {
     transform: translateY(-100%);
   }
 
   .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
-  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-bot,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-bot,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-bot,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-bot {
     transform: translateY(0);
@@ -212,7 +267,6 @@
 
   .pagmar-btn__roll:hover .pagmar-btn__roll-track,
   .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__roll-track,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__roll-track,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__roll-track {
     transform: translateY(-50%);
@@ -224,11 +278,11 @@
   }
 }
 
-/* ── Index CTA pill ── */
+/* ── Index CTA pill - Figma 2601:40649 / 2610:43099 ── */
 body.pagmar-index .pagmar__index-cta-pill {
   width: auto;
-  min-width: calc(244 * var(--index-u));
-  height: calc(55 * var(--index-u));
+  min-width: calc(266.166 * var(--index-u));
+  height: calc(62 * var(--index-u));
 }
 
 body.pagmar-index .pagmar__index-cta-pill__body {
@@ -245,57 +299,73 @@ body.pagmar-index .pagmar__index-cta-pill__body {
   width: auto;
   min-width: 100%;
   height: 100%;
-  gap: calc(10 * var(--index-u));
-  direction: ltr;
-  border: 1px solid hsla(0, 0%, 100%, 0.3);
-  border-radius: var(--pagmar-pill-radius);
-  background: rgba(255, 255, 255, 0.16);
-  -webkit-backdrop-filter: blur(14px) saturate(165%);
-  backdrop-filter: blur(14px) saturate(165%);
+  gap: 0;
+  direction: rtl;
+  border: 1px solid transparent;
+  border-radius: calc(70 * var(--index-u));
+  background: var(--pagmar-yellow-white);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: none;
-  padding: calc(10 * var(--index-u)) calc(40 * var(--index-u));
-  color: var(--index-chrome-accent);
+  padding: calc(14 * var(--index-u)) calc(30 * var(--index-u)) calc(15 * var(--index-u));
+  color: #1e1e1e;
   font-family: "TheBasics", "DavidLibre", serif;
-  font-size: calc(24 * var(--index-u));
+  font-size: calc(32 * var(--index-u));
   font-weight: 400;
   font-style: normal;
-  line-height: 1.1;
-  letter-spacing: calc(-0.72 * var(--index-u));
+  line-height: normal;
+  letter-spacing: calc(-0.32 * var(--index-u));
   white-space: nowrap;
+  transition:
+    background var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    border-color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    -webkit-backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    box-shadow var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
-body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll-row {
-  display: inline-flex;
+body.pagmar-index .pagmar__index-cta-pill__body .pagmar__index-cta-pill__label {
+  display: block;
   flex: 0 0 auto;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: calc(10 * var(--index-u));
-  min-width: 0;
+  color: inherit;
+  transition: color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
-body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll--chars {
-  flex: 0 0 auto;
+body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll--lines,
+body.pagmar-index .pagmar__index-cta-pill__body .pagmar-btn__roll--lines .pagmar-btn__roll-track {
+  transform: none !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.pagmar-index .pagmar__index-cta-pill:hover:not(:active) .pagmar__index-cta-pill__body {
+    background: transparent;
+    border-color: var(--pagmar-yellow-white);
+    color: var(--pagmar-yellow-white);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  body.pagmar-index .pagmar__index-cta-pill:hover:not(:active) .pagmar__index-cta-pill__label {
+    color: var(--pagmar-yellow-white);
+  }
 }
 
 body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner,
-body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner,
-body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner {
+body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner {
   left: auto !important;
   right: auto !important;
   top: auto !important;
   bottom: auto !important;
 }
 
-/* ── Index chrome text buttons (about, filter) — no frame ── */
+/* ── Index chrome - about icon + filter text (Figma 2601:40649) ── */
 body.pagmar-index .pagmar__index-about,
 body.pagmar-index .pagmar__index-filter-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  min-width: calc(50 * var(--index-u));
-  height: calc(50 * var(--index-u));
   padding: 0;
   border: none;
   border-radius: 0;
@@ -306,31 +376,71 @@ body.pagmar-index .pagmar__index-filter-trigger {
   transition: opacity var(--index-transition-duration) var(--index-transition-ease);
 }
 
+body.pagmar-index .pagmar__index-about {
+  min-width: 0;
+}
+
+body.pagmar-index .pagmar__index-filter-trigger {
+  width: auto;
+  height: var(--pagmar-chrome-hit);
+  min-width: 0;
+  min-height: var(--pagmar-chrome-hit);
+  justify-content: flex-end;
+}
+
+body.pagmar-index .pagmar__index-about__icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
 body.pagmar-index .pagmar__index-about.is-over-content,
 body.pagmar-index .pagmar__index-filter-trigger.is-over-content {
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
-  color: var(--pagmar-close-on-light);
+  color: var(--pagmar-close-on-dark);
 }
 
 body.pagmar-index .pagmar__index-filter-trigger__label {
   position: relative;
-  left: auto;
-  top: auto;
-  transform: none;
+  display: block;
   pointer-events: none;
 }
 
+body.pagmar-index .pagmar__index-filter-trigger__label::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: calc(-3 * var(--index-u));
+  left: 0;
+  height: var(--pagmar-line-weight);
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-filter-trigger__label::after {
+    transform: scaleX(1);
+  }
+}
+
 body.pagmar-index .pagmar__index-filter-trigger__label.pagmar-btn__roll--chars {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
   visibility: hidden;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label::after {
+  display: none;
 }
 
 /* ── Questionnaire submit (figma-q) ── */
@@ -364,7 +474,7 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
   align-items: center;
   justify-content: center;
   text-align: center;
-  border: 1px solid var(--pagmar-pill-border);
+  border: var(--pagmar-line-weight) solid var(--pagmar-pill-border);
   border-radius: var(--pagmar-pill-radius);
   background: transparent;
   -webkit-backdrop-filter: none;
@@ -395,9 +505,11 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
 
 .figma-q__btn.is-over-content,
 .figma-q__btn-outer.is-over-content .figma-q__btn {
+  border-color: var(--pagmar-glass-border);
   background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
-  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow-pill);
 }
 
 .figma-q__btn:hover:not(:disabled),
@@ -411,11 +523,13 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
   background: var(--pagmar-pill-glass-bg);
 }
 
-/* Result overlay buttons inherit figma-q — always over content */
+/* Result overlay buttons inherit figma-q - always over content */
 .pagmar-canvas--result .figma-q__btn {
+  border-color: var(--pagmar-glass-border);
   background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
-  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow-pill);
 }
 
 .pagmar-canvas--result .figma-q__btn:hover:not(:disabled),
@@ -434,14 +548,12 @@ body.pagmar-create .pagmar__action-btn__inner {
   min-width: calc(160 * var(--u, var(--index-u)));
   height: var(--action-btn-h, calc(55 * var(--u)));
   padding: 0 calc(32 * var(--u, var(--index-u)));
-  border: 1px solid var(--pagmar-pill-border);
+  border: var(--pagmar-line-weight) solid var(--pagmar-glass-border);
   border-radius: var(--pagmar-pill-radius);
   background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
-  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.06),
-    0 2px 8px rgba(0, 0, 0, 0.12);
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow-pill);
   filter: none;
 }
 
@@ -459,7 +571,7 @@ body.pagmar-create .pagmar__action-btn__label {
 body.pagmar-index .pagmar__action-btn__label-line,
 body.pagmar-create .pagmar__action-btn__label-line {
   height: 1.1em;
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
 }
 
 body.pagmar-index .pagmar__action-btn:hover .pagmar__action-btn__inner,
@@ -482,10 +594,15 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
   margin: calc(2 * var(--u, var(--fu)));
 }
 
+.figma-q__field .intro__choice-grid--dock .intro__choice-btn--figma {
+  border-radius: 0;
+  margin: 0;
+}
+
 /* ── Export + text panel save ── */
 body.pagmar-create .pagmar__export-btn,
 body.pagmar-index .pagmar__text-save {
-  border: 1px solid var(--pagmar-pill-border);
+  border: var(--pagmar-line-weight) solid var(--pagmar-pill-border);
   border-radius: var(--pagmar-pill-radius);
   background: transparent;
   -webkit-backdrop-filter: none;
@@ -494,15 +611,17 @@ body.pagmar-index .pagmar__text-save {
 
 body.pagmar-create .pagmar__export-btn:hover,
 body.pagmar-index .pagmar__text-save:hover:not(:disabled) {
+  border-color: var(--pagmar-glass-border);
   background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur));
-  backdrop-filter: blur(var(--pagmar-pill-glass-blur));
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow-pill);
 }
 
 body.pagmar-index .pagmar__text-save {
   border-radius: var(--pagmar-pill-radius);
   background: transparent;
-  color: #f4f4f4;
+  color: var(--pagmar-yellow-white);
   border-color: var(--pagmar-pill-border);
 }
 
@@ -511,21 +630,22 @@ body.pagmar-index .pagmar__text-close {
   border-color: var(--pagmar-close-border-light);
 }
 
-/* ── Close / icon-only buttons — clean pill, no label roll ── */
+/* ── Close / icon-only buttons - clean pill, no label roll ── */
 .pagmar__about-close,
 .pagmar__result-close,
 .figma-close {
-  position: absolute;
+  position: fixed;
   z-index: 30;
-  right: calc(var(--pagmar-close-right) * var(--pagmar-close-u, var(--u, 1px)));
-  top: calc(var(--pagmar-close-top) * var(--pagmar-close-u, var(--u, 1px)));
+  right: var(--pagmar-chrome-right);
+  top: var(--pagmar-chrome-top);
   left: auto;
   bottom: auto;
-  width: calc(var(--pagmar-close-hit) * var(--pagmar-close-u, var(--u, 1px)));
-  height: calc(var(--pagmar-close-hit) * var(--pagmar-close-u, var(--u, 1px)));
+  width: var(--pagmar-chrome-hit);
+  height: var(--pagmar-chrome-hit);
   transform: none;
   box-sizing: border-box;
   display: inline-flex;
+  direction: ltr;
   align-items: flex-start;
   justify-content: flex-end;
   padding: 0;
@@ -561,20 +681,20 @@ body.pagmar-index .pagmar__text-close {
     border-color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
-/* Dark background — white X */
+/* Dark background - white X */
 .figma-close,
 .pagmar__result-close {
   color: var(--pagmar-close-on-dark);
-  border: 1px solid var(--pagmar-close-border-dark);
+  border: var(--pagmar-line-weight) solid var(--pagmar-close-border-dark);
 }
 
-/* Light background — blue X */
+/* Text panel close - white X */
 body.pagmar-index .pagmar__text-close {
-  color: var(--pagmar-close-on-light);
-  border: 1px solid var(--pagmar-close-border-light);
+  color: var(--pagmar-close-on-dark);
+  border: var(--pagmar-line-weight) solid var(--pagmar-close-border-dark);
 }
 
-/* Detail page — white X, no glass frame (matches index chrome) */
+/* Detail page - X uses page text color */
 body.pagmar-amulet-detail .pagmar__detail-close {
   box-sizing: border-box;
   display: inline-flex;
@@ -587,11 +707,11 @@ body.pagmar-amulet-detail .pagmar__detail-close {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
-  color: var(--pagmar-close-on-dark);
+  color: var(--detail-fg, var(--pagmar-yellow-white));
   transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
-/* Questionnaire / request-flow close — white X on black, no frame */
+/* Questionnaire / request-flow close - white X on black, no frame */
 .figma-close {
   border: none;
   background: transparent;
@@ -603,11 +723,22 @@ body.pagmar-amulet-detail .pagmar__detail-close {
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
-  color: var(--pagmar-close-on-dark);
+  position: relative;
+  right: auto;
+  top: auto;
+  color: var(--pagmar-yellow-white);
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger.is-over-content {
-  color: var(--pagmar-close-on-light);
+  color: var(--pagmar-yellow-white);
 }
 
 .figma-close.is-over-content,
@@ -622,8 +753,8 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
 
 .figma-close.is-over-content,
 .pagmar__result-close.is-over-content {
-  color: var(--pagmar-close-on-light);
-  border-color: var(--pagmar-close-border-light);
+  color: var(--pagmar-close-on-dark);
+  border-color: var(--pagmar-close-border-dark);
 }
 
 body.pagmar-amulet-detail .pagmar__detail-close:hover,
@@ -641,60 +772,46 @@ body.pagmar-amulet-detail .pagmar__detail-close:focus-visible {
 }
 
 .figma-close img,
-.pagmar__result-close img {
+.pagmar__result-close img,
+.pagmar__about-close img {
   display: block;
-  object-fit: none;
-  object-position: -9999px;
-  overflow: hidden;
-  background-color: currentColor;
-  -webkit-mask-image: var(--pagmar-close-glyph);
-  mask-image: var(--pagmar-close-glyph);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  pointer-events: none;
-  user-select: none;
-  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
-}
-
-.pagmar__about-close img,
-.figma-close img,
-.pagmar__result-close img {
-  width: calc(var(--pagmar-close-icon-w) * var(--pagmar-close-u, var(--u, 1px)));
-  height: calc(var(--pagmar-close-icon-h) * var(--pagmar-close-u, var(--u, 1px)));
+  width: calc(var(--pagmar-close-icon-w) * var(--pagmar-chrome-u));
+  height: calc(var(--pagmar-close-icon-h) * var(--pagmar-chrome-u));
   flex-shrink: 0;
-  object-fit: contain;
-  object-position: right top;
-}
-
-body.pagmar-amulet-detail .pagmar__detail-close img {
-  width: calc(var(--pagmar-close-icon-w) * var(--u, 1px));
-  height: calc(var(--pagmar-close-icon-h) * var(--u, 1px));
   object-fit: contain;
   object-position: right top;
   -webkit-mask-image: none;
   mask-image: none;
   background-color: transparent;
-  filter: brightness(0) invert(1);
+  filter: none;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+body.pagmar-amulet-detail .pagmar__detail-close img,
+body.pagmar-amulet-detail .pagmar__detail-close svg {
+  width: calc(var(--pagmar-close-icon-w) * var(--pagmar-chrome-u));
+  height: calc(var(--pagmar-close-icon-h) * var(--pagmar-chrome-u));
+  object-fit: contain;
+  object-position: right top;
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+  filter: none;
 }
 
 body.pagmar-index .pagmar__index-filter-trigger__icon {
-  position: relative;
-  left: auto;
-  top: auto;
-  transform: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: none;
-  width: 42%;
-  height: 42%;
-}
-
-body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
+  width: calc(16.119 * var(--index-u));
+  height: calc(21.235 * var(--index-u));
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
@@ -704,20 +821,21 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
   right: auto;
   bottom: auto;
   display: block;
-  width: calc(var(--pagmar-close-icon-w) * var(--index-u, 1px));
-  height: calc(var(--pagmar-close-icon-h) * var(--index-u, 1px));
+  width: calc(var(--pagmar-close-icon-w) * var(--index-u));
+  height: calc(var(--pagmar-close-icon-h) * var(--index-u));
   transform: none;
   object-fit: contain;
-  object-position: right top;
-  filter: brightness(0) invert(1);
+  object-position: center;
   -webkit-mask-image: none;
   mask-image: none;
   background-color: transparent;
+  filter: brightness(0) invert(1);
 }
 
 .figma-close:hover img,
 .pagmar__result-close:hover img,
 body.pagmar-amulet-detail .pagmar__detail-close:hover img,
+body.pagmar-amulet-detail .pagmar__detail-close:hover svg,
 body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-filter-trigger__icon,
 body.pagmar-index .pagmar__text-close:hover {
   opacity: 0.72;
@@ -728,7 +846,7 @@ body.pagmar-index .pagmar__text-close {
   height: calc(36 * var(--u));
   font-size: 0;
   line-height: 0;
-  color: var(--pagmar-close-on-light);
+  color: var(--pagmar-close-on-dark);
   background-color: currentColor;
   -webkit-mask-image: var(--pagmar-close-glyph);
   mask-image: var(--pagmar-close-glyph);
@@ -741,7 +859,7 @@ body.pagmar-index .pagmar__text-close {
 }
 
 body.pagmar-index .pagmar__text-close:focus-visible {
-  outline: 1px solid rgba(21, 0, 225, 0.45);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.45);
   outline-offset: calc(2 * var(--u));
 }
 
@@ -752,25 +870,14 @@ body.pagmar-index .pagmar__text-close:focus-visible {
 
   .pagmar-btn__roll:hover .pagmar-btn__roll-track,
   .figma-q__btn:not(:disabled):hover .pagmar-btn__roll-track,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__roll-track,
   .pagmar__action-btn:hover:not(:disabled) .pagmar__action-btn__label-track,
   .pagmar__create-save:hover:not(:disabled) .pagmar__create-save-label-track,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__roll-track,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__roll-track,
   .figma-q__btn:not(:disabled):hover .pagmar-btn__char-top,
-  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-top,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-top,
-  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-top,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-top,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-top,
   .figma-q__btn:not(:disabled):hover .pagmar-btn__char-bot,
-  .pagmar__index-cta-pill:hover:not(:active) .pagmar-btn__char-bot,
-  .pagmar__index-filter-trigger:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-about:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-filter-item:hover .pagmar-btn__char-bot,
-  body.pagmar-index .pagmar__index-filter-active-tag:hover .pagmar-btn__char-bot,
   .pagmar__export-btn:hover:not(:disabled) .pagmar-btn__char-bot,
   .pagmar__text-save:hover:not(:disabled) .pagmar-btn__char-bot {
     transform: none;

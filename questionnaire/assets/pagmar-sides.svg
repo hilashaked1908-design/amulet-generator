@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1078" fill="none" aria-hidden="true">
   <!-- Side lines + corner L-brackets -->
-  <g stroke="#F1F1F1" stroke-width="1" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision">
+  <g stroke="#F4F4E8" stroke-width="1.5" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision">
     <path d="M 19 26 V 1050"/>
     <path d="M 1901 26 V 1050"/>
     <path d="M 19 19 H 26 M 19 19 V 26"/>

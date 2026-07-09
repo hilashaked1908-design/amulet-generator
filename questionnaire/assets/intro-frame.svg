@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" fill="none" aria-hidden="true">
   <!-- מסגרת 1920×1080 — מדידות מהמוקאפ (1024×574 → 1920×1080) -->
-  <g stroke="#e6e6e6" stroke-width="1" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" opacity="0.88">
+  <g stroke="#e6e6e6" stroke-width="1.5" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" opacity="0.88">
     <!-- קו עליון + פער למרכז -->
     <path d="M 19 19 H 936 M 984 19 H 1901"/>
     <!-- קו תחתון + פער + סימוני אנך -->

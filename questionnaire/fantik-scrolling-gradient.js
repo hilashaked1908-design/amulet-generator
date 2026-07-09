@@ -1,5 +1,5 @@
 /**
- * Fantik Studio ScrollingBackgroundGradient — extracted from fantik.studio bundle.
+ * Fantik Studio ScrollingBackgroundGradient - extracted from fantik.studio bundle.
  * BG component: screens=.5, timeMultiplier=.1, scale=1, distortionIterations=6, distortionIntensity=.3
  * colourPalette: (0.2,.2,.2), (0.3,.3,.3), (0.5,.5,.5), (0.2,.2,.2)
  */

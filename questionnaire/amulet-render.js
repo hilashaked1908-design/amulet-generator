@@ -1,10 +1,8 @@
 /**
- * Shared render path — vector preview (Q1–Q3), PBR only when all answers are in.
+ * Shared render path - vector preview (Q1-Q3), PBR only when all answers are in.
  */
-import {
-  renderThreePbrAmuletInteractive,
-  renderVectorPreviewInteractive,
-} from '../three-pbr-amulet.js';
+import { renderThreePbrAmuletInteractive } from '../three-pbr-amulet.js';
+import { renderQuestionnaireStageVectors } from './amulet-detail-vectors.js';
 import {
   initAmuletCompose,
   composeFromAnswers,
@@ -116,15 +114,14 @@ export async function renderQuestionnaireAmulet(answers, container, options = {}
   const ageNum = questionnaire.ageNum ?? 25;
 
   if (vectorOnly) {
-    return renderVectorPreviewInteractive({
+    return renderQuestionnaireStageVectors({
       svg,
       style2,
       style3: style3Scaled,
       container,
       vectorStage,
-      ageNum,
       onProgress,
-      autoRotate,
+      answers,
     });
   }
 

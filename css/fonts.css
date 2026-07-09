@@ -1,7 +1,44 @@
-/* Site fonts — files in /fonts/ */
+/* Site fonts - files in /fonts/ */
 
 :root {
-  --pagmar-green: #ffffff;
+  --pagmar-line-weight: 1.5px;
+  /* צהוב לבן - site ink for text, vectors, chrome on dark */
+  --pagmar-yellow-white: #F4F4E8;
+  --pagmar-yellow-white-rgb: 244, 244, 232;
+  --pagmar-green: var(--pagmar-yellow-white);
+  --pagmar-ink: var(--pagmar-yellow-white);
+}
+
+@font-face {
+  font-family: "Narkiss Yair";
+  src: url("../fonts/NarkissYair-Regular-TRIAL.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Narkiss Yair Variable";
+  src: url("../fonts/NarkissYair-Regular-TRIAL.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lava Pro HL";
+  src: url("../fonts/LavaProHL-Thin.ttf") format("truetype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lava Pro HL";
+  src: url("../fonts/LavaProHL-Thin.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -29,9 +66,57 @@
 }
 
 @font-face {
+  font-family: "TheBasics";
+  src: url("../fonts/TheBasics-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics Mono";
+  src: url("../fonts/TheBasicsMono-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TheBasics Display Thin";
+  src: url("../fonts/TheBasicsDisplay-Thin.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Ratzif22";
   src: url("../fonts/Ratzif22-Regular.otf") format("opentype");
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Light.otf") format("opentype");
+  font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
@@ -46,56 +131,16 @@
 
 @font-face {
   font-family: "Ratzif22";
-  src: url("../fonts/Ratzif22-Bold.otf") format("opentype");
-  font-weight: 700;
+  src: url("../fonts/Ratzif22-SemiBold.otf") format("opentype");
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Romema Spitzer TRIAL";
-  src: url("../fonts/RomemaSpitzerTRIAL-Light.otf") format("opentype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TheBasics Display Thin";
-  src: url("../fonts/TheBasics-DisplayThin.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TheBasics Mono";
-  src: url("../fonts/TheBasics-Mono.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TheBasics";
-  src: url("../fonts/TheBasics-Regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TheBasics";
-  src: url("../fonts/TheBasics-Medium.otf") format("opentype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TheBasics";
-  src: url("../fonts/TheBasics-Bold.otf") format("opentype");
-  font-weight: 700;
+  font-family: "Ratzif22";
+  src: url("../fonts/Ratzif22-Thin.otf") format("opentype");
+  font-weight: 100;
   font-style: normal;
   font-display: swap;
 }

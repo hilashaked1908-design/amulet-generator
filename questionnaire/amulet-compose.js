@@ -1,5 +1,5 @@
 /**
- * Amulet SVG compose — extracted for questionnaire (prototype-v2-thick.html untouched).
+ * Amulet SVG compose - extracted for questionnaire (prototype-v2-thick.html untouched).
  */
 'use strict';
 
@@ -53,13 +53,13 @@ function readParams() {
   const GLYPHS_DIR = '../glyphs';
   /** מקסימום אותיות בשכבת שם */
   const MAX_LETTERS = 3;
-  /** מקסימום אותיות בשרשרת חיבורים (Q1/Q2/L3) — כרגע 3 להפחתת עומס */
+  /** מקסימום אותיות בשרשרת חיבורים (Q1/Q2/L3) - כרגע 3 להפחתת עומס */
   const MAX_LETTERS_LAYER3 = 3;
-  /** שכבת Q1 (קרמיקה) — שתי אותיות מחוברות */
+  /** שכבת Q1 (קרמיקה) - שתי אותיות מחוברות */
   const MAX_Q1_CERAMIC_LETTERS = 2;
   /** מקסימום אותיות בשכבת Q4 (מתכת מאחורי האבן) */
   const MAX_FRINGE_LETTERS = 3;
-  /** כוונת חיבורים לפריסת אותיות — לפי סוג הקמע (הגנה / זימון) */
+  /** כוונת חיבורים לפריסת אותיות - לפי סוג הקמע (הגנה / זימון) */
   function amuletPlacementIntent(amuletType) {
     return amuletType === 'summoning' ? 'summoning' : 'protection';
   }
@@ -78,7 +78,7 @@ function readParams() {
   }
   /** שכבה 2 (שם) */
   const LAYER2_SCALE = 1.25;
-  /** שכבה 3 (כוונה) — שכבה קדמית */
+  /** שכבה 3 (כוונה) - שכבה קדמית */
   const LAYER3_SCALE = 1.2;
   const FRAME_PAD = 40;
   const SUMMONING_FRAME_PAD = 30;
@@ -87,7 +87,7 @@ function readParams() {
   const FRAME_MASK_SCALE = 2;
   const FRAME_STROKE = 3;
 
-  /** גיל → bump — זהה ל-prototype.html */
+  /** גיל → bump - זהה ל-prototype.html */
   const AGE_BUMP_SCALE = {
     under18: 4,
     '18-24': 7,
@@ -158,7 +158,7 @@ function readParams() {
   };
 
   /**
-   * שכבה 2 — מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז).
+   * שכבה 2 - מרווח לפי סטטוס משפחתי (מרחק אותיות מהמרכז).
    * טווח קיצוני כמו דחיפות: נשוי≈עכשיו (0.5) · רווק≈רחוק (2.0).
    * סדר: רווק → גרוש → אלמן → זוגיות → נשוי.
    */
@@ -171,7 +171,7 @@ function readParams() {
   };
 
   /**
-   * שכבה 2 — חלקות לפי עיסוק: 1 = חלק, 0 = קוצני.
+   * שכבה 2 - חלקות לפי עיסוק: 1 = חלק, 0 = קוצני.
    * טכנולוגיה ופיננסים → ממשל וביטחון → ידע והוראה → טיפול ובריאות → חקלאות → יצירה ורוח.
    */
   const OCCUPATION_SMOOTHNESS = {
@@ -183,7 +183,7 @@ function readParams() {
     creation_spirit: 0
   };
 
-  /** שכבה 2 — סגנון קו ומרקם לפי תחום עיסוק */
+  /** שכבה 2 - סגנון קו ומרקם לפי תחום עיסוק */
   const OCCUPATION_VISUAL = {
     care_health: {
       linecap: 'round',
@@ -297,13 +297,13 @@ function readParams() {
     return 1 - occupationSmoothnessFromQ6(q6);
   }
 
-  /** @deprecated — upper layers no longer use Q6 wobble */
+  /** @deprecated - upper layers no longer use Q6 wobble */
   function frameContourFromQ6(_q6) {
     return FRAME_CONTOUR_SMOOTH;
   }
 
   /**
-   * Q4 — frame thickness is uniform (no belief-based scaling).
+   * Q4 - frame thickness is uniform (no belief-based scaling).
    * Q6 → מרקם/קוצניות מתכת (ערכי unified לפי סדר התשובות).
    */
   const Q4_BELIEF_FRAME_RADIUS_SCALE = {
@@ -373,7 +373,7 @@ function readParams() {
     confusion: 'meaning'
   };
 
-  /** domainStrokeHex — זהה ל-prototype-v2-saved-roughness.html */
+  /** domainStrokeHex - זהה ל-prototype-v2-saved-roughness.html */
   function domainStrokeHex(style3OrDomainKey) {
     const map = {
       love: '#EF4F85',
@@ -392,7 +392,7 @@ function readParams() {
   }
 
   /**
-   * Q5 → גווני אפור-שחור (זמני) — אותה מיפוי תחום, ללא צבעים רוויים.
+   * Q5 → גווני אפור-שחור (זמני) - אותה מיפוי תחום, ללא צבעים רוויים.
    */
   const Q5_CERAMIC_GRAY = {
     hope: '#aeaeb4',
@@ -424,7 +424,7 @@ function readParams() {
     return STATUS_SPACING[key] != null ? STATUS_SPACING[key] : STATUS_SPACING.single;
   }
 
-  /** שכבה 2 — א נסתרת רק אם יש חיבור א↔אות בשם (לא תמיד) */
+  /** שכבה 2 - א נסתרת רק אם יש חיבור א↔אות בשם (לא תמיד) */
   function nameLettersNeedHiddenAleph(letters, intent) {
     const CC = requireConnectionCore();
     return letters.some(
@@ -438,10 +438,10 @@ function readParams() {
     const lines = [
       'צורה ← שם + חיבורי ' + style2.intent + ' (סוג קמע)',
       layer2?.hiddenHub
-        ? 'עוגן נסתר: א — יש חיבור א↔אות בשם, לא מוצגת'
+        ? 'עוגן נסתר: א - יש חיבור א↔אות בשם, לא מוצגת'
         : layer2?.anchor
           ? 'עוגן: ' + layer2.anchor + ' (הכי הרבה חיבורים בשם)'
-          : 'עוגן: —',
+          : 'עוגן: -',
       'מרחק ← סטטוס ' + style2.familyStatus + ' → spacing×' + style2.spacing.toFixed(2),
       'שם ← SVG bump=' +
         layer2LetterBumpProfile(style2).scale +
@@ -563,7 +563,7 @@ function readParams() {
     };
   }
 
-  /** style2 — תמיד מחושב (מסגרת/מרקם), גם כשאין אותיות L2 */
+  /** style2 - תמיד מחושב (מסגרת/מרקם), גם כשאין אותיות L2 */
   function visualStyleLayer2(p, seedOverride) {
     const styleP = questionnaireStyleBase(p);
     const gender = GENDER_VISUAL[styleP.gender] || GENDER_VISUAL.female;
@@ -606,7 +606,7 @@ function readParams() {
     };
   }
 
-  /** זכר: פרופיל לפי גיל — זהה ל-prototype.html */
+  /** זכר: פרופיל לפי גיל - זהה ל-prototype.html */
   function maleBumpProfile(age, surfaceScale) {
     const s = surfaceScale;
     if (s <= 0) {
@@ -632,7 +632,7 @@ function readParams() {
     };
   }
 
-  /** שכבה 2 — אותיות: חספוס לפי עיסוק */
+  /** שכבה 2 - אותיות: חספוס לפי עיסוק */
   function layer2LetterBumpProfile(style) {
     const key = style.occupationKey || 'care_health';
     const occ = OCCUPATION_VISUAL[key] || OCCUPATION_VISUAL.care_health;
@@ -648,7 +648,7 @@ function readParams() {
     };
   }
 
-  /** מסגרת — טקסטורה חלקה קבועה (Q4 משפיע רק על עובי) */
+  /** מסגרת - טקסטורה חלקה קבועה (Q4 משפיע רק על עובי) */
   function frameBumpProfile(style) {
     const preset = FRAME_TEXTURE_SMOOTH;
     return {
@@ -663,7 +663,7 @@ function readParams() {
     return layer2LetterBumpProfile(style);
   }
 
-  /** גיל = עוצמת חספוס — זהה ל-prototype.html (שכבה 3) */
+  /** גיל = עוצמת חספוס - זהה ל-prototype.html (שכבה 3) */
   function ageBumpByGender(style) {
     const s = style.surfaceScale;
     const g = style.gender || 'female';
@@ -713,7 +713,7 @@ function readParams() {
     return style.layer === 2 ? layer2LetterBumpProfile(style) : ageBumpByGender(style);
   }
 
-  /** פילטר משולב — עותק מדויק מ-prototype.html */
+  /** פילטר משולב - עותק מדויק מ-prototype.html */
   function buildCombinedFilter(filterId, style) {
     const bump = bumpProfileForStyle(style);
     return (
@@ -923,7 +923,7 @@ function readParams() {
     return attrs;
   }
 
-  /** הקטנת מסת L3 ~65% מבסיס — קו דק כמו חוט/שריטה, רווחים דומיננטיים */
+  /** הקטנת מסת L3 ~65% מבסיס - קו דק כמו חוט/שריטה, רווחים דומיננטיים */
   const L3_STROKE_BASE = 45;
   const PATH_MAIN_W = L3_STROKE_BASE * L3_MASS_SCALE;
 
@@ -1185,7 +1185,7 @@ function readParams() {
     return contour;
   }
 
-  /** לולאת השוליים הארוכה ביותר — מוגבל לכמה רכיבים כדי לא לתקוע */
+  /** לולאת השוליים הארוכה ביותר - מוגבל לכמה רכיבים כדי לא לתקוע */
   function traceLargestBoundary(grid, bw, bh, x0, y0) {
     const visited = new Uint8Array(bw * bh);
     let best = [];
@@ -1209,7 +1209,7 @@ function readParams() {
 
   const PBR_TUBE_RADIUS = 6;
 
-  /** רוחב מסכת אבן — תואם ל-rasterizeNameLettersStoneMask ב-PBR */
+  /** רוחב מסכת אבן - תואם ל-rasterizeNameLettersStoneMask ב-PBR */
   function stoneSlabMaskStroke(style2, style3) {
     const scale = style3?.amuletScale || 1;
     const strokeW = PATH_MAIN_W * scale;
@@ -1251,7 +1251,7 @@ function readParams() {
     });
   }
 
-  /** קונטור מסגרת — מסכת L2 ממוזגת (צורת האבן), dilation + offset */
+  /** קונטור מסגרת - מסכת L2 ממוזגת (צורת האבן), dilation + offset */
   async function buildStoneSlabFrameContour(layersHtml, defsHtml, pad, style2, style3) {
     const mount = mountLayersRoot(layersHtml, defsHtml);
     if (!mount) return { points: [] };
@@ -1274,7 +1274,7 @@ function readParams() {
     }
   }
 
-  /** רוחב מסכה ל-L2 — תואם לצינורות דקים ב-3D + organic */
+  /** רוחב מסכה ל-L2 - תואם לצינורות דקים ב-3D + organic */
   function pbrL2MaskStroke(style2) {
     const gender = style2?.gender || 'female';
     const tubeR =
@@ -1289,14 +1289,14 @@ function readParams() {
     return 2 * (tubeR * 1.2 + organic) * (style2?.amuletScale || 1);
   }
 
-  /** רוחב מסכה ל-L3 — תואם לceramic מנופח */
+  /** רוחב מסכה ל-L3 - תואם לceramic מנופח */
   function pbrL3MaskStroke(style3) {
     const scale = style3?.amuletScale || 1;
     const domePad = 14;
     return PATH_MAIN_W * scale + domePad * 2;
   }
 
-  /** מרחק מסגרת — מרווח שווה מחוץ למסכה המשולבת */
+  /** מרחק מסגרת - מרווח שווה מחוץ למסכה המשולבת */
   function computeFrameContourPad(style2, style3) {
     const rough = style2 ? 1 - frameSmoothnessFromStyle(style2) : 0;
     const bump3 = ageBumpByGender(style3).scale || 0;
@@ -1528,7 +1528,7 @@ function readParams() {
     return gridFromImageData(ctx.getImageData(0, 0, bw, bh).data, bw, bh);
   }
 
-  /** קונטור offset — union L2+L3, dilation מעגלית (מרחק שווה), מעקב שוליים */
+  /** קונטור offset - union L2+L3, dilation מעגלית (מרחק שווה), מעקב שוליים */
   async function buildCombinedLayersFrameContour(layersHtml, defsHtml, pad, style2, style3) {
     const mount = mountLayersRoot(layersHtml, defsHtml);
     if (!mount) return { points: [] };
@@ -1648,7 +1648,7 @@ function readParams() {
     return { x, y };
   }
 
-  /** דגימת נקודות מ-L2 בלבד — צורת האבן נגזרת מהשם (Q2) */
+  /** דגימת נקודות מ-L2 בלבד - צורת האבן נגזרת מהשם (Q2) */
   function sampleStoneShapePathPoints(layersHtml, defsHtml, style2, centerDx, centerDy) {
     const doc = new DOMParser().parseFromString(
       '<svg xmlns="http://www.w3.org/2000/svg" width="' +
@@ -1698,7 +1698,7 @@ function readParams() {
     return samples;
   }
 
-  /** דגימת נקודות מ-paths של L2+L3 — עם outset לפי סוג שכבה */
+  /** דגימת נקודות מ-paths של L2+L3 - עם outset לפי סוג שכבה */
   function sampleAmuletPathPoints(layersHtml, defsHtml, style2) {
     const doc = new DOMParser().parseFromString(
       '<svg xmlns="http://www.w3.org/2000/svg" width="' +
@@ -1790,7 +1790,7 @@ function readParams() {
     return cur;
   }
 
-  /** מעגל הגנה — עיקולים לפי Q4 (במקום עיגול מושלם) */
+  /** מעגל הגנה - עיקולים לפי Q4 (במקום עיגול מושלם) */
   function buildCircularFrameContour(cx, cy, r, style2) {
     const smooth = frameSmoothnessFromStyle(style2);
     const rough = 1 - smooth;
@@ -1819,7 +1819,7 @@ function readParams() {
     return points;
   }
 
-  /** קונטור offset סימטרי — 360 קרניים, עוטף L2+L3 במרחק שווה */
+  /** קונטור offset סימטרי - 360 קרניים, עוטף L2+L3 במרחק שווה */
   function buildSummoningFrameContour(cx, cy, samples, pad, style2) {
     const r = new Float64Array(360);
     for (const s of samples) {
@@ -1870,7 +1870,7 @@ function readParams() {
     return points;
   }
 
-  /** מסגרת — עוטפת צורת האבן (מסכת L2 ממוזגת), עם עיקולים לפי Q5 */
+  /** מסגרת - עוטפת צורת האבן (מסכת L2 ממוזגת), עם עיקולים לפי Q5 */
   async function buildIntentFrameLayer(style3, extentBBox, layersHtml, defsHtml, style2, centerDx, centerDy) {
     const intent = style3.intent || (style3.amuletType === 'summoning' ? 'summoning' : 'protection');
     if (intent !== 'protection' && intent !== 'summoning') return null;
@@ -1908,7 +1908,7 @@ function readParams() {
     };
   }
 
-  /** ממרכז שכבה 3 (כוונה) על מרכז שכבה 2 (שם) — שכבה 2 נשארת קבועה */
+  /** ממרכז שכבה 3 (כוונה) על מרכז שכבה 2 (שם) - שכבה 2 נשארת קבועה */
   function alignLayer3ToLayer2(layer2Content, layer3Content, vb, defsHtml) {
     const c2 = measureContentBBox(layer2Content, vb, defsHtml);
     const c3 = measureContentBBox(layer3Content, vb, defsHtml);
@@ -1944,7 +1944,7 @@ function readParams() {
     hope: 'לבן·מט',
     excitement: 'כרום·כסף',
     fear: 'כרום·שחור',
-    confusion: 'מתכת·מברשת',
+    confusion: 'מתכת',
     impatience: 'שחור·מט',
     longing: 'זכוכית'
   };
@@ -2045,7 +2045,7 @@ function readParams() {
     return pickSentenceLetterWords(str, MAX_LETTERS_LAYER3).letters;
   }
 
-  /** שכבת Q1 (קרמיקה) — עד 2 אותיות: ראשונה מכל מילה, עם גיבוי לאות שנייה במילה הראשונה */
+  /** שכבת Q1 (קרמיקה) - עד 2 אותיות: ראשונה מכל מילה, עם גיבוי לאות שנייה במילה הראשונה */
   function getQ1CeramicLetters(str) {
     const letters = getSentenceLetters(str);
     if (letters.length >= MAX_Q1_CERAMIC_LETTERS) return letters.slice(0, MAX_Q1_CERAMIC_LETTERS);
@@ -2073,7 +2073,7 @@ function readParams() {
     return out.slice(0, MAX_Q1_CERAMIC_LETTERS);
   }
 
-  /** אותיות עבריות מהשם — ללא כפילויות, עד 3 */
+  /** אותיות עבריות מהשם - ללא כפילויות, עד 3 */
   function lettersFromName(name) {
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
     const used = new Set();
@@ -2087,7 +2087,7 @@ function readParams() {
     return out;
   }
 
-  /** אות ראשונה מכל מילה ב-Q7 — טבעת הבלטה על האבן */
+  /** אות ראשונה מכל מילה ב-Q7 - טבעת הבלטה על האבן */
   const Q7_CIRCLE = {
     radiusFrac: 0.36,
     letterSz: 36,
@@ -2116,7 +2116,7 @@ function readParams() {
     return (h * 2 - 1) * spread;
   }
 
-  /** Q7 — אותיות מפוזרות במעגל (ללא חיבורים) להבלטה על האבן */
+  /** Q7 - אותיות מפוזרות במעגל (ללא חיבורים) להבלטה על האבן */
   async function buildQ7CircleEmbossMarkup(letters, style, center) {
     if (!letters.length) return '';
     const n = letters.length;
@@ -2199,7 +2199,7 @@ function readParams() {
     };
   }
 
-  /** Q4 — שכבת מתכת מחוברת (כמו שם), מיושרת לשכבת האבן */
+  /** Q4 - שכבת מתכת מחוברת (כמו שם), מיושרת לשכבת האבן */
   async function buildQ4MetalLayer(letters, style, intent) {
     if (!letters.length) {
       return { content: '', placements: [], skipped: letters };
@@ -2246,7 +2246,7 @@ function readParams() {
     return false;
   }
 
-  /** מיקומים מוחלטים מהעורך — ללא hub, spacing, twist או seed */
+  /** מיקומים מוחלטים מהעורך - ללא hub, spacing, twist או seed */
   function findEditorLetterConnection(letter, letters, intent, prevLetter, letterIdx) {
     const CC = requireConnectionCore();
     if (prevLetter) {
@@ -2407,7 +2407,7 @@ function readParams() {
   }
 
   /**
-   * מרחק בין אותיות סביב ה-hub — כמו דחיפות בשכבה 3.
+   * מרחק בין אותיות סביב ה-hub - כמו דחיפות בשכבה 3.
    * מכפיל את המרחק מנקודת העוגן (לא את גודל האותיות).
    */
   function applySpacingToPlacements(placements, anchor, factor) {
@@ -2424,7 +2424,7 @@ function readParams() {
     });
   }
 
-  /** עיקול קל של חיבורים — סיבוב אותיות סביב העוגן + זווית גליף */
+  /** עיקול קל של חיבורים - סיבוב אותיות סביב העוגן + זווית גליף */
   function applyConnectionTwist(placements, anchor, twistDeg, seed) {
     const hub = placements.find((p) => p.letter === anchor);
     const ox = hub ? hub.x : CX;
@@ -2688,7 +2688,7 @@ function readParams() {
     const l3Letters = metalLetters;
     const layer3 = await buildLayerContent(l3Letters, style3, style3.intent);
     if (!layer3.content) {
-      throw new Error('לא ניתן לצייר שכבת כוונה — בדקי חיבורים וגליפים');
+      throw new Error('לא ניתן לצייר שכבת כוונה - בדקי חיבורים וגליפים');
     }
 
     const style2 = visualStyleLayer2(params);
@@ -2698,7 +2698,7 @@ function readParams() {
       if (layer2.style) Object.assign(style2, layer2.style);
     }
 
-    /** Stone engraving (Q3) + Q7 stone emboss + metal emboss (Q1) — PBR only. */
+    /** Stone engraving (Q3) + Q7 stone emboss + metal emboss (Q1) - PBR only. */
     let metalEmbossMarkup = '';
     let q3ThreadMarkup = '';
     let q3StoneEngraveMarkup = '';
@@ -2732,7 +2732,7 @@ function readParams() {
       allPlacements.push(...layer2.placements.map((p) => ({ ...p, amuletScale: style2.amuletScale })));
     }
     const surfaceScale = style3.surfaceScale || 0;
-    /** viewBox לפי שכבה 3 בלבד — כמו דחיפות; כדי שסטטוס משפחתי לא ישנה זום של כל הקמע */
+    /** viewBox לפי שכבה 3 בלבד - כמו דחיפות; כדי שסטטוס משפחתי לא ישנה זום של כל הקמע */
     let vb = viewBoxForPlacements(l3Placements, surfaceScale);
     if (style2?.spacing > 1 && layer2?.placements?.length) {
       const l2SpreadPad = Math.round((style2.spacing - 1) * 55);
@@ -2769,7 +2769,7 @@ function readParams() {
     }
 
     let metalFringeMarkup = '';
-    /* Q4 metal fringe behind stone — disabled per user request */
+    /* Q4 metal fringe behind stone - disabled per user request */
     const ENABLE_METAL_FRINGE_SVG = false;
     if (ENABLE_METAL_FRINGE_SVG && q4Letters.length) {
       const fringeStyle = visualStyleMetalFringe(params);
@@ -3009,7 +3009,7 @@ function readParams() {
     return Promise.race([
       promise,
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('PBR timeout — נסי שוב')), ms)
+        setTimeout(() => reject(new Error('PBR timeout - נסי שוב')), ms)
       )
     ]);
   }
@@ -3162,7 +3162,7 @@ function readParams() {
     const container = document.getElementById('amuletContainer');
     const canvas = container.querySelector('canvas');
 
-    /* ייצוא מיידי מה-canvas — בלי await לפני ההורדה (חשוב ל-user gesture) */
+    /* ייצוא מיידי מה-canvas - בלי await לפני ההורדה (חשוב ל-user gesture) */
     if (canvas) {
       try {
         exportCanvasPng(canvas);
@@ -3181,7 +3181,7 @@ function readParams() {
         ? new XMLSerializer().serializeToString(svgEl)
         : null;
     if (!svgString) {
-      setStatus('אין קמע לייצוא — צרי קמע קודם');
+      setStatus('אין קמע לייצוא - צרי קמע קודם');
       return;
     }
     try {
@@ -3299,13 +3299,13 @@ function readParams() {
     return svg;
   }
 
-  /** חספוס מתכת — מלוטש (0.06) עד מעט פחות מבריק עם גיל */
+  /** חספוס מתכת - מלוטש (0.06) עד מעט פחות מבריק עם גיל */
   function ageToMetalRoughness(age) {
     const a = Math.max(1, Math.min(120, Number(age) || 25));
     return 0.06 + (a / 120) * 0.1;
   }
 
-  /** חספוס זכוכית חלבית — מטושטש (frosted) */
+  /** חספוס זכוכית חלבית - מטושטש (frosted) */
   function ageToGlassRoughness(age, surfaceScale) {
     const a = Math.max(1, Math.min(120, Number(age) || 25));
     const base = 0.38 + (a / 120) * 0.12;
@@ -3357,7 +3357,7 @@ function readParams() {
   /** תואם ל-pathLayers stroke-width */
   const PATH_MAIN_STROKE = 45;
   const TUBE_RADIUS = PATH_MAIN_STROKE / 2;
-  /** דגימה כל N פיקסלים לאורך הנתיב — שומר פינות כמו SVG */
+  /** דגימה כל N פיקסלים לאורך הנתיב - שומר פינות כמו SVG */
   const PATH_SAMPLE_STEP = 2;
 
   /** נקודת נתיב → קואורדינטות root SVG (תומך ב-SVG מקונן) */
@@ -3394,7 +3394,7 @@ function readParams() {
     return pts;
   }
 
-  /** פוליליין — אותה צורה כמו SVG, בלי עיגול פינות */
+  /** פוליליין - אותה צורה כמו SVG, בלי עיגול פינות */
   function buildStrokeCurve(pts) {
     const curve = new THREE.CurvePath();
     for (let i = 0; i < pts.length - 1; i++) {
@@ -3411,7 +3411,7 @@ function readParams() {
     return len;
   }
 
-  /** תאורה מהצד — מדגישה עיגול הצינור (לא מהמצלמה) */
+  /** תאורה מהצד - מדגישה עיגול הצינור (לא מהמצלמה) */
   function addMetalLights(scene) {
     scene.add(new THREE.HemisphereLight(0xffffff, 0x505060, 0.5));
     const key = new THREE.DirectionalLight(0xffffff, 4.2);
@@ -3442,7 +3442,7 @@ function readParams() {
     return count;
   }
 
-  /** מסכה לבנה — stroke על כל path (ב-SVG האמיתי ה-stroke על ה-<g>) */
+  /** מסכה לבנה - stroke על כל path (ב-SVG האמיתי ה-stroke על ה-<g>) */
   function stylizeMaskLayer(layerEl) {
     const clone = layerEl.cloneNode(true);
     clone.querySelectorAll('*').forEach((el) => {
@@ -3558,7 +3558,7 @@ function readParams() {
 
   /**
    * L2 = צינורות מתכת 3D (Three.js) · L3 = זכוכית SVG מלמעלה.
-   * בלי מסכה — הצורה נלקחת מנתיבי ה-SVG הקיימים.
+   * בלי מסכה - הצורה נלקחת מנתיבי ה-SVG הקיימים.
    */
 
 let composeInitPromise = null;

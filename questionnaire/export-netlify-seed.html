@@ -50,7 +50,7 @@
 <body>
   <div class="card">
     <h1>ייצוא הקמעות לאתר</h1>
-    <p>מייצא תמונות + מודלים תלת־ממדיים — בדיוק כמו במחשב שלך.</p>
+    <p>מייצא תמונות + מודלים תלת־ממדיים - בדיוק כמו במחשב שלך.</p>
     <div class="count" id="count">…</div>
     <p id="status"></p>
     <button type="button" id="exportBtn" disabled>הורד קובץ netlify-seed.zip</button>
@@ -85,10 +85,10 @@
 
     if (!collection.length) {
       countEl.textContent = '0 קמעות';
-      statusEl.innerHTML = '<span class="err">לא נמצאו קמעות.</span><br>פתחי דרך <strong>http://localhost:8080</strong> — אותו דפדפן.';
+      statusEl.innerHTML = '<span class="err">לא נמצאו קמעות.</span><br>פתחי דרך <strong>http://localhost:8080</strong> - אותו דפדפן.';
     } else {
       countEl.textContent = collection.length + ' קמעות';
-      statusEl.textContent = 'לחצי להורדה (לוקח דקה בערך — כולל 3D).';
+      statusEl.textContent = 'לחצי להורדה (לוקח דקה בערך - כולל 3D).';
       btn.disabled = false;
     }
 

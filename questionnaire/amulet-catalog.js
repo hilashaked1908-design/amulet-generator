@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  /** Gallery demo data removed — only user amulets in the garden are indexed. */
+  /** Gallery demo data removed - only user amulets in the garden are indexed. */
   window.AMULET_CATALOG = [];
 
   const Q5_FEELING_TO_DOMAIN = {
@@ -38,7 +38,7 @@
     longing: 'זכוכית',
     excitement: 'כרום·כסף',
     impatience: 'שחור·מט',
-    confusion: 'מתכת·מברשת',
+    confusion: 'מתכת',
   };
 
   const Q4_COMPONENT_MAT = {
@@ -63,16 +63,17 @@
     const question = questions.find(function (q) {
       return q.key === key;
     });
-    if (!question || !question.options) return value || '—';
+    if (!question || !question.options) return value || '-';
     const option = question.options.find(function (o) {
       return o.value === value;
     });
-    return option ? option.label : value || '—';
+    return option ? option.label : value || '-';
   }
 
   function formatWish(text) {
-    const trimmed = (text || '').trim();
-    if (!trimmed) return '—';
+    const raw = window.pagmarNormalizeDashes ? window.pagmarNormalizeDashes(text) : text;
+    const trimmed = (raw || '').trim();
+    if (!trimmed) return '-';
     if (trimmed.charAt(0) === '״' || trimmed.charAt(0) === '"') return trimmed;
     return '״' + trimmed + '״';
   }
@@ -83,7 +84,7 @@
     return trimmed.replace(/^[\u05F4"\u201C]+|[\u05F4"\u201D]+$/g, '').trim();
   }
 
-  /** Topic rules derived from wish/change text — aligned with index filter sidebar labels. */
+  /** Topic rules derived from wish/change text - aligned with index filter sidebar labels. */
   const CONTENT_TOPIC_RULES = [
     {
       key: 'family',
@@ -217,14 +218,14 @@
       Q6_TAG_LABEL[record.q6Difficulty] ||
       resolveChoiceLabel('q6Difficulty', record.q6Difficulty);
 
-    if (q5Label && q5Label !== '—') labels.add(q5Label);
-    if (q4Label && q4Label !== '—') {
+    if (q5Label && q5Label !== '-') labels.add(q5Label);
+    if (q4Label && q4Label !== '-') {
       labels.add(q4Label);
       if (record.q4Belief === 'support') labels.add('תמיכה מהסביבה שלי');
       if (record.q4Belief === 'signs') labels.add('סימנים וצירופי מקרים');
       if (record.q4Belief === 'concrete_actions') labels.add('מעשים שאני עושה');
     }
-    if (q6Label && q6Label !== '—') labels.add(q6Label);
+    if (q6Label && q6Label !== '-') labels.add(q6Label);
 
     if (domainKey === 'love') labels.add('זוגיות');
     if (domainKey === 'family') labels.add('משפחה');
@@ -336,7 +337,7 @@
     const whyNow = stripQuotes(data.q3WhyNow);
     const change = stripQuotes(data.q7Change);
     const parts = [wish, whyNow, change].filter(Boolean);
-    if (!parts.length) return '—';
+    if (!parts.length) return '-';
     return '״' + parts.join('. ') + '״';
   }
 
@@ -344,13 +345,13 @@
     const q5Label = resolveChoiceLabel('q5Feeling', data.q5Feeling);
     const q4Label = resolveChoiceLabel('q4Belief', data.q4Belief);
     const q6Label = Q6_TAG_LABEL[data.q6Difficulty] || resolveChoiceLabel('q6Difficulty', data.q6Difficulty);
-    const q5Mat = Q5_COMPONENT_MAT[data.q5Feeling] || '—';
-    const q4Mat = Q4_COMPONENT_MAT[data.q4Belief] || '—';
-    const q6Mat = Q6_COMPONENT_MAT[data.q6Difficulty] || '—';
+    const q5Mat = Q5_COMPONENT_MAT[data.q5Feeling] || '-';
+    const q4Mat = Q4_COMPONENT_MAT[data.q4Belief] || '-';
+    const q6Mat = Q6_COMPONENT_MAT[data.q6Difficulty] || '-';
     const lines = [];
-    if (q5Label !== '—' && q5Mat !== '—') lines.push(q5Label + '- ' + q5Mat);
-    if (q4Label !== '—' && q4Mat !== '—') lines.push(q4Mat + '- ' + q4Label);
-    if (q6Label !== '—' && q6Mat !== '—') lines.push(q6Label + '- ' + q6Mat);
+    if (q5Label !== '-' && q5Mat !== '-') lines.push(q5Label + '- ' + q5Mat);
+    if (q4Label !== '-' && q4Mat !== '-') lines.push(q4Label + '- ' + q4Mat);
+    if (q6Label !== '-' && q6Mat !== '-') lines.push(q6Label + '- ' + q6Mat);
     return lines;
   }
 
@@ -360,7 +361,7 @@
     const q6Label = Q6_TAG_LABEL[data.q6Difficulty] || resolveChoiceLabel('q6Difficulty', data.q6Difficulty);
     const domain = domainLabelFromRecord(data);
     return [q5Label, q4Label, q6Label, domain].filter(function (label) {
-      return label && label !== '—';
+      return label && label !== '-';
     });
   }
 
@@ -368,9 +369,9 @@
     const data = record || {};
     return {
       wish: formatWish(data.q1Wish),
-      name: (data.q2Name || '').trim() || '—',
-      whyNow: (data.q3WhyNow || '').trim() || '—',
-      change: (data.q7Change || '').trim() || '—',
+      name: (data.q2Name || '').trim() || '-',
+      whyNow: (data.q3WhyNow || '').trim() || '-',
+      change: (data.q7Change || '').trim() || '-',
       story: buildStoryParagraph(data),
       components: buildComponentsFromRecord(data),
       tags: buildTagsFromRecord(data),
@@ -434,11 +435,11 @@
     const base = userAmuletBaseIndex();
     if (index < base) {
       return {
-        wish: '—',
-        name: '—',
-        whyNow: '—',
-        change: '—',
-        story: '—',
+        wish: '-',
+        name: '-',
+        whyNow: '-',
+        change: '-',
+        story: '-',
         components: [],
         tags: [],
       };

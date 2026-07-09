@@ -1,5 +1,5 @@
 /**
- * Shared 3D presentation lighting — amulet detail page is the source of truth.
+ * Shared 3D presentation lighting - amulet detail page is the source of truth.
  * Used by amulet.html and the questionnaire result overlay / garden snapshots.
  */
 import * as THREE from './vendor/three.module.js';
@@ -41,7 +41,7 @@ export function buildRoomEnvironmentMap(targetRenderer) {
   return tex;
 }
 
-/** Stone + metal rig from amulet detail page — tuned for שיש / marble read. */
+/** Stone + metal rig from amulet detail page - tuned for שיש / marble read. */
 export function addCreationLights(parent) {
   parent.add(new THREE.AmbientLight(0xd0cec8, 0.05));
   parent.add(new THREE.HemisphereLight(0xe8e6e0, 0x585650, 0.03));
@@ -75,7 +75,7 @@ export function applyPresentRendererSettings(renderer, scene) {
   }
 }
 
-/** Calacatta / שיש·חם (archaeological_doubt) — narrow match so other stones stay untouched. */
+/** Calacatta / שיש·חם (archaeological_doubt) - narrow match so other stones stay untouched. */
 function isCalacattaSheshMaterial(m) {
   const metalness = m.metalness ?? 0;
   const roughness = m.roughness ?? 1;

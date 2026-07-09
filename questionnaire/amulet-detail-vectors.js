@@ -2,24 +2,41 @@
  * Renders individual amulet layer vectors as a single united outline
  * (raster union → outer contour → stroke, like the loader vessels).
  */
+import {
+  clearChoicePresetThumbVectors,
+  syncChoicePresetThumbVectors,
+} from './choice-preset-vectors.js?v=20250709-choice-vectors';
 
-const DETAIL_VECTOR_COLOR = '#f5f5f5';
-const DETAIL_VECTOR_STROKE = 2;
-const DETAIL_VECTOR_BOX_W = 224.39;
-const DETAIL_VECTOR_BOX_H = 224.39;
-const DETAIL_VECTOR_PAD = 24;
+const DETAIL_VECTOR_COLOR = '#F4F4E8'; /* צהוב לבן - --pagmar-yellow-white */
+/** Internal mask raster only (never shown). Must stay pure white - lum threshold is 248. */
+const DETAIL_RASTER_MASK_BG = '#ffffff';
+const DETAIL_VECTOR_STROKE = 1.5;
+const DETAIL_VECTOR_STROKE_MARGIN = 6;
+const DETAIL_VECTOR_BOX_W = 151.168;
+const DETAIL_VECTOR_BOX_H = 132.379;
+const DETAIL_VECTOR_BOX_BY_VARIANT = {
+  'pagmar__detail-vector--timing': 151.168,
+  'pagmar__detail-vector--belonging': 150.314,
+  'pagmar__detail-vector--request': 151.168,
+};
+const DETAIL_VECTOR_PAD = 12;
+/** Room under the shape so the stroke is not clipped on the shared baseline. */
+const DETAIL_VECTOR_BOTTOM_PAD = DETAIL_VECTOR_PAD + DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
 const DETAIL_VECTOR_SCALE = 1;
-const DETAIL_VECTOR_STROKE_MARGIN = 3;
 const DETAIL_MASK_SCALE = 4;
 const DEFAULT_MASK_STROKE = 17;
 const PATH_MAIN_W = 45 * 0.37;
-const CONTOUR_SUBSAMPLE_DIST = 5;
-const CONTOUR_CHAIKIN_PASSES = 1;
+const CONTOUR_SUBSAMPLE_DIST = 4;
+const CONTOUR_CHAIKIN_PASSES = 2;
+const STAGE_CONTOUR_SUBSAMPLE_DIST = 3;
+const STAGE_CONTOUR_CHAIKIN_PASSES = 3;
+const QUESTIONNAIRE_THUMB_BOX_W = 90.3;
+const QUESTIONNAIRE_THUMB_BOX_H = 89.813;
 
 const LAYER_VECTOR_CONFIG = {
-  '.layer-q3-stone-engrave': { dilate: 10, pad: 32 },
-  '.layer-2': { dilate: 12, pad: 36 },
-  '.layer-3': { dilate: 10, pad: 40 },
+  '.layer-q3-stone-engrave': { dilate: 12, pad: 36 },
+  '.layer-2': { dilate: 14, pad: 40 },
+  '.layer-3': { dilate: 12, pad: 44 },
 };
 
 function waitForPaint() {
@@ -44,7 +61,7 @@ function stripQuotes(text) {
 
 function setDetailFieldText(el, sourceText) {
   if (!el) return;
-  el.textContent = String(sourceText || '').trim() || '—';
+  el.textContent = String(sourceText || '').trim() || '-';
 }
 
 const composeCache = new Map();
@@ -226,7 +243,7 @@ function composedSvgHasLayers(svgMarkup) {
   }
 }
 
-/** Per-amulet compose for detail page — never the global live-builder snapshot. */
+/** Per-amulet compose for detail page - never the global live-builder snapshot. */
 async function resolveDetailPageCompose(record, idx) {
   const entryId = resolveDetailEntryId(idx);
   if (entryId != null) {
@@ -465,6 +482,68 @@ function hideOtherLayers(mount, selector) {
   });
 }
 
+function showOnlyLayers(mount, selectors) {
+  const selectorList = selectors.join(',');
+  mount.querySelectorAll('.amulet-layer').forEach(function (layer) {
+    if (layer.matches(selectorList)) {
+      layer.removeAttribute('display');
+    } else {
+      layer.setAttribute('display', 'none');
+    }
+  });
+  mount.querySelectorAll('.layer-frame').forEach(function (layer) {
+    layer.setAttribute('display', 'none');
+  });
+  mount.querySelectorAll('.layer-metal-fringe').forEach(function (layer) {
+    layer.setAttribute('display', 'none');
+  });
+}
+
+function combinedLayerConfig(selectors) {
+  let dilate = 0;
+  let pad = 0;
+  selectors.forEach(function (selector) {
+    const config = layerVectorConfig(selector);
+    dilate = Math.max(dilate, config.dilate);
+    pad = Math.max(pad, config.pad);
+  });
+  return { dilate: dilate, pad: pad };
+}
+
+function estimateCombinedMaskStroke(layers, selectors, style2, style3) {
+  let max = 0;
+  selectors.forEach(function (selector) {
+    const selLayers = layers.filter(function (layer) {
+      return layer.matches(selector);
+    });
+    max = Math.max(max, estimateMaskStroke(selLayers, selector, style2, style3));
+  });
+  return max > 0 ? max : DEFAULT_MASK_STROKE;
+}
+
+function layersContentBBox(mountedSvg, selectors, pad, maskStroke, dilate) {
+  let combined = null;
+  selectors.forEach(function (selector) {
+    const box = layerContentBBox(mountedSvg, selector, pad, maskStroke, dilate);
+    if (!box) return;
+    if (!combined) {
+      combined = {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+      };
+      return;
+    }
+    const x0 = Math.min(combined.x, box.x);
+    const y0 = Math.min(combined.y, box.y);
+    const x1 = Math.max(combined.x + combined.width, box.x + box.width);
+    const y1 = Math.max(combined.y + combined.height, box.y + box.height);
+    combined = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+  });
+  return combined;
+}
+
 function prepareLayerForMask(mountedSvg, selector, maskStroke) {
   hideOtherLayers(mountedSvg, selector);
   mountedSvg.querySelectorAll(selector).forEach(function (layer) {
@@ -475,20 +554,22 @@ function prepareLayerForMask(mountedSvg, selector, maskStroke) {
   });
 }
 
-function buildMaskSvgMarkup(mountedSvg) {
+function buildMaskSvgMarkup(mountedSvg, extraBottom) {
   const clone = mountedSvg.cloneNode(true);
   clone.removeAttribute('style');
   const viewBox = clone.getAttribute('viewBox') || '0 0 680 680';
   const viewSize = parseViewBoxSize(viewBox);
+  const extraH = Math.max(0, extraBottom || 0);
+  const totalH = viewSize.h + extraH;
   clone.setAttribute('width', String(viewSize.w));
-  clone.setAttribute('height', String(viewSize.h));
-  clone.setAttribute('viewBox', viewBox);
+  clone.setAttribute('height', String(totalH));
+  clone.setAttribute('viewBox', '0 0 ' + viewSize.w + ' ' + totalH);
 
   const ns = 'http://www.w3.org/2000/svg';
   const bg = document.createElementNS(ns, 'rect');
   bg.setAttribute('width', String(viewSize.w));
-  bg.setAttribute('height', String(viewSize.h));
-  bg.setAttribute('fill', '#ffffff');
+  bg.setAttribute('height', String(totalH));
+  bg.setAttribute('fill', DETAIL_RASTER_MASK_BG);
   clone.insertBefore(bg, clone.firstChild);
 
   return '<?xml version="1.0" encoding="UTF-8"?>' + new XMLSerializer().serializeToString(clone);
@@ -508,9 +589,15 @@ function loadSvgMarkupAsImage(svgMarkup) {
   });
 }
 
-function rasterCropFromMountedSvg(mountedSvg, crop, scale) {
+function rasterBBoxPad(maskStroke, dilate, pad) {
+  return Math.ceil((maskStroke || 0) / 2) + (dilate || 0) + (pad || 0) + 28;
+}
+
+function rasterCropFromMountedSvg(mountedSvg, crop, scale, viewExtra) {
   const viewSize = parseViewBoxSize(mountedSvg.getAttribute('viewBox'));
-  const markup = buildMaskSvgMarkup(mountedSvg);
+  const extraH = Math.max(0, viewExtra || 0);
+  const markup = buildMaskSvgMarkup(mountedSvg, extraH);
+  const totalH = viewSize.h + extraH;
   return loadSvgMarkupAsImage(markup).then(function (img) {
     const bw = Math.max(1, Math.round(crop.width * scale));
     const bh = Math.max(1, Math.round(crop.height * scale));
@@ -518,11 +605,11 @@ function rasterCropFromMountedSvg(mountedSvg, crop, scale) {
     canvas.width = bw;
     canvas.height = bh;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = DETAIL_RASTER_MASK_BG;
     ctx.fillRect(0, 0, bw, bh);
 
     const sx = (img.naturalWidth || viewSize.w) / viewSize.w;
-    const sy = (img.naturalHeight || viewSize.h) / viewSize.h;
+    const sy = (img.naturalHeight || totalH) / totalH;
     ctx.drawImage(
       img,
       crop.x * sx,
@@ -719,17 +806,27 @@ function chaikinSmoothClosed(points, passes) {
   return pts;
 }
 
-function smoothContour(points) {
+function smoothContour(points, options) {
   if (!points || points.length < 8) return points;
-  const subsampled = subsampleContour(points, CONTOUR_SUBSAMPLE_DIST);
-  let smoothed = chaikinSmoothClosed(subsampled, CONTOUR_CHAIKIN_PASSES);
+  const minDist = options?.subsampleDist ?? CONTOUR_SUBSAMPLE_DIST;
+  const passes = options?.chaikinPasses ?? CONTOUR_CHAIKIN_PASSES;
+  const subsampled = subsampleContour(points, minDist);
+  let smoothed = chaikinSmoothClosed(subsampled, passes);
   if (contourSelfIntersects(smoothed)) {
-    smoothed = subsampled;
+    smoothed = chaikinSmoothClosed(subsampled, Math.max(1, passes - 1));
+    if (contourSelfIntersects(smoothed)) smoothed = subsampled;
   }
   return smoothed;
 }
 
-/** Straight segments — Catmull-Rom overshoots concave corners and self-intersects. */
+function smoothContourStage(points) {
+  return smoothContour(points, {
+    subsampleDist: STAGE_CONTOUR_SUBSAMPLE_DIST,
+    chaikinPasses: STAGE_CONTOUR_CHAIKIN_PASSES,
+  });
+}
+
+/** Straight segments - Catmull-Rom overshoots concave corners and self-intersects. */
 function closedPolylinePath(points) {
   const n = points.length;
   if (n < 3) return '';
@@ -738,6 +835,35 @@ function closedPolylinePath(points) {
     d += ' L ' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2);
   }
   return d + ' Z';
+}
+
+/** Quadratic mid-point smoothing - rounded corners without Catmull-Rom overshoot. */
+function closedRoundedPath(points) {
+  const n = points.length;
+  if (n < 3) return closedPolylinePath(points);
+  let d = 'M ' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2);
+  for (let i = 0; i < n; i++) {
+    const cur = points[i];
+    const nxt = points[(i + 1) % n];
+    const mx = cur.x + (nxt.x - cur.x) * 0.5;
+    const my = cur.y + (nxt.y - cur.y) * 0.5;
+    d +=
+      ' Q ' +
+      cur.x.toFixed(2) +
+      ' ' +
+      cur.y.toFixed(2) +
+      ' ' +
+      mx.toFixed(2) +
+      ' ' +
+      my.toFixed(2);
+  }
+  return d + ' Z';
+}
+
+function contourPathD(contour, rounded) {
+  if (!contour || contour.length < 3) return '';
+  const pts = rounded ? smoothContourStage(contour) : contour;
+  return rounded ? closedRoundedPath(pts) : closedPolylinePath(pts);
 }
 
 function segmentsIntersect(a, b, c, d) {
@@ -786,10 +912,17 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
       prepareLayerForMask(mountedSvg, selector, maskStroke);
       await waitForPaint();
 
-      const crop = layerContentBBox(mountedSvg, selector, config.pad) || fullCrop;
+      const crop =
+        layerContentBBox(mountedSvg, selector, config.pad, maskStroke, config.dilate) || fullCrop;
       if (!crop || crop.width < 8 || crop.height < 8) continue;
 
-      const contour = await rasterContourFromCrop(mountedSvg, crop, scale, config.dilate);
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        crop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
       if (contour) return contour;
     } catch (err) {
       console.warn('[detail-vectors] raster attempt failed for', selector, err);
@@ -804,7 +937,13 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
     try {
       prepareLayerForMask(mountedSvg, selector, maskStroke);
       await waitForPaint();
-      const contour = await rasterContourFromCrop(mountedSvg, fullCrop, scale, config.dilate);
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        fullCrop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
       if (contour) return contour;
     } catch (err) {
       console.warn('[detail-vectors] full-view raster failed for', selector, err);
@@ -817,46 +956,100 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
   return null;
 }
 
-async function rasterContourFromCrop(mountedSvg, crop, scale, dilate) {
-  const data = await rasterCropFromMountedSvg(mountedSvg, crop, scale);
-  const bw = Math.max(1, Math.round(crop.width * scale));
-  const bh = Math.max(1, Math.round(crop.height * scale));
+async function rasterContourFromCrop(mountedSvg, crop, scale, dilate, maskStroke) {
+  const viewSize = parseViewBoxSize(mountedSvg.getAttribute('viewBox'));
+  const cropBottom = crop.y + crop.height;
+  const touchesViewBottom = cropBottom >= viewSize.h - 1;
+  const edgePad = touchesViewBottom
+    ? Math.max(48, Math.ceil((maskStroke || 0) / 2) + (dilate || 0) + 24)
+    : Math.max(16, Math.ceil((dilate || 0) / 2));
+  const rasterCrop = {
+    x: crop.x,
+    y: crop.y,
+    width: crop.width,
+    height: crop.height + edgePad,
+  };
+  const viewExtra = touchesViewBottom ? edgePad : 0;
+  const data = await rasterCropFromMountedSvg(mountedSvg, rasterCrop, scale, viewExtra);
+  const bw = Math.max(1, Math.round(rasterCrop.width * scale));
+  const bh = Math.max(1, Math.round(rasterCrop.height * scale));
   if (countGridFilled(gridFromImageData(data, bw, bh)) < 16) return null;
 
   const raw = contourFromRaster(data, bw, bh, Math.round(dilate * scale));
   if (!raw) return null;
 
   return raw.map(function (p) {
-    return { x: p.x / scale + crop.x, y: p.y / scale + crop.y };
+    return { x: p.x / scale + rasterCrop.x, y: p.y / scale + rasterCrop.y };
   });
 }
 
-function layerContentBBox(mountedSvg, selector, pad) {
+function mergeAxisBBox(minX, minY, maxX, maxY, bb) {
+  if (!bb || bb.width <= 0 || bb.height <= 0) {
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  }
+  return {
+    minX: Math.min(minX, bb.x),
+    minY: Math.min(minY, bb.y),
+    maxX: Math.max(maxX, bb.x + bb.width),
+    maxY: Math.max(maxY, bb.y + bb.height),
+  };
+}
+
+function layerContentBBox(mountedSvg, selector, pad, maskStroke, dilate) {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+
+  // Layer roots first — getBBox includes mirrored halves (amulet-mirror transforms).
   mountedSvg.querySelectorAll(selector).forEach(function (layer) {
     try {
-      const bb = layer.getBBox();
-      if (bb.width > 0 && bb.height > 0) {
-        minX = Math.min(minX, bb.x);
-        minY = Math.min(minY, bb.y);
-        maxX = Math.max(maxX, bb.x + bb.width);
-        maxY = Math.max(maxY, bb.y + bb.height);
-      }
+      const merged = mergeAxisBBox(minX, minY, maxX, maxY, layer.getBBox());
+      minX = merged.minX;
+      minY = merged.minY;
+      maxX = merged.maxX;
+      maxY = merged.maxY;
     } catch (_) {}
   });
+
+  if (!isFinite(minX)) {
+    const geometrySelector =
+      selector +
+      ' path,' +
+      selector +
+      ' circle,' +
+      selector +
+      ' ellipse,' +
+      selector +
+      ' line,' +
+      selector +
+      ' polyline,' +
+      selector +
+      ' polygon,' +
+      selector +
+      ' rect';
+    mountedSvg.querySelectorAll(geometrySelector).forEach(function (el) {
+      try {
+        const merged = mergeAxisBBox(minX, minY, maxX, maxY, el.getBBox());
+        minX = merged.minX;
+        minY = merged.minY;
+        maxX = merged.maxX;
+        maxY = merged.maxY;
+      } catch (_) {}
+    });
+  }
   if (!isFinite(minX)) return null;
   const viewSize = parseViewBoxSize(mountedSvg.getAttribute('viewBox'));
-  const inset = pad || 0;
-  const x = Math.max(0, minX - inset);
-  const y = Math.max(0, minY - inset);
+  const edgePad = rasterBBoxPad(maskStroke, dilate, pad);
+  const x = Math.max(0, minX - edgePad);
+  const y = Math.max(0, minY - edgePad);
+  const x1 = Math.min(viewSize.w, maxX + edgePad);
+  const y1 = Math.min(viewSize.h, maxY + edgePad);
   return {
     x: x,
     y: y,
-    width: Math.min(viewSize.w - x, maxX - minX + inset * 2),
-    height: Math.min(viewSize.h - y, maxY - minY + inset * 2),
+    width: Math.max(1, x1 - x),
+    height: Math.max(1, y1 - y),
   };
 }
 
@@ -886,6 +1079,62 @@ function contourBounds(points) {
   return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
 }
 
+function detailVectorBoxForContainer(container) {
+  if (!container || !container.classList) return DETAIL_VECTOR_BOX_W;
+  const classes = Object.keys(DETAIL_VECTOR_BOX_BY_VARIANT);
+  for (let i = 0; i < classes.length; i++) {
+    if (container.classList.contains(classes[i])) {
+      return DETAIL_VECTOR_BOX_BY_VARIANT[classes[i]];
+    }
+  }
+  return DETAIL_VECTOR_BOX_W;
+}
+
+function detailVectorFrameSize(options) {
+  return {
+    boxW: options?.boxW ?? DETAIL_VECTOR_BOX_W,
+    boxH: options?.boxH ?? DETAIL_VECTOR_BOX_H,
+  };
+}
+
+/** Center stage preview - square viewBox hugging contour, not the full compose canvas. */
+function questionnaireStageFitLayout(bounds) {
+  const minX = bounds.minX;
+  const minY = bounds.minY;
+  const maxX = bounds.maxX;
+  const maxY = bounds.maxY;
+  const cw = Math.max(maxX - minX, 1);
+  const ch = Math.max(maxY - minY, 1);
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const bleed = DETAIL_VECTOR_STROKE * 2 + DETAIL_VECTOR_STROKE_MARGIN;
+  const boxSize = Math.max(cw, ch) + bleed * 2;
+  const vbX = cx - boxSize * 0.5;
+  const vbY = cy - boxSize * 0.5;
+  return {
+    viewBox: vbX + ' ' + vbY + ' ' + boxSize + ' ' + boxSize,
+    preserveAspectRatio: 'xMidYMid meet',
+  };
+}
+
+function estimateDetailVectorScale(bounds, options) {
+  const minX = bounds.minX;
+  const minY = bounds.minY;
+  const maxX = bounds.maxX;
+  const maxY = bounds.maxY;
+  const cw = Math.max(maxX - minX, 1);
+  const ch = Math.max(maxY - minY, 1);
+  const frame = detailVectorFrameSize(options);
+  const innerW = frame.boxW - DETAIL_VECTOR_PAD * 2;
+  const innerH = frame.boxH - DETAIL_VECTOR_PAD - DETAIL_VECTOR_BOTTOM_PAD;
+  return Math.min(innerW / cw, innerH / ch) * DETAIL_VECTOR_SCALE;
+}
+
+function strokeBleedInUserUnits(scale) {
+  const screenBleed = DETAIL_VECTOR_STROKE * 0.5 + DETAIL_VECTOR_STROKE_MARGIN + 2;
+  return screenBleed / Math.max(scale, 0.05);
+}
+
 function detailVectorFitLayout(bounds, options) {
   const minX = bounds.minX;
   const minY = bounds.minY;
@@ -893,34 +1142,54 @@ function detailVectorFitLayout(bounds, options) {
   const maxY = bounds.maxY;
   const cw = Math.max(maxX - minX, 1);
   const ch = Math.max(maxY - minY, 1);
+  const frame = detailVectorFrameSize(options);
 
   if (options && options.tight) {
-    const pad = DETAIL_VECTOR_PAD + DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
-    const vbX = minX - pad;
-    const vbY = minY - pad;
-    const vbW = cw + pad * 2;
-    const vbH = ch + pad * 2;
+    const padX = DETAIL_VECTOR_PAD + DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
+    const padTop = DETAIL_VECTOR_PAD;
+    const padBottom = DETAIL_VECTOR_BOTTOM_PAD;
+    const vbX = minX - padX;
+    const vbY = minY - padTop;
+    const vbW = cw + padX * 2;
+    const vbH = ch + padTop + padBottom;
     return {
       viewBox: vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH,
       transform: '',
-      preserveAspectRatio: 'xMidYMid meet',
+      preserveAspectRatio: 'xMaxYMax meet',
     };
   }
 
-  const innerW = DETAIL_VECTOR_BOX_W - DETAIL_VECTOR_PAD * 2;
-  const innerH = DETAIL_VECTOR_BOX_H - DETAIL_VECTOR_PAD * 2;
+  if (options && options.thumb) {
+    const boxW = QUESTIONNAIRE_THUMB_BOX_W;
+    const boxH = QUESTIONNAIRE_THUMB_BOX_H;
+    const pad = 8;
+    const innerW = boxW - pad * 2;
+    const innerH = boxH - pad * 2;
+    const scale = Math.min(innerW / cw, innerH / ch);
+    const tx = boxW - pad - maxX * scale;
+    const ty = boxH - pad - maxY * scale;
+    return {
+      viewBox: '0 0 ' + boxW + ' ' + boxH,
+      transform: 'translate(' + tx + ',' + ty + ') scale(' + scale + ')',
+      preserveAspectRatio: 'xMaxYMax meet',
+    };
+  }
+
+  const innerW = frame.boxW - DETAIL_VECTOR_PAD * 2;
+  const innerH = frame.boxH - DETAIL_VECTOR_PAD - DETAIL_VECTOR_BOTTOM_PAD;
   const scale = Math.min(innerW / cw, innerH / ch) * DETAIL_VECTOR_SCALE;
-  const tx = (DETAIL_VECTOR_BOX_W - cw * scale) / 2 - minX * scale;
-  const ty = (DETAIL_VECTOR_BOX_H - ch * scale) / 2 - minY * scale;
+  const tx = frame.boxW - DETAIL_VECTOR_PAD - maxX * scale;
+  const ty = frame.boxH - DETAIL_VECTOR_BOTTOM_PAD - maxY * scale;
   return {
-    viewBox: '0 0 ' + DETAIL_VECTOR_BOX_W + ' ' + DETAIL_VECTOR_BOX_H,
+    viewBox: '0 0 ' + frame.boxW + ' ' + frame.boxH,
     transform: 'translate(' + tx + ',' + ty + ') scale(' + scale + ')',
-    preserveAspectRatio: 'xMidYMid meet',
+    preserveAspectRatio: 'xMaxYMax meet',
   };
 }
 
 function renderContourSvg(contour, container, options) {
-  const pathD = closedPolylinePath(contour);
+  const rounded = Boolean(options && options.rounded);
+  const pathD = contourPathD(contour, rounded);
   if (!pathD) return false;
 
   const ns = 'http://www.w3.org/2000/svg';
@@ -942,15 +1211,16 @@ function renderContourSvg(contour, container, options) {
   pathEl.setAttribute('shape-rendering', 'geometricPrecision');
 
   const bounds = contourBounds(contour);
-  const strokeMargin = DETAIL_VECTOR_STROKE_MARGIN;
+  const preliminaryScale = estimateDetailVectorScale(bounds, options);
+  const bleed = strokeBleedInUserUnits(preliminaryScale);
   const layout = detailVectorFitLayout({
-    minX: bounds.minX - strokeMargin,
-    minY: bounds.minY - strokeMargin,
-    maxX: bounds.maxX + strokeMargin,
-    maxY: bounds.maxY + strokeMargin,
+    minX: bounds.minX - bleed,
+    minY: bounds.minY - bleed,
+    maxX: bounds.maxX + bleed,
+    maxY: bounds.maxY + bleed,
   }, options);
   svg.setAttribute('viewBox', layout.viewBox);
-  svg.setAttribute('preserveAspectRatio', layout.preserveAspectRatio || 'xMidYMid meet');
+  svg.setAttribute('preserveAspectRatio', layout.preserveAspectRatio || 'xMaxYMax meet');
 
   const group = document.createElementNS(ns, 'g');
   if (layout.transform) group.setAttribute('transform', layout.transform);
@@ -996,13 +1266,20 @@ async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style
       });
       await waitForPaint();
 
-      const crop = layerContentBBox(mountedSvg, selector, config.pad) || fullCrop;
+      const crop =
+        layerContentBBox(mountedSvg, selector, config.pad, maskStroke, config.dilate) || fullCrop;
       if (!crop || crop.width < 8 || crop.height < 8) {
         maskStroke *= 1.35;
         continue;
       }
 
-      const contour = await rasterContourFromCrop(mountedSvg, crop, scale, config.dilate);
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        crop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
       if (contour && contour.length >= 8) return contour;
 
       maskStroke *= 1.35;
@@ -1026,6 +1303,230 @@ async function renderClonedUnitedOutline(svgEl, selector, container, style2, sty
   }
 }
 
+const QUESTIONNAIRE_STAGE_SELECTORS = {
+  1: ['.layer-3'],
+  2: ['.layer-3', '.layer-2'],
+  3: ['.layer-3', '.layer-2', '.layer-q3-stone-engrave'],
+};
+
+const QUESTIONNAIRE_THUMB_SELECTORS = {
+  1: '.layer-3',
+  2: '.layer-2',
+  3: '.layer-q3-stone-engrave',
+};
+
+async function extractUnifiedContour(svgEl, selectors, style2, style3) {
+  const selectorList = selectors.join(',');
+  const layers = Array.from(svgEl.querySelectorAll(selectorList));
+  if (!layers.length) return null;
+
+  const config = combinedLayerConfig(selectors);
+  let maskStroke = estimateCombinedMaskStroke(layers, selectors, style2, style3);
+  const scale = DETAIL_MASK_SCALE;
+  const viewSize = parseViewBoxSize(svgEl.getAttribute('viewBox'));
+  const fullCrop = { x: 0, y: 0, width: viewSize.w, height: viewSize.h };
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const mountedSvg = mountComposedSvg(svgEl);
+    try {
+      showOnlyLayers(mountedSvg, selectors);
+      mountedSvg.querySelectorAll(selectorList).forEach(function (layer) {
+        styleLayerGeometryForRaster(layer, maskStroke);
+      });
+      await waitForPaint();
+
+      const crop =
+        layersContentBBox(mountedSvg, selectors, config.pad, maskStroke, config.dilate) ||
+        fullCrop;
+      if (!crop || crop.width < 8 || crop.height < 8) {
+        maskStroke *= 1.35;
+        continue;
+      }
+
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        crop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
+      if (contour && isContourUsable(contour, selectors[selectors.length - 1])) {
+        return contour;
+      }
+    } catch (err) {
+      console.warn('[detail-vectors] unified raster attempt failed', err);
+    } finally {
+      if (mountedSvg.parentNode) mountedSvg.parentNode.removeChild(mountedSvg);
+    }
+    maskStroke *= 1.35;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const mountedSvg = mountComposedSvg(svgEl);
+    try {
+      showOnlyLayers(mountedSvg, selectors);
+      mountedSvg.querySelectorAll(selectorList).forEach(function (layer) {
+        styleLayerGeometryForRaster(layer, maskStroke);
+      });
+      await waitForPaint();
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        fullCrop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
+      if (contour && contour.length >= 8) return contour;
+    } catch (err) {
+      console.warn('[detail-vectors] unified full-view raster failed', err);
+    } finally {
+      if (mountedSvg.parentNode) mountedSvg.parentNode.removeChild(mountedSvg);
+    }
+    maskStroke *= 1.35;
+  }
+
+  return null;
+}
+
+async function extractLayerContour(svgEl, selector, defsEl, style2, style3) {
+  const layers = Array.from(svgEl.querySelectorAll(selector));
+  if (!layers.length) return null;
+
+  try {
+    const contour = await unionLayerContour(layers, defsEl, svgEl, selector, style2, style3);
+    if (contour && isContourUsable(contour, selector)) return contour;
+  } catch (err) {
+    console.warn('[detail-vectors] union failed for', selector, err);
+  }
+
+  const mountedSvg = mountComposedSvg(svgEl);
+  try {
+    const contour = await rasterContourFromMountedLayer(mountedSvg, selector, style2, style3);
+    if (contour && isContourUsable(contour, selector)) return contour;
+  } finally {
+    if (mountedSvg.parentNode) mountedSvg.parentNode.removeChild(mountedSvg);
+  }
+
+  return null;
+}
+
+function renderUnifiedStageSvg(contour, container, viewBox) {
+  const pathD = contourPathD(contour, true);
+  if (!pathD) return null;
+
+  const bounds = contourBounds(contour);
+  const bleed = DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
+  const layout = questionnaireStageFitLayout({
+    minX: bounds.minX - bleed,
+    minY: bounds.minY - bleed,
+    maxX: bounds.maxX + bleed,
+    maxY: bounds.maxY + bleed,
+  });
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('xmlns', ns);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('viewBox', layout.viewBox || viewBox || '0 0 680 680');
+  svg.setAttribute('preserveAspectRatio', layout.preserveAspectRatio || 'xMidYMid meet');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('overflow', 'visible');
+  svg.classList.add('pagmar__questionnaire-stage-vector');
+
+  const pathEl = document.createElementNS(ns, 'path');
+  pathEl.setAttribute('d', pathD);
+  pathEl.setAttribute('fill', 'none');
+  pathEl.setAttribute('stroke', DETAIL_VECTOR_COLOR);
+  pathEl.setAttribute('stroke-width', String(DETAIL_VECTOR_STROKE));
+  pathEl.setAttribute('stroke-linejoin', 'round');
+  pathEl.setAttribute('stroke-linecap', 'round');
+  pathEl.setAttribute('vector-effect', 'non-scaling-stroke');
+  pathEl.setAttribute('shape-rendering', 'geometricPrecision');
+  svg.appendChild(pathEl);
+
+  container.innerHTML = '';
+  container.appendChild(svg);
+  return svg;
+}
+
+export function clearQuestionnaireThumbVectors() {
+  for (let q = 1; q <= 8; q += 1) {
+    const container = document.getElementById('vectorThumbQ' + q);
+    if (!container) continue;
+    container.hidden = true;
+    container.innerHTML = '';
+  }
+  clearChoicePresetThumbVectors();
+}
+
+async function renderQuestionnaireThumbVectors(svgEl, vectorStage, style2, style3) {
+  for (let q = 1; q <= 8; q += 1) {
+    const container = document.getElementById('vectorThumbQ' + q);
+    if (!container) continue;
+
+    const selector = QUESTIONNAIRE_THUMB_SELECTORS[q];
+    if (!selector || q > vectorStage) {
+      container.hidden = true;
+      container.innerHTML = '';
+      continue;
+    }
+
+    await yieldToBrowser();
+    const contour = await extractLayerContour(svgEl, selector, null, style2, style3);
+    if (!contour) {
+      container.hidden = true;
+      container.innerHTML = '';
+      continue;
+    }
+
+    renderContourSvg(contour, container, { thumb: true, rounded: true });
+    container.hidden = false;
+  }
+}
+
+/**
+ * Questionnaire center stage - same united-outline vectors as the amulet detail page.
+ * @param {{ svg: string, style2: object, style3: object, container: HTMLElement, vectorStage?: number, onProgress?: Function }} opts
+ */
+export async function renderQuestionnaireStageVectors(opts) {
+  const { svg, style2, style3, container, vectorStage = 1, onProgress, answers } = opts || {};
+  if (!container || !svg) return null;
+
+  const selectors =
+    QUESTIONNAIRE_STAGE_SELECTORS[vectorStage] || QUESTIONNAIRE_STAGE_SELECTORS[1];
+
+  onProgress?.(0.08, 'מצייר וקטורים…');
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svg, 'image/svg+xml');
+  const svgEl = doc.querySelector('svg');
+  if (!svgEl) return null;
+
+  const viewBox = svgEl.getAttribute('viewBox') || '0 0 680 680';
+
+  await yieldToBrowser();
+  const unifiedContour = await extractUnifiedContour(svgEl, selectors, style2, style3);
+  onProgress?.(0.72, 'מצייר וקטורים…');
+
+  if (!unifiedContour) return null;
+
+  renderUnifiedStageSvg(unifiedContour, container, viewBox);
+  await renderQuestionnaireThumbVectors(svgEl, vectorStage, style2, style3);
+  if (answers) {
+    await syncChoicePresetThumbVectors(answers);
+  }
+  onProgress?.(1, 'הושלם');
+
+  return {
+    vector: true,
+    pbr: false,
+    vectorStage: vectorStage,
+    interactive: false,
+    layers: 1,
+  };
+}
+
 async function extractAndRender(containerId, svgEl, selector, viewBox, defsEl, style2, style3) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -1033,21 +1534,16 @@ async function extractAndRender(containerId, svgEl, selector, viewBox, defsEl, s
   const layers = Array.from(svgEl.querySelectorAll(selector));
   if (!layers.length) return;
 
-  const renderOptions =
-    container.classList.contains('pagmar__detail-vector') ||
-    container.classList.contains('pagmar__result-vector')
-      ? { tight: true }
-      : null;
+  const renderOptions = container.classList.contains('pagmar__result-vector')
+    ? { tight: true, rounded: true }
+    : {
+        rounded: true,
+        boxW: detailVectorBoxForContainer(container),
+        boxH: DETAIL_VECTOR_BOX_H,
+      };
 
-  let contour;
-  try {
-    contour = await unionLayerContour(layers, defsEl, svgEl, selector, style2, style3);
-  } catch (err) {
-    console.warn('[detail-vectors] union failed for', selector, err);
-    contour = null;
-  }
-
-  if (contour && isContourUsable(contour, selector) && renderContourSvg(contour, container, renderOptions)) {
+  const contour = await extractLayerContour(svgEl, selector, defsEl, style2, style3);
+  if (contour && renderContourSvg(contour, container, renderOptions)) {
     return;
   }
 

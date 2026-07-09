@@ -113,7 +113,11 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
 
   function markAmulet3DReady() {
     setExportReady(true);
-    signalSceneReady();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        signalSceneReady();
+      });
+    });
   }
 
   function signalSceneReady() {
@@ -150,7 +154,7 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
       return;
     }
     Promise.all([
-      import('./amulet-detail-vectors.js').then(function (vectors) {
+      import('./amulet-detail-vectors.js?v=20250708-vector-raster-fix').then(function (vectors) {
         return vectors.getSharedDetailCompose(answers);
       }),
       import('../three-pbr-amulet.js'),

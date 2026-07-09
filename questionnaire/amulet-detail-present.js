@@ -1,5 +1,5 @@
 /**
- * Result overlay — mount amulet with the same 3D pipeline as amulet.html (detail page).
+ * Result overlay - mount amulet with the same 3D pipeline as amulet.html (detail page).
  */
 import { loadGlb } from './amulet-glb-store.js';
 import { disposeThreePbr } from '../three-pbr-amulet.js';

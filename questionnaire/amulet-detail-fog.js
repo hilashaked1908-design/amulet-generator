@@ -1,8 +1,8 @@
 /**
- * Luca fog — detail page + result overlay.
+ * Luca fog - detail page + result overlay.
  */
 import * as THREE from './vendor/three.module.js';
-import { createLucaFog } from './garden-fog.js';
+import { createLucaFog } from './garden-fog.js?v=20250708-vector-fog-exp';
 
 const GARDEN_CAMERA_FOV = 58;
 
@@ -18,6 +18,24 @@ const fogState = {
 };
 
 const frameCallbacks = [];
+const fogPointer = {
+  x: typeof window !== 'undefined' ? window.innerWidth * 0.5 : 0,
+  y: typeof window !== 'undefined' ? window.innerHeight * 0.5 : 0,
+};
+let fogPointerBound = false;
+
+function ensureFogPointerTracking() {
+  if (fogPointerBound || typeof document === 'undefined') return;
+  fogPointerBound = true;
+  document.addEventListener(
+    'pointermove',
+    function (e) {
+      fogPointer.x = e.clientX;
+      fogPointer.y = e.clientY;
+    },
+    { passive: true, capture: true }
+  );
+}
 
 export function getDetailFogState() {
   return fogState;
@@ -33,12 +51,17 @@ export function bootFogWebGL(host, options) {
   if (!host) return fogState;
   if (fogState.webglBooted && fogState.host === host) return fogState;
 
+  ensureFogPointerTracking();
   disposeFogWebGL();
 
   fogState.webglBooted = true;
   fogState.host = host;
 
-  const fogRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  const fogRenderer = new THREE.WebGLRenderer({
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  });
   fogRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   fogRenderer.setClearColor(0x000000, 0);
   fogRenderer.domElement.className = 'pagmar__detail-fog-canvas';
@@ -80,7 +103,7 @@ export function bootDetailFogWebGL(host) {
   return bootFogWebGL(host, { profile: 'garden' });
 }
 
-/** @deprecated Use bootDetailFogWebGL — kept for scene.js compatibility */
+/** @deprecated Use bootDetailFogWebGL - kept for scene.js compatibility */
 export function bootDetailFog(host) {
   return bootDetailFogWebGL(host);
 }
@@ -124,7 +147,10 @@ export function resizeDetailFog() {
 }
 
 export function renderDetailFog(t) {
-  if (fogState.lucaFog) fogState.lucaFog.update(t);
+  if (fogState.lucaFog) {
+    fogState.lucaFog.setPointer(fogPointer.x, fogPointer.y);
+    fogState.lucaFog.update(t);
+  }
   if (fogState.renderer && fogState.scene && fogState.camera) {
     fogState.renderer.render(fogState.scene, fogState.camera);
   }
@@ -138,6 +164,7 @@ function startDetailFrameLoop() {
     requestAnimationFrame(frame);
     const t = (typeof now === 'number' ? now : performance.now()) * 0.001;
     renderDetailFog(t);
+    if (window.pagmarGlassLens) window.pagmarGlassLens.tick();
     for (let i = 0; i < frameCallbacks.length; i++) {
       frameCallbacks[i](t);
     }

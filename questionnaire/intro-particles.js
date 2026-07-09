@@ -23,8 +23,8 @@
       ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
       return;
     }
-    ctx.strokeStyle = '#e8e8e8';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#F4F4E8';
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(-size / 2, -size / 2, size, size);
   }
 

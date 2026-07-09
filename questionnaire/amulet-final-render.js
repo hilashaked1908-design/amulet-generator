@@ -1,5 +1,5 @@
 /**
- * Final PBR render — same pipeline as prototype-v2-thick.html composeAmulet().
+ * Final PBR render - same pipeline as prototype-v2-thick.html composeAmulet().
  */
 import { renderThreePbrAmuletInteractive, getActivePbrScene, getActivePbrRenderer } from '../three-pbr-amulet.js';
 import { deferToNextTask, yieldToMainThread } from '../render-yield.js';
@@ -35,7 +35,7 @@ export function invalidateComposeCache() {
 
 window.amuletInvalidateComposeCache = invalidateComposeCache;
 
-/** Background SVG compose while user answers Q4–Q6 (no textures yet). */
+/** Background SVG compose while user answers Q4-Q6 (no textures yet). */
 export async function precomposeForFinalRender(answers) {
   if (!answers?.q1Wish?.trim()) return;
   try {

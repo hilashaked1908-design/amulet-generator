@@ -1,5 +1,5 @@
 /**
- * Fantik Studio–style flowing gradient — amulet detail page background.
+ * Fantik Studio-style flowing gradient - amulet detail page background.
  */
 (function () {
   'use strict';

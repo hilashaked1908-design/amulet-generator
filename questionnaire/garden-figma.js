@@ -1,5 +1,5 @@
 /**
- * Figma 1763:25756 — amulets at exact artboard x/y/w/h + garden interactions.
+ * Figma 1763:25756 - amulets at exact artboard x/y/w/h + garden interactions.
  */
 (function () {
   'use strict';

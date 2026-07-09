@@ -6,7 +6,7 @@ import {
   disposeFogWebGL,
   getDetailFogState,
   resizeFogHost,
-} from './amulet-detail-fog.js?v=20250707-garden-loader-fog';
+} from './amulet-detail-fog.js?v=20250708-loader-black';
 
 const FOG_HOST_ID = 'createFullpageLoaderFog';
 

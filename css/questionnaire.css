@@ -1,41 +1,40 @@
-/* Pagmar — Figma node 1322:65279 @ 1920×1080 */
+/* Pagmar - Figma node 1322:65279 @ 1920×1080 */
 
 :root {
   --page-bg: #080808;
   --ink: #1B1613;
   --pagmar-corner-scale: 1;
-  --pagmar-content-margin: 0px;
-  --pagmar-margin: var(--pagmar-content-margin);
+  --pagmar-margin: var(--pagmar-margin-top);
   --pagmar-w: 1920;
   --pagmar-h: 1080;
   --frame-line: #969696;
-  /* Vector 10 / 11 */
-  --frame-x: 20;
-  --frame-top: 20.41;
-  --frame-w: 1880;
+  /* Vector 10 / 11 - horizontal inset matches --pagmar-design-inset inside content box */
+  --frame-x: var(--pagmar-design-inset, 30);
+  --frame-top: 30.41;
+  --frame-w: calc(var(--pagmar-w) - 2 * var(--pagmar-design-inset, 30));
   --frame-h: 50.055;
-  /* כפתור עליון.svg — Figma @ 1920×1080 */
+  /* כפתור עליון.svg - Figma @ 1920×1080 */
   --emblem-w: 164;
   --emblem-h: 83;
   --emblem-symbol-w: 52;
   --emblem-symbol-h: 40;
   --emblem-x: 878;
   --emblem-y: 50;
-  /* כפתור פילטר.svg — Figma @ 1920×1080 */
+  /* כפתור פילטר.svg - Figma @ 1920×1080 */
   --filter-btn-w: 53;
   --filter-btn-h: 48;
-  --filter-btn-x: 1847;
+  --filter-btn-x: calc(var(--pagmar-w) - var(--pagmar-design-inset, 30) - var(--filter-btn-w));
   --filter-btn-y: 67;
   /* grid */
   --grid-x: -62.85;
   --grid-y: -130.45;
   --grid-w: 2675.2;
   --grid-h: 1229.638;
-  /* step indicators — Figma @ x1530 y1012.71 (1547 − 17px), gap 44.34 */
+  /* step indicators - Figma @ x1530 y1012.71 (1547 − 17px), gap 44.34 */
   --step-size: 27.841;
   --step-gap: 44.34;
   --step-y: 1012.71;
-  /* מסגרת תחתונה — Figma y=1008.71 (כוכבים נשארים ב-y1012.71) */
+  /* מסגרת תחתונה - Figma y=1008.71 (כוכבים נשארים ב-y1012.71) */
   --frame-bottom: 1008.71;
   --step-x1: 1530;
   --step-x2: 1574.34;
@@ -45,10 +44,10 @@
   --step-x6: 1751.7;
   --step-x7: 1796.04;
   --step-x8: 1840.38;
-  /* inner stage — מעל הכוכבים התחתונים */
+  /* inner stage - מעל הכוכבים התחתונים */
   --stage-top: 70;
   --stage-bottom-gap: 73;
-  /* Component 10 — question panel (Figma 1357:65705) */
+  /* Component 10 - question panel (Figma 1357:65705) */
   --qf-anchor-x: 1025.701;
   --qf-anchor-y: 350.515;
   --question-comp-w: 653.865;
@@ -62,7 +61,7 @@
   --question-frame-line: #222;
   --question-open-duration: 1.05s;
   --question-open-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  /* נקודת התרחבות — פינה שמאלית-תחתונה של הכוכב ביחס ל-shell */
+  /* נקודת התרחבות - פינה שמאלית-תחתונה של הכוכב ביחס ל-shell */
   --question-clip-origin-x: calc(var(--question-star-x) - var(--question-shell-x));
   --question-clip-origin-y: calc(var(--question-star-size) - var(--question-shell-y));
 }
@@ -83,7 +82,7 @@ body {
 body {
   font-family: "DavidLibre", "Ratzif22", "David", "Times New Roman", serif;
   background: var(--page-bg);
-  color: #e8e8e8;
+  color: var(--pagmar-yellow-white);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -98,7 +97,7 @@ body.is-modal-open {
   min-height: 100dvh;
   width: 100vw;
   height: 100dvh;
-  padding: var(--pagmar-margin);
+  padding: 0;
   box-sizing: border-box;
   background: var(--page-bg);
   display: flex;
@@ -186,7 +185,7 @@ body.is-modal-open {
 }
 
 .pagmar__step:focus-visible {
-  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.45);
   outline-offset: calc(2 * var(--u));
 }
 
@@ -230,7 +229,7 @@ body.is-modal-open {
 }
 
 .pagmar__emblem:focus-visible {
-  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.45);
   outline-offset: calc(2 * var(--u));
 }
 
@@ -271,7 +270,7 @@ body.is-spec-panel-open .pagmar__garden {
   cursor: default;
 }
 
-/* finished amulet — interactive 3D on same page */
+/* finished amulet - interactive 3D on same page */
 body.is-amulet-ready .pagmar__emblem:not(.pagmar__emblem--create),
 body.is-amulet-ready .pagmar__garden {
   display: none !important;
@@ -348,7 +347,7 @@ body.is-amulet-ready .result__status:not([hidden]) {
 }
 
 .pagmar__star:focus-visible {
-  outline: 1px solid rgba(241, 241, 241, 0.45);
+  outline: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.45);
   outline-offset: calc(3 * var(--u));
 }
 
@@ -462,7 +461,7 @@ body.is-amulet-ready .result__status:not([hidden]) {
   font-size: max(0.75rem, calc(18 * var(--u)));
   line-height: 1;
   letter-spacing: -0.01em;
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
   white-space: nowrap;
 }
 
@@ -472,7 +471,7 @@ body.is-amulet-ready .result__status:not([hidden]) {
   font-size: max(1rem, calc(32 * var(--u)));
   line-height: 1.15;
   letter-spacing: -0.01em;
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
   text-align: right;
 }
 
@@ -491,9 +490,9 @@ body.is-amulet-ready .result__status:not([hidden]) {
   font-size: max(0.85rem, calc(16 * var(--u)));
   line-height: 1.4;
   padding: calc(10 * var(--u)) calc(12 * var(--u));
-  border: 1px solid #222;
+  border: var(--pagmar-line-weight) solid #222;
   background: #080808;
-  color: #f1f1f1;
+  color: var(--pagmar-yellow-white);
   resize: none;
 }
 
@@ -554,12 +553,12 @@ body.is-amulet-ready .result__status:not([hidden]) {
   font-family: "Ratzif22", "DavidLibre", serif;
   font-size: max(0.7rem, calc(18 * var(--u)));
   line-height: 0.8;
-  color: #f1f1f1;
+  color: var(--pagmar-yellow-white);
   pointer-events: none;
 }
 
 .pagmar__question-save:hover:not(:disabled) .pagmar__question-save-label {
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
 }
 
 .pagmar-canvas:has(.pagmar__question-frame.is-open) .pagmar__garden {
@@ -650,7 +649,7 @@ body.result-page {
   overflow: auto;
   padding: 24px 24px 20px;
   background: rgba(8, 8, 8, 0.97);
-  border: 1px solid rgba(241, 241, 241, 0.16);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.16);
   opacity: 0;
   transform: translateY(12px) scale(0.98);
   transition:
@@ -678,16 +677,16 @@ body.result-page {
   font-family: "DavidLibre", "Ratzif22", serif;
   font-size: 1.05rem;
   line-height: 1.55;
-  color: #ececec;
+  color: var(--pagmar-yellow-white);
   margin-bottom: 14px;
 }
 
 .intro__question-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid rgba(241, 241, 241, 0.18);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.18);
   background: rgba(0, 0, 0, 0.45);
-  color: #f5f5f5;
+  color: var(--pagmar-yellow-white);
   font: inherit;
   font-size: 0.95rem;
   resize: vertical;
@@ -717,9 +716,9 @@ body.result-page {
 
 .intro__choice-btn {
   padding: 10px 12px;
-  border: 1px solid rgba(241, 241, 241, 0.18);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.18);
   background: transparent;
-  color: #e8e8e8;
+  color: var(--pagmar-yellow-white);
   font: inherit;
   font-size: 0.9rem;
   text-align: right;
@@ -744,9 +743,9 @@ body.result-page {
 
 .intro__question-next {
   padding: 8px 18px;
-  border: 1px solid rgba(241, 241, 241, 0.22);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.22);
   background: transparent;
-  color: #eee;
+  color: var(--pagmar-yellow-white);
   font: inherit;
   font-size: 0.82rem;
   letter-spacing: 0.06em;
@@ -806,9 +805,9 @@ body.viewer-page {
 
 .viewer__btn {
   padding: calc(6 * var(--u)) calc(14 * var(--u));
-  border: 1px solid rgba(150, 150, 150, 0.35);
+  border: var(--pagmar-line-weight) solid rgba(150, 150, 150, 0.35);
   background: rgba(8, 8, 8, 0.6);
-  color: #e0e0e0;
+  color: var(--pagmar-yellow-white);
   font: inherit;
   font-size: max(0.75rem, calc(10 * var(--u)));
   letter-spacing: 0.05em;
@@ -839,10 +838,10 @@ body.viewer-page {
 }
 
 .result__viewer-link:hover {
-  color: #e0e0e0;
+  color: var(--pagmar-yellow-white);
 }
 
-/* 3D viewer — fixed top bar, impossible to miss */
+/* 3D viewer - fixed top bar, impossible to miss */
 .viewer-cta {
   position: fixed;
   top: max(16px, env(safe-area-inset-top, 0px));
@@ -851,8 +850,8 @@ body.viewer-page {
   transform: translateX(-50%);
   display: inline-block;
   padding: 14px 32px;
-  border: 2px solid #f1f1f1;
-  background: #f1f1f1;
+  border: var(--pagmar-line-weight) solid var(--pagmar-yellow-white);
+  background: var(--pagmar-yellow-white);
   color: #080808;
   font-family: "Ratzif22", "DavidLibre", system-ui, sans-serif;
   font-size: 1rem;
@@ -864,8 +863,8 @@ body.viewer-page {
 }
 
 .viewer-cta:hover {
-  background: #F5F5F5;
-  border-color: #F5F5F5;
+  background: var(--pagmar-yellow-white);
+  border-color: var(--pagmar-yellow-white);
 }
 
 .viewer-cta[hidden] {
@@ -888,9 +887,9 @@ body.viewer-page {
 .result-viewer-bar__link {
   pointer-events: auto;
   padding: 12px 28px;
-  border: 1px solid rgba(241, 241, 241, 0.55);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.55);
   background: rgba(8, 8, 8, 0.94);
-  color: #f1f1f1;
+  color: var(--pagmar-yellow-white);
   font-family: "Ratzif22", "DavidLibre", serif;
   font-size: 0.95rem;
   letter-spacing: 0.06em;
@@ -901,7 +900,7 @@ body.viewer-page {
 }
 
 .result-viewer-bar__link:hover {
-  border-color: #f1f1f1;
+  border-color: var(--pagmar-yellow-white);
   background: rgba(24, 24, 24, 0.98);
 }
 
@@ -913,9 +912,9 @@ body.viewer-page {
   bottom: calc(12 * var(--u));
   transform: translateX(-50%);
   padding: calc(10 * var(--u)) calc(22 * var(--u));
-  border: 1px solid rgba(241, 241, 241, 0.42);
+  border: var(--pagmar-line-weight) solid rgba(241, 241, 241, 0.42);
   background: rgba(8, 8, 8, 0.88);
-  color: #f1f1f1;
+  color: var(--pagmar-yellow-white);
   font-family: "Ratzif22", "DavidLibre", serif;
   font-size: max(0.8rem, calc(14 * var(--u)));
   letter-spacing: 0.06em;
@@ -935,10 +934,14 @@ body.viewer-page {
 }
 
 /* ============================================================
-   Index page — Figma 1412:12 light garden
+   Index page - Figma 1412:12 light garden
    ============================================================ */
 
-/* Site intro — Figma Frame 225 (1763:26756), Cyber Garden enter pattern */
+html:has(body.pagmar-index:not(.is-create-mode)) {
+  background: #000000;
+}
+
+/* Site intro - Figma Frame 225 (1763:26756), Cyber Garden enter pattern */
 body.pagmar-index.is-site-intro-open {
   overflow: hidden;
 }
@@ -981,7 +984,7 @@ body.pagmar-index.is-site-intro-open {
     calc(95 * var(--intro-u))
     calc(60 * var(--intro-u));
   background: #ededeb;
-  border: 1px solid #ccc8c0;
+  border: var(--pagmar-line-weight) solid #ccc8c0;
   border-radius: 4px;
   box-shadow: 7px 7px 7px rgba(0, 0, 0, 0.08);
   cursor: pointer;
@@ -1046,7 +1049,7 @@ body.pagmar-index.is-site-intro-open {
   justify-content: center;
   gap: calc(60 * var(--intro-u));
   width: 100%;
-  border-top: 1px solid #808080;
+  border-top: var(--pagmar-line-weight) solid #808080;
   padding-top: calc(30 * var(--intro-u));
 }
 
@@ -1178,16 +1181,16 @@ body.pagmar-index.is-site-intro-open {
 }
 
 body.pagmar-index {
-  --page-bg: #1500E1;
-  --index-chrome-accent: #F5F5F5;
-  --index-chrome-line: #F5F5F5;
+  --page-bg: #000000;
+  --index-chrome-accent: var(--pagmar-yellow-white);
+  --index-chrome-line: var(--pagmar-yellow-white);
   --index-filter-bg: #131415;
   --index-ink: var(--ink);
   --index-transition-duration: 300ms;
   --index-transition-ease: cubic-bezier(0.42, 0, 0.58, 1);
   --index-create-transition-duration: 520ms;
   --index-create-transition-ease: cubic-bezier(0.33, 0, 0.2, 1);
-  background: #1500E1;
+  background: #000000;
   color: var(--ink);
   overflow: hidden;
   transition:
@@ -1196,7 +1199,8 @@ body.pagmar-index {
 }
 
 body.pagmar-index .pagmar-viewport {
-  padding: var(--pagmar-content-margin);
+  /* Garden amulets bleed to viewport edges - chrome uses physical --pagmar-margin-* */
+  padding: 0;
   background: transparent;
   width: 100vw;
   height: 100dvh;
@@ -1217,22 +1221,26 @@ body.pagmar-index .pagmar-canvas {
   border-radius: 0;
   background: transparent;
   overflow: visible;
-  --u: calc(100cqw / var(--pagmar-w));
-  --index-u: min(var(--u), calc(100cqh / var(--pagmar-h)));
-  /* Figma 2127:3662 — chrome coords inside the content inset */
+  --u: var(--pagmar-margin-u);
+  --index-u: var(--pagmar-margin-u);
+  /* Figma 2127:3662 - chrome coords inside the content inset */
   --index-chrome-margin: 0;
   --index-chrome-top: calc(1.361 * var(--index-u));
-  --index-cta-bottom: calc(39.883 * var(--index-u));
-  --index-filter-sidebar-right: calc(var(--pagmar-close-right) * var(--index-u));
-  --index-filter-sidebar-top: calc(var(--pagmar-close-top) * var(--index-u));
+  --index-cta-bottom: calc((49.75 - var(--pagmar-design-inset, 30)) * var(--index-u));
+  --index-chrome-inset-left: var(--pagmar-chrome-left);
+  --index-chrome-inset-right: var(--pagmar-chrome-right);
+  --index-chrome-inset-top: var(--pagmar-chrome-top);
+  --index-filter-sidebar-right: var(--pagmar-chrome-right);
+  --index-filter-sidebar-top: var(--pagmar-chrome-top);
+  --index-u: var(--pagmar-margin-u);
   --index-filter-column-width: calc(296 * var(--index-u));
   --index-filter-stack-gap: calc(21 * var(--index-u));
-  --index-filter-item-gap: calc(6 * var(--index-u));
-  --index-filter-trigger-block: calc(50 * var(--index-u));
-  --index-filter-toolbar-height: calc(50 * var(--index-u));
+  --index-filter-item-gap: calc(16 * var(--index-u));
+  --index-filter-trigger-block: var(--pagmar-chrome-hit);
+  --index-filter-toolbar-height: var(--pagmar-chrome-hit);
   --index-filter-tag-line-height: calc(26.4 * var(--index-u));
   --index-filter-head-gap: calc(16 * var(--index-u));
-  /* Figma 2295:28985 — equal stack: X → tag → grid row 1 @ y=263.5 */
+  /* Figma 2295:28985 - equal stack: X → tag → grid row 1 @ y=263.5 */
   --index-filter-grid-row1-top: calc(263.5 * var(--index-u));
   --index-filter-card-size: 410;
   --index-filter-card-gap: 92;
@@ -1250,7 +1258,7 @@ body.pagmar-index .pagmar-canvas {
     var(--index-filter-sidebar-top) + var(--index-filter-toolbar-height) +
       var(--index-filter-page-stack-gap)
   );
-  /* First filter line — same row as active tag on filter page */
+  /* First filter line - same row as active tag on filter page */
   --index-filter-list-start-inset: calc(
     var(--index-filter-toolbar-height) + var(--index-filter-page-stack-gap)
   );
@@ -1258,7 +1266,7 @@ body.pagmar-index .pagmar-canvas {
     var(--index-filter-toolbar-height) + var(--index-filter-page-stack-gap) +
       var(--index-filter-tag-line-height)
   );
-  /* Figma 2266:22459 Frame 336 — glass column 460px */
+  /* Figma 2266:22459 Frame 336 - glass column 460px */
   --index-filter-glass-width: calc(460 * var(--index-u));
 }
 
@@ -1289,7 +1297,7 @@ body.pagmar-index .pagmar__atmosphere--back {
   background: transparent;
 }
 
-/* Fantik ScrollingBackgroundGradient — opaque canvas, fog composited in shader */
+/* Fantik ScrollingBackgroundGradient - opaque canvas, fog composited in shader */
 body.pagmar-index .pagmar__atmosphere--fantik {
   background: transparent;
   pointer-events: none;
@@ -1301,9 +1309,7 @@ body.pagmar-index .pagmar__depth-rim {
 }
 
 body.pagmar-index .pagmar__atmosphere--fallback {
-  background:
-    radial-gradient(ellipse 120% 95% at 50% 52%, #1500E1 0%, #1200C4 28%, #0F00A8 52%, #0B007C 76%, #070050 100%),
-    #1500E1;
+  background: #000000;
   background-size: cover;
 }
 
@@ -1421,13 +1427,14 @@ body.pagmar-index.is-spec-panel-open .pagmar__garden {
   cursor: default;
 }
 
-/* index frame borders — Figma Group 60 */
+/* index frame borders - Figma Group 60 */
 body.pagmar-index .pagmar__index-frame {
-  position: absolute;
+  position: fixed;
   z-index: 90;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(calc(1880 * var(--index-u)), 100%);
+  left: var(--pagmar-margin-left);
+  right: var(--pagmar-margin-right);
+  width: auto;
+  transform: none;
   pointer-events: none;
   line-height: 0;
 }
@@ -1439,33 +1446,25 @@ body.pagmar-index .pagmar__index-frame img {
 }
 
 body.pagmar-index .pagmar__index-frame--top {
-  top: 0;
+  top: var(--pagmar-margin-top);
 }
 
 body.pagmar-index .pagmar__index-frame--bottom {
-  bottom: 0;
+  bottom: var(--pagmar-margin-bottom);
 }
 
-/* filter + chrome — Figma 2127:3662 */
+/* filter + chrome - Figma 2601:40649; position from pagmar-chrome.css */
 body.pagmar-index .pagmar__index-about {
-  position: fixed;
   z-index: 110;
-  left: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
-  top: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-top));
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  min-width: calc(50 * var(--index-u));
-  height: calc(50 * var(--index-u));
   margin: 0;
   padding: 0;
   border: none;
   border-radius: 0;
   background: transparent;
-  color: var(--index-chrome-accent);
-  font-family: "TheBasics", "DavidLibre", serif;
   cursor: pointer;
   pointer-events: auto;
   isolation: isolate;
@@ -1474,16 +1473,11 @@ body.pagmar-index .pagmar__index-about {
   appearance: none;
 }
 
-body.pagmar-index .pagmar__index-about__label {
-  display: inline-flex;
-  align-items: center;
-  font-size: calc(24 * var(--index-u));
-  font-weight: 400;
-  font-style: normal;
-  line-height: 1.1;
-  letter-spacing: calc(-0.24 * var(--index-u));
-  text-align: center;
-  white-space: nowrap;
+body.pagmar-index .pagmar__index-about__icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
   user-select: none;
 }
@@ -1529,7 +1523,10 @@ body.pagmar-index .pagmar__index-filter-item.is-typing {
 }
 
 body.pagmar-index .pagmar__index-filter-item.is-typing {
-  width: 100%;
+  display: inline-block;
+  width: var(--type-full-width, auto);
+  min-width: var(--type-full-width, auto);
+  align-self: flex-end;
 }
 
 body.pagmar-index .pagmar__index-cta-pill__label.is-typing {
@@ -1547,15 +1544,15 @@ body.pagmar-index .pagmar__index-about:active {
 }
 
 body.pagmar-index .pagmar__index-about:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
   outline-offset: calc(3 * var(--index-u));
 }
 
 body.pagmar-index .pagmar__index-filter-sidebar {
   position: fixed;
   z-index: 110;
-  right: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
-  top: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-top));
+  right: var(--index-chrome-inset-right);
+  top: var(--index-chrome-inset-top);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -1573,38 +1570,31 @@ body.pagmar-index .pagmar__index-filter-sidebar:not(.is-expanded) .pagmar__index
   display: none;
 }
 
-/* Figma 2266:22459 — glass column flush to viewport edge (same pill glass as CTA) */
-body.pagmar-index .pagmar__index-filter-sidebar::before {
-  content: '';
+/* Figma 2601:41632 / Frame 336 - glass column only when filter is open */
+body.pagmar-index .pagmar__index-filter-sidebar .pagmar__index-filter-glass-lens {
   position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
   width: var(--index-filter-glass-width);
-  background: var(--pagmar-pill-glass-bg, rgba(28, 28, 28, 0.1));
-  -webkit-backdrop-filter: blur(var(--pagmar-pill-glass-blur, 10px));
-  backdrop-filter: blur(var(--pagmar-pill-glass-blur, 10px));
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.06),
-    0 2px 8px rgba(0, 0, 0, 0.12);
   z-index: 0;
   opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity var(--index-transition-duration) var(--index-transition-ease),
-    backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
-    -webkit-backdrop-filter var(--index-transition-duration) var(--index-transition-ease);
+  transform: translateZ(0);
+  border-left: none;
+  border-radius: 0;
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+  overflow: hidden;
+}
+
+body.pagmar-index .pagmar__index-filter-sidebar.is-expanded .pagmar__index-filter-glass-lens {
+  opacity: 1;
 }
 
 body.pagmar-index .pagmar__index-filter-sidebar.is-expanded {
   max-height: calc(
-    100% - var(--index-filter-sidebar-top) - var(--index-cta-bottom) - calc(55 * var(--index-u))
+    100% - var(--index-filter-sidebar-top) - var(--index-cta-bottom) - calc(62 * var(--index-u))
   );
   overflow: visible;
-}
-
-body.pagmar-index .pagmar__index-filter-sidebar.is-expanded::before {
-  opacity: 1;
 }
 
 body.pagmar-index .pagmar__index-filter-trigger {
@@ -1613,9 +1603,13 @@ body.pagmar-index .pagmar__index-filter-trigger {
   right: 0;
   top: 0;
   box-sizing: border-box;
-  display: block;
-  width: calc(50 * var(--index-u));
-  height: calc(50 * var(--index-u));
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: auto;
+  height: var(--pagmar-chrome-hit);
+  min-width: 0;
+  min-height: var(--pagmar-chrome-hit);
   margin: 0;
   padding: 0;
   border: none;
@@ -1630,66 +1624,18 @@ body.pagmar-index .pagmar__index-filter-trigger {
   appearance: none;
 }
 
-body.pagmar-index .pagmar__index-filter-trigger .pagmar__index-chrome-corner--tl {
-  left: calc(6.038 * var(--index-u));
-  top: calc(6 * var(--index-u));
-}
-
-body.pagmar-index .pagmar__index-filter-trigger .pagmar__index-chrome-corner--tr {
-  right: calc(6.013 * var(--index-u));
-  top: calc(6 * var(--index-u));
-  transform: scaleX(-1);
-}
-
-body.pagmar-index .pagmar__index-filter-trigger .pagmar__index-chrome-corner--bl {
-  left: calc(6.012 * var(--index-u));
-  bottom: calc(6.024 * var(--index-u));
-  transform: scaleY(-1);
-}
-
-body.pagmar-index .pagmar__index-filter-trigger .pagmar__index-chrome-corner--br {
-  right: calc(6.031 * var(--index-u));
-  bottom: calc(6 * var(--index-u));
-  transform: scale(-1, -1);
-}
-
-body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner--tl {
-  left: 0;
-  top: 0;
-}
-
-body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner--tr {
-  right: 0;
-  top: 0;
-  transform: scaleX(-1);
-}
-
-body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner--bl {
-  left: 0;
-  bottom: 0;
-  transform: scaleY(-1);
-}
-
-body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner--br {
-  right: 0;
-  bottom: 0;
-  transform: scale(-1, -1);
-}
-
+/* Figma 2601:40649 - plain text trigger (2374:41840), no vector corners */
 body.pagmar-index .pagmar__index-filter-trigger__label {
-  position: absolute;
-  z-index: 1;
-  left: 50%;
-  top: 50%;
+  position: relative;
   display: block;
+  font-family: "TheBasics", "DavidLibre", serif;
   font-size: calc(24 * var(--index-u));
   font-weight: 400;
   font-style: normal;
   line-height: 1.1;
   letter-spacing: calc(-0.24 * var(--index-u));
-  text-align: center;
+  text-align: right;
   white-space: nowrap;
-  transform: translate(-50%, -50%);
   pointer-events: none;
   user-select: none;
 }
@@ -1708,17 +1654,21 @@ body.pagmar-index .pagmar__index-filter-trigger__icon {
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger {
-  display: flex;
+  position: relative;
+  right: auto;
+  top: auto;
+  display: inline-flex;
   align-items: flex-start;
   justify-content: flex-end;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label {
   visibility: hidden;
-}
-
-body.pagmar-index.is-filter-page .pagmar__index-filter-trigger .pagmar__index-chrome-corner {
-  display: none;
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
@@ -1732,7 +1682,11 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__icon {
   height: calc(var(--pagmar-close-icon-h) * var(--index-u));
   transform: none;
   object-fit: contain;
-  object-position: right top;
+  object-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+  filter: brightness(0) invert(1);
   pointer-events: none;
   user-select: none;
 }
@@ -1742,7 +1696,7 @@ body.pagmar-index .pagmar__index-filter-trigger:active {
 }
 
 body.pagmar-index .pagmar__index-filter-trigger:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
   outline-offset: calc(3 * var(--index-u));
 }
 
@@ -1767,7 +1721,7 @@ body.pagmar-index .pagmar__index-filter-sidebar.is-expanded .pagmar__index-filte
   max-height: calc(
     100dvh - var(--index-filter-sidebar-top) -
       var(--index-filter-list-start-inset) - var(--index-cta-bottom) -
-      calc(55 * var(--index-u))
+      calc(62 * var(--index-u))
   );
   padding-top: 0;
   pointer-events: auto;
@@ -1798,9 +1752,12 @@ body.pagmar-index .pagmar__index-filter-list::-webkit-scrollbar {
 }
 
 body.pagmar-index .pagmar__index-filter-item {
-  display: block;
+  position: relative;
+  display: inline-block;
   flex: 0 0 auto;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  align-self: flex-end;
   min-height: calc(25 * var(--index-u));
   margin: 0;
   padding: 0;
@@ -1811,8 +1768,8 @@ body.pagmar-index .pagmar__index-filter-item {
   font-size: calc(24 * var(--index-u));
   font-weight: 400;
   font-style: normal;
-  line-height: 110%;
-  letter-spacing: calc(-0.48 * var(--index-u));
+  line-height: calc(25 * var(--index-u));
+  letter-spacing: -0.02em;
   direction: rtl;
   text-align: right;
   white-space: nowrap;
@@ -1821,6 +1778,25 @@ body.pagmar-index .pagmar__index-filter-item {
   transition: opacity 120ms ease;
   -webkit-appearance: none;
   appearance: none;
+}
+
+body.pagmar-index .pagmar__index-filter-item::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: calc(-2 * var(--index-u));
+  width: 100%;
+  height: var(--pagmar-line-weight);
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.pagmar-index .pagmar__index-filter-sidebar.is-expanded .pagmar__index-filter-item:hover::after {
+    transform: scaleX(1);
+  }
 }
 
 body.pagmar-index .pagmar__index-filter-item--mono {
@@ -1851,7 +1827,7 @@ body.pagmar-index .pagmar__index-filter-item:active {
 }
 
 body.pagmar-index .pagmar__index-filter-item:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
   outline-offset: calc(2 * var(--index-u));
 }
 
@@ -1860,12 +1836,7 @@ body.pagmar-index .pagmar__index-filter-item.is-active {
 }
 
 body.pagmar-index .pagmar__index-filter-item .pagmar-btn__roll--chars {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  direction: rtl;
-  unicode-bidi: plaintext;
+  display: inline;
 }
 
 body.pagmar-index .pagmar__index-filter-active-tag .pagmar-btn__roll--chars {
@@ -1899,9 +1870,12 @@ body.pagmar-index .pagmar__index-filter-toolbar {
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar {
   z-index: 350;
+  top: var(--pagmar-chrome-top);
+  right: var(--pagmar-chrome-right);
+  align-items: stretch;
 }
 
-/* Filter page — Luca fog stays on garden canvas; amulets hidden in garden-three.js */
+/* Filter page - Luca fog stays on garden canvas; amulets hidden in garden-three.js */
 body.pagmar-index.is-filter-page .pagmar__garden,
 body.pagmar-index.is-filter-page .pagmar__garden canvas {
   opacity: 1 !important;
@@ -1917,6 +1891,17 @@ body.pagmar-index.is-filter-page .pagmar__garden {
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-head {
   gap: var(--index-filter-page-tag-gap);
+  width: 100%;
+  align-items: stretch;
+}
+
+body.pagmar-index.is-filter-page .pagmar__index-filter-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: calc(var(--pagmar-close-icon-h) * var(--index-u));
 }
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar:not(.is-expanded) {
@@ -1990,7 +1975,7 @@ body.pagmar-index .pagmar__index-filter-active-tag:active {
 }
 
 body.pagmar-index .pagmar__index-filter-active-tag:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
   outline-offset: calc(3 * var(--index-u));
 }
 
@@ -2003,17 +1988,17 @@ body.pagmar-index .pagmar__index-filter-grid {
 
 body.pagmar-index.is-filter-page .pagmar__index-filter-grid {
   position: fixed;
-  top: var(--pagmar-content-margin);
-  left: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
-  right: calc(var(--pagmar-content-margin) + var(--index-filter-sidebar-right));
+  top: 0;
+  left: var(--index-chrome-inset-left);
+  right: var(--index-chrome-inset-right);
   width: auto;
   transform: none;
-  --index-filter-grid-uy: var(--index-u);
-  --index-filter-grid-u: var(--index-filter-grid-uy, var(--index-u));
+  --index-filter-grid-u: var(--pagmar-margin-u);
+  --index-filter-grid-uy: var(--index-filter-grid-u);
   height: 100dvh;
   max-height: 100dvh;
   z-index: 240;
-  overflow-x: visible;
+  overflow-x: clip;
   overflow-y: auto;
   pointer-events: auto;
   overscroll-behavior: contain;
@@ -2030,6 +2015,25 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-grid-spacer {
   visibility: hidden;
 }
 
+body.pagmar-index .pagmar__index-filter-rows {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: calc(var(--index-filter-grid-row1-top));
+  padding-bottom: calc(200 * var(--index-filter-grid-u, var(--index-u)));
+}
+
+body.pagmar-index .pagmar__index-filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: 100%;
+  align-items: center;
+  justify-items: center;
+}
+
+body.pagmar-index .pagmar__index-filter-row + .pagmar__index-filter-row {
+  margin-top: calc(80.5 * var(--index-filter-grid-u, var(--index-u)));
+}
+
 body.pagmar-index.is-filter-page .pagmar__index-filter-grid::-webkit-scrollbar {
   display: none;
   width: 0;
@@ -2037,7 +2041,7 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-grid::-webkit-scrollbar {
 }
 
 body.pagmar-index .pagmar__index-filter-card {
-  position: absolute;
+  position: relative;
   z-index: 1;
   margin: 0;
   padding: 0;
@@ -2051,12 +2055,12 @@ body.pagmar-index .pagmar__index-filter-card {
 }
 
 body.pagmar-index .pagmar__index-filter-card:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
   outline-offset: calc(2 * var(--index-filter-grid-u, var(--index-u)));
 }
 
 
-/* Old localStorage JPEG/WebP snapshots had no alpha — black fills transparent areas */
+/* Old localStorage JPEG/WebP snapshots had no alpha - black fills transparent areas */
 body.pagmar-index .pagmar__index-filter-card-img--legacy {
   mix-blend-mode: lighten;
 }
@@ -2076,16 +2080,17 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-sidebar {
   z-index: 350;
 }
 
-/* CTA — Figma 2127:3662 Component 15 */
+/* CTA - Figma 2601:40649 / 2610:43099 */
 body.pagmar-index .pagmar__index-cta-pill {
   position: absolute;
   z-index: 300;
   left: 50%;
-  bottom: var(--index-cta-bottom);
+  bottom: calc(var(--pagmar-margin-bottom) + var(--index-cta-bottom));
   transform: translateX(-50%);
   box-sizing: border-box;
-  width: calc(244 * var(--index-u));
-  height: calc(55 * var(--index-u));
+  width: auto;
+  min-width: calc(266.166 * var(--index-u));
+  height: calc(62 * var(--index-u));
   margin: 0;
   padding: 0;
   border: none;
@@ -2098,107 +2103,42 @@ body.pagmar-index .pagmar__index-cta-pill {
   appearance: none;
 }
 
-body.pagmar-index .pagmar__index-cta__corner {
-  position: absolute;
-  width: calc(8.947 * var(--index-u));
-  height: calc(8.946 * var(--index-u));
-  pointer-events: none;
-  user-select: none;
-  transition:
-    top var(--index-transition-duration) var(--index-transition-ease),
-    right var(--index-transition-duration) var(--index-transition-ease),
-    bottom var(--index-transition-duration) var(--index-transition-ease),
-    left var(--index-transition-duration) var(--index-transition-ease);
-}
-
-body.pagmar-index .pagmar__index-cta__corner--tl {
-  left: calc(4.392 * var(--index-u));
-  top: calc(5.506 * var(--index-u));
-}
-
-body.pagmar-index .pagmar__index-cta__corner--tr {
-  right: calc(6.027 * var(--index-u));
-  top: calc(5.506 * var(--index-u));
-  transform: scaleX(-1);
-}
-
-body.pagmar-index .pagmar__index-cta__corner--bl {
-  left: calc(4.392 * var(--index-u));
-  bottom: calc(4.983 * var(--index-u));
-  transform: scaleY(-1);
-}
-
-body.pagmar-index .pagmar__index-cta__corner--br {
-  right: calc(6.027 * var(--index-u));
-  bottom: calc(4.983 * var(--index-u));
-  transform: scale(-1, -1);
-}
-
 body.pagmar-index .pagmar__index-cta-pill__body {
-  position: absolute;
-  left: calc(4.392 * var(--index-u));
-  right: calc(6.027 * var(--index-u));
-  top: calc(5.506 * var(--index-u));
-  bottom: calc(4.494 * var(--index-u));
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
   display: inline-flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: calc(10 * var(--index-u));
-  direction: ltr;
+  gap: 0;
+  direction: rtl;
   box-sizing: border-box;
-  padding: calc(10 * var(--index-u)) calc(40 * var(--index-u));
-  border: none;
-  border-radius: calc(60 * var(--index-u));
-  background: transparent;
+  width: auto;
+  min-width: 100%;
+  height: 100%;
+  padding: calc(14 * var(--index-u)) calc(30 * var(--index-u)) calc(15 * var(--index-u));
+  border: var(--pagmar-line-weight) solid transparent;
+  border-radius: calc(70 * var(--index-u));
+  background: var(--pagmar-yellow-white);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
-  color: var(--index-chrome-accent);
+  color: #1e1e1e;
   transition:
-    background var(--index-transition-duration) var(--index-transition-ease),
-    backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
-    -webkit-backdrop-filter var(--index-transition-duration) var(--index-transition-ease),
-    box-shadow var(--index-transition-duration) var(--index-transition-ease);
-}
-
-/* K95-style hover pill — amulet number follows cursor on garden hover */
-body.pagmar-index .pagmar__garden-amulet-hover {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 12;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(-9999px, -9999px, 0);
-  will-change: transform, opacity;
-}
-
-body.pagmar-index.is-filter-page .pagmar__garden-amulet-hover {
-  z-index: 400;
-}
-
-body.pagmar-index .pagmar__garden-amulet-hover .pagmar__glass-pill__text {
-  font-family: "TheBasics", "DavidLibre", serif;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-}
-
-/* Figma Component 15 — glass only when a garden amulet sits behind the fixed pill */
-body.pagmar-index .pagmar__index-cta-pill.is-over-amulet .pagmar__index-cta-pill__body {
-  background: rgba(255, 255, 255, 0.06);
-  -webkit-backdrop-filter: blur(calc(12 * var(--index-u)));
-  backdrop-filter: blur(calc(12 * var(--index-u)));
-  box-shadow: none;
+    opacity var(--index-transition-duration) var(--index-transition-ease),
+    background var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    border-color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    -webkit-backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    box-shadow var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
 body.pagmar-index .pagmar__index-cta__arrow {
-  flex: 0 0 auto;
-  width: calc(14.593 * var(--index-u));
-  height: calc(14.593 * var(--index-u));
-  pointer-events: none;
-  user-select: none;
+  display: none !important;
 }
 
 body.pagmar-index .pagmar__index-cta-pill__label {
@@ -2206,41 +2146,161 @@ body.pagmar-index .pagmar__index-cta-pill__label {
   z-index: 1;
   flex: 0 1 auto;
   min-width: 0;
-  min-height: calc(25 * var(--index-u));
-  color: var(--index-chrome-accent);
+  min-height: 0;
+  color: #1e1e1e;
   font-family: "TheBasics", "DavidLibre", serif;
-  font-size: calc(24 * var(--index-u));
+  font-size: calc(32 * var(--index-u));
   font-weight: 400;
   font-style: normal;
-  line-height: 110%;
-  letter-spacing: calc(-0.72 * var(--index-u));
+  line-height: normal;
+  letter-spacing: calc(-0.32 * var(--index-u));
   direction: rtl;
   text-align: center;
   white-space: nowrap;
+  transition: color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+/* Figma 2625:44380 - Frame 402 amulet hover card */
+body.pagmar-index {
+  --figma402-head-gap: 8;
+  --figma402-pad-x: 24;
+  /* Figma text style: תגיות - Narkiss Yair Variable 20 / leading 90% */
+  --figma-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --figma-tag-size: 20;
+  --figma-tag-line-height: 0.9;
+  --figma-tag-tracking: 0.6;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover__surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  width: auto;
+  max-width: none;
+  height: fit-content;
+  min-width: 0;
+  overflow: visible;
+  opacity: 1;
+  isolation: isolate;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover.is-anchor-left .pagmar__garden-amulet-hover__surface {
+  transform: translateX(-100%);
+}
+
+/* Glass surface - clone layer + chrome rim; inline-flex hugs wrapped text up to 400px */
+body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip {
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 400px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  vertical-align: top;
+  padding: 14px 24px !important;
+  border-radius: 40px !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: var(--pagmar-line-weight) solid transparent !important;
+  background-clip: padding-box !important;
+  position: relative !important;
+  box-shadow: none !important;
   overflow: hidden;
+  pointer-events: none;
+  gap: 0;
 }
 
-body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--tl {
-  left: 0;
-  top: 0;
+body.pagmar-index .pagmar__garden-amulet-hover.has-request .pagmar__garden-amulet-hover__surface.glass-tooltip {
+  gap: calc(var(--figma402-head-gap) * 1px);
 }
 
-body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--tr {
-  right: 0;
-  top: 0;
-  transform: scaleX(-1);
+body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-clone {
+  border-radius: 40px;
 }
 
-body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--bl {
-  left: 0;
-  bottom: 0;
-  transform: scaleY(-1);
+body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-chrome {
+  border-radius: 40px;
 }
 
-body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner--br {
-  right: 0;
-  bottom: 0;
-  transform: scale(-1, -1);
+body.pagmar-index.is-filter-page .pagmar__garden-amulet-hover {
+  z-index: 400;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover__head {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(10 * var(--index-u));
+  direction: ltr;
+  margin: 0;
+  max-width: 100%;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover.has-request .pagmar__garden-amulet-hover__head {
+  margin-bottom: 0;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover__index,
+body.pagmar-index .pagmar__garden-amulet-hover__request {
+  margin: 0;
+  font-family: var(--figma-tag-font) !important;
+  font-size: calc(var(--figma-tag-size) * var(--index-u)) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  line-height: var(--figma-tag-line-height) !important;
+  letter-spacing: calc(var(--figma-tag-tracking) * var(--index-u)) !important;
+  color: var(--pagmar-yellow-white) !important;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover__index {
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover__request {
+  position: relative;
+  z-index: 3;
+  display: block;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+body.pagmar-index .pagmar__garden-amulet-hover .pagmar__glass-pill__arrow {
+  display: block;
+  flex: 0 0 auto;
+  width: calc(11.41 * var(--index-u));
+  height: calc(11.41 * var(--index-u));
+  background: var(--pagmar-glass-pill-arrow) no-repeat center / contain;
+  opacity: 0.92;
 }
 
 body.pagmar-index .pagmar__index-cta-pill:active {
@@ -2248,7 +2308,7 @@ body.pagmar-index .pagmar__index-cta-pill:active {
 }
 
 body.pagmar-index .pagmar__index-cta-pill:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline: var(--pagmar-line-weight) solid rgba(30, 30, 30, 0.45);
   outline-offset: calc(3 * var(--index-u));
 }
 
@@ -2263,22 +2323,22 @@ body.pagmar-index.is-create-mode .pagmar__index-frame img {
   opacity: 0.35;
 }
 
-/* legacy emblem — hidden on index */
+/* legacy emblem - hidden on index */
 body.pagmar-index .pagmar__emblem--index {
   display: none !important;
 }
 
-/* legacy filter SVG — hidden */
+/* legacy filter SVG - hidden */
 body.pagmar-index .pagmar__filter-btn {
   display: none !important;
 }
 
-/* legacy fixed action button — hidden */
+/* legacy fixed action button - hidden */
 body.pagmar-index .pagmar__action-btn--fixed {
   display: none !important;
 }
 
-/* progress bar — hidden on index */
+/* progress bar - hidden on index */
 body.pagmar-index .pagmar__progress {
   display: none !important;
 }
@@ -2314,8 +2374,8 @@ body.pagmar-index .pagmar__progress-dot {
   width: calc(10 * var(--u));
   height: calc(10 * var(--u));
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(var(--pagmar-yellow-white-rgb), 0.55);
+  border: var(--pagmar-line-weight) solid rgba(0, 0, 0, 0.12);
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
@@ -2328,7 +2388,7 @@ body.pagmar-index .pagmar__progress-dot.is-current {
   transform: scale(1.25);
 }
 
-/* choice panel — Figma right side */
+/* choice panel - Figma right side */
 body.pagmar-index .pagmar__choice-panel {
   position: absolute;
   z-index: 8;
@@ -2357,7 +2417,7 @@ body.pagmar-index .pagmar__choice-title {
   font-size: max(1rem, calc(24 * var(--u)));
   font-weight: 400;
   line-height: normal;
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
   text-align: right;
   letter-spacing: calc(-0.72 * var(--u));
   margin-bottom: calc(26 * var(--u));
@@ -2376,31 +2436,52 @@ body.pagmar-index .pagmar__choice-options {
 body.pagmar-index .pagmar__choice-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
+  direction: ltr;
   width: 100%;
   min-height: calc(38 * var(--u));
-  padding: calc(9 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
-  border: 1px solid #F5F5F5;
+  padding: calc(9 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));
+  border: var(--pagmar-line-weight) solid var(--pagmar-yellow-white);
   border-radius: calc(50 * var(--u));
   background: #131415;
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
   font-family: "TheBasics", "Ratzif22", "DavidLibre", serif;
   font-size: max(0.8rem, calc(20 * var(--u)));
   font-weight: 400;
   font-style: normal;
   line-height: normal;
-  text-align: center;
-  white-space: nowrap;
+  text-align: right;
   cursor: pointer;
-  transition:
-    background var(--index-transition-duration) var(--index-transition-ease),
-    color var(--index-transition-duration) var(--index-transition-ease);
-  -webkit-appearance: none;
-  appearance: none;
+}
+
+body.pagmar-index .pagmar__choice-pill .intro__choice-btn__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  direction: rtl;
+}
+
+body.pagmar-index .pagmar__choice-pill .intro__choice-btn__radio {
+  flex: 0 0 calc(18 * var(--u));
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+body.pagmar-index .pagmar__choice-pill.is-selected .intro__choice-btn__radio::after {
+  content: '';
+  position: absolute;
+  inset: calc(3 * var(--u));
+  border-radius: 50%;
+  background: currentColor;
 }
 
 body.pagmar-index .pagmar__choice-pill.is-selected {
-  background: #F5F5F5;
+  background: var(--pagmar-yellow-white);
   color: #131415;
 }
 
@@ -2408,7 +2489,7 @@ body.pagmar-index .pagmar__choice-pill:hover {
   background: #1f2021;
 }
 
-/* amulet spec panel — Figma Frame 265 */
+/* amulet spec panel - Figma Frame 265 */
 body.pagmar-index .pagmar__spec-panel {
   position: absolute;
   z-index: 200;
@@ -2443,7 +2524,7 @@ body.pagmar-index .pagmar__spec-panel__rule {
   display: block;
   position: relative;
   width: 100%;
-  height: 1px;
+  height: var(--pagmar-line-weight);
   margin-bottom: calc(8 * var(--u));
   background: #c5c5c5;
 }
@@ -2460,7 +2541,7 @@ body.pagmar-index .pagmar__spec-panel__notch {
 body.pagmar-index .pagmar__spec-panel__title {
   margin: 0;
   padding-bottom: calc(4 * var(--u));
-  border-bottom: 2px solid #c5c5c5;
+  border-bottom: var(--pagmar-line-weight) solid #c5c5c5;
   font-family: "Ratzif22", "DavidLibre", serif;
   font-size: max(0.85rem, calc(18 * var(--u)));
   font-weight: 500;
@@ -2480,8 +2561,8 @@ body.pagmar-index .pagmar__text-panel {
   transform: translateY(-50%) translateX(calc(-16 * var(--u)));
   width: min(calc(520 * var(--u)), 42vw);
   padding: calc(28 * var(--u)) calc(32 * var(--u));
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(var(--pagmar-yellow-white-rgb), 0.92);
+  border: var(--pagmar-line-weight) solid rgba(0, 0, 0, 0.14);
   border-radius: calc(6 * var(--u));
   pointer-events: auto;
   opacity: 0;
@@ -2519,8 +2600,8 @@ body.pagmar-index .pagmar__text-question {
 body.pagmar-index .pagmar__text-input {
   width: 100%;
   padding: calc(10 * var(--u)) calc(12 * var(--u));
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  background: #F5F5F5;
+  border: var(--pagmar-line-weight) solid rgba(0, 0, 0, 0.2);
+  background: var(--pagmar-yellow-white);
   color: var(--ink);
   font: inherit;
   font-size: max(0.9rem, calc(17 * var(--u)));
@@ -2549,10 +2630,10 @@ body.pagmar-index .pagmar__text-actions {
 
 body.pagmar-index .pagmar__text-save {
   padding: calc(8 * var(--u)) calc(20 * var(--u));
-  border: 1px solid var(--ink);
+  border: var(--pagmar-line-weight) solid var(--ink);
   border-radius: calc(70 * var(--u));
   background: var(--ink);
-  color: #F4F4F4;
+  color: var(--pagmar-yellow-white);
   font-family: "DavidLibre", "Ratzif22", serif;
   font-size: max(0.82rem, calc(16 * var(--u)));
   cursor: pointer;
@@ -2569,7 +2650,7 @@ body.pagmar-index .pagmar__text-close {
   cursor: pointer;
 }
 
-/* CTA — Figma "צור קמע כפתור" + Frame 223 text roll (224×83) */
+/* CTA - Figma "צור קמע כפתור" + Frame 223 text roll (224×83) */
 body.pagmar-index .pagmar__action-btn,
 body.pagmar-create .pagmar__action-btn {
   display: inline-flex;
@@ -2596,7 +2677,7 @@ body.pagmar-create .pagmar__action-btn__inner {
   /* Design coordinate space for text-band positioning */
   --action-btn-design-w: 224;
   --action-btn-design-h: 83;
-  /* Inner text band — viewBox 224×83 (Figma Frame 223) */
+  /* Inner text band - viewBox 224×83 (Figma Frame 223) */
   --action-btn-text-box-x: 22;
   --action-btn-text-box-center-y: 35.419;
   --action-btn-text-box-w: 183.473;
@@ -2681,7 +2762,7 @@ body.pagmar-create .pagmar__action-btn:hover .pagmar__action-btn__inner {
 
 body.pagmar-index .pagmar__action-btn:focus-visible,
 body.pagmar-create .pagmar__action-btn:focus-visible {
-  outline: 1px solid rgba(128, 128, 128, 0.35);
+  outline: var(--pagmar-line-weight) solid rgba(128, 128, 128, 0.35);
   outline-offset: 3px;
 }
 
@@ -2743,23 +2824,22 @@ body.pagmar-index.is-amulet-ready .result__status:not([hidden]) {
   }
 
   body.pagmar-index .pagmar__index-cta-pill:hover .pagmar__index-cta__corner,
-  body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner,
-  body.pagmar-index .pagmar__index-filter-trigger:hover .pagmar__index-chrome-corner {
+  body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner {
     transition-duration: 0.01ms;
   }
 }
 
 /* ============================================================
-   Index — inline create mode (Figma 1744:23679 — אנכי)
+   Index - inline create mode (Figma 1744:23679 - אנכי)
    ============================================================ */
 
 body.pagmar-index.is-create-mode {
-  --page-bg: #1500E1;
-  --ink: #1500E1;
-  --index-ink: #1500E1;
+  --page-bg: #000000;
+  --ink: var(--pagmar-yellow-white);
+  --index-ink: var(--pagmar-yellow-white);
   --index-transition-duration: var(--index-create-transition-duration);
   --index-transition-ease: var(--index-create-transition-ease);
-  --create-ink: #1500E1;
+  --create-ink: var(--pagmar-yellow-white);
   --create-stack-w: 835.125;
   --create-amulet-area-h: 635.188;
   --create-question-area-h: 262.767;
@@ -2768,7 +2848,7 @@ body.pagmar-index.is-create-mode {
   --create-question-content-bottom: 32;
   --create-stack-h: 897.955;
   --create-stack-y: 112.838;
-  --create-stack-bottom-margin: 20;
+  --create-stack-bottom-margin: var(--pagmar-design-inset, 30);
   --create-amulet-pct: calc(var(--create-amulet-area-h) / var(--create-stack-h) * 100%);
   --create-question-pct: calc(var(--create-question-area-h) / var(--create-stack-h) * 100%);
   --create-content-top-pct: calc(
@@ -2790,12 +2870,12 @@ body.pagmar-index.is-create-mode {
   --create-save-label-tracking: -0.48;
   --create-save-label-roll: calc((var(--create-save-label-size) + var(--create-save-label-gap)) * -1);
   --index-create-scale: 1;
-  background: #1500E1;
-  color: #1500E1;
+  background: #000000;
+  color: var(--pagmar-yellow-white);
 }
 
 body.pagmar-index.is-create-mode.is-create-exiting {
-  background: #F8F8F7;
+  background: var(--pagmar-yellow-white);
   --ink: #1B1613;
   color: var(--ink);
   --index-ink: var(--ink);
@@ -2803,12 +2883,12 @@ body.pagmar-index.is-create-mode.is-create-exiting {
 
 body.pagmar-index.is-create-mode:not(.is-create-exiting) [stroke="#1B1613"],
 body.pagmar-create [stroke="#1B1613"] {
-  stroke: #F8F8F7;
+  stroke: var(--pagmar-yellow-white);
 }
 
 body.pagmar-index.is-create-mode:not(.is-create-exiting) [fill="#1B1613"],
 body.pagmar-create [fill="#1B1613"] {
-  fill: #F8F8F7;
+  fill: var(--pagmar-yellow-white);
 }
 
 body.pagmar-index.is-create-mode.is-create-exiting .pagmar__index-cta-pill,
@@ -2833,11 +2913,12 @@ body.pagmar-index.is-create-mode .pagmar__spec-panel {
   pointer-events: none !important;
 }
 
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__garden {
-  opacity: 1;
-  pointer-events: none;
-  cursor: default;
+/* Legacy questionnaire.css garden rule - keep black during request flow */
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__stage .pagmar__garden,
+body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__stage .pagmar__garden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 body.pagmar-index.is-create-mode.is-create-exiting .pagmar__garden {
@@ -2900,7 +2981,7 @@ body.pagmar-create .pagmar__create-stack {
   isolation: isolate;
 }
 
-/* Figma Component 12 (1748:25754) — percentage insets from stack root */
+/* Figma Component 12 (1748:25754) - percentage insets from stack root */
 body.pagmar-index.is-create-mode .pagmar__component12__frame-shell,
 body.pagmar-create .pagmar__component12__frame-shell {
   position: absolute;
@@ -2969,7 +3050,7 @@ body.pagmar-create .pagmar__create-amulet-inner {
   pointer-events: none;
 }
 
-/* Figma Frame 242 — content band inside bottom frame */
+/* Figma Frame 242 - content band inside bottom frame */
 body.pagmar-index.is-create-mode .pagmar__component12__question,
 body.pagmar-create .pagmar__component12__question {
   position: absolute;
@@ -3059,8 +3140,9 @@ body.pagmar-index.is-create-mode .pagmar__index-create-amulet-view canvas {
   display: block;
   max-width: 100%;
   max-height: 100%;
-  width: auto !important;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
   touch-action: none;
   cursor: grab;
 }
@@ -3087,7 +3169,7 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   display: none;
 }
 
-/* Amulet loader — finished gallery amulet spins while vectors / textures build */
+/* Amulet loader - finished gallery amulet spins while vectors / textures build */
 .pagmar__amulet-loader {
   position: absolute;
   inset: 0;
@@ -3157,12 +3239,12 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   font-size: calc(32 * var(--u));
   line-height: 1.1;
   letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(var(--pagmar-yellow-white-rgb), 0.88);
   text-align: center;
   text-shadow: 0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.85);
 }
 
-/* Vessel loader — inside create amulet frame only (detail page loader, frame-scoped) */
+/* Vessel loader - inside create amulet frame only (detail page loader, frame-scoped) */
 .pagmar__amulet-frame-loader {
   position: absolute;
   inset: 0;
@@ -3192,12 +3274,10 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
 
 .pagmar__amulet-frame-loader__vessels {
   position: relative;
-  width: 44%;
-  height: 44%;
-  min-width: 108px;
-  min-height: 108px;
-  max-width: 280px;
-  max-height: 280px;
+  width: min(88%, calc(280 * var(--pagmar-margin-u, 1px)));
+  height: min(88%, calc(280 * var(--pagmar-margin-u, 1px)));
+  aspect-ratio: 1;
+  flex: 0 0 auto;
   overflow: clip;
   isolation: isolate;
   transform: translateZ(0);
@@ -3219,30 +3299,36 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
+  animation-play-state: running;
+  backface-visibility: hidden;
   filter: brightness(0) invert(1);
 }
 
 .pagmar__amulet-frame-loader__vessel--1 {
-  width: 52%;
+  width: 56%;
   height: auto;
+  aspect-ratio: 162.765 / 281.371;
   animation-delay: 0s;
 }
 
 .pagmar__amulet-frame-loader__vessel--2 {
-  width: 90%;
+  width: 96%;
   height: auto;
+  aspect-ratio: 278.478 / 284.742;
   animation-delay: -1s;
 }
 
 .pagmar__amulet-frame-loader__vessel--3 {
-  width: 94%;
+  width: 100%;
   height: auto;
+  aspect-ratio: 291.758 / 162.674;
   animation-delay: -2s;
 }
 
 .pagmar__amulet-frame-loader__vessel--4 {
-  width: 88%;
+  width: 94%;
   height: auto;
+  aspect-ratio: 272.426 / 277.41;
   animation-delay: -3s;
 }
 
@@ -3251,18 +3337,127 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   25%, 100% { opacity: 0; }
 }
 
+/* Gallery full-page loader — same vessel spin as garden → amulet detail page */
+.pagmar__detail-page-loader--create {
+  --loader-u: min(calc(100vw / 1920), calc(100dvh / 1080));
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.pagmar__detail-page-loader--create[hidden] {
+  display: none;
+}
+
+.pagmar__detail-page-loader--create.is-leaving {
+  opacity: 0;
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessels {
+  position: relative;
+  width: calc(305 * var(--loader-u));
+  height: calc(305 * var(--loader-u));
+  flex: 0 0 auto;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: running;
+  backface-visibility: hidden;
+  filter: brightness(0) invert(1);
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel--1 {
+  width: calc(158.765 * var(--loader-u));
+  height: calc(277.371 * var(--loader-u));
+  animation-delay: 0s;
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel--2 {
+  width: calc(274.478 * var(--loader-u));
+  height: calc(280.742 * var(--loader-u));
+  animation-delay: -1s;
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel--3 {
+  width: calc(287.758 * var(--loader-u));
+  height: calc(158.675 * var(--loader-u));
+  animation-delay: -2s;
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel--4 {
+  width: calc(268.429 * var(--loader-u));
+  height: calc(273.41 * var(--loader-u));
+  animation-delay: -3s;
+}
+
+.pagmar__detail-page-loader--create .pagmar__detail-page-loader__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pagmar__amulet-frame-loader__vessel {
+  .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel {
     animation: none;
     opacity: 0;
   }
 
-  .pagmar__amulet-frame-loader__vessel--1 {
+  .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel--1 {
     opacity: 1;
   }
 }
 
-/* Full-page vessel loader — final PBR build (matches amulet detail page) */
+.pagmar-vessel-morph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pagmar-yellow-white);
+}
+
+.pagmar-vessel-morph__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar-vessel-morph__svg {
+    transition: none;
+  }
+}
+
+/* Full-page vessel loader - final PBR build (matches amulet detail page) */
 .pagmar__create-fullpage-loader {
   --loader-u: min(calc(100vw / 1920), calc(100dvh / 1080));
   position: fixed;
@@ -3271,8 +3466,8 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1500E1;
-  color: #1500E1;
+  background: #000000;
+  color: var(--pagmar-yellow-white);
   pointer-events: none;
   transition: opacity 320ms ease;
 }
@@ -3317,53 +3512,20 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   width: calc(305 * var(--loader-u));
   height: calc(305 * var(--loader-u));
   flex: 0 0 auto;
-  overflow: clip;
+  overflow: visible;
   isolation: isolate;
   transform: translateZ(0);
+  aspect-ratio: 1;
 }
 
-.pagmar__create-fullpage-loader__vessel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate3d(-50%, -50%, 0);
-  display: block;
-  object-fit: fill;
-  pointer-events: none;
-  user-select: none;
-  opacity: 0;
-  will-change: opacity;
-  animation-name: pagmar-detail-vessel-slot;
-  animation-duration: 4s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-fill-mode: both;
-  backface-visibility: hidden;
-  filter: brightness(0) invert(1);
+.pagmar__create-fullpage-loader__vessels .pagmar-vessel-morph {
+  width: 100%;
+  height: 100%;
 }
 
-.pagmar__create-fullpage-loader__vessel--1 {
-  width: calc(158.765 * var(--loader-u));
-  height: calc(277.371 * var(--loader-u));
-  animation-delay: 0s;
-}
-
-.pagmar__create-fullpage-loader__vessel--2 {
-  width: calc(274.478 * var(--loader-u));
-  height: calc(280.742 * var(--loader-u));
-  animation-delay: -1s;
-}
-
-.pagmar__create-fullpage-loader__vessel--3 {
-  width: calc(287.758 * var(--loader-u));
-  height: calc(158.675 * var(--loader-u));
-  animation-delay: -2s;
-}
-
-.pagmar__create-fullpage-loader__vessel--4 {
-  width: calc(268.429 * var(--loader-u));
-  height: calc(273.41 * var(--loader-u));
-  animation-delay: -3s;
+.pagmar__create-fullpage-loader__vessels .pagmar-vessel-morph__svg {
+  width: 100%;
+  height: 100%;
 }
 
 .pagmar__create-fullpage-loader__caption {
@@ -3372,7 +3534,7 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   flex-direction: row;
   align-items: baseline;
   justify-content: center;
-  color: #F5F5F5;
+  color: var(--pagmar-yellow-white);
   text-align: center;
 }
 
@@ -3404,7 +3566,7 @@ body.is-create-fullpage-loading .pagmar__request-artboard {
 body.is-create-fullpage-loading,
 body.pagmar-create.is-amulet-rendering,
 body.pagmar-index.is-create-mode.is-amulet-rendering {
-  background: #1500E1 !important;
+  background: #000000 !important;
 }
 
 body.is-create-fullpage-loading .pagmar__atmosphere--back,
@@ -3418,19 +3580,13 @@ body.is-create-fullpage-loading .pagmar__request-artboard > .figma-close {
   pointer-events: auto !important;
 }
 
-/* Final build — loader only; hide question card, step rail, amulet frame */
+/* Final build - loader only; hide question card, amulet frame */
 body.is-create-fullpage-loading .pagmar__request-artboard > .figma-q,
-body.is-create-fullpage-loading .pagmar__request-artboard > .figma-step-marker,
-body.is-create-fullpage-loading .pagmar__request-artboard > .figma-step-rail__line,
-body.is-create-fullpage-loading .pagmar__request-artboard > .figma-panel,
+body.is-create-fullpage-loading .pagmar__request-artboard > .figma-amulet-stage,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-q,
-body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-step-marker,
-body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-step-rail__line,
-body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-panel,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-amulet-stage,
 body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-q,
-body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-step-marker,
-body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-step-rail__line,
-body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-panel {
+body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-amulet-stage {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -3445,6 +3601,15 @@ body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-close 
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pagmar__amulet-frame-loader__vessel {
+    animation: none;
+    opacity: 0;
+  }
+
+  .pagmar__amulet-frame-loader__vessel--1 {
+    opacity: 1;
+  }
+
   .pagmar__create-fullpage-loader__vessel {
     animation: none;
     opacity: 0;
@@ -3577,15 +3742,15 @@ body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagma
   }
 }
 
-/* --- Create page — Figma 1537:4415 @ 1920×1080 (exact coords) --- */
+/* --- Create page - Figma 1537:4415 @ 1920×1080 (exact coords) --- */
 
 body.pagmar-create {
   --pagmar-w: 1920;
   --pagmar-h: 1080;
   --page-bg: #000000;
-  --ink: #F8F8F7;
+  --ink: var(--pagmar-yellow-white);
   --create-bg: #000000;
-  --create-ink: #F4F4F4;
+  --create-ink: var(--pagmar-yellow-white);
   --create-panel-bg: transparent;
   --create-stack-w: 835.125;
   --create-amulet-area-h: 635.188;
@@ -3595,7 +3760,7 @@ body.pagmar-create {
   --create-question-content-bottom: 32;
   --create-stack-h: 897.955;
   --create-stack-y: 112.838;
-  --create-stack-bottom-margin: 20;
+  --create-stack-bottom-margin: var(--pagmar-design-inset, 30);
   --create-amulet-pct: calc(var(--create-amulet-area-h) / var(--create-stack-h) * 100%);
   --create-question-pct: calc(var(--create-question-area-h) / var(--create-stack-h) * 100%);
   --create-content-top-pct: calc(
@@ -3610,7 +3775,7 @@ body.pagmar-create {
   --create-head-area: 48;
   --create-question-box-h: 96;
   background: #000000;
-  color: #F4F4F4;
+  color: var(--pagmar-yellow-white);
   overflow: hidden;
 }
 
@@ -3619,7 +3784,8 @@ body.pagmar-create #grid-bg {
 }
 
 body.pagmar-create .pagmar-viewport {
-  padding: var(--pagmar-content-margin);
+  /* Garden bleeds to edges - request-flow chrome uses --pagmar-margin-* */
+  padding: 0;
   width: 100vw;
   height: 100dvh;
   box-sizing: border-box;
@@ -3657,8 +3823,9 @@ body.pagmar-create .pagmar__request-flow .pagmar__create-amulet-view canvas {
   display: block;
   max-width: 100%;
   max-height: 100%;
-  width: auto !important;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
   touch-action: none;
   cursor: grab;
 }
@@ -3687,7 +3854,7 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__index-create-amulet-frame
   opacity: 1;
 }
 
-/* Create stack — Figma Component 12 */
+/* Create stack - Figma Component 12 */
 body.pagmar-create .pagmar__create-stack {
   position: absolute;
   z-index: 2;
@@ -3728,8 +3895,9 @@ body.pagmar-create .pagmar__create-amulet-view canvas {
   display: block;
   max-width: 100%;
   max-height: 100%;
-  width: auto !important;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
   touch-action: none;
   cursor: grab;
 }
@@ -3773,7 +3941,7 @@ body.pagmar-create .pagmar__create-amulet-frame.is-textures-loading .pagmar__cre
   font-size: calc(14 * var(--u));
 }
 
-/* Figma Frame 242 — תוכן שאלה בתוך מסגרת תחתונה */
+/* Figma Frame 242 - תוכן שאלה בתוך מסגרת תחתונה */
 body.pagmar-create .pagmar__create-question-panel,
 body.pagmar-index.is-create-mode .pagmar__create-question-panel {
   position: relative;
@@ -3793,7 +3961,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-panel {
   pointer-events: auto;
   overflow: hidden;
   background: transparent;
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
 }
 
 body.pagmar-create .pagmar__create-question-panel[hidden],
@@ -3870,7 +4038,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-text {
   font-style: normal;
   line-height: 1;
   letter-spacing: calc(-0.64 * var(--u));
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
   text-align: right;
   white-space: nowrap;
 }
@@ -3893,7 +4061,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-box {
   height: calc(var(--create-question-box-h, 96) * var(--u));
   margin-bottom: 0;
   box-sizing: border-box;
-  border: 1px solid var(--create-frame-stroke, #5b5b5b);
+  border: var(--pagmar-line-weight) solid var(--create-frame-stroke, #5b5b5b);
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -3930,7 +4098,7 @@ body.pagmar-create .pagmar__create-question-field:has(.intro__choice-grid--figma
   overflow: visible;
 }
 
-/* Figma 1729:22573 — גריד אפשרויות עם מסגרות נפרדות */
+/* Figma 1729:22573 - גריד אפשרויות עם מסגרות נפרדות */
 body.pagmar-create .pagmar__create-question-field .intro__choice-grid--figma,
 body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid--figma {
   display: flex;
@@ -3940,6 +4108,11 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-g
   width: 100%;
   height: 100%;
   min-height: calc(var(--create-question-box-h) * var(--u));
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-grid--divided .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-grid--divided .intro__choice-btn--figma {
+  border-color: var(--pagmar-yellow-white);
 }
 
 body.pagmar-create .pagmar__create-question-field .intro__choice-grid-row,
@@ -3975,29 +4148,59 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
+  direction: ltr;
   flex: 1 1 0;
   min-width: 0;
   min-height: calc(48 * var(--u));
   height: calc(48 * var(--u));
   padding: 0 calc(16 * var(--u));
   margin: -0.5px;
-  border: 1px solid #7e7e7e;
+  border: var(--pagmar-line-weight) solid #7e7e7e;
   border-radius: 0;
   background: transparent;
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
   font-family: "TheBasics", serif;
   font-size: calc(24 * var(--u));
   font-weight: 400;
   font-style: normal;
   line-height: 1.1;
   letter-spacing: calc(-0.48 * var(--u));
-  text-align: center;
+  text-align: right;
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--index-transition-duration) var(--index-transition-ease);
   -webkit-appearance: none;
   appearance: none;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn__label,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  direction: rtl;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn__radio,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn__radio {
+  flex: 0 0 calc(18 * var(--u));
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma.is-selected .intro__choice-btn__radio::after,
+body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma.is-selected .intro__choice-btn__radio::after {
+  content: '';
+  position: absolute;
+  inset: calc(3 * var(--u));
+  border-radius: 50%;
+  background: currentColor;
 }
 
 body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma:hover,
@@ -4008,7 +4211,18 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
 body.pagmar-create .pagmar__create-question-field .intro__choice-btn--figma.is-selected,
 body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn--figma.is-selected {
   background: rgba(248, 248, 247, 0.12);
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
+}
+
+.intro__choice-divider {
+  flex: none;
+  width: 100%;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-top: var(--pagmar-line-weight) solid var(--pagmar-yellow-white);
+  pointer-events: none;
 }
 
 body.pagmar-create .pagmar__create-question-field,
@@ -4051,7 +4265,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question
   padding: 0;
   border: none;
   background: transparent;
-  color: #f8f8f7;
+  color: var(--pagmar-yellow-white);
   text-align: right;
   resize: none;
 }
@@ -4073,8 +4287,8 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__question
   flex: 0 0 auto;
 }
 
-/* 1548:6424 Frame 199 — py 12, px 10 */
-/* legacy choice styles — not used in Frame 236 flow */
+/* 1548:6424 Frame 199 - py 12, px 10 */
+/* legacy choice styles - not used in Frame 236 flow */
 body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-row:not(.intro__choice-row--figma) {
   display: flex;
   flex-direction: column;
@@ -4095,7 +4309,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #F4F4F4;
+  color: var(--pagmar-yellow-white);
   font-family: "DavidLibre", "Ratzif22", serif;
   font-size: calc(24 * var(--u));
   font-weight: 400;
@@ -4113,12 +4327,12 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
 
 body.pagmar-create .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma).is-selected,
 body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-btn:not(.intro__choice-btn--figma).is-selected {
-  color: #F4F4F4;
+  color: var(--pagmar-yellow-white);
   text-decoration: underline;
   text-underline-offset: calc(3 * var(--u));
 }
 
-/* Figma 1661:16102 Frame 236 — save button (physical left, matching Component 12) */
+/* Figma 1661:16102 Frame 236 - save button (physical left, matching Component 12) */
 body.pagmar-create .pagmar__create-save-wrap,
 body.pagmar-index.is-create-mode .pagmar__create-save-wrap {
   position: relative;
@@ -4158,7 +4372,7 @@ body.pagmar-index.is-create-mode .pagmar__create-question-box[hidden] {
   display: none !important;
 }
 
-/* Figma 1661:16102 Frame 236 — save button */
+/* Figma 1661:16102 Frame 236 - save button */
 body.pagmar-create .pagmar__create-save,
 body.pagmar-index.is-create-mode .pagmar__create-save {
   display: inline-grid;
@@ -4278,11 +4492,11 @@ body.pagmar-index.is-create-mode.is-building .pagmar__create-save .pagmar__creat
 
 body.pagmar-create .pagmar__create-save:focus-visible,
 body.pagmar-index.is-create-mode .pagmar__create-save:focus-visible {
-  outline: 1px solid rgba(11, 11, 11, 0.35);
+  outline: var(--pagmar-line-weight) solid rgba(11, 11, 11, 0.35);
   outline-offset: calc(2 * var(--u));
 }
 
-/* פעולות קמע — same banner button as site CTA */
+/* פעולות קמע - same banner button as site CTA */
 body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn {
   pointer-events: auto;
 }
@@ -4324,10 +4538,10 @@ body.pagmar-create .pagmar__export-btn {
   width: calc(var(--create-amulet-w) * var(--u));
   min-height: calc(44 * var(--u));
   padding: calc(10 * var(--u)) calc(16 * var(--u));
-  border: 1px solid #F4F4F4;
+  border: var(--pagmar-line-weight) solid var(--pagmar-yellow-white);
   border-radius: 999px;
   background: transparent;
-  color: #F4F4F4;
+  color: var(--pagmar-yellow-white);
   font-family: "DavidLibre", "Ratzif22", serif;
   font-size: calc(16 * var(--u));
   line-height: 1.2;
@@ -4342,7 +4556,7 @@ body.pagmar-create .pagmar__export-btn:hover {
 }
 
 body.pagmar-create .pagmar__export-btn:focus-visible {
-  outline: 1px solid rgba(244, 244, 244, 0.35);
+  outline: var(--pagmar-line-weight) solid rgba(244, 244, 244, 0.35);
   outline-offset: calc(3 * var(--u));
 }
 
@@ -4361,28 +4575,11 @@ body.pagmar-index.is-create-mode.is-building .pagmar__create-question-field .int
   pointer-events: auto;
 }
 
-/* Q4+ — vectors already on screen; keep questions interactive during background work */
-body.pagmar-create.is-semantic-questions.is-building .pagmar__create-save,
-body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__create-save,
-body.pagmar-create.is-semantic-questions.is-building .intro__choice-btn,
-body.pagmar-index.is-create-mode.is-semantic-questions.is-building .intro__choice-btn,
-body.pagmar-create.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__btn-outer,
-body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__btn-outer,
-body.pagmar-create.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__field .intro__question-input,
-body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__field .intro__question-input {
-  pointer-events: auto;
-}
-
-body.pagmar-create.is-semantic-questions.is-building .pagmar__create-save .pagmar__create-save-label,
-body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__create-save .pagmar__create-save-label {
-  opacity: 1;
-}
-
 body.pagmar-create.is-amulet-rendering .pagmar__export-btn {
   display: none !important;
 }
 
-/* Completion — only headline in right panel, no input square */
+/* Completion - only headline in right panel, no input square */
 body.pagmar-index.is-create-mode.is-create-amulet-ready .pagmar__create-question-stack,
 body.pagmar-index.is-create-mode.is-create-complete .pagmar__create-question-stack,
 body.pagmar-index.is-create-mode .pagmar__index-create.is-create-complete .pagmar__create-question-stack {

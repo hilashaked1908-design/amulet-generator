@@ -1,13 +1,13 @@
 /**
- * Index chrome buttons — Figma 2127:3662 (Frame 336).
- * Terminal-style typewriter on load for chrome labels; filter list shows immediately on open.
+ * Index chrome buttons - Figma 2601:40649.
+ * Terminal-style typewriter on load for CTA + filter labels; about is icon-only.
  */
 (function () {
   'use strict';
 
   if (!document.body.classList.contains('pagmar-index')) return;
 
-  /** Frame 336 — filter labels */
+  /** Frame 336 - filter labels */
   const FILTER_LABELS = [
     { label: 'זוגיות' },
     { label: 'משפחה' },
@@ -376,14 +376,15 @@
   }
 
   function closeFilterPage() {
-    const shouldGoBack = filterHistoryPushed;
-    filterHistoryPushed = false;
-    exitFilterPage();
-    if (shouldGoBack) {
+    if (filterHistoryPushed) {
+      filterHistoryPushed = false;
       try {
         history.back();
+        return;
       } catch (_) {}
     }
+    exitFilterPage();
+    syncFilterTriggerMode();
   }
 
   function toggleFilterLabel(label, options) {
@@ -595,9 +596,6 @@
   }
 
   if (shouldRunInitialChromeTyping()) {
-    if (aboutBtn) {
-      restoreStaticTypeText(aboutBtn.querySelector('.pagmar__index-about__label'));
-    }
     if (filterTrigger) {
       restoreStaticTypeText(filterTrigger.querySelector('.pagmar__index-filter-trigger__label'));
     }
@@ -643,10 +641,12 @@
         })
       );
       filterHistoryPushed = true;
+      syncFilterTriggerMode();
       return;
     }
     if (document.body.classList.contains('is-filter-page') || activeFilterLabels.length) {
       exitFilterPage();
+      syncFilterTriggerMode();
     }
   });
 
@@ -693,7 +693,7 @@
     enhanceButtonRoll();
   });
 
-  /* Hover typing removed — Figma buttons only shift corners on hover */
+  /* Hover typing removed - Figma buttons only shift corners on hover */
 
   if (filterTrigger) {
     filterTrigger.addEventListener('pointerdown', function (e) {

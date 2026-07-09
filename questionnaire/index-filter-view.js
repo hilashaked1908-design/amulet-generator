@@ -1,5 +1,5 @@
 /**
- * Filter page (עמוד פילטר) — Figma 2295:28985 filtered amulet grid.
+ * Filter page (עמוד פילטר) - Figma 2295:28985 filtered amulet grid.
  */
 (function () {
   'use strict';
@@ -7,11 +7,8 @@
   if (!document.body.classList.contains('pagmar-index')) return;
 
   const GRID_COLS_COUNT = 4;
-  const GRID_ROW_TOPS = [263.5, 754];
   const CARD_SIZE = 410;
   const GRID_GAP = 92;
-  const GRID_ROW_STEP = CARD_SIZE + 80.5;
-  const GRID_BOTTOM_PAD = 200;
   const FULL_ROW_WIDTH = GRID_COLS_COUNT * CARD_SIZE + (GRID_COLS_COUNT - 1) * GRID_GAP;
 
   const filterActive = document.getElementById('indexFilterActive');
@@ -22,8 +19,6 @@
   let filterGridResizeRaf = 0;
   let gridLayout = {
     cardSizeU: CARD_SIZE,
-    gapU: GRID_GAP,
-    stepU: CARD_SIZE + GRID_GAP,
   };
 
   function normalizeFilterLabels(input) {
@@ -40,12 +35,16 @@
     return String(index + 1).padStart(3, '0');
   }
 
-  function getIndexU() {
+  function getGridU() {
+    if (!filterGrid) return 1;
+    const style = getComputedStyle(filterGrid);
+    const gridU = parseFloat(style.getPropertyValue('--index-filter-grid-u'));
+    if (gridU > 0) return gridU;
     if (!pagmarCanvas) return 1;
     const rect = pagmarCanvas.getBoundingClientRect();
-    const style = getComputedStyle(pagmarCanvas);
-    const pagmarW = parseFloat(style.getPropertyValue('--pagmar-w')) || 1920;
-    const pagmarH = parseFloat(style.getPropertyValue('--pagmar-h')) || 1080;
+    const canvasStyle = getComputedStyle(pagmarCanvas);
+    const pagmarW = parseFloat(canvasStyle.getPropertyValue('--pagmar-w')) || 1920;
+    const pagmarH = parseFloat(canvasStyle.getPropertyValue('--pagmar-h')) || 1080;
     if (!(rect.width > 0 && rect.height > 0)) return 1;
     return Math.min(rect.width / pagmarW, rect.height / pagmarH);
   }
@@ -54,35 +53,20 @@
     if (!filterGrid) return FULL_ROW_WIDTH;
     const widthPx = filterGrid.getBoundingClientRect().width;
     if (!(widthPx > 0)) return FULL_ROW_WIDTH;
-    return widthPx / getIndexU();
+    return widthPx / getGridU();
   }
 
   function resolveGridMetrics(availableWidthU) {
     const scale = Math.min(1, availableWidthU / FULL_ROW_WIDTH);
-    const cardSizeU = CARD_SIZE * scale;
-    const gapU = GRID_GAP * scale;
     return {
-      cardSizeU: cardSizeU,
-      gapU: gapU,
-      stepU: cardSizeU + gapU,
+      cardSizeU: CARD_SIZE * scale,
     };
   }
 
-  function gridColumnLeft(col, metrics) {
-    return col * metrics.stepU;
-  }
-
-  function cardPosition(index, metrics) {
-    const col = index % GRID_COLS_COUNT;
-    const row = Math.floor(index / GRID_COLS_COUNT);
-    return {
-      left: gridColumnLeft(col, metrics),
-      top:
-        GRID_ROW_TOPS[row] != null
-          ? GRID_ROW_TOPS[row]
-          : GRID_ROW_TOPS[GRID_ROW_TOPS.length - 1] +
-            (row - GRID_ROW_TOPS.length + 1) * GRID_ROW_STEP,
-    };
+  function applyCardSize(card, cardSizeU) {
+    const size = 'calc(' + cardSizeU + ' * var(--index-filter-grid-u))';
+    card.style.width = size;
+    card.style.height = size;
   }
 
   function dispatchAmuletHover(detail) {
@@ -99,12 +83,8 @@
 
     gridLayout = metrics;
 
-    cards.forEach(function (card, gridIndex) {
-      const pos = cardPosition(gridIndex, metrics);
-      card.style.left = 'calc(' + pos.left + ' * var(--index-u))';
-      card.style.top = 'calc(' + pos.top + ' * var(--index-u))';
-      card.style.width = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
-      card.style.height = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
+    cards.forEach(function (card) {
+      applyCardSize(card, metrics.cardSizeU);
     });
     updateFilterGridScrollHeight(totalCards);
   }
@@ -115,12 +95,6 @@
       syncFilterGridFrame();
       layoutFilterCards();
     });
-  }
-
-  function gridContentHeight(cardCount) {
-    if (cardCount <= 0) return 0;
-    const pos = cardPosition(cardCount - 1, gridLayout);
-    return pos.top + gridLayout.cardSizeU + GRID_BOTTOM_PAD;
   }
 
   function syncFilterGridFrame() {
@@ -136,22 +110,9 @@
 
   function updateFilterGridScrollHeight(cardCount) {
     if (!filterGrid) return;
-
-    let spacer = filterGrid.querySelector('.pagmar__index-filter-grid-spacer');
     if (cardCount <= 0) {
-      if (spacer) spacer.remove();
       filterGrid.scrollTop = 0;
-      return;
     }
-
-    if (!spacer) {
-      spacer = document.createElement('div');
-      spacer.className = 'pagmar__index-filter-grid-spacer';
-      spacer.setAttribute('aria-hidden', 'true');
-      filterGrid.appendChild(spacer);
-    }
-
-    spacer.style.height = 'calc(' + gridContentHeight(cardCount) + ' * var(--index-u))';
   }
 
   function renderActiveTags(filterLabels) {
@@ -163,7 +124,7 @@
       tag.className = 'pagmar__index-filter-active-tag';
       tag.textContent = '[' + filterLabel + ']';
       tag.dataset.typeText = '[' + filterLabel + ']';
-      tag.setAttribute('aria-label', 'הצג פילטרים נוספים — ' + filterLabel);
+      tag.setAttribute('aria-label', 'הצג פילטרים נוספים - ' + filterLabel);
       tag.setAttribute('aria-pressed', 'true');
       tag.setAttribute('aria-expanded', 'false');
       tag.addEventListener('click', function (e) {
@@ -281,16 +242,18 @@
     window.location.href = url;
   }
 
-  function createGridCard(amuletIndex, gridIndex) {
-    const metrics = gridLayout;
-    const pos = cardPosition(gridIndex, metrics);
+  function amuletRequestText(amuletIndex) {
+    if (typeof window.getAmuletRecord !== 'function') return '';
+    const record = window.getAmuletRecord(amuletIndex);
+    if (!record || !record.q1Wish) return '';
+    return String(record.q1Wish).trim();
+  }
+
+  function createGridCard(amuletIndex) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'pagmar__index-filter-card';
-    card.style.left = 'calc(' + pos.left + ' * var(--index-u))';
-    card.style.top = 'calc(' + pos.top + ' * var(--index-u))';
-    card.style.width = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
-    card.style.height = 'calc(' + metrics.cardSizeU + ' * var(--index-u))';
+    applyCardSize(card, gridLayout.cardSizeU);
     card.dataset.index = String(amuletIndex);
     card.setAttribute('aria-label', 'קמע ' + specIndexLabel(amuletIndex));
 
@@ -310,12 +273,25 @@
     card.appendChild(img);
 
     const hoverLabel = '[' + specIndexLabel(amuletIndex) + ']';
+    const hoverRequest = amuletRequestText(amuletIndex);
 
     card.addEventListener('mouseenter', function (e) {
-      dispatchAmuletHover({ active: true, label: hoverLabel, x: e.clientX, y: e.clientY });
+      dispatchAmuletHover({
+        active: true,
+        label: hoverLabel,
+        request: hoverRequest,
+        x: e.clientX,
+        y: e.clientY,
+      });
     });
     card.addEventListener('mousemove', function (e) {
-      dispatchAmuletHover({ active: true, label: hoverLabel, x: e.clientX, y: e.clientY });
+      dispatchAmuletHover({
+        active: true,
+        label: hoverLabel,
+        request: hoverRequest,
+        x: e.clientX,
+        y: e.clientY,
+      });
     });
     card.addEventListener('mouseleave', function () {
       dispatchAmuletHover({ active: false });
@@ -330,11 +306,7 @@
 
   function renderGrid(filterLabels) {
     if (!filterGrid) return;
-    filterGrid.querySelectorAll('.pagmar__index-filter-card').forEach(function (card) {
-      card.remove();
-    });
-    const spacer = filterGrid.querySelector('.pagmar__index-filter-grid-spacer');
-    if (spacer) spacer.remove();
+    filterGrid.innerHTML = '';
 
     const indices =
       typeof window.getMatchingAmuletIndices === 'function'
@@ -344,9 +316,24 @@
     syncFilterGridFrame();
     gridLayout = resolveGridMetrics(measureGridWidthU());
 
-    indices.forEach(function (amuletIndex, gridIndex) {
-      filterGrid.appendChild(createGridCard(amuletIndex, gridIndex));
-    });
+    if (!indices.length) {
+      updateFilterGridScrollHeight(0);
+      return;
+    }
+
+    const rows = document.createElement('div');
+    rows.className = 'pagmar__index-filter-rows';
+
+    for (let i = 0; i < indices.length; i += GRID_COLS_COUNT) {
+      const row = document.createElement('div');
+      row.className = 'pagmar__index-filter-row';
+      indices.slice(i, i + GRID_COLS_COUNT).forEach(function (amuletIndex) {
+        row.appendChild(createGridCard(amuletIndex));
+      });
+      rows.appendChild(row);
+    }
+
+    filterGrid.appendChild(rows);
     scheduleFilterGridLayout();
     filterGrid.scrollTop = 0;
   }

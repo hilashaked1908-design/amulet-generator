@@ -1,5 +1,5 @@
 /**
- * Amulet garden — Cyber Garden style (ground-plane pan + low camera + sprites).
+ * Amulet garden - Cyber Garden style (ground-plane pan + low camera + sprites).
  */
 console.log('%c[garden-three] v20250707-white-fog-v2 loaded', 'color:lime;font-size:14px');
 import * as THREE from './vendor/three.module.js';
@@ -31,17 +31,17 @@ const COLLECTION_KEY = 'amuletCollection';
 /** Tiny JPEG thumb kept in localStorage; full image lives in IndexedDB. */
 const COLLECTION_LS_THUMB_PX = 280;
 const COLLECTION_LS_SNAPSHOT_MAX_CHARS = 96000;
-/** Fixed garden slot for user-created amulets — same depth as gallery row 1. */
+/** Fixed garden slot for user-created amulets - same depth as gallery row 1. */
 const USER_AMULET_SLOT = { x: 4.0, z: 2.5 };
 
-/** NEW amulets [018]+ — wide meadow from anchor [014], alternating wings + depth rows. */
+/** NEW amulets [018]+ - wide meadow from anchor [014], alternating wings + depth rows. */
 const NEW_AMULET_FIRST_LABEL = 18;
 const NEW_AMULET_WING_BASE_PX = 380;
 const NEW_AMULET_WING_ROW_GROW_PX = 95;
 const NEW_AMULET_DEPTH_BASE_PX = 50;
 const NEW_AMULET_DEPTH_ROW_PX = 110;
 const NEW_AMULET_DEPTH_JITTER_PX = [0, 34, 20, 48];
-/** Scattered meadow slots (screen px from anchor [014]) — fills sides, forward, and back. */
+/** Scattered meadow slots (screen px from anchor [014]) - fills sides, forward, and back. */
 const SPREAD_MEADOW_SLOTS = [
   { side: -420, depth: 45 },
   { side: 420, depth: 75 },
@@ -79,7 +79,7 @@ const REVERT_V10_LAYOUT_PREFIX = 'chain-wide-v10';
 const RESTORED_LAYOUT_PREFIX = 'preserved-pos-v9';
 const LOCKED_CHAIN_LABEL_TAG = 'locked-chain-v1';
 
-/** Locked positions for [015]/[016] — 100px after prev, offset sideways. */
+/** Locked positions for [015]/[016] - 100px after prev, offset sideways. */
 const LOCKED_CHAIN_LABELS = [
   { label: 15, prevLabel: 14, afterPx: 100, sidePx: -180 },
   { label: 16, prevLabel: 15, afterPx: 100, sidePx: 180 },
@@ -90,7 +90,7 @@ const CHAIN_SAVED_LABEL_NUDGE = {
   17: { rightPx: 60, forwardPx: 200 },
 };
 
-/** Cyber Garden–style movement: low camera, hold + slide on ground plane */
+/** Cyber Garden-style movement: low camera, hold + slide on ground plane */
 const CAMERA_Y_BASE = 1.5;
 const PAN_SPEED = 0.028;
 const LOOK_AHEAD = 6;
@@ -119,17 +119,17 @@ const AMULET_LAYOUT_BASE = [
 
 /** Per-amulet screen nudges from opening camera (right / back; negative back = forward). */
 const AMULET_SCREEN_NUDGES_PX = [
-  { tex: 0, rightPx: 20, backPx: -20 }, // 001 — right 20, forward 20
-  { tex: 1, backPx: 80 }, // 002 — 80px back (100 − 20 forward)
+  { tex: 0, rightPx: 20, backPx: -20 }, // 001 - right 20, forward 20
+  { tex: 1, backPx: 80 }, // 002 - 80px back (100 − 20 forward)
 ];
 
-/** Opening — frame gallery amulets 001–003 (left / centre / right). */
+/** Opening - frame gallery amulets 001-003 (left / centre / right). */
 const OPENING_FRAME_TEX = [0, 1, 2];
 const OPENING_SHIFT_RIGHT_PX = 120;
 const OPENING_ZOOM_IN_PX = 150;
 /** Extra opening-camera nudge in screen pixels (left / back). */
 const OPENING_CAMERA_NUDGE_LEFT_PX = 80;
-/** 100 base + 450 pull-back — camera farther from amulets at opening. */
+/** 100 base + 450 pull-back - camera farther from amulets at opening. */
 const OPENING_CAMERA_NUDGE_BACK_PX = 550;
 const OPENING_REF_VIEWPORT_H = 1080;
 const OPENING_CAMERA_BACK_Z = 8.2;
@@ -287,7 +287,7 @@ function buildAmuletLayout() {
 const AMULET_LAYOUT = buildAmuletLayout();
 const INITIAL_CAMERA = openingCameraPose();
 
-/** Float disabled — keeps amulet anchors stable. */
+/** Float disabled - keeps amulet anchors stable. */
 const FLOAT_AMP_Y = 0;
 const FLOAT_AMP_X = 0;
 const FLOAT_AMP_Z = 0;
@@ -299,10 +299,10 @@ const SPRITE_SIZE =
   7.0 +
   SPRITE_PX_EXTRA /
     (OPENING_REF_VIEWPORT_H / (2 * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2)) * SPRITE_REF_DIST));
-/** Anchor nudge — original screen placement. */
+/** Anchor nudge - original screen placement. */
 const SCREEN_LOWER_PX = 570;
 const CLICK_DRAG_PX = 8;
-/** Full 360° spin when an amulet is clicked — slow one-sided Y rotation on the sprite */
+/** Full 360° spin when an amulet is clicked - slow one-sided Y rotation on the sprite */
 const AMULET_SPIN_MS = 2800;
 /** Subtle scale while spec panel is open for that amulet */
 const SELECTED_SCALE = 1.05;
@@ -310,7 +310,7 @@ const SCALE_LERP = 0.18;
 const FOCUS_FADE_LERP = 0.22;
 /** Tighter screen bounds for hit tests and spec-panel anchoring (opaque content, not full quad). */
 const VISUAL_HIT_FACTOR = 0.38;
-/** Cyber Garden–style blue depth sheet — sprites pass through while scrolling. */
+/** Cyber Garden-style blue depth sheet - sprites pass through while scrolling. */
 const FOG_VEIL_AHEAD = 42;
 const SPRITE_ORDER_BEHIND_VEIL = 2;
 const SPRITE_ORDER_IN_FRONT = 8;
@@ -320,7 +320,7 @@ const mount = document.getElementById('questionGarden');
 if (!mount) throw new Error('#questionGarden not found');
 if (location.protocol === 'file:') {
   mount.innerHTML =
-    '<p style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#f4f4f4;font-family:sans-serif;padding:2rem;text-align:center;line-height:1.6">פתחי דרך השרת המקומי:<br><code style="color:#ccc">http://localhost:8080/questionnaire/index.html</code></p>';
+    '<p style="color:#F4F4E8;font-family:sans-serif;padding:2rem;text-align:center;line-height:1.6">פתחי דרך השרת:<br><code style="color:#ccc">http://127.0.0.1:8080/questionnaire/index.html</code></p>';
   throw new Error('Garden requires local server (not file://)');
 }
 
@@ -388,7 +388,7 @@ let lastPointer = {
 let userAmuletSprite = null;
 let collectionSprites = [];
 let livePlacementAnchor = null;
-/** Prepared PBR mesh for user amulet 008 — true 3D spin in the garden. */
+/** Prepared PBR mesh for user amulet 008 - true 3D spin in the garden. */
 let userAmuletMeshTemplate = null;
 let userAmuletMeshTemplatePromise = null;
 /** @type {{ group: THREE.Group, sprite: THREE.Sprite, baseRotY: number, fitMaxDim: number, startTime: number } | null} */
@@ -426,7 +426,7 @@ function writeStoredItem(key, value) {
     localStorage.setItem(key, value);
     return true;
   } catch (err) {
-    console.warn('[garden-three] localStorage quota exceeded for', key, '– retrying after cleanup');
+    console.warn('[garden-three] localStorage quota exceeded for', key, '- retrying after cleanup');
   }
 
   try {
@@ -465,7 +465,7 @@ function removeStoredItem(key) {
   localStorage.removeItem(key);
 }
 
-/** In-memory collection for this page session — never reload stale storage mid-flow. */
+/** In-memory collection for this page session - never reload stale storage mid-flow. */
 let runtimeCollection = null;
 
 function parseCollectionRaw(raw) {
@@ -634,7 +634,7 @@ function saveCollection(collection) {
   console.error(
     '[garden-three] CRITICAL: could not save',
     collection.length,
-    'amulet(s) — localStorage full. Do not refresh.'
+    'amulet(s) - localStorage full. Do not refresh.'
   );
   return false;
 }
@@ -670,18 +670,18 @@ function persistLiveAmuletPositions() {
   if (dirty) saveCollection(collection);
 }
 
-/** Absolute garden slots by display label — bypasses screen nudges when set. */
+/** Absolute garden slots by display label - bypasses screen nudges when set. */
 const COLLECTION_ABSOLUTE_SLOTS = {
   10: { x: 0.2, z: -0.55, yWorld: -1.95 }, // [010]
 };
 
-/** Fine-tune collection slots by display label ([011]+) — relative nudges. */
+/** Fine-tune collection slots by display label ([011]+) - relative nudges. */
 const COLLECTION_LABEL_LAYOUT = {
-  11: { zWorld: -5.5, backPx: 220, downPx: 480 }, // 011 — back + lower, visible on opening
-  12: { zWorld: 4.0, xWorld: -6.0, rightPx: 240, backPx: 160, downPx: 50 }, // 012 — more back, bit lower
+  11: { zWorld: -5.5, backPx: 220, downPx: 480 }, // 011 - back + lower, visible on opening
+  12: { zWorld: 4.0, xWorld: -6.0, rightPx: 240, backPx: 160, downPx: 50 }, // 012 - more back, bit lower
 };
 
-/** [021] — visible slot next to [020], not far wing (pan required). */
+/** [021] - visible slot next to [020], not far wing (pan required). */
 const LABEL_021_CHAIN_OFFSET = { afterPx: 140, sidePx: 200 };
 const LABEL_021_FORCED_TAG = 'label-021-visible-v3';
 
@@ -909,7 +909,7 @@ function newAmuletSpreadOffset(label) {
   };
 }
 
-/** [018]+ — wide alternating wings, each row deeper into the garden. */
+/** [018]+ - wide alternating wings, each row deeper into the garden. */
 function positionForNewAmulet(slotIndex, pose) {
   const label = collectionDisplayLabel(slotIndex);
   if (label < NEW_AMULET_FIRST_LABEL) return null;
@@ -930,7 +930,7 @@ function positionForNewAmulet(slotIndex, pose) {
   return { x: side.x, z: side.z, yWorld: anchorPos.yWorld };
 }
 
-/** v9 grid — one-time restore for entries displaced by v10 migration. */
+/** v9 grid - one-time restore for entries displaced by v10 migration. */
 function positionInWideChainV9(slotIndex, pose) {
   const anchorIdx = chainWideAnchorIndex();
   if (anchorIdx < 0) return null;
@@ -1036,7 +1036,7 @@ function positionFromEntry(entry, collectionIndex) {
   return collectionSlotPosition(collectionIndex);
 }
 
-/** Undo opening-down-200-v1 — restore saved positions after layout revert. */
+/** Undo opening-down-200-v1 - restore saved positions after layout revert. */
 function revertOpeningGlobalDownOnce() {
   try {
     if (localStorage.getItem(OPENING_DOWN_MIGRATION_KEY) !== 'done') return;
@@ -1072,7 +1072,7 @@ function revertOpeningGlobalDownOnce() {
   } catch (_) {}
 }
 
-/** One-time label nudges — persists to storage, never stacks on refresh. */
+/** One-time label nudges - persists to storage, never stacks on refresh. */
 function migrateForwardNudgeLabels() {
   const collection = loadCollection();
   if (!collection.length) return;
@@ -1093,7 +1093,7 @@ function migrateForwardNudgeLabels() {
   if (dirty) saveCollection(collection);
 }
 
-/** One-time: restore positions v10 moved — never re-layout saved amulets on refresh. */
+/** One-time: restore positions v10 moved - never re-layout saved amulets on refresh. */
 function revertV10LayoutOnce() {
   const collection = loadCollection();
   const startIdx = chainWideStartIndex();
@@ -1129,7 +1129,7 @@ function revertV10LayoutOnce() {
   if (dirty) saveCollection(collection);
 }
 
-/** Place [021] beside [020] in view — replaces off-screen wing / bad nudge positions. */
+/** Place [021] beside [020] in view - replaces off-screen wing / bad nudge positions. */
 function forceRepositionLabel021Once() {
   const collection = loadCollection();
   const idx = collectionIndexForLabel(21);
@@ -1265,7 +1265,7 @@ function applyPositionToSprite(sprite, pos, collectionIndex) {
   applySpriteFloat(sprite);
 }
 
-/** Fill missing entry.position only — never overwrite saved positions. */
+/** Fill missing entry.position only - never overwrite saved positions. */
 function fillMissingCollectionPositionsInStorage() {
   const collection = loadCollection();
   if (!collection.length) return;
@@ -1790,7 +1790,7 @@ function userAmuletSlotPosition(selfRadius) {
   return findClearPosition(USER_AMULET_SLOT.x, USER_AMULET_SLOT.z, selfRadius);
 }
 
-/** Place new amulet — [018]+ in wide spread meadow. */
+/** Place new amulet - [018]+ in wide spread meadow. */
 function resolveNewAmuletPlacement(selfRadius) {
   const occupied = collectOccupiedPositions(null);
   const collection = loadCollection();
@@ -1887,7 +1887,7 @@ function migrateUserAmuletPositionIfNeeded() {
   sessionStorage.setItem(POSITION_VERSION_KEY, POSITION_VERSION);
 }
 
-/** Nudge placement when another amulet already occupies the spot — spread in X and depth. */
+/** Nudge placement when another amulet already occupies the spot - spread in X and depth. */
 function collectOccupiedPositions(excludeSprite) {
   const occupied = [];
   const seen = new Set();
@@ -2092,7 +2092,7 @@ async function buildCollectionEntryFromSprite(sprite, entryId) {
   }
 
   if (!snapshotUrl) {
-    console.warn('[garden-three] collection entry without snapshot — answers and position still saved');
+    console.warn('[garden-three] collection entry without snapshot - answers and position still saved');
   }
 
   try {
@@ -2194,7 +2194,7 @@ function persistLiveAmuletToCollection(sprite) {
     if (spriteIdx >= 0) collectionSprites.splice(spriteIdx, 1);
     sprite.userData.isCollectionAmulet = false;
     delete sprite.userData.collectionIndex;
-    console.error('[garden-three] failed to save new amulet to collection — do not refresh');
+    console.error('[garden-three] failed to save new amulet to collection - do not refresh');
   } else {
     enrichCollectionEntryInBackground(sprite, entryId);
   }
@@ -2221,7 +2221,7 @@ async function archiveUserAmuletToCollection() {
     collection[collIdx] = Object.assign({}, collection[collIdx], updated);
     if (!saveCollection(collection)) {
       collection[collIdx] = prev;
-      console.error('[garden-three] failed to persist archived amulet — do not refresh');
+      console.error('[garden-three] failed to persist archived amulet - do not refresh');
       return false;
     }
     enrichCollectionEntryInBackground(sprite, entryId);
@@ -2241,7 +2241,7 @@ async function archiveUserAmuletToCollection() {
 
   if (!saveCollection(collection)) {
     collection.pop();
-    console.error('[garden-three] failed to persist archived amulet — do not refresh');
+    console.error('[garden-three] failed to persist archived amulet - do not refresh');
     return false;
   }
   enrichCollectionEntryInBackground(sprite, entryIdNew);
@@ -2423,7 +2423,7 @@ function restoreCollectionFromStorage() {
     });
   }
 
-  /* Load a few amulets at a time — same quality, less network congestion online. */
+  /* Load a few amulets at a time - same quality, less network congestion online. */
   var batchSize = 3;
   var chain = Promise.resolve();
   for (var start = 0; start < collection.length; start += batchSize) {
@@ -2515,7 +2515,7 @@ function makeSprite(layout, texture, questionIndex) {
 }
 
 function attachGalleryAnswers(_sprite) {
-  /* Gallery amulets removed — only user/collection sprites remain. */
+  /* Gallery amulets removed - only user/collection sprites remain. */
 }
 
 function spriteGardenIndex(sprite) {
@@ -2588,6 +2588,27 @@ function spriteDisplayLabel(sprite) {
   return '[' + String(index + 1).padStart(3, '0') + ']';
 }
 
+function spriteRequestText(sprite) {
+  const answers = sprite.userData.answers;
+  if (answers && answers.q1Wish) {
+    return String(answers.q1Wish).trim();
+  }
+
+  let index;
+  if (sprite.userData.isUserAmulet) {
+    index = USER_AMULET_INDEX + loadCollection().length;
+  } else if (sprite.userData.isCollectionAmulet) {
+    index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
+  } else {
+    return '';
+  }
+
+  if (typeof window.getAmuletRecord !== 'function') return '';
+  const record = window.getAmuletRecord(index);
+  if (!record || !record.q1Wish) return '';
+  return String(record.q1Wish).trim();
+}
+
 function canShowAmuletHover() {
   if (!document.body.classList.contains('pagmar-index')) return false;
   if (!controlsEnabled) return false;
@@ -2611,7 +2632,13 @@ function updateCursorFromPointer(clientX, clientY) {
   document.body.style.cursor = hit ? 'pointer' : controlsEnabled ? 'grab' : 'default';
   dispatchAmuletHover(
     hit
-      ? { active: true, label: spriteDisplayLabel(hit), x: clientX, y: clientY }
+      ? {
+          active: true,
+          label: spriteDisplayLabel(hit),
+          request: spriteRequestText(hit),
+          x: clientX,
+          y: clientY,
+        }
       : { active: false }
   );
 }
@@ -2731,7 +2758,7 @@ function updateFocusVisuals() {
   updateDepthFade(performance.now());
 }
 
-/** 0–1 while spinning; clears spinActive when the turn finishes. */
+/** 0-1 while spinning; clears spinActive when the turn finishes. */
 function amuletSpinProgress(sprite, now) {
   if (!sprite.userData.spinActive) return null;
   if (sprite.userData.isUserAmulet && activeUserAmulet3DSpin) return null;
@@ -2740,7 +2767,7 @@ function amuletSpinProgress(sprite, now) {
   return t;
 }
 
-/** Symmetric Y spin — front and back look the same, only edge-on goes thin. */
+/** Symmetric Y spin - front and back look the same, only edge-on goes thin. */
 function spinScaleXFromProgress(t) {
   return Math.abs(Math.cos(t * Math.PI * 2));
 }
@@ -2774,7 +2801,7 @@ function disposeGardenSpinGroup(group) {
   });
 }
 
-/* Garden sprites use the snapshot captured during creation — no re-render needed. */
+/* Garden sprites use the snapshot captured during creation - no re-render needed. */
 
 async function ensureUserAmuletMeshTemplate() {
   if (userAmuletMeshTemplate) return userAmuletMeshTemplate;
@@ -2798,7 +2825,7 @@ async function ensureUserAmuletMeshTemplate() {
         ageNum: composed.ageNum,
         l3MaterialMode: 'stone',
       };
-      // Vector tubes only on reload — full PBR would freeze the tab for many seconds.
+      // Vector tubes only on reload - full PBR would freeze the tab for many seconds.
       sceneClone = await pbr.buildVectorSceneCloneForGarden(meshOpts);
     }
     userAmuletMeshTemplate = wrapPbrSceneForGarden(sceneClone);
@@ -3038,7 +3065,7 @@ function spriteBoundsInCanvas(sprite) {
   };
 }
 
-/** Screen-space hit test — pick the amulet whose center is closest to the click. */
+/** Screen-space hit test - pick the amulet whose center is closest to the click. */
 function pickAmulet(clientX, clientY, tight) {
   const rect = canvas.getBoundingClientRect();
   const sx = clientX - rect.left;
@@ -3522,7 +3549,7 @@ window.gardenClearUserAmulet = function () {
 };
 
 window.gardenPrimeUserAmuletMesh3D = function () {
-  // Intentionally lazy — building the 3D mesh blocks the main thread if done eagerly.
+  // Intentionally lazy - building the 3D mesh blocks the main thread if done eagerly.
 };
 
 window.questionnaireStar = {

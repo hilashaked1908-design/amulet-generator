@@ -1,5 +1,5 @@
 /**
- * Floating star dots — Oobe-XR style drift only (https://oobexr.zerotredici.app).
+ * Floating star dots - Oobe-XR style drift only (https://oobexr.zerotredici.app).
  */
 (function () {
   'use strict';
@@ -30,6 +30,7 @@
   let W = 1;
   let H = 1;
   let fade = 0;
+  const YELLOW_WHITE_RGB = '244, 244, 232';
   const stars = [];
 
   function isQuestionnaireBgMode() {
@@ -101,7 +102,7 @@
 
       ctx.beginPath();
       ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+      ctx.fillStyle = 'rgba(' + YELLOW_WHITE_RGB + ',' + alpha + ')';
       ctx.fill();
     }
   }

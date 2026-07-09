@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
   <rect width="140" height="140" fill="#1B1613"/>
-  <g fill="none" stroke="#1B1B1B" stroke-width="1" shape-rendering="geometricPrecision">
+  <g fill="none" stroke="#1B1B1B" stroke-width="1.5" shape-rendering="geometricPrecision">
     <line x1="0.5" y1="0" x2="0.5" y2="140"/>
     <line x1="0" y1="0.5" x2="140" y2="0.5"/>
     <!-- 4 ??????? ????? ? ??? ?-Figma -->

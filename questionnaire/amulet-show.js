@@ -1,5 +1,5 @@
 /**
- * Final textured amulet — after all 7 answers (prototype-v2-thick pipeline).
+ * Final textured amulet - after all 7 answers (prototype-v2-thick pipeline).
  */
 import { renderFinalAmuletLikePrototype } from './amulet-final-render.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
 import { captureLiveAmuletSnapshot } from '../three-pbr-amulet.js';
-import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-result-answers';
+import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-vector-raster-fix';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
 const SNAPSHOT_KEY = 'amuletUserSnapshot';
@@ -221,8 +221,9 @@ function getNextAmuletIndex() {
 var RESULT_COMPONENT_ITEM_CLASSES = { 1: 'pagmar__result-list-item--material' };
 
 function formatResultWish(text) {
-  const trimmed = (text || '').trim();
-  if (!trimmed) return '—';
+  const raw = window.pagmarNormalizeDashes ? window.pagmarNormalizeDashes(text) : text;
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '-';
   if (trimmed.charAt(0) === '״' || trimmed.charAt(0) === '"') return trimmed;
   return '״' + trimmed + '״';
 }
@@ -268,15 +269,18 @@ function populateResultOverlay(answers) {
   const componentsEl = document.getElementById('resultComponents');
 
   if (numEl) {
-    const label = '[' + String(getNextAmuletIndex()).padStart(3, '0') + ']';
-    const inner = numEl.querySelector('.pagmar__glass-pill__text');
-    if (inner) inner.textContent = label;
-    else numEl.textContent = label;
+    const digits = numEl.querySelector('.pagmar__result-num__digits');
+    const label = String(getNextAmuletIndex()).padStart(3, '0');
+    if (digits) {
+      digits.textContent = label;
+    } else {
+      numEl.textContent = '[' + label + ']';
+    }
   }
 
-  const name = (a.q2Name || '').trim() || spec?.name || '—';
-  const timing = (a.q3WhyNow || '').trim() || spec?.whyNow || '—';
-  const wish = formatResultWish(a.q1Wish) || spec?.wish || '—';
+  const name = (a.q2Name || '').trim() || spec?.name || '-';
+  const timing = (a.q3WhyNow || '').trim() || spec?.whyNow || '-';
+  const wish = formatResultWish(a.q1Wish) || spec?.wish || '-';
 
   if (nameEl) nameEl.textContent = name;
   if (timingEl) timingEl.textContent = timing;
@@ -304,21 +308,26 @@ function getResultUnitPx() {
 function fitResultStoryTypography() {
   const storyEl = document.getElementById('resultStory');
   const requestEl = document.querySelector('.pagmar__result-request');
-  const rightEl = document.querySelector('.pagmar__result-right');
-  const vectorEl = rightEl?.querySelector('.pagmar__result-vector--request');
+  const requestBlock = document.querySelector('.pagmar__result-request-block');
+  const vectorEl = requestBlock?.querySelector('.pagmar__result-vector');
   if (!storyEl || !requestEl) return;
 
   const u = getResultUnitPx();
   const tagEl = requestEl.querySelector('.pagmar__result-tag');
   const tagH = tagEl ? tagEl.offsetHeight : 0;
   const gap = 16 * u;
-  const vectorReserve = vectorEl ? vectorEl.offsetTop : 544.715 * u;
-  const maxStoryPx = Math.max(48, vectorReserve - tagH - gap - 8);
-  let sizePx = 75 * u;
-  const minPx = 28 * u;
+  const blockH = requestBlock ? requestBlock.clientHeight : 0;
+  const vectorH = vectorEl ? vectorEl.offsetHeight : 132.379 * u;
+  const vectorGap = 32 * u;
+  const maxStoryPx = Math.max(
+    48,
+    (blockH || 559.379 * u) - tagH - gap - vectorH - vectorGap - 8
+  );
+  let sizePx = 40 * u;
+  const minPx = 24 * u;
 
   storyEl.style.fontSize = sizePx + 'px';
-  storyEl.style.lineHeight = 'normal';
+  storyEl.style.lineHeight = '1.11';
 
   let guard = 0;
   while (storyEl.scrollHeight > maxStoryPx + 1 && sizePx > minPx && guard < 80) {
@@ -453,7 +462,7 @@ async function showResultOverlay(container, answers) {
 
   slot.innerHTML = '';
 
-  const fogMod = await import('./result-overlay-fog.js?v=20250708-result-layout');
+  const fogMod = await import('./result-overlay-fog.js?v=20250709-result-layout');
   try {
     await fogMod.bootResultOverlayFog();
   } catch (err) {
@@ -555,11 +564,22 @@ function hideResultOverlay() {
   document.body.classList.remove('is-result-overlay-open');
   clearResultViewActive();
 
-  import('./result-overlay-fog.js?v=20250708-result-layout')
+  import('./result-overlay-fog.js?v=20250709-result-layout')
     .then(function (mod) {
       mod.stopResultOverlayFog();
     })
     .catch(function () {});
+
+  if (
+    document.body.classList.contains('is-create-mode') ||
+    document.body.classList.contains('pagmar-create')
+  ) {
+    import('./request-flow-fog.js?v=20250709-garden-fog')
+      .then(function (mod) {
+        return mod.bootRequestFlowFog();
+      })
+      .catch(function () {});
+  }
 
   if (disposePresentedAmulet) {
     disposePresentedAmulet();
@@ -630,7 +650,7 @@ async function placeIndexAmuletInGarden(container, answers) {
   const liveCanvas = container?.querySelector('canvas');
   const canvas = captureGardenSnapshotFromCanvas(liveCanvas);
   if (!canvas) {
-    console.warn('[amulet-show] placeIndexAmuletInGarden — no canvas');
+    console.warn('[amulet-show] placeIndexAmuletInGarden - no canvas');
     return false;
   }
 
@@ -868,7 +888,7 @@ function bindSaveAmuletButton() {
 export async function showFinishedAmulet(answersOverride) {
   const answers = answersOverride || loadAnswers();
   if (!allAnswered(answers)) {
-    console.warn('[amulet] showFinishedAmulet — not all answers yet', answers);
+    console.warn('[amulet] showFinishedAmulet - not all answers yet', answers);
     return;
   }
 
@@ -896,13 +916,13 @@ export async function showFinishedAmulet(answersOverride) {
       hideIndexCreateActionButtons();
       stashCreateQuestionInput();
     }
-    await showAmuletLoader('טוען קמע', { fullscreen: true, progress: 0 });
+    await showAmuletLoader('טוען קמע', { fullscreen: true, gallery: true });
     document.body.classList.add('is-amulet-rendering');
   }
 
   try {
     if (!inlineCreate) {
-      await showAmuletLoader('טוען קמע', { fullscreen: true, progress: 0 });
+      await showAmuletLoader('טוען קמע', { fullscreen: true, gallery: true });
     }
     console.log('[amulet] starting prototype PBR render');
 
@@ -1005,34 +1025,12 @@ function captureSnapshotCanvas(sourceCanvas) {
 
 let currentExportHandler = null;
 
-function bindResultActionButtonHover() {
-  document.querySelectorAll('.pagmar__result-overlay .figma-q__btn-outer').forEach(function (outer) {
-    if (outer.dataset.hoverBound === '1') return;
-    outer.dataset.hoverBound = '1';
-
-    outer.addEventListener('mouseenter', function () {
-      outer.classList.add('is-hovered');
-    });
-    outer.addEventListener('mouseleave', function () {
-      outer.classList.remove('is-hovered');
-    });
-    outer.addEventListener('focusin', function () {
-      outer.classList.add('is-hovered');
-    });
-    outer.addEventListener('focusout', function () {
-      outer.classList.remove('is-hovered');
-    });
-  });
-
-  if (window.pagmarButtonRoll) {
-    window.pagmarButtonRoll.enhance(document);
-  }
-}
+let currentCreateAnotherHandler = null;
 
 function bindResultOverlayButtons(container, answers) {
-  bindResultActionButtonHover();
   const saveBtn = document.getElementById('resultSaveBtn');
   const exportBtn = document.getElementById('resultExportBtn');
+  const createAnotherBtn = document.getElementById('resultCreateAnotherBtn');
   const closeBtn = document.getElementById('resultCloseBtn');
 
   if (currentSaveHandler && saveBtn) {
@@ -1040,6 +1038,9 @@ function bindResultOverlayButtons(container, answers) {
   }
   if (currentExportHandler && exportBtn) {
     exportBtn.removeEventListener('click', currentExportHandler);
+  }
+  if (currentCreateAnotherHandler && createAnotherBtn) {
+    createAnotherBtn.removeEventListener('click', currentCreateAnotherHandler);
   }
   if (currentCloseHandler && closeBtn) {
     closeBtn.removeEventListener('click', currentCloseHandler);
@@ -1070,9 +1071,39 @@ function bindResultOverlayButtons(container, answers) {
     }
   }
 
+  function handleCreateAnother() {
+    hideResultOverlay();
+    hideAmuletLoader({ force: true });
+    restoreCreateWorkspaceAfterResult();
+    if (disposePresentedAmulet) {
+      disposePresentedAmulet();
+    }
+    capturePresentedSnapshot = null;
+    disposePresentedAmulet = null;
+    clearSavedSnapshot();
+    if (container) {
+      container.innerHTML = '';
+      container.hidden = false;
+    }
+    document.body.classList.remove(
+      'is-amulet-rendering',
+      'is-amulet-ready',
+      'is-create-amulet-ready',
+      'is-create-complete'
+    );
+    if (typeof window.pagmarRestartQuestionnaire === 'function') {
+      window.pagmarRestartQuestionnaire();
+      return;
+    }
+    if (typeof window.startIndexCreateFlow === 'function') {
+      window.startIndexCreateFlow();
+    }
+  }
+
   currentSaveHandler = handleSave;
   currentCloseHandler = handleSave;
   currentExportHandler = handleExport;
+  currentCreateAnotherHandler = handleCreateAnother;
 
   if (saveBtn) {
     saveBtn.addEventListener('click', handleSave);
@@ -1081,6 +1112,10 @@ function bindResultOverlayButtons(container, answers) {
   if (exportBtn) {
     exportBtn.disabled = false;
     exportBtn.addEventListener('click', handleExport);
+  }
+
+  if (createAnotherBtn) {
+    createAnotherBtn.addEventListener('click', handleCreateAnother);
   }
 
   if (closeBtn) {
@@ -1108,7 +1143,7 @@ export async function restoreResultViewFromSession(answersOverride) {
   container.hidden = false;
 
   document.body.classList.add('is-amulet-rendering');
-  await showAmuletLoader('טוען קמע', { fullscreen: true, progress: 0 });
+  await showAmuletLoader('טוען קמע', { fullscreen: true, gallery: true });
 
   try {
     const hasLiveCanvas = Boolean(container.querySelector('canvas')?.width);

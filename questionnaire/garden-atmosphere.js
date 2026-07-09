@@ -1,5 +1,5 @@
 /**
- * Fantik Studio ScrollingBackgroundGradient — copied from fantik.studio bundle (BG).
+ * Fantik Studio ScrollingBackgroundGradient - copied from fantik.studio bundle (BG).
  * palette (0.2,.2,.2)(0.3,.3,.3)(0.5,.5,.5)(0.2,.2,.2)
  * screens=.5 timeMultiplier=.1 scale=1 distortionIterations=6 distortionIntensity=.3
  */
@@ -8,7 +8,8 @@
 
   if (
     !document.body.classList.contains('pagmar-index') &&
-    !document.body.classList.contains('pagmar-create')
+    !document.body.classList.contains('pagmar-create') &&
+    !document.body.classList.contains('pagmar-amulet-detail')
   ) {
     return;
   }
@@ -27,6 +28,7 @@
   const DISTORTION_INTENSITY = 0.3;
   const SCROLL_SPEED = 0.015;
   const BASE_BLUE = [21 / 255, 0, 225 / 255];
+  const BASE_GARDEN = [0, 0, 0]; // black - index garden only
 
   const canvas = document.createElement('canvas');
   canvas.id = 'garden-atmosphere-back';
@@ -43,7 +45,7 @@
     '}',
   ].join('\n');
 
-  // Loop bound must be a constant for WebGL1 — Fantik uses 6 iterations.
+  // Loop bound must be a constant for WebGL1 - Fantik uses 6 iterations.
   const fragSrc = [
     'precision highp float;',
     'uniform float uTime;',
@@ -55,6 +57,9 @@
     'uniform float uUvScale;',
     'uniform float uUvDistortionIntensity;',
     'uniform vec3 uBaseBlue;',
+    'uniform float uLiftAmount;',
+    'uniform float uFogBandLo;',
+    'uniform float uFogBandHi;',
     'varying vec2 vUv;',
     'float noise(vec3 v){',
     '  const vec2 C=vec2(1.0/6.0,1.0/3.0);',
@@ -110,11 +115,12 @@
     '  }',
     '  float colourInput=noise(vec3(uv,sin(uTime)))*0.5+0.5;',
     '  vec3 colour=cosineGradientColour(colourInput,uColourA,uColourB,uColourC,uColourD);',
-  // Fantik on #111 shows 0.2–0.5 gray wisps — map same signal onto #1500E1.
+  // Fantik on #111 shows 0.2-0.5 gray wisps - same signal on black garden.
     '  vec3 lift=(colour-vec3(0.2))/0.3;',
     '  lift=clamp(lift,0.0,1.0);',
     '  vec3 fogLight=vec3(0.88,0.9,1.0);',
-    '  vec3 finalColour=mix(uBaseBlue,fogLight,lift*0.78);',
+    '  float bottomBand=1.0-smoothstep(uFogBandLo,uFogBandHi,vUv.y);',
+    '  vec3 finalColour=mix(uBaseBlue,fogLight,lift*uLiftAmount*bottomBand);',
     '  gl_FragColor=vec4(finalColour,1.0);',
     '}',
   ].join('\n');
@@ -170,6 +176,9 @@
   const uUvScale = gl.getUniformLocation(prog, 'uUvScale');
   const uDistInt = gl.getUniformLocation(prog, 'uUvDistortionIntensity');
   const uBaseBlue = gl.getUniformLocation(prog, 'uBaseBlue');
+  const uLiftAmount = gl.getUniformLocation(prog, 'uLiftAmount');
+  const uFogBandLo = gl.getUniformLocation(prog, 'uFogBandLo');
+  const uFogBandHi = gl.getUniformLocation(prog, 'uFogBandHi');
 
   let W = 1;
   let H = 1;
@@ -179,6 +188,41 @@
   function isQuestionnaireBgMode() {
     const body = document.body;
     return body.classList.contains('is-create-mode') || body.classList.contains('pagmar-create');
+  }
+
+  function baseColour() {
+    const body = document.body;
+    // Garden + questionnaire share the same pure-black Fantik base (Figma 2554).
+    if (
+      body.classList.contains('pagmar-index') ||
+      body.classList.contains('pagmar-create') ||
+      body.classList.contains('pagmar-amulet-detail')
+    ) {
+      return BASE_GARDEN;
+    }
+    return BASE_BLUE;
+  }
+
+  function liftAmount() {
+    const body = document.body;
+    if (body.classList.contains('pagmar-index')) {
+      return 0.48;
+    }
+    if (
+      body.classList.contains('pagmar-create') ||
+      body.classList.contains('pagmar-amulet-detail')
+    ) {
+      return 0;
+    }
+    return 0.78;
+  }
+
+  function fogBand() {
+    const body = document.body;
+    if (body.classList.contains('pagmar-index')) {
+      return [0.46, 0.62];
+    }
+    return [-1, -0.5];
   }
 
   function on() {
@@ -215,10 +259,15 @@
     gl.uniform3f(uColourB, PALETTE[1][0], PALETTE[1][1], PALETTE[1][2]);
     gl.uniform3f(uColourC, PALETTE[2][0], PALETTE[2][1], PALETTE[2][2]);
     gl.uniform3f(uColourD, PALETTE[3][0], PALETTE[3][1], PALETTE[3][2]);
-    gl.uniform3f(uBaseBlue, BASE_BLUE[0], BASE_BLUE[1], BASE_BLUE[2]);
+    const base = baseColour();
+    gl.uniform3f(uBaseBlue, base[0], base[1], base[2]);
+    gl.uniform1f(uLiftAmount, liftAmount());
+    const band = fogBand();
+    gl.uniform1f(uFogBandLo, band[0]);
+    gl.uniform1f(uFogBandHi, band[1]);
     gl.uniform1f(uUvScale, UV_SCALE);
     gl.uniform1f(uDistInt, DISTORTION_INTENSITY);
-    gl.clearColor(BASE_BLUE[0], BASE_BLUE[1], BASE_BLUE[2], 1);
+    gl.clearColor(base[0], base[1], base[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

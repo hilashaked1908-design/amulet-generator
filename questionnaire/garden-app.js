@@ -1,5 +1,5 @@
 /**
- * True 3D garden — React Three Fiber + custom pan camera + fog + sprites.
+ * True 3D garden - React Three Fiber + custom pan camera + fog + sprites.
  */
 import React, {
   Suspense,
@@ -16,7 +16,7 @@ import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
-const FOG_COLOR = '#F4F4F4';
+const FOG_COLOR = '#F4F4E8';
 const FOG_DENSITY = 0.045;
 const CAMERA_Y = 12;
 const CAMERA_Z = 16;
@@ -28,7 +28,7 @@ const _ray = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 const _hit = new THREE.Vector3();
 
-/** Figma 1425:1074 — exact bounding boxes */
+/** Figma 1425:1074 - exact bounding boxes */
 const AMULET_FIGMA = [
   { tex: 0, x: 28.0771484375, y: 506.9833984375, w: 398.0166015625, h: 398.0166015625 },
   { tex: 1, x: 380.8310546875, y: 365.0234375, w: 225.443359375, h: 225.443359375 },

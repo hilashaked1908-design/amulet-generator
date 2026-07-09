@@ -1,5 +1,5 @@
 /**
- * K95-style companion cursor — yellow dot beside the native pointer, ring on hover.
+ * K95-style companion cursor - yellow dot beside the native pointer, ring on hover.
  */
 (function () {
   'use strict';
