@@ -97,7 +97,6 @@ window.AMULET_QUESTIONS = [
       'בחרו את מה שהכי חסר לכם כרגע ביחס לבקשה.',
     figmaTitleOffset: true,
     type: 'choice',
-    choiceDividers: true,
     options: [
       { value: 'uncertainty', label: 'ביטחון' },
       { value: 'waiting', label: 'הצלחה' },

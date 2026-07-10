@@ -2231,10 +2231,12 @@ body.pagmar-index .pagmar__garden-amulet-hover.has-request .pagmar__garden-amule
   gap: calc(var(--figma402-head-gap) * 1px);
 }
 
+body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__backdrop,
 body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-clone {
   border-radius: 40px;
 }
 
+body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__backdrop,
 body.pagmar-index .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-chrome {
   border-radius: 40px;
 }
@@ -2915,7 +2917,7 @@ body.pagmar-index.is-create-mode .pagmar__spec-panel {
 
 /* Legacy questionnaire.css garden rule - keep black during request flow */
 body.pagmar-index.is-create-mode.is-panel-open .pagmar__stage .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__stage .pagmar__garden {
+body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__stage .pagmar__garden {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -3348,7 +3350,8 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   justify-content: center;
   background: transparent;
   pointer-events: none;
-  transition: opacity 320ms ease;
+  opacity: 1;
+  transition: opacity 480ms ease-out;
 }
 
 .pagmar__detail-page-loader--create[hidden] {
@@ -3357,6 +3360,7 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
 
 .pagmar__detail-page-loader--create.is-leaving {
   opacity: 0;
+  pointer-events: none;
 }
 
 .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessels {
@@ -3367,6 +3371,13 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   overflow: clip;
   isolation: isolate;
   transform: translateZ(0);
+  z-index: 1;
+}
+
+.pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel {
@@ -3512,20 +3523,55 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   width: calc(305 * var(--loader-u));
   height: calc(305 * var(--loader-u));
   flex: 0 0 auto;
-  overflow: visible;
+  overflow: clip;
   isolation: isolate;
   transform: translateZ(0);
   aspect-ratio: 1;
 }
 
-.pagmar__create-fullpage-loader__vessels .pagmar-vessel-morph {
-  width: 100%;
-  height: 100%;
+.pagmar__create-fullpage-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: running;
+  backface-visibility: hidden;
+  filter: brightness(0) invert(1);
 }
 
-.pagmar__create-fullpage-loader__vessels .pagmar-vessel-morph__svg {
-  width: 100%;
-  height: 100%;
+.pagmar__create-fullpage-loader__vessel--1 {
+  width: calc(158.765 * var(--loader-u));
+  height: calc(277.371 * var(--loader-u));
+  animation-delay: 0s;
+}
+
+.pagmar__create-fullpage-loader__vessel--2 {
+  width: calc(274.478 * var(--loader-u));
+  height: calc(280.742 * var(--loader-u));
+  animation-delay: -1s;
+}
+
+.pagmar__create-fullpage-loader__vessel--3 {
+  width: calc(287.758 * var(--loader-u));
+  height: calc(158.675 * var(--loader-u));
+  animation-delay: -2s;
+}
+
+.pagmar__create-fullpage-loader__vessel--4 {
+  width: calc(268.429 * var(--loader-u));
+  height: calc(273.41 * var(--loader-u));
+  animation-delay: -3s;
 }
 
 .pagmar__create-fullpage-loader__caption {
@@ -3569,6 +3615,39 @@ body.pagmar-index.is-create-mode.is-amulet-rendering {
   background: #000000 !important;
 }
 
+/* Q8 → result on index: garden atmosphere behind gallery loader (not black) */
+body.pagmar-index.is-create-mode.is-amulet-rendering,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading {
+  background: transparent !important;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__stage .pagmar__garden,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__stage .pagmar__garden,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--back,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--fantik,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__atmosphere--back,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__atmosphere--fantik {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog {
+  display: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard::before,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-artboard::before {
+  display: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-fog,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-fog {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 body.is-create-fullpage-loading .pagmar__atmosphere--back,
 body.pagmar-create.is-amulet-rendering .pagmar__atmosphere--back,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--back {
@@ -3585,6 +3664,10 @@ body.is-create-fullpage-loading .pagmar__request-artboard > .figma-q,
 body.is-create-fullpage-loading .pagmar__request-artboard > .figma-amulet-stage,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-q,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-amulet-stage,
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-artboard > .figma-request-about,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-artboard > .figma-q,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-artboard > .figma-amulet-stage,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-artboard > .figma-request-about,
 body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-q,
 body.pagmar-create.is-amulet-rendering .pagmar__request-artboard > .figma-amulet-stage {
   opacity: 0 !important;

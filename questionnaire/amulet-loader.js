@@ -1,7 +1,6 @@
 /**
- * Amulet loaders - gallery vessel spin between questions, morph for idle Q1 / full-page PBR.
+ * Amulet loaders - rotating gallery vessel vectors (frame, idle Q1, full-page PBR).
  */
-import { mountVesselMorph, preloadVesselMorph } from './loader-vessel-morph.js?v=20250709-q-loader';
 
 const DEFAULT_LOADER_TEXT = 'טוען קמע';
 const GALLERY_VESSEL_ASSETS = [
@@ -17,6 +16,8 @@ let loaderFogResize = null;
 let loaderFogStop = null;
 let fullpageLoadProgress = 0;
 let galleryFullpageActive = false;
+let galleryLoaderFadeToken = 0;
+const GALLERY_LOADER_FADE_MS = 480;
 
 function statusEl() {
   return (
@@ -70,16 +71,6 @@ function appendGalleryVesselSpin(parent, baseClass) {
   return vessels;
 }
 
-function appendVesselMorph(parent, baseClass) {
-  const vessels = document.createElement('div');
-  vessels.className = baseClass + '__vessels';
-  vessels.setAttribute('aria-hidden', 'true');
-  const morph = mountVesselMorph(vessels);
-  vessels._vesselMorph = morph;
-  parent.appendChild(vessels);
-  return vessels;
-}
-
 function startFrameLoaderMotion(root) {
   /* Gallery spin uses CSS animation - no JS start needed. */
 }
@@ -97,14 +88,14 @@ function frameHasVectorPreview() {
 }
 
 function showQuestionnaireFrameLoader(label) {
-  /* Q1 - no vector yet: keep the idle stage morph running (don't tear it down). */
+  /* Q1 - no vector yet: idle vessel spin in the stage (same as garden → amulet). */
   if (!frameHasVectorPreview()) {
     if (typeof window.pagmarStartCreateAmuletMorph === 'function') {
       window.pagmarStartCreateAmuletMorph();
       return true;
     }
   } else {
-    stopIdleMorph();
+    stopIdleVesselSpin();
   }
 
   const loader = ensureFrameLoader();
@@ -116,19 +107,6 @@ function showQuestionnaireFrameLoader(label) {
   const sr = loader.querySelector('.pagmar__amulet-frame-loader__sr');
   if (sr) sr.textContent = label;
   return true;
-}
-
-function startVesselMorph(root) {
-  const vessels = root?.querySelector('[class$="__vessels"]');
-  const morph = vessels?._vesselMorph;
-  if (!morph) return;
-  morph.stop();
-  morph.start();
-}
-
-function stopVesselMorph(root) {
-  const vessels = root?.querySelector('[class$="__vessels"]');
-  vessels?._vesselMorph?.stop();
 }
 
 function ensureFrameLoader() {
@@ -180,7 +158,16 @@ async function startFullpageLoaderFog() {
 
 function ensureGalleryFullpageLoader() {
   let loader = document.getElementById('pagmarGalleryFullpageLoader');
-  if (loader) return loader;
+  if (loader) {
+    if (!loader.querySelector('#createFullpageLoaderFog')) {
+      const fog = document.createElement('div');
+      fog.id = 'createFullpageLoaderFog';
+      fog.className = 'pagmar__create-fullpage-loader__fog pagmar__detail-fog';
+      fog.setAttribute('aria-hidden', 'true');
+      loader.insertBefore(fog, loader.firstChild);
+    }
+    return loader;
+  }
 
   loader = document.createElement('div');
   loader.id = 'pagmarGalleryFullpageLoader';
@@ -188,6 +175,11 @@ function ensureGalleryFullpageLoader() {
   loader.hidden = true;
   loader.setAttribute('role', 'status');
   loader.setAttribute('aria-live', 'polite');
+
+  const fog = document.createElement('div');
+  fog.id = 'createFullpageLoaderFog';
+  fog.className = 'pagmar__create-fullpage-loader__fog pagmar__detail-fog';
+  fog.setAttribute('aria-hidden', 'true');
 
   const vessels = document.createElement('div');
   vessels.className = 'pagmar__detail-page-loader__vessels';
@@ -208,19 +200,57 @@ function ensureGalleryFullpageLoader() {
   sr.className = 'pagmar__detail-page-loader__sr';
   sr.textContent = DEFAULT_LOADER_TEXT;
 
+  loader.appendChild(fog);
   loader.appendChild(vessels);
   loader.appendChild(sr);
   document.body.appendChild(loader);
   return loader;
 }
 
-function hideGalleryFullpageLoader() {
+function fadeOutGalleryFullpageLoader(options) {
+  const opts = options || {};
+  const force = Boolean(opts.force);
   galleryFullpageActive = false;
   const loader = document.getElementById('pagmarGalleryFullpageLoader');
-  if (!loader) return;
+
+  if (!loader || loader.hidden) {
+    stopFullpageLoaderFog();
+    setFullpageLoading(false);
+    fullpageLoadProgress = 0;
+    return Promise.resolve();
+  }
+
+  if (force) {
+    galleryLoaderFadeToken += 1;
+    stopFullpageLoaderFog();
+    setFullpageLoading(false);
+    loader.classList.remove('is-leaving');
+    loader.hidden = true;
+    loader.removeAttribute('aria-busy');
+    fullpageLoadProgress = 0;
+    return Promise.resolve();
+  }
+
+  const token = ++galleryLoaderFadeToken;
   loader.classList.remove('is-leaving');
-  loader.hidden = true;
-  loader.removeAttribute('aria-busy');
+  void loader.offsetWidth;
+  loader.classList.add('is-leaving');
+
+  return new Promise(function (resolve) {
+    window.setTimeout(function () {
+      if (token !== galleryLoaderFadeToken) {
+        resolve();
+        return;
+      }
+      stopFullpageLoaderFog();
+      setFullpageLoading(false);
+      loader.classList.remove('is-leaving');
+      loader.hidden = true;
+      loader.removeAttribute('aria-busy');
+      fullpageLoadProgress = 0;
+      resolve();
+    }, GALLERY_LOADER_FADE_MS);
+  });
 }
 
 function ensureFullpageLoader() {
@@ -232,6 +262,11 @@ function ensureFullpageLoader() {
       fog.className = 'pagmar__create-fullpage-loader__fog pagmar__detail-fog';
       fog.setAttribute('aria-hidden', 'true');
       loader.insertBefore(fog, loader.firstChild);
+    }
+    const inner = loader.querySelector('.pagmar__create-fullpage-loader__inner');
+    if (inner && !inner.querySelector('.pagmar__create-fullpage-loader__vessel')) {
+      inner.querySelector('.pagmar__create-fullpage-loader__vessels')?.remove();
+      appendGalleryVesselSpin(inner, 'pagmar__create-fullpage-loader');
     }
     loader.querySelector('.pagmar__create-fullpage-loader__label')?.remove();
     return loader;
@@ -252,7 +287,7 @@ function ensureFullpageLoader() {
   const inner = document.createElement('div');
   inner.className = 'pagmar__create-fullpage-loader__inner';
 
-  appendVesselMorph(inner, 'pagmar__create-fullpage-loader');
+  appendGalleryVesselSpin(inner, 'pagmar__create-fullpage-loader');
 
   const caption = document.createElement('p');
   caption.className = 'pagmar__create-fullpage-loader__caption';
@@ -312,7 +347,7 @@ function setFullpageLoading(active) {
   document.body.classList.toggle('is-create-fullpage-loading', Boolean(active));
 }
 
-function maybeRestartIdleMorph() {
+function maybeRestartIdleVesselSpin() {
   if (typeof window.pagmarStartCreateAmuletMorph !== 'function') return;
   if (document.body.classList.contains('is-amulet-rendering')) return;
   if (
@@ -333,7 +368,7 @@ function maybeRestartIdleMorph() {
   window.pagmarStartCreateAmuletMorph();
 }
 
-function stopIdleMorph() {
+function stopIdleVesselSpin() {
   if (typeof window.pagmarHideCreateAmuletMorph === 'function') {
     window.pagmarHideCreateAmuletMorph();
   }
@@ -349,32 +384,28 @@ function hideFrameLoader(options) {
     loader.hidden = true;
     loader.removeAttribute('aria-busy');
   }
-  if (!opts.skipIdleMorph) {
-    maybeRestartIdleMorph();
+  if (!opts.skipIdleVesselSpin) {
+    maybeRestartIdleVesselSpin();
   }
   resolveFrameLoaderIdle();
 }
 
 function hideFullpageLoader(options) {
   const opts = options || {};
-  if (galleryFullpageActive) {
-    hideGalleryFullpageLoader();
-    setFullpageLoading(false);
-    fullpageLoadProgress = 0;
-    return true;
+  if (galleryFullpageActive || document.getElementById('pagmarGalleryFullpageLoader')?.classList.contains('is-leaving')) {
+    return fadeOutGalleryFullpageLoader(opts);
   }
-  if (!opts.force && fullpageLoadProgress < 1) return false;
+  if (!opts.force && fullpageLoadProgress < 1) return Promise.resolve(false);
   setFullpageLoading(false);
   stopFullpageLoaderFog();
   resetFullpageLoaderPosition();
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (loader) {
-    stopVesselMorph(loader);
     loader.hidden = true;
     loader.removeAttribute('aria-busy');
   }
   fullpageLoadProgress = 0;
-  return true;
+  return Promise.resolve(true);
 }
 
 export function setAmuletLoaderProgress(frac) {
@@ -395,34 +426,32 @@ export async function showAmuletLoader(text, options) {
   const opts = options || {};
   const label = text || DEFAULT_LOADER_TEXT;
 
-  if (opts.fullscreen && !opts.gallery) {
-    await preloadVesselMorph();
-  } else {
-    await preloadLoaderGallerySpin();
-  }
+  await preloadLoaderGallerySpin();
 
   if (opts.fullscreen && opts.gallery) {
-    stopIdleMorph();
-    hideFrameLoader({ skipIdleMorph: true });
+    stopIdleVesselSpin();
+    hideFrameLoader({ skipIdleVesselSpin: true });
     hideFullpageLoader({ force: true });
+    galleryLoaderFadeToken += 1;
     galleryFullpageActive = true;
     fullpageLoadProgress = 0;
     const loader = ensureGalleryFullpageLoader();
     setFullpageLoading(true);
-    loader.hidden = false;
     loader.classList.remove('is-leaving');
+    loader.hidden = false;
+    void loader.offsetWidth;
     loader.setAttribute('aria-busy', 'true');
+    await startFullpageLoaderFog();
     const sr = loader.querySelector('.pagmar__detail-page-loader__sr');
     if (sr) sr.textContent = label;
   } else if (opts.fullscreen) {
     galleryFullpageActive = false;
-    stopIdleMorph();
-    hideFrameLoader({ skipIdleMorph: true });
+    stopIdleVesselSpin();
+    hideFrameLoader({ skipIdleVesselSpin: true });
     const loader = ensureFullpageLoader();
     setFullpageLoading(true);
     loader.hidden = false;
     loader.setAttribute('aria-busy', 'true');
-    startVesselMorph(loader);
     fullpageLoadProgress =
       typeof opts.progress === 'number' ? Math.max(0, Math.min(1, opts.progress)) : 0;
     await startFullpageLoaderFog();
@@ -451,9 +480,9 @@ export function hideAmuletFrameLoader() {
   hideFrameLoader();
 }
 
-export function hideAmuletLoader(options) {
+export async function hideAmuletLoader(options) {
   hideFrameLoader();
-  hideFullpageLoader(options);
+  await hideFullpageLoader(options);
 
   const frame = amuletFrameEl();
   if (frame) frame.classList.remove('is-amulet-loading-keep-preview');
@@ -463,7 +492,7 @@ export function hideAmuletLoader(options) {
 }
 
 export function resetAmuletLoaderCache() {
-  hideAmuletLoader();
+  void hideAmuletLoader({ force: true });
 }
 
 export async function setBuildStatus(text, visible) {
@@ -486,9 +515,7 @@ export function preloadLoaderGallerySpin() {
         img.src = src;
       });
     })
-  ).then(function () {
-    return preloadVesselMorph();
-  });
+  );
 }
 
 window.amuletShowLoader = showAmuletLoader;

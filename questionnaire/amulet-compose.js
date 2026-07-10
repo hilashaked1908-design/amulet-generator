@@ -16,6 +16,10 @@ function cc() {
 }
 function requireConnectionCore() { return cc(); }
 
+function glyphLetter(ch) {
+  return cc().normalizeSofitLetter(ch);
+}
+
 function applyAnswers(answers, options = {}) {
   if (options.partial !== undefined) {
     lastApplyPartial = options.partial === true;
@@ -2004,7 +2008,8 @@ function readParams() {
       .filter((w) => w.length > 0)[0];
     if (!word) return [];
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
-    for (const ch of word) {
+    for (const raw of word) {
+      const ch = glyphLetter(raw);
       if (avail.has(ch)) return [ch];
     }
     return [];
@@ -2021,7 +2026,7 @@ function readParams() {
       const chars = [...word];
       let picked = null;
       for (let i = 0; i < chars.length; i++) {
-        const ch = chars[i];
+        const ch = glyphLetter(chars[i]);
         if (!avail.has(ch)) continue;
         if (i === 0 && !used.has(ch)) {
           picked = ch;
@@ -2056,7 +2061,8 @@ function readParams() {
       .filter((w) => w.length > 0);
     const out = letters.slice();
     if (words.length && out.length === 1) {
-      for (const ch of [...words[0]]) {
+      for (const raw of [...words[0]]) {
+        const ch = glyphLetter(raw);
         if (!avail.has(ch) || out.includes(ch)) continue;
         out.push(ch);
         break;
@@ -2064,7 +2070,8 @@ function readParams() {
     }
     for (const word of words.slice(1)) {
       if (out.length >= MAX_Q1_CERAMIC_LETTERS) break;
-      for (const ch of [...word]) {
+      for (const raw of [...word]) {
+        const ch = glyphLetter(raw);
         if (!avail.has(ch) || out.includes(ch)) continue;
         out.push(ch);
         break;
@@ -2078,7 +2085,8 @@ function readParams() {
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
     const used = new Set();
     const out = [];
-    for (const ch of String(name || '').replace(/\s/g, '')) {
+    for (const raw of String(name || '').replace(/\s/g, '')) {
+      const ch = glyphLetter(raw);
       if (out.length >= MAX_LETTERS) break;
       if (!avail.has(ch) || used.has(ch)) continue;
       used.add(ch);
@@ -2101,7 +2109,8 @@ function readParams() {
     const out = [];
     for (const word of String(str || '').trim().split(/\s+/).filter(Boolean)) {
       if (out.length >= Q7_CIRCLE.maxLetters) break;
-      for (const ch of word) {
+      for (const raw of word) {
+        const ch = glyphLetter(raw);
         if (avail.has(ch)) {
           out.push(ch);
           break;
@@ -2179,7 +2188,8 @@ function readParams() {
     const avail = new Set(glyphLetters.length ? glyphLetters : HEB);
     const used = new Set();
     const out = [];
-    for (const ch of phrase.replace(/\s/g, '')) {
+    for (const raw of phrase.replace(/\s/g, '')) {
+      const ch = glyphLetter(raw);
       if (out.length >= MAX_FRINGE_LETTERS) break;
       if (!avail.has(ch) || used.has(ch)) continue;
       used.add(ch);

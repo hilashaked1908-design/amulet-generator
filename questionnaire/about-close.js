@@ -5,7 +5,6 @@
 
   function closeAbout() {
     var overlay = document.getElementById('aboutOverlay');
-    var btn = document.getElementById('aboutCloseBtn');
     if (!overlay) return;
 
     overlay.hidden = true;
@@ -13,23 +12,18 @@
     overlay.setAttribute('aria-hidden', 'true');
     overlay.style.display = 'none';
 
-    if (btn) btn.hidden = true;
-
     document.body.classList.remove('is-about-overlay-open');
     window.dispatchEvent(new CustomEvent('questionnaire:about-closed'));
   }
 
   function openAbout() {
     var overlay = document.getElementById('aboutOverlay');
-    var btn = document.getElementById('aboutCloseBtn');
     if (!overlay) return;
 
     overlay.hidden = false;
     overlay.style.display = '';
     overlay.removeAttribute('aria-hidden');
     overlay.classList.add('is-visible');
-
-    if (btn) btn.hidden = false;
 
     document.body.classList.add('is-about-overlay-open');
     window.dispatchEvent(new CustomEvent('questionnaire:about-opened'));

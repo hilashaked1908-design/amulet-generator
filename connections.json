@@ -1537,29 +1537,6 @@
       }
     },
     {
-      "from": "ל",
-      "to": "ב",
-      "intent": "protection",
-      "fromGlyph": {
-        "x": 340.0,
-        "y": 297.0,
-        "rotation": -1.0,
-        "scale": 1.4267,
-        "size": 214.0,
-        "flipX": false,
-        "flipY": false
-      },
-      "toGlyph": {
-        "x": 424.0,
-        "y": 332.0,
-        "rotation": 0.0,
-        "scale": 1.0,
-        "size": 150.0,
-        "flipX": false,
-        "flipY": false
-      }
-    },
-    {
       "from": "ב",
       "to": "נ",
       "intent": "summoning",
@@ -2245,29 +2222,6 @@
         "rotation": 0.0,
         "scale": 1.0,
         "size": 150.0,
-        "flipX": false,
-        "flipY": false
-      }
-    },
-    {
-      "from": "ב",
-      "to": "ל",
-      "intent": "protection",
-      "fromGlyph": {
-        "x": 340.0,
-        "y": 340.0,
-        "rotation": 0.0,
-        "scale": 1.0,
-        "size": 150.0,
-        "flipX": false,
-        "flipY": false
-      },
-      "toGlyph": {
-        "x": 295.0,
-        "y": 261.0,
-        "rotation": 0.0,
-        "scale": 1.4,
-        "size": 210.0,
         "flipX": false,
         "flipY": false
       }
@@ -7203,6 +7157,857 @@
       "toGlyph": {
         "x": 354.0,
         "y": 347.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ר",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 304.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 358.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ש",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 345.0,
+        "y": 244.0,
+        "rotation": -90.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 341.0,
+        "y": 360.0,
+        "rotation": 1.0,
+        "scale": 1.6267,
+        "size": 244.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 384.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 325.0,
+        "y": 346.0,
+        "rotation": 0.0,
+        "scale": 1.3067,
+        "size": 196.0,
+        "flipX": true,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ס",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 296.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 376.0,
+        "y": 344.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "כ",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 338.0,
+        "rotation": 0.0,
+        "scale": 1.0267,
+        "size": 154.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 396.0,
+        "y": 337.0,
+        "rotation": -1.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "י",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 355.0,
+        "y": 349.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 337.0,
+        "y": 240.0,
+        "rotation": 0.0,
+        "scale": 0.72,
+        "size": 108.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ח",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 298.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": true,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 385.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ח",
+      "to": "ז",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 272.0,
+        "y": 333.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "י",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 328.0,
+        "y": 267.0,
+        "rotation": 0.0,
+        "scale": 0.72,
+        "size": 108.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 359.0,
+        "y": 350.0,
+        "rotation": 0.0,
+        "scale": 1.4,
+        "size": 210.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "ר",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 257.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 317.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 356.0,
+        "y": 357.0,
+        "rotation": 0.0,
+        "scale": 1.3733,
+        "size": 206.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "ס",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 316.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 429.0,
+        "y": 341.0,
+        "rotation": 0.0,
+        "scale": 1.0667,
+        "size": 160.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "מ",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 318.0,
+        "y": 342.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 388.0,
+        "y": 281.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "ל",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 413.0,
+        "y": 310.0,
+        "rotation": 0.0,
+        "scale": 1.6267,
+        "size": 244.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "כ",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 291.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 384.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": true,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "ז",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 317.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 399.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "כ",
+      "to": "א",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 319.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 342.0,
+        "y": 305.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ב",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 297.0,
+        "rotation": -1.0,
+        "scale": 1.4267,
+        "size": 214.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 411.0,
+        "y": 330.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ז",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 370.0,
+        "y": 321.0,
+        "rotation": 0.0,
+        "scale": 1.48,
+        "size": 222.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 310.0,
+        "y": 356.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ל",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 303.0,
+        "y": 380.0,
+        "rotation": 0.0,
+        "scale": 1.4667,
+        "size": 220.0,
+        "flipX": true,
+        "flipY": true
+      },
+      "toGlyph": {
+        "x": 378.0,
+        "y": 299.0,
+        "rotation": 0.0,
+        "scale": 1.4667,
+        "size": 220.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ס",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 298.0,
+        "y": 311.0,
+        "rotation": 0.0,
+        "scale": 1.4267,
+        "size": 214.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 369.0,
+        "y": 345.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 379.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ר",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 327.0,
+        "rotation": 0.0,
+        "scale": 1.36,
+        "size": 204.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 394.0,
+        "y": 362.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ל",
+      "to": "ש",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 350.0,
+        "y": 284.0,
+        "rotation": 0.0,
+        "scale": 1.32,
+        "size": 198.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 342.0,
+        "y": 369.0,
+        "rotation": 0.0,
+        "scale": 1.3467,
+        "size": 202.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "ש",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 297.0,
+        "y": 314.0,
+        "rotation": 0.0,
+        "scale": 0.9733,
+        "size": 146.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 380.0,
+        "y": 389.0,
+        "rotation": 0.0,
+        "scale": 1.32,
+        "size": 198.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "ר",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 317.0,
+        "y": 341.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 396.0,
+        "y": 341.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 412.0,
+        "y": 351.0,
+        "rotation": 0.0,
+        "scale": 1.1467,
+        "size": 172.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "ס",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 307.0,
+        "y": 381.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 365.0,
+        "y": 282.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "מ",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 282.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": true,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 398.0,
+        "y": 339.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "מ",
+      "to": "ז",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 363.0,
+        "y": 315.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "ש",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 282.0,
+        "rotation": -94.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 339.0,
+        "y": 392.0,
+        "rotation": 0.0,
+        "scale": 1.4267,
+        "size": 214.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "ר",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 353.0,
+        "y": 322.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "ק",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 333.0,
+        "y": 287.0,
+        "rotation": 0.0,
+        "scale": 1.2,
+        "size": 180.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "ס",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 269.0,
+        "y": 336.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": true,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 412.0,
+        "y": 337.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "י",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 322.0,
+        "y": 223.0,
+        "rotation": 0.0,
+        "scale": 0.8667,
+        "size": 130.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "ז",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 380.0,
+        "y": 284.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      }
+    },
+    {
+      "from": "ס",
+      "to": "א",
+      "intent": "protection",
+      "fromGlyph": {
+        "x": 340.0,
+        "y": 340.0,
+        "rotation": 0.0,
+        "scale": 1.0,
+        "size": 150.0,
+        "flipX": false,
+        "flipY": false
+      },
+      "toGlyph": {
+        "x": 277.0,
+        "y": 281.0,
         "rotation": 0.0,
         "scale": 1.0,
         "size": 150.0,

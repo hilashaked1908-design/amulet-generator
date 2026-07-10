@@ -269,12 +269,17 @@ function populateResultOverlay(answers) {
   const componentsEl = document.getElementById('resultComponents');
 
   if (numEl) {
-    const digits = numEl.querySelector('.pagmar__result-num__digits');
+    const textEl = numEl.querySelector('.pagmar__result-num__text');
     const label = String(getNextAmuletIndex()).padStart(3, '0');
-    if (digits) {
-      digits.textContent = label;
+    if (textEl) {
+      textEl.textContent = '[' + label + ']';
     } else {
-      numEl.textContent = '[' + label + ']';
+      const digits = numEl.querySelector('.pagmar__result-num__digits');
+      if (digits) {
+        digits.textContent = label;
+      } else {
+        numEl.textContent = '[' + label + ']';
+      }
     }
   }
 
@@ -386,6 +391,14 @@ async function waitForOverlayLayout() {
     });
   });
 }
+
+function waitForMs(ms) {
+  return new Promise(function (resolve) {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+const RESULT_OVERLAY_FADE_MS = 400;
 
 function isSheshAmulet(answers) {
   return answers?.q4Belief === 'doubt';
@@ -510,14 +523,17 @@ async function showResultOverlay(container, answers) {
     fogMod.resizeResultOverlayFog();
   });
 
-  if (workspace) workspace.classList.remove('is-open');
+  try {
+    await renderResultOverlayVectors(answers);
+  } catch (err) {
+    console.warn('[amulet-show] result vectors failed', err);
+  }
 
-  overlay.classList.add('is-visible');
-  document.body.classList.remove('is-amulet-rendering');
-  markResultViewActive();
+  fitResultStoryTypography();
+  await waitForOverlayLayout();
 
   try {
-    const hoverMod = await import('./result-overlay-hover.js?v=20250708-result-hover');
+    const hoverMod = await import('./result-overlay-hover.js?v=20250710-result-glass-360');
     if (typeof hoverMod.bootResultAmuletHover === 'function') {
       hoverMod.bootResultAmuletHover();
     }
@@ -525,7 +541,33 @@ async function showResultOverlay(container, answers) {
     console.warn('[amulet-show] result hover boot failed', err);
   }
 
+  try {
+    const questionHoverMod = await import('./result-overlay-question-hover.js?v=20250710-result-tag-hover');
+    if (typeof questionHoverMod.bootResultQuestionHover === 'function') {
+      questionHoverMod.bootResultQuestionHover();
+    }
+  } catch (err) {
+    console.warn('[amulet-show] result question hover boot failed', err);
+  }
+
+  if (window.pagmarGlassLens) {
+    const resultNum = document.getElementById('resultNum');
+    if (resultNum) window.pagmarGlassLens.register(resultNum);
+    overlay.querySelectorAll('.glass-lens').forEach(function (lensEl) {
+      window.pagmarGlassLens.register(lensEl);
+    });
+  }
+
+  if (workspace) workspace.classList.remove('is-open');
+
+  /* Reveal the finished result page behind the loader, then fade the loader out. */
+  overlay.classList.add('is-visible');
+  await waitForOverlayLayout();
+  await waitForMs(RESULT_OVERLAY_FADE_MS);
   fitResultStoryTypography();
+  await waitForOverlayLayout();
+
+  markResultViewActive();
   if (!window.__pagmarResultStoryFitBound) {
     window.__pagmarResultStoryFitBound = true;
     window.addEventListener('resize', function () {
@@ -534,17 +576,9 @@ async function showResultOverlay(container, answers) {
     });
   }
 
-  await waitForOverlayLayout();
-  try {
-    await renderResultOverlayVectors(answers);
-  } catch (err) {
-    console.warn('[amulet-show] result vectors failed', err);
-  }
-
-  fitResultStoryTypography();
-
+  document.body.classList.remove('is-amulet-rendering');
   setAmuletLoaderProgress(1);
-  hideAmuletLoader();
+  await hideAmuletLoader();
 
   if (typeof window.pagmarPushResultHistory === 'function') {
     window.pagmarPushResultHistory();
@@ -946,7 +980,7 @@ export async function showFinishedAmulet(answersOverride) {
       } else {
         document.body.classList.remove('is-amulet-rendering');
         setAmuletLoaderProgress(1);
-        hideAmuletLoader();
+        await hideAmuletLoader({ force: true });
         const workspace = document.getElementById('indexCreateWorkspace');
         if (wasIndexCreate && workspace) workspace.classList.add('is-open');
         document.body.classList.add(
@@ -965,7 +999,7 @@ export async function showFinishedAmulet(answersOverride) {
       }
     } else {
       setAmuletLoaderProgress(1);
-      hideAmuletLoader();
+      await hideAmuletLoader();
     }
 
     setStatus('', false);
@@ -973,7 +1007,7 @@ export async function showFinishedAmulet(answersOverride) {
   } catch (err) {
     if (token !== renderToken) return;
     if (inlineCreate) document.body.classList.remove('is-amulet-rendering');
-    hideAmuletLoader({ force: true });
+    await hideAmuletLoader({ force: true });
     if (zone) zone.classList.remove('is-textures-loading');
     console.error('[amulet] prototype PBR render failed', err);
     setStatus('לא הצלחנו להציג את הקמע: ' + (err?.message || err), true);
@@ -1055,20 +1089,10 @@ function bindResultOverlayButtons(container, answers) {
   }
 
   function handleExport() {
-    const slot = document.getElementById('resultAmulet3D');
-    const liveCanvas = slot?.querySelector('canvas');
-    const exportContainer = liveCanvas ? slot : container;
     try {
-      const snap = captureGardenSnapshotFromCanvas(liveCanvas);
-      if (snap) {
-        exportCanvasAsTransparentPng(snap, { filename: 'amulet' });
-        return;
-      }
-
-      exportAmuletCanvasPng(exportContainer, { filename: 'amulet' });
-    } catch (err) {
-      console.error('[amulet-show] export failed', err);
-    }
+      sessionStorage.setItem('pagmarExportViewActive', '1');
+    } catch (_) {}
+    window.location.href = 'export-view.html';
   }
 
   function handleCreateAnother() {

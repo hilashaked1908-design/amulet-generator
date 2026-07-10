@@ -1,0 +1,347 @@
+/* Export view - Figma 2701:46347 @ 1920×1080 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body.pagmar-export-view {
+  margin: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #000000;
+  color: #f4f4e8;
+}
+
+.pagmar__export-fog {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: transparent;
+}
+
+.pagmar__export-fog.pagmar__detail-fog--live {
+  opacity: 1;
+}
+
+.pagmar__export-fog .pagmar__detail-fog-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pagmar__export-page {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  --pagmar-w: 1920;
+  --pagmar-h: 1080;
+  --export-fg: #f4f4e8;
+  --export-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --export-body-font: "TheBasics", "TheBasics Mono", monospace;
+  --export-wish-font: "Lava Pro HL", "TheBasics Display Thin", serif;
+}
+
+.pagmar__export-main {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  --u: min(calc(100cqw / var(--pagmar-w)), calc(100cqh / var(--pagmar-h)));
+  padding:
+    calc(50 * var(--u))
+    calc(50 * var(--u))
+    calc(80 * var(--u));
+}
+
+.pagmar__export-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.pagmar__export-chrome .pagmar-chrome__about,
+.pagmar__export-chrome .pagmar-chrome__close {
+  pointer-events: auto;
+}
+
+/* ── 800×800 card - Figma 2604:42787 ── */
+.pagmar__export-card {
+  position: relative;
+  width: calc(800 * var(--u));
+  height: calc(800 * var(--u));
+  flex: 0 0 auto;
+  border: calc(1 * var(--u)) solid var(--export-fg);
+  overflow: hidden;
+  background: transparent;
+  direction: rtl;
+}
+
+/* Vectors - top left, Figma 2604:42794 */
+.pagmar__export-vectors {
+  position: absolute;
+  z-index: 4;
+  top: calc(29 * var(--u));
+  left: calc(76 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(30 * var(--u));
+  pointer-events: none;
+}
+
+.pagmar__export-vector {
+  position: relative;
+  width: calc(94.083 * var(--u));
+  height: calc(90.895 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.pagmar__export-vector svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pagmar__export-vector svg path {
+  stroke: var(--export-fg);
+  stroke-width: var(--pagmar-line-weight, 1.5px);
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Name - top right, Figma 2604:42791 */
+.pagmar__export-name {
+  position: absolute;
+  z-index: 4;
+  top: calc(38 * var(--u));
+  right: calc(29 * var(--u));
+  margin: 0;
+  max-width: calc(173 * var(--u));
+  color: var(--export-fg);
+  font-family: var(--export-tag-font);
+  font-size: calc(18 * var(--u));
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: right;
+  pointer-events: none;
+}
+
+/* Timing - bottom left, Figma 2604:42790 */
+.pagmar__export-timing-block {
+  position: absolute;
+  z-index: 4;
+  left: calc(29 * var(--u));
+  bottom: calc(168 * var(--u));
+  width: calc(233 * var(--u));
+  pointer-events: none;
+}
+
+.pagmar__export-tag {
+  display: block;
+  margin: 0 0 calc(8 * var(--u));
+  color: var(--export-fg);
+  font-family: var(--export-tag-font);
+  font-size: calc(18 * var(--u));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: calc(0.5 * var(--u));
+  text-align: right;
+}
+
+.pagmar__export-timing {
+  margin: 0;
+  color: var(--export-fg);
+  font-family: var(--export-body-font);
+  font-size: calc(27 * var(--u));
+  font-weight: 400;
+  line-height: 1.1;
+  text-align: right;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Outcome - bottom left lower, Figma 2604:42792 */
+.pagmar__export-outcome {
+  position: absolute;
+  z-index: 4;
+  left: calc(29 * var(--u));
+  bottom: calc(56 * var(--u));
+  width: calc(233 * var(--u));
+  margin: 0;
+  color: var(--export-fg);
+  font-family: var(--export-body-font);
+  font-size: calc(27 * var(--u));
+  font-weight: 400;
+  line-height: 1.1;
+  text-align: right;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+/* Wish - bottom right, Figma 2604:42789 */
+.pagmar__export-wish {
+  position: absolute;
+  z-index: 4;
+  right: calc(29 * var(--u));
+  bottom: calc(56 * var(--u));
+  width: calc(360 * var(--u));
+  max-height: calc(280 * var(--u));
+  margin: 0;
+  color: var(--export-fg);
+  font-family: var(--export-wish-font);
+  font-size: calc(90 * var(--u));
+  font-weight: 100;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: calc(-1.8 * var(--u));
+  text-align: right;
+  direction: rtl;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Amulet - מיקום קמע 536×536, Figma 2704:46454 */
+.pagmar__export-amulet-frame {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: calc(70.33 * var(--u));
+  width: calc(536 * var(--u));
+  height: calc(536 * var(--u));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pagmar__export-amulet-slot {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
+.pagmar__export-amulet-slot canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 360° hover pill */
+.pagmar__export-amulet-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+.pagmar__export-amulet-hover.is-visible {
+  opacity: 1;
+}
+
+.pagmar__export-amulet-hover__surface {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(11 * var(--u, 1px)) calc(18 * var(--u, 1px)) calc(10 * var(--u, 1px)) calc(16 * var(--u, 1px));
+  border-radius: calc(40 * var(--u, 1px));
+  overflow: hidden;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.pagmar__export-amulet-hover__surface .glass-lens__backdrop,
+.pagmar__export-amulet-hover__surface .glass-clone,
+.pagmar__export-amulet-hover__surface .glass-chrome,
+.pagmar__export-amulet-hover__surface .glass-lens__tint {
+  border-radius: calc(40 * var(--u, 1px));
+}
+
+.pagmar__export-amulet-hover .pagmar__glass-pill__text {
+  position: relative;
+  z-index: 3;
+  font-family: var(--export-tag-font);
+  font-size: calc(16 * var(--u, 1px));
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0.02em;
+  color: var(--export-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pagmar__export-amulet-hover .pagmar__glass-pill__deg {
+  font-size: 0.72em;
+  vertical-align: super;
+}
+
+/* Export button - Figma 2702:46435 */
+.pagmar__export-image-btn {
+  position: relative;
+  z-index: 5;
+  margin-top: calc(50 * var(--u));
+  padding: calc(14 * var(--u)) calc(30 * var(--u)) calc(15 * var(--u));
+  border: none;
+  border-radius: calc(70 * var(--u));
+  background: #f4f4e8;
+  color: #1e1e1e;
+  font-family: var(--export-body-font);
+  font-size: calc(24 * var(--u));
+  font-weight: 400;
+  letter-spacing: calc(-0.24 * var(--u));
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: opacity 0.2s ease;
+}
+
+.pagmar__export-image-btn:hover {
+  opacity: 0.88;
+}
+
+.pagmar__export-image-btn:focus-visible {
+  outline: calc(2 * var(--u)) solid rgba(244, 244, 232, 0.45);
+  outline-offset: calc(3 * var(--u));
+}
+
+.pagmar__export-image-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.pagmar__export-image-btn__label {
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .pagmar__export-main {
+    padding:
+      calc(72 * var(--u))
+      calc(16 * var(--u))
+      calc(40 * var(--u));
+  }
+
+  .pagmar__export-card {
+    width: min(calc(800 * var(--u)), calc(100vw - 32px));
+    height: min(calc(800 * var(--u)), calc(100vw - 32px));
+  }
+}

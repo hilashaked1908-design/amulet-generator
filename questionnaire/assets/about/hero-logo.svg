@@ -1,5 +1,5 @@
 <svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 17.5376 21.2351" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="Frame 315">
-<path id="Vector" d="M0.709717 2L16.8279 18.2351M16.8279 2L0.709656 18.2351" stroke="#F4F4E8" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+<path id="Vector" d="M0.709717 2L16.8279 18.2351M16.8279 2L0.709656 18.2351" stroke="var(--stroke-0, #F5F5F5)" stroke-width="2"/>
 </g>
 </svg>

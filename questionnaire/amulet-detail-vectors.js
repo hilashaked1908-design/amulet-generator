@@ -22,7 +22,10 @@ const DETAIL_VECTOR_BOX_BY_VARIANT = {
 const DETAIL_VECTOR_PAD = 12;
 /** Room under the shape so the stroke is not clipped on the shared baseline. */
 const DETAIL_VECTOR_BOTTOM_PAD = DETAIL_VECTOR_PAD + DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
-const DETAIL_VECTOR_SCALE = 1;
+/** Shrink-to-fit inset so stroke + joins stay inside the frame. */
+const DETAIL_VECTOR_FIT_INSET = 0.86;
+const DETAIL_VECTOR_VIEW_BLEED = 20;
+const DETAIL_VECTOR_SCALE = DETAIL_VECTOR_FIT_INSET;
 const DETAIL_MASK_SCALE = 4;
 const DEFAULT_MASK_STROKE = 17;
 const PATH_MAIN_W = 45 * 0.37;
@@ -34,9 +37,9 @@ const QUESTIONNAIRE_THUMB_BOX_W = 90.3;
 const QUESTIONNAIRE_THUMB_BOX_H = 89.813;
 
 const LAYER_VECTOR_CONFIG = {
-  '.layer-q3-stone-engrave': { dilate: 12, pad: 36 },
-  '.layer-2': { dilate: 14, pad: 40 },
-  '.layer-3': { dilate: 12, pad: 44 },
+  '.layer-q3-stone-engrave': { dilate: 16, pad: 56, minCropH: 72, minCropW: 100 },
+  '.layer-2': { dilate: 16, pad: 48, minCropH: 100, minCropW: 88 },
+  '.layer-3': { dilate: 18, pad: 60, minCropH: 160, minCropW: 100 },
 };
 
 function waitForPaint() {
@@ -103,6 +106,11 @@ export async function bootDetailVectors() {
   await waitForDetailContent();
   await waitForDetailCatalog();
   await waitForFonts();
+  if (window.pagmarDetailComposePreload) {
+    try {
+      await window.pagmarDetailComposePreload;
+    } catch (_) {}
+  }
   await waitForPaint();
   await renderVectors();
 }
@@ -139,15 +147,35 @@ async function waitForDetailCatalog() {
   }
 }
 
+function readNavAnswersForEntry(entryId) {
+  if (entryId == null) return null;
+  try {
+    const navRaw = sessionStorage.getItem('pagmarAmuletDetailNav');
+    if (!navRaw) return null;
+    const nav = JSON.parse(navRaw);
+    if (nav && nav.entryId == entryId && nav.answers) {
+      return nav.answers;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function resolveDetailAnswers(idx) {
   const entryId = resolveDetailEntryId(idx);
-  if (
-    entryId != null &&
-    window.__pagmarDetailAnswersByEntryId &&
-    window.__pagmarDetailAnswersByEntryId[entryId] &&
-    window.__pagmarDetailAnswersByEntryId[entryId].q1Wish
-  ) {
-    return window.__pagmarDetailAnswersByEntryId[entryId];
+  if (entryId != null) {
+    const navAnswers = readNavAnswersForEntry(entryId);
+    if (navAnswers && navAnswers.q1Wish) return navAnswers;
+    if (
+      window.__pagmarDetailAnswersByEntryId &&
+      window.__pagmarDetailAnswersByEntryId[entryId] &&
+      window.__pagmarDetailAnswersByEntryId[entryId].q1Wish
+    ) {
+      return window.__pagmarDetailAnswersByEntryId[entryId];
+    }
+    if (typeof window.pagmarFindCollectionEntryById === 'function') {
+      const entry = window.pagmarFindCollectionEntryById(entryId);
+      if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
+    }
   }
   if (typeof window.pagmarResolveCollectionEntry === 'function') {
     const entry = window.pagmarResolveCollectionEntry(idx);
@@ -158,6 +186,21 @@ function resolveDetailAnswers(idx) {
     if (record && record.q1Wish) return record;
   }
   return null;
+}
+
+function authoritativeDetailAnswers(entryId, idx) {
+  if (entryId != null) {
+    const navAnswers = readNavAnswersForEntry(entryId);
+    if (navAnswers && navAnswers.q1Wish) return navAnswers;
+    if (
+      window.__pagmarDetailAnswersByEntryId &&
+      window.__pagmarDetailAnswersByEntryId[entryId] &&
+      window.__pagmarDetailAnswersByEntryId[entryId].q1Wish
+    ) {
+      return window.__pagmarDetailAnswersByEntryId[entryId];
+    }
+  }
+  return resolveDetailAnswers(idx);
 }
 
 function readFreshComposedFromStorage() {
@@ -202,7 +245,13 @@ function resolveDetailEntryId(idx) {
     const navRaw = sessionStorage.getItem('pagmarAmuletDetailNav');
     if (navRaw) {
       const nav = JSON.parse(navRaw);
-      if (nav && nav.index === idx && nav.entryId != null) return nav.entryId;
+      const urlEntryRaw = new URLSearchParams(window.location.search).get('entry');
+      const urlEntry =
+        urlEntryRaw != null && urlEntryRaw !== '' ? parseInt(urlEntryRaw, 10) : null;
+      if (nav && nav.entryId != null) {
+        if (Number.isFinite(urlEntry) && nav.entryId == urlEntry) return nav.entryId;
+        if (nav.index === idx) return nav.entryId;
+      }
     }
   } catch (_) {}
 
@@ -243,13 +292,68 @@ function composedSvgHasLayers(svgMarkup) {
   }
 }
 
-/** Per-amulet compose for detail page - never the global live-builder snapshot. */
-async function resolveDetailPageCompose(record, idx) {
-  const entryId = resolveDetailEntryId(idx);
+export async function preloadDetailCompose(entryId, answers) {
+  if (!answers || !answers.q1Wish) return null;
+  window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
+  if (
+    window.__pagmarDetailComposedByEntryId[entryId] &&
+    composedSvgHasLayers(window.__pagmarDetailComposedByEntryId[entryId].svg)
+  ) {
+    return window.__pagmarDetailComposedByEntryId[entryId];
+  }
+  try {
+    await waitForFonts();
+    const compose = await import('./amulet-compose.js');
+    await compose.initAmuletCompose();
+    const composed = await getSharedDetailCompose(answers, { entryId: entryId });
+    if (composed?.svg && composedSvgHasLayers(composed.svg)) {
+      window.__pagmarDetailComposedByEntryId[entryId] = composed;
+      return composed;
+    }
+  } catch (err) {
+    console.warn('[detail-vectors] preload compose failed', err);
+  }
+  return null;
+}
+
+/** Per-amulet compose for detail page - preloaded/cache first, then live compose, then IDB. */
+async function resolveDetailPageCompose(record, idx, entryIdOverride) {
+  const entryId = entryIdOverride != null ? entryIdOverride : resolveDetailEntryId(idx);
+
+  if (entryId != null && window.__pagmarDetailComposedByEntryId?.[entryId]) {
+    const cached = window.__pagmarDetailComposedByEntryId[entryId];
+    if (cached?.svg && composedSvgHasLayers(cached.svg)) return cached;
+  }
+
+  if (window.pagmarDetailComposePreload) {
+    try {
+      const preloaded = await window.pagmarDetailComposePreload;
+      if (preloaded?.svg && composedSvgHasLayers(preloaded.svg)) return preloaded;
+    } catch (_) {}
+  }
+
+  if (record && record.q1Wish) {
+    try {
+      const compose = await import('./amulet-compose.js');
+      await compose.initAmuletCompose();
+      const composed = await getSharedDetailCompose(record, { entryId: entryId });
+      if (composed?.svg && composedSvgHasLayers(composed.svg)) {
+        if (entryId != null) {
+          window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
+          window.__pagmarDetailComposedByEntryId[entryId] = composed;
+        }
+        return composed;
+      }
+    } catch (err) {
+      console.warn('[detail-vectors] compose from answers failed, trying IDB', err);
+    }
+  }
+
   if (entryId != null) {
     const perEntry = await readComposedForEntry(entryId);
     if (perEntry?.svg && composedSvgHasLayers(perEntry.svg)) return perEntry;
   }
+
   return getSharedDetailCompose(record, { entryId: entryId });
 }
 
@@ -315,26 +419,12 @@ export async function renderResultOverlayVectors(answers) {
   }
 }
 
-async function renderVectors(options = {}) {
-  const markBootDone = options.markBootDone !== false;
+export async function renderExportCardVectors(answers) {
+  if (!answers || !answers.q1Wish) return;
+
   try {
-    await import('./seed-bootstrap.js')
-      .then(function (mod) {
-        return mod.ensureSeedCollectionLoaded();
-      })
-      .catch(function () {});
-
-    const idx = parseAmuletIndex();
-    const base = (window.AMULET_QUESTIONS || []).length;
-    if (idx < base) return;
-
-    const record = resolveDetailAnswers(idx);
-    if (!record || !record.q1Wish) return;
-
-    clearDetailVectorSlots();
-
     await yieldToBrowser();
-    const composed = await resolveDetailPageCompose(record, idx);
+    const composed = await resolveResultCompose(answers);
     if (!composed || !composed.svg) return;
 
     const parser = new DOMParser();
@@ -346,9 +436,9 @@ async function renderVectors(options = {}) {
     const defsEl = svgEl.querySelector('defs');
 
     await extractAndRender(
-      'detailVectorTiming',
+      'exportVectorQ1',
       svgEl,
-      '.layer-q3-stone-engrave',
+      '.layer-3',
       viewBox,
       defsEl,
       composed.style2,
@@ -356,7 +446,7 @@ async function renderVectors(options = {}) {
     );
     await yieldToBrowser();
     await extractAndRender(
-      'detailVectorBelonging',
+      'exportVectorQ2',
       svgEl,
       '.layer-2',
       viewBox,
@@ -366,25 +456,128 @@ async function renderVectors(options = {}) {
     );
     await yieldToBrowser();
     await extractAndRender(
-      'detailVectorRequest',
+      'exportVectorQ3',
       svgEl,
-      '.layer-3',
+      '.layer-q3-stone-engrave',
       viewBox,
       defsEl,
       composed.style2,
       composed.style3
     );
+  } catch (err) {
+    console.warn('[export-vectors] failed:', err);
+  }
+}
 
-    if (composed.questionnaire) {
-      applyQuestionnaireFieldLabels(composed.questionnaire, {
-        request: 'detailRequestCriterion',
-        name: 'detailName',
-        timing: 'detailTiming',
-      });
+function detailVectorsComplete() {
+  return ['detailVectorTiming', 'detailVectorBelonging', 'detailVectorRequest'].every(function (id) {
+    const el = document.getElementById(id);
+    return el && el.querySelector('svg path[d]');
+  });
+}
+
+async function renderVectorsOnce(options) {
+  const markBootDone = options.markBootDone !== false;
+  await import('./seed-bootstrap.js')
+    .then(function (mod) {
+      return mod.ensureSeedCollectionLoaded();
+    })
+    .catch(function () {});
+
+  const idx = parseAmuletIndex();
+  const base = (window.AMULET_QUESTIONS || []).length;
+  if (idx < base) return false;
+
+  const entryId = resolveDetailEntryId(idx);
+  const record = authoritativeDetailAnswers(entryId, idx);
+  if (!record || !record.q1Wish) return false;
+
+  clearDetailVectorSlots();
+
+  await waitForFonts();
+  await yieldToBrowser();
+  const composed = await resolveDetailPageCompose(record, idx, entryId);
+  if (!composed || !composed.svg) return false;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(composed.svg, 'image/svg+xml');
+  const svgEl = doc.querySelector('svg');
+  if (!svgEl) return false;
+
+  const viewBox = svgEl.getAttribute('viewBox') || '0 0 680 680';
+  const defsEl = svgEl.querySelector('defs');
+
+  await extractAndRender(
+    'detailVectorTiming',
+    svgEl,
+    '.layer-q3-stone-engrave',
+    viewBox,
+    defsEl,
+    composed.style2,
+    composed.style3
+  );
+  await yieldToBrowser();
+  await extractAndRender(
+    'detailVectorBelonging',
+    svgEl,
+    '.layer-2',
+    viewBox,
+    defsEl,
+    composed.style2,
+    composed.style3
+  );
+  await yieldToBrowser();
+  await extractAndRender(
+    'detailVectorRequest',
+    svgEl,
+    '.layer-3',
+    viewBox,
+    defsEl,
+    composed.style2,
+    composed.style3
+  );
+
+  if (composed.questionnaire) {
+    applyQuestionnaireFieldLabels(composed.questionnaire, {
+      request: 'detailRequestCriterion',
+      name: 'detailName',
+      timing: 'detailTiming',
+    });
+  }
+
+  return detailVectorsComplete();
+}
+
+async function renderVectors(options = {}) {
+  const markBootDone = options.markBootDone !== false;
+  try {
+    if (window.pagmarDetailComposePreload) {
+      try {
+        await window.pagmarDetailComposePreload;
+      } catch (_) {}
+    }
+
+    let rendered = false;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (attempt > 0) {
+        await waitForFonts();
+        await waitForPaint();
+        await new Promise(function (resolve) {
+          window.setTimeout(resolve, 140 * attempt);
+        });
+      }
+      rendered = await renderVectorsOnce(options);
+      if (rendered) break;
+    }
+    if (!rendered) {
+      console.warn('[detail-vectors] incomplete after retries');
     }
   } catch (err) {
     console.warn('[detail-vectors] failed:', err);
   } finally {
+    try {
+      window.dispatchEvent(new CustomEvent('pagmar:detail-vectors-ready'));
+    } catch (_) {}
     if (markBootDone && window.pagmarDetailBoot) window.pagmarDetailBoot.done('vectors');
   }
 }
@@ -411,11 +604,26 @@ function clearDetailVectorSlots() {
 }
 
 function parseAmuletIndex() {
-  const params = new URLSearchParams(window.location.search);
-  const raw = params.get('id');
-  if (raw == null || raw === '') return 0;
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const entryRaw = params.get('entry');
+    if (entryRaw != null && entryRaw !== '') {
+      const entryId = parseInt(entryRaw, 10);
+      if (
+        Number.isFinite(entryId) &&
+        typeof window.pagmarIndexForEntryId === 'function'
+      ) {
+        const fromEntry = window.pagmarIndexForEntryId(entryId);
+        if (fromEntry != null) return fromEntry;
+      }
+    }
+    const raw = params.get('id');
+    if (raw == null || raw === '') return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch (_) {
+    return 0;
+  }
 }
 
 function estimateMaskStroke(layers, selector, style2, style3) {
@@ -447,7 +655,28 @@ function estimateMaskStroke(layers, selector, style2, style3) {
 }
 
 function layerVectorConfig(selector) {
-  return LAYER_VECTOR_CONFIG[selector] || { dilate: 8, pad: 24 };
+  return LAYER_VECTOR_CONFIG[selector] || { dilate: 8, pad: 24, minCropH: 64, minCropW: 64 };
+}
+
+function normalizeCropForLayer(crop, viewSize, config) {
+  if (!crop) return crop;
+  const minH = config.minCropH || 64;
+  const minW = config.minCropW || 64;
+  let x = crop.x;
+  let y = crop.y;
+  let width = crop.width;
+  let height = crop.height;
+  if (height < minH) {
+    const extra = minH - height;
+    y = Math.max(0, y - extra * 0.55);
+    height = Math.min(viewSize.h - y, height + extra);
+  }
+  if (width < minW) {
+    const extra = minW - width;
+    x = Math.max(0, x - extra * 0.5);
+    width = Math.min(viewSize.w - x, width + extra);
+  }
+  return { x: x, y: y, width: width, height: height };
 }
 
 function countGridFilled(grid) {
@@ -456,7 +685,7 @@ function countGridFilled(grid) {
   return n;
 }
 
-function mountComposedSvg(svgEl) {
+async function mountComposedSvg(svgEl) {
   const ns = 'http://www.w3.org/2000/svg';
   const mount = svgEl.cloneNode(true);
   mount.setAttribute('xmlns', ns);
@@ -467,6 +696,7 @@ function mountComposedSvg(svgEl) {
   mount.style.cssText =
     'position:fixed;left:-10000px;top:0;width:680px;height:680px;pointer-events:none;z-index:-1';
   document.body.appendChild(mount);
+  await waitForPaint();
   return mount;
 }
 
@@ -907,13 +1137,14 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
   const fullCrop = { x: 0, y: 0, width: viewSize.w, height: viewSize.h };
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const mountedSvg = mountComposedSvg(svgEl);
+    const mountedSvg = await mountComposedSvg(svgEl);
     try {
       prepareLayerForMask(mountedSvg, selector, maskStroke);
       await waitForPaint();
 
-      const crop =
+      let crop =
         layerContentBBox(mountedSvg, selector, config.pad, maskStroke, config.dilate) || fullCrop;
+      crop = normalizeCropForLayer(crop, viewSize, config);
       if (!crop || crop.width < 8 || crop.height < 8) continue;
 
       const contour = await rasterContourFromCrop(
@@ -923,7 +1154,7 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
         config.dilate,
         maskStroke
       );
-      if (contour) return contour;
+      if (contour && isContourUsable(contour, selector)) return contour;
     } catch (err) {
       console.warn('[detail-vectors] raster attempt failed for', selector, err);
     } finally {
@@ -933,7 +1164,7 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const mountedSvg = mountComposedSvg(svgEl);
+    const mountedSvg = await mountComposedSvg(svgEl);
     try {
       prepareLayerForMask(mountedSvg, selector, maskStroke);
       await waitForPaint();
@@ -944,7 +1175,7 @@ async function unionLayerContour(layers, defsEl, svgEl, selector, style2, style3
         config.dilate,
         maskStroke
       );
-      if (contour) return contour;
+      if (contour && isContourUsable(contour, selector)) return contour;
     } catch (err) {
       console.warn('[detail-vectors] full-view raster failed for', selector, err);
     } finally {
@@ -961,8 +1192,8 @@ async function rasterContourFromCrop(mountedSvg, crop, scale, dilate, maskStroke
   const cropBottom = crop.y + crop.height;
   const touchesViewBottom = cropBottom >= viewSize.h - 1;
   const edgePad = touchesViewBottom
-    ? Math.max(48, Math.ceil((maskStroke || 0) / 2) + (dilate || 0) + 24)
-    : Math.max(16, Math.ceil((dilate || 0) / 2));
+    ? Math.max(72, Math.ceil((maskStroke || 0) / 2) + (dilate || 0) + 36)
+    : Math.max(24, Math.ceil((dilate || 0) / 2) + 8);
   const rasterCrop = {
     x: crop.x,
     y: crop.y,
@@ -1058,10 +1289,26 @@ function isContourUsable(contour, selector) {
   const b = contourBounds(contour);
   const cw = Math.max(b.maxX - b.minX, 0);
   const ch = Math.max(b.maxY - b.minY, 0);
-  if (cw < 6 || ch < 6) return false;
-  if (selector === '.layer-q3-stone-engrave' && cw / Math.max(ch, 1) > 10 && ch < 24) {
-    return false;
+  if (cw < 8 || ch < 8) return false;
+
+  if (selector === '.layer-q3-stone-engrave') {
+    if (ch < 14 || cw < 24) return false;
+    return cw * ch >= 280;
   }
+  if (selector === '.layer-3') {
+    if (ch < 22 || cw < 20) return false;
+    if (cw / Math.max(ch, 1) > 7) return false;
+    return cw * ch >= 400;
+  }
+  if (selector === '.layer-2') {
+    if (ch < 18 || cw < 20) return false;
+    if (ch < 26 && cw / Math.max(ch, 1) > 4) return false;
+    return cw * ch >= 360;
+  }
+
+  if (cw * ch < 180) return false;
+  if (ch < 22 && cw / Math.max(ch, 1) > 3.5) return false;
+  if (cw < 22 && ch / Math.max(cw, 1) > 3.5) return false;
   return true;
 }
 
@@ -1131,8 +1378,28 @@ function estimateDetailVectorScale(bounds, options) {
 }
 
 function strokeBleedInUserUnits(scale) {
-  const screenBleed = DETAIL_VECTOR_STROKE * 0.5 + DETAIL_VECTOR_STROKE_MARGIN + 2;
-  return screenBleed / Math.max(scale, 0.05);
+  const screenBleed = DETAIL_VECTOR_STROKE * 2 + DETAIL_VECTOR_STROKE_MARGIN * 2 + 6;
+  return Math.max(DETAIL_VECTOR_VIEW_BLEED, screenBleed / Math.max(scale, 0.05));
+}
+
+/** Hug the contour in compose space — no transform, generous bleed so stroke is never clipped. */
+function detailContourFitLayout(bounds) {
+  const minX = bounds.minX;
+  const minY = bounds.minY;
+  const maxX = bounds.maxX;
+  const maxY = bounds.maxY;
+  const cw = Math.max(maxX - minX, 1);
+  const ch = Math.max(maxY - minY, 1);
+  const bleed = DETAIL_VECTOR_VIEW_BLEED;
+  const boxW = cw + bleed * 2;
+  const boxH = ch + bleed * 2;
+  const vbX = minX - bleed;
+  const vbY = minY - bleed;
+  return {
+    viewBox: vbX + ' ' + vbY + ' ' + boxW + ' ' + boxH,
+    transform: '',
+    preserveAspectRatio: 'xMidYMax meet',
+  };
 }
 
 function detailVectorFitLayout(bounds, options) {
@@ -1144,18 +1411,19 @@ function detailVectorFitLayout(bounds, options) {
   const ch = Math.max(maxY - minY, 1);
   const frame = detailVectorFrameSize(options);
 
-  if (options && options.tight) {
+  if (options && (options.tight || options.frame)) {
     const padX = DETAIL_VECTOR_PAD + DETAIL_VECTOR_STROKE + DETAIL_VECTOR_STROKE_MARGIN;
     const padTop = DETAIL_VECTOR_PAD;
     const padBottom = DETAIL_VECTOR_BOTTOM_PAD;
-    const vbX = minX - padX;
-    const vbY = minY - padTop;
-    const vbW = cw + padX * 2;
-    const vbH = ch + padTop + padBottom;
+    const innerW = frame.boxW - padX * 2;
+    const innerH = frame.boxH - padTop - padBottom;
+    const scale = Math.min(innerW / cw, innerH / ch) * DETAIL_VECTOR_SCALE;
+    const tx = (frame.boxW - cw * scale) * 0.5 - minX * scale;
+    const ty = frame.boxH - padBottom - maxY * scale;
     return {
-      viewBox: vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH,
-      transform: '',
-      preserveAspectRatio: 'xMaxYMax meet',
+      viewBox: '0 0 ' + frame.boxW + ' ' + frame.boxH,
+      transform: 'translate(' + tx + ',' + ty + ') scale(' + scale + ')',
+      preserveAspectRatio: 'xMidYMid meet',
     };
   }
 
@@ -1211,14 +1479,28 @@ function renderContourSvg(contour, container, options) {
   pathEl.setAttribute('shape-rendering', 'geometricPrecision');
 
   const bounds = contourBounds(contour);
-  const preliminaryScale = estimateDetailVectorScale(bounds, options);
-  const bleed = strokeBleedInUserUnits(preliminaryScale);
-  const layout = detailVectorFitLayout({
-    minX: bounds.minX - bleed,
-    minY: bounds.minY - bleed,
-    maxX: bounds.maxX + bleed,
-    maxY: bounds.maxY + bleed,
-  }, options);
+  let layout;
+  if (options && options.detail) {
+    layout = detailContourFitLayout({
+      minX: bounds.minX - DETAIL_VECTOR_VIEW_BLEED,
+      minY: bounds.minY - DETAIL_VECTOR_VIEW_BLEED,
+      maxX: bounds.maxX + DETAIL_VECTOR_VIEW_BLEED,
+      maxY: bounds.maxY + DETAIL_VECTOR_VIEW_BLEED,
+    });
+  } else {
+    const preliminaryScale = estimateDetailVectorScale(bounds, options);
+    const bleed = strokeBleedInUserUnits(preliminaryScale);
+    layout = detailVectorFitLayout(
+      {
+        minX: bounds.minX - bleed,
+        minY: bounds.minY - bleed,
+        maxX: bounds.maxX + bleed,
+        maxY: bounds.maxY + bleed,
+      },
+      options
+    );
+  }
+
   svg.setAttribute('viewBox', layout.viewBox);
   svg.setAttribute('preserveAspectRatio', layout.preserveAspectRatio || 'xMaxYMax meet');
 
@@ -1248,7 +1530,7 @@ function styleLayerGeometryForRaster(root, strokeWidth) {
   });
 }
 
-async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style3) {
+async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style3, rasterOptions) {
   const config = layerVectorConfig(selector);
   const layers = Array.from(mountedSvg.querySelectorAll(selector));
   if (!layers.length) return null;
@@ -1257,7 +1539,42 @@ async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style
   const scale = DETAIL_MASK_SCALE;
   const viewSize = parseViewBoxSize(mountedSvg.getAttribute('viewBox'));
   const fullCrop = { x: 0, y: 0, width: viewSize.w, height: viewSize.h };
+  const fullOnly = Boolean(rasterOptions && rasterOptions.fullOnly);
 
+  async function tryFullCrop() {
+    hideOtherLayers(mountedSvg, selector);
+    mountedSvg.querySelectorAll(selector).forEach(function (layer) {
+      styleLayerGeometryForRaster(layer, maskStroke);
+    });
+    await waitForPaint();
+    return rasterContourFromCrop(mountedSvg, fullCrop, scale, config.dilate, maskStroke);
+  }
+
+  if (fullOnly) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const contour = await tryFullCrop();
+        if (contour && isContourUsable(contour, selector)) return contour;
+      } catch (err) {
+        console.warn('[detail-vectors] full-only raster failed for', selector, err);
+      }
+      maskStroke *= 1.3;
+    }
+    return null;
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const contour = await tryFullCrop();
+      if (contour && isContourUsable(contour, selector)) return contour;
+      maskStroke *= 1.3;
+    } catch (err) {
+      console.warn('[detail-vectors] full-view raster failed for', selector, err);
+      maskStroke *= 1.3;
+    }
+  }
+
+  maskStroke = estimateMaskStroke(layers, selector, style2, style3);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       hideOtherLayers(mountedSvg, selector);
@@ -1266,8 +1583,9 @@ async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style
       });
       await waitForPaint();
 
-      const crop =
+      let crop =
         layerContentBBox(mountedSvg, selector, config.pad, maskStroke, config.dilate) || fullCrop;
+      crop = normalizeCropForLayer(crop, viewSize, config);
       if (!crop || crop.width < 8 || crop.height < 8) {
         maskStroke *= 1.35;
         continue;
@@ -1280,7 +1598,7 @@ async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style
         config.dilate,
         maskStroke
       );
-      if (contour && contour.length >= 8) return contour;
+      if (contour && isContourUsable(contour, selector)) return contour;
 
       maskStroke *= 1.35;
     } catch (err) {
@@ -1289,11 +1607,33 @@ async function rasterContourFromMountedLayer(mountedSvg, selector, style2, style
     }
   }
 
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      hideOtherLayers(mountedSvg, selector);
+      mountedSvg.querySelectorAll(selector).forEach(function (layer) {
+        styleLayerGeometryForRaster(layer, maskStroke);
+      });
+      await waitForPaint();
+      const contour = await rasterContourFromCrop(
+        mountedSvg,
+        fullCrop,
+        scale,
+        config.dilate,
+        maskStroke
+      );
+      if (contour && isContourUsable(contour, selector)) return contour;
+      maskStroke *= 1.35;
+    } catch (err) {
+      console.warn('[detail-vectors] clone full-view raster failed for', selector, err);
+      maskStroke *= 1.35;
+    }
+  }
+
   return null;
 }
 
 async function renderClonedUnitedOutline(svgEl, selector, container, style2, style3, options) {
-  const mountedSvg = mountComposedSvg(svgEl);
+  const mountedSvg = await mountComposedSvg(svgEl);
   try {
     const contour = await rasterContourFromMountedLayer(mountedSvg, selector, style2, style3);
     if (!contour || !isContourUsable(contour, selector)) return false;
@@ -1327,7 +1667,7 @@ async function extractUnifiedContour(svgEl, selectors, style2, style3) {
   const fullCrop = { x: 0, y: 0, width: viewSize.w, height: viewSize.h };
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const mountedSvg = mountComposedSvg(svgEl);
+    const mountedSvg = await mountComposedSvg(svgEl);
     try {
       showOnlyLayers(mountedSvg, selectors);
       mountedSvg.querySelectorAll(selectorList).forEach(function (layer) {
@@ -1362,7 +1702,7 @@ async function extractUnifiedContour(svgEl, selectors, style2, style3) {
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const mountedSvg = mountComposedSvg(svgEl);
+    const mountedSvg = await mountComposedSvg(svgEl);
     try {
       showOnlyLayers(mountedSvg, selectors);
       mountedSvg.querySelectorAll(selectorList).forEach(function (layer) {
@@ -1388,23 +1728,59 @@ async function extractUnifiedContour(svgEl, selectors, style2, style3) {
   return null;
 }
 
-async function extractLayerContour(svgEl, selector, defsEl, style2, style3) {
+function samplePathContourFromLayer(mountedSvg, selector) {
+  const points = [];
+  mountedSvg.querySelectorAll(selector + ' path').forEach(function (path) {
+    try {
+      const len = path.getTotalLength();
+      if (!Number.isFinite(len) || len <= 0) return;
+      const steps = Math.max(20, Math.min(180, Math.ceil(len / 6)));
+      for (let i = 0; i <= steps; i += 1) {
+        const pt = path.getPointAtLength((len * i) / steps);
+        if (Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+          points.push({ x: pt.x, y: pt.y });
+        }
+      }
+    } catch (_) {}
+  });
+  if (points.length < 12) return null;
+  return subsampleContour(points, CONTOUR_SUBSAMPLE_DIST);
+}
+
+async function extractLayerContour(svgEl, selector, defsEl, style2, style3, extractOptions) {
   const layers = Array.from(svgEl.querySelectorAll(selector));
   if (!layers.length) return null;
+  const preferFullCrop = Boolean(extractOptions && extractOptions.preferFullCrop);
 
+  const mountedSvg = await mountComposedSvg(svgEl);
   try {
-    const contour = await unionLayerContour(layers, defsEl, svgEl, selector, style2, style3);
-    if (contour && isContourUsable(contour, selector)) return contour;
-  } catch (err) {
-    console.warn('[detail-vectors] union failed for', selector, err);
-  }
+    if (preferFullCrop) {
+      const fullContour = await rasterContourFromMountedLayer(
+        mountedSvg,
+        selector,
+        style2,
+        style3,
+        { fullOnly: true }
+      );
+      if (fullContour && isContourUsable(fullContour, selector)) return fullContour;
+    }
 
-  const mountedSvg = mountComposedSvg(svgEl);
-  try {
-    const contour = await rasterContourFromMountedLayer(mountedSvg, selector, style2, style3);
-    if (contour && isContourUsable(contour, selector)) return contour;
+    const rasterContour = await rasterContourFromMountedLayer(mountedSvg, selector, style2, style3);
+    if (rasterContour && isContourUsable(rasterContour, selector)) return rasterContour;
+
+    const sampled = samplePathContourFromLayer(mountedSvg, selector);
+    if (sampled && isContourUsable(sampled, selector)) return sampled;
   } finally {
     if (mountedSvg.parentNode) mountedSvg.parentNode.removeChild(mountedSvg);
+  }
+
+  if (!preferFullCrop) {
+    try {
+      const contour = await unionLayerContour(layers, defsEl, svgEl, selector, style2, style3);
+      if (contour && isContourUsable(contour, selector)) return contour;
+    } catch (err) {
+      console.warn('[detail-vectors] union failed for', selector, err);
+    }
   }
 
   return null;
@@ -1529,31 +1905,36 @@ export async function renderQuestionnaireStageVectors(opts) {
 
 async function extractAndRender(containerId, svgEl, selector, viewBox, defsEl, style2, style3) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container) return false;
 
   const layers = Array.from(svgEl.querySelectorAll(selector));
-  if (!layers.length) return;
+  if (!layers.length) return false;
 
   const renderOptions = container.classList.contains('pagmar__result-vector')
     ? { tight: true, rounded: true }
     : {
+        detail: true,
+        preferFullCrop: true,
         rounded: true,
         boxW: detailVectorBoxForContainer(container),
         boxH: DETAIL_VECTOR_BOX_H,
       };
 
-  const contour = await extractLayerContour(svgEl, selector, defsEl, style2, style3);
+  const contour = await extractLayerContour(svgEl, selector, defsEl, style2, style3, {
+    preferFullCrop: Boolean(renderOptions.detail),
+  });
   if (contour && renderContourSvg(contour, container, renderOptions)) {
-    return;
+    return true;
   }
 
   try {
     if (await renderClonedUnitedOutline(svgEl, selector, container, style2, style3, renderOptions)) {
-      return;
+      return true;
     }
   } catch (err) {
     console.warn('[detail-vectors] clone union failed for', selector, err);
   }
 
   console.warn('[detail-vectors] united contour empty for', selector);
+  return false;
 }

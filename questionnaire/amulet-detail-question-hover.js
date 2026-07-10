@@ -34,11 +34,13 @@
   tip.setAttribute('aria-hidden', 'true');
   tip.innerHTML =
     '<div class="pagmar__garden-amulet-hover__surface glass-tooltip glass-lens" data-glass-source="detail-fog">' +
+    '<div class="glass-lens__backdrop" aria-hidden="true">' +
     '<div class="glass-clone" aria-hidden="true">' +
     '<canvas class="glass-clone__capture" aria-hidden="true"></canvas>' +
     '</div>' +
     '<div class="glass-lens__tint" aria-hidden="true"></div>' +
     '<div class="glass-chrome" aria-hidden="true"></div>' +
+    '</div>' +
     '<div class="pagmar__garden-amulet-hover__head">' +
     '<span class="pagmar__glass-pill__arrow" aria-hidden="true"></span>' +
     '<span class="pagmar__garden-amulet-hover__index"></span>' +

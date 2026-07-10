@@ -215,8 +215,9 @@
   }
 
   function navigateToAmuletDetail(amuletIndex) {
+    var entryId = entryIdForAmuletIndex(amuletIndex);
     if (typeof window.pagmarNavigateToAmuletDetail === 'function') {
-      window.pagmarNavigateToAmuletDetail(amuletIndex);
+      window.pagmarNavigateToAmuletDetail(amuletIndex, entryId);
       return;
     }
     if (typeof window.gardenStashIndexReturnState === 'function') {
@@ -228,17 +229,14 @@
     try {
       sessionStorage.setItem('pagmarAmuletNavAt', String(Date.now()));
     } catch (_) {}
-    var entryId = entryIdForAmuletIndex(amuletIndex);
-    var url = 'amulet.html?id=' + encodeURIComponent(amuletIndex);
-    if (entryId != null) {
-      url += '&entry=' + encodeURIComponent(entryId);
-      try {
-        sessionStorage.setItem(
-          'pagmarAmuletDetailNav',
-          JSON.stringify({ index: amuletIndex, entryId: entryId })
-        );
-      } catch (_) {}
-    }
+    if (entryId == null) return;
+    var url = 'amulet.html?entry=' + encodeURIComponent(entryId) + '&id=' + encodeURIComponent(amuletIndex);
+    try {
+      sessionStorage.setItem(
+        'pagmarAmuletDetailNav',
+        JSON.stringify({ index: amuletIndex, entryId: entryId })
+      );
+    } catch (_) {}
     window.location.href = url;
   }
 

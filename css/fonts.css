@@ -35,8 +35,8 @@
 
 @font-face {
   font-family: "Lava Pro HL";
-  src: url("../fonts/LavaProHL-Thin.ttf") format("truetype");
-  font-weight: normal;
+  src: url("../fonts/LavaProHL-Regular.ttf") format("truetype");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }

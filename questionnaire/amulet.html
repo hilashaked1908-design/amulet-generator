@@ -9,9 +9,9 @@
   <title>קמע - מידע</title>
   <script src="pagmar-boot.js?v=20250709-full-site"></script>
   <link rel="stylesheet" href="../css/fonts.css?v=20250709-full-site">
-  <link rel="stylesheet" href="../css/glass-lens.css?v=20250709-full-site">
-  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250709-lava-260">
-  <link rel="stylesheet" href="../css/buttons.css?v=20250709-full-site">
+  <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-glass-blur-distort">
+  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250710-text-right">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250710-glass-blur-distort">
   <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250709-full-site">
   <style>
     /* One keyframe + phased delays = seamless 1→2→3→4→1 loop */
@@ -95,7 +95,7 @@
           console.warn('[amulet-detail] fog WebGL boot failed', err);
         });
 
-      import('./amulet-detail-vectors.js?v=20250709-line-weight')
+      import('./amulet-detail-vectors.js?v=20250710-vector-wrap')
         .then(function (mod) {
           if (typeof mod.bootDetailVectors === 'function') {
             return mod.bootDetailVectors();
@@ -262,15 +262,17 @@
       <header class="pagmar__detail-chrome" aria-label="כלי מפרט">
         <button type="button" class="pagmar__detail-close pagmar-chrome__close" id="detailCloseBtn" aria-label="חזרה לגן הקמעות">
           <svg width="16.119" height="21.235" viewBox="0 0 17.5376 21.2351" fill="none" aria-hidden="true" focusable="false">
-            <path d="M0.709717 2L16.8279 18.2351M16.8279 2L0.709656 18.2351" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M0.709717 2L16.8279 18.2351M16.8279 2L0.709656 18.2351" stroke="currentColor" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
           </svg>
         </button>
         <span class="pagmar__detail-num glass-lens" id="detailNum" data-glass-source="detail-fog">
-          <span class="glass-clone" aria-hidden="true">
-            <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
+          <span class="glass-lens__backdrop" aria-hidden="true">
+            <span class="glass-clone" aria-hidden="true">
+              <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
+            </span>
+            <span class="glass-lens__tint" aria-hidden="true"></span>
+            <span class="glass-chrome" aria-hidden="true"></span>
           </span>
-          <span class="glass-lens__tint" aria-hidden="true"></span>
-          <span class="glass-chrome" aria-hidden="true"></span>
           <span class="pagmar__detail-num__text">[001]</span>
         </span>
       </header>
@@ -391,14 +393,14 @@
   </div>
 
   <script defer src="questions.js?v=20250704b"></script>
-  <script defer src="amulet-catalog.js?v=20250708-detail-fast"></script>
+  <script defer src="amulet-catalog.js?v=20250710-detail-entry"></script>
   <script defer src="../connection-core.js"></script>
-  <script defer src="glass-lens.js?v=20250709-glass-question-tip"></script>
-  <script defer src="amulet-detail.js?v=20250709-question-tip"></script>
+  <script defer src="glass-lens.js?v=20250710-glass-blur-distort"></script>
+  <script defer src="amulet-detail.js?v=20250710-vector-wrap"></script>
   <script defer src="amulet-detail-hover.js?v=20250709-clone-all"></script>
   <script defer src="amulet-detail-question-hover.js?v=20250709-glass-question-tip"></script>
   <script type="module">
-    import('./amulet-detail-scene.js').catch(function (err) {
+    import('./amulet-detail-scene.js?v=20250710-sprite-answers').catch(function (err) {
       console.warn('[amulet-detail] scene boot failed', err);
       if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('scene');
     });

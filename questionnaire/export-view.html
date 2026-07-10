@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" data-pagmar-build="20250710-export-view">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>קמע - ייצוא</title>
+  <script src="pagmar-boot.js?v=20250710-export-view"></script>
+  <link rel="stylesheet" href="../css/fonts.css?v=20250710-export-view">
+  <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-export-view">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250710-export-view">
+  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250710-export-view">
+  <link rel="stylesheet" href="../css/export-view.css?v=20250710-export-view">
+</head>
+<body class="pagmar-export-view">
+
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter
+        id="glass-distortion"
+        x="-20%"
+        y="-20%"
+        width="140%"
+        height="140%"
+        color-interpolation-filters="sRGB"
+      >
+        <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="8" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="pagmar__export-fog" id="exportFogHost" aria-hidden="true"></div>
+
+  <div class="pagmar__export-page">
+    <header class="pagmar__export-chrome">
+      <a class="pagmar-chrome__about" href="index.html?result=1" aria-label="דף הבית">
+        <img
+          src="assets/index-figma-2127/about-icon-2601.svg"
+          width="60"
+          height="60"
+          alt=""
+          decoding="async"
+          draggable="false"
+        >
+      </a>
+      <button type="button" class="pagmar-chrome__close" id="exportCloseBtn" aria-label="סגור">
+        <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
+      </button>
+    </header>
+
+    <main class="pagmar__export-main" aria-label="ייצוא קמע">
+      <div class="pagmar__export-card" id="exportCard">
+        <div class="pagmar__export-vectors" aria-hidden="true">
+          <div class="pagmar__export-vector" id="exportVectorQ1"></div>
+          <div class="pagmar__export-vector" id="exportVectorQ2"></div>
+          <div class="pagmar__export-vector" id="exportVectorQ3"></div>
+        </div>
+
+        <p class="pagmar__export-name" id="exportName"></p>
+
+        <div class="pagmar__export-timing-block">
+          <span class="pagmar__export-tag">[תזמון]</span>
+          <p class="pagmar__export-timing" id="exportTiming"></p>
+        </div>
+
+        <p class="pagmar__export-outcome" id="exportOutcome"></p>
+
+        <p class="pagmar__export-wish" id="exportWish"></p>
+
+        <div class="pagmar__export-amulet-frame" aria-label="קמע מסתובב">
+          <div class="pagmar__export-amulet-slot" id="exportAmulet3D"></div>
+        </div>
+      </div>
+
+      <button type="button" class="pagmar__export-image-btn" id="exportImageBtn">
+        <span class="pagmar__export-image-btn__label">יצא תמונה</span>
+      </button>
+    </main>
+  </div>
+
+  <script src="glass-lens.js?v=20250710-export-view"></script>
+  <script src="questions.js?v=20250710-export-view"></script>
+  <script type="module" src="export-view.js?v=20250710-export-view"></script>
+</body>
+</html>

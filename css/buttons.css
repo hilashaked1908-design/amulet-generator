@@ -86,15 +86,37 @@
   --pagmar-glass-pill-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13' fill='none'%3E%3Cpath d='M2.5 10.5L10.5 2.5M10.5 2.5H4.2M10.5 2.5V8.8' stroke='#F4F4E8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* Figma Glass surface - shared by pills, cards, chrome overlays */
+/* Figma Glass surface - backdrop layer blurs what's behind; host keeps border only */
 .pagmar-glass-surface,
 .pagmar__glass-pill {
+  position: relative;
+  isolation: isolate;
   border: var(--pagmar-line-weight) solid var(--pagmar-glass-border);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  transform: translateZ(0);
+}
+
+.pagmar-glass-surface::before,
+.pagmar__glass-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
   background: var(--pagmar-glass-fill-gradient), var(--pagmar-glass-fill);
   -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
   backdrop-filter: var(--pagmar-glass-backdrop);
   box-shadow: var(--pagmar-glass-shadow);
-  transform: translateZ(0);
+  pointer-events: none;
+}
+
+.pagmar-glass-surface > *,
+.pagmar__glass-pill > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* K95 glass pill - detail / result hover (not garden Frame 402) */
@@ -463,6 +485,7 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label::after {
 
 .figma-q__btn {
   position: relative;
+  isolation: isolate;
   left: auto;
   top: auto;
   transform: none;
@@ -490,11 +513,30 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label::after {
   white-space: nowrap;
   transition:
     background var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
+    border-color var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+.figma-q__btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--pagmar-pill-glass-bg);
+  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
+  backdrop-filter: var(--pagmar-glass-backdrop);
+  box-shadow: var(--pagmar-glass-shadow-pill);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
     backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease),
     -webkit-backdrop-filter var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
 }
 
 .figma-q__btn-label {
+  position: relative;
+  z-index: 1;
   font-family: inherit;
   font-size: inherit;
   font-weight: inherit;
@@ -506,10 +548,11 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label::after {
 .figma-q__btn.is-over-content,
 .figma-q__btn-outer.is-over-content .figma-q__btn {
   border-color: var(--pagmar-glass-border);
-  background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
-  backdrop-filter: var(--pagmar-glass-backdrop);
-  box-shadow: var(--pagmar-glass-shadow-pill);
+}
+
+.figma-q__btn.is-over-content::before,
+.figma-q__btn-outer.is-over-content .figma-q__btn::before {
+  opacity: 1;
 }
 
 .figma-q__btn:hover:not(:disabled),
@@ -520,27 +563,29 @@ body.pagmar-index.is-filter-page .pagmar__index-filter-trigger__label::after {
 
 .figma-q__btn-outer.is-over-content .figma-q__btn:hover:not(:disabled),
 .figma-q__btn.is-over-content:hover:not(:disabled) {
-  background: var(--pagmar-pill-glass-bg);
+  background: transparent;
 }
 
 /* Result overlay buttons inherit figma-q - always over content */
 .pagmar-canvas--result .figma-q__btn {
   border-color: var(--pagmar-glass-border);
-  background: var(--pagmar-pill-glass-bg);
-  -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
-  backdrop-filter: var(--pagmar-glass-backdrop);
-  box-shadow: var(--pagmar-glass-shadow-pill);
+}
+
+.pagmar-canvas--result .figma-q__btn::before {
+  opacity: 1;
 }
 
 .pagmar-canvas--result .figma-q__btn:hover:not(:disabled),
 .pagmar-canvas--result .figma-q__btn:focus-visible:not(:disabled) {
-  background: var(--pagmar-pill-glass-bg);
+  background: transparent;
   opacity: 1;
 }
 
 /* ── Action buttons (save / export over amulet) ── */
 body.pagmar-index .pagmar__action-btn__inner,
 body.pagmar-create .pagmar__action-btn__inner {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -550,16 +595,31 @@ body.pagmar-create .pagmar__action-btn__inner {
   padding: 0 calc(32 * var(--u, var(--index-u)));
   border: var(--pagmar-line-weight) solid var(--pagmar-glass-border);
   border-radius: var(--pagmar-pill-radius);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  filter: none;
+}
+
+body.pagmar-index .pagmar__action-btn__inner::before,
+body.pagmar-create .pagmar__action-btn__inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
   background: var(--pagmar-pill-glass-bg);
   -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
   backdrop-filter: var(--pagmar-glass-backdrop);
   box-shadow: var(--pagmar-glass-shadow-pill);
-  filter: none;
+  pointer-events: none;
 }
 
 body.pagmar-index .pagmar__action-btn__label,
 body.pagmar-create .pagmar__action-btn__label {
   position: relative;
+  z-index: 1;
   left: auto;
   top: auto;
   width: auto;
@@ -577,7 +637,7 @@ body.pagmar-create .pagmar__action-btn__label-line {
 body.pagmar-index .pagmar__action-btn:hover .pagmar__action-btn__inner,
 body.pagmar-create .pagmar__action-btn:hover .pagmar__action-btn__inner {
   filter: none;
-  background: var(--pagmar-pill-glass-bg);
+  background: transparent;
 }
 
 body.pagmar-index.is-create-mode .pagmar__index-create-amulet-actions .pagmar__action-btn__inner {
@@ -602,6 +662,8 @@ body.pagmar-index.is-create-mode .pagmar__create-question-field .intro__choice-b
 /* ── Export + text panel save ── */
 body.pagmar-create .pagmar__export-btn,
 body.pagmar-index .pagmar__text-save {
+  position: relative;
+  isolation: isolate;
   border: var(--pagmar-line-weight) solid var(--pagmar-pill-border);
   border-radius: var(--pagmar-pill-radius);
   background: transparent;
@@ -609,13 +671,34 @@ body.pagmar-index .pagmar__text-save {
   backdrop-filter: none;
 }
 
-body.pagmar-create .pagmar__export-btn:hover,
-body.pagmar-index .pagmar__text-save:hover:not(:disabled) {
-  border-color: var(--pagmar-glass-border);
+body.pagmar-create .pagmar__export-btn::before,
+body.pagmar-index .pagmar__text-save::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
   background: var(--pagmar-pill-glass-bg);
   -webkit-backdrop-filter: var(--pagmar-glass-backdrop);
   backdrop-filter: var(--pagmar-glass-backdrop);
   box-shadow: var(--pagmar-glass-shadow-pill);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+}
+
+body.pagmar-create .pagmar__export-btn:hover::before,
+body.pagmar-index .pagmar__text-save:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+body.pagmar-create .pagmar__export-btn:hover,
+body.pagmar-index .pagmar__text-save:hover:not(:disabled) {
+  border-color: var(--pagmar-glass-border);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 body.pagmar-index .pagmar__text-save {

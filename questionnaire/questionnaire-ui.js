@@ -30,20 +30,22 @@
   const amuletStageParent = document.getElementById('questionStage');
   const pagmarCanvas = document.getElementById('pagmarCanvas');
   const questionGarden = document.getElementById('questionGarden');
-  let createAmuletMorph = null;
+  const GALLERY_VESSEL_ASSETS = [
+    'assets/detail/loader-vessel-1.svg',
+    'assets/detail/loader-vessel-2.svg',
+    'assets/detail/loader-vessel-3.svg',
+    'assets/detail/loader-vessel-4.svg',
+  ];
+  let createAmuletIdleSpinMounted = false;
 
   function stopCreateAmuletMorph() {
-    if (createAmuletMorph) {
-      createAmuletMorph.stop();
-      createAmuletMorph.destroy();
-      createAmuletMorph = null;
-    }
     const host = document.getElementById('createAmuletMorphHost');
     if (host) {
       host.classList.add('is-hidden');
       host.textContent = '';
       host.setAttribute('aria-hidden', 'true');
     }
+    createAmuletIdleSpinMounted = false;
   }
 
   function resetCreateAmuletPreview() {
@@ -73,27 +75,25 @@
     host.classList.remove('is-hidden');
     host.setAttribute('aria-hidden', 'false');
 
-    if (createAmuletMorph) {
-      createAmuletMorph.start();
-      return;
-    }
+    if (createAmuletIdleSpinMounted) return;
 
-    void import('./loader-vessel-morph.js?v=20250709-q-loader')
-      .then(function (mod) {
-        return mod.preloadVesselMorph().then(function () {
-          if (!isCreateFlow() || !host.isConnected) return;
-          if (createAmuletMorph) {
-            createAmuletMorph.start();
-            return;
-          }
-          const morph = mod.mountVesselMorph(host);
-          morph.start();
-          createAmuletMorph = morph;
-        });
-      })
-      .catch(function (err) {
-        console.error('[questionnaire] vessel morph failed', err);
-      });
+    const vessels = document.createElement('div');
+    vessels.className = 'pagmar__amulet-frame-loader__vessels';
+    vessels.setAttribute('aria-hidden', 'true');
+
+    GALLERY_VESSEL_ASSETS.forEach(function (src, index) {
+      const img = document.createElement('img');
+      img.className =
+        'pagmar__amulet-frame-loader__vessel pagmar__amulet-frame-loader__vessel--' + (index + 1);
+      img.src = src;
+      img.alt = '';
+      img.decoding = 'sync';
+      img.draggable = false;
+      vessels.appendChild(img);
+    });
+
+    host.appendChild(vessels);
+    createAmuletIdleSpinMounted = true;
   }
 
   window.pagmarHideCreateAmuletMorph = stopCreateAmuletMorph;
@@ -149,22 +149,22 @@
   const CREATE_SAVE_LABEL_NEXT = 'לשאלה הבאה';
   const CREATE_SAVE_LABEL_FINAL = 'צור קמע';
 
-  const VECTOR_TIP_DEFAULT =
-    'הצורה נוצרת מהמילים שכתבתם.\nהאותיות מתחברות ויוצרות את קווי המתאר הראשונים של הקמע.';
+  /** Q8 (index 7) — no post-answer caption. */
+  const LAST_EXPLAINED_QUESTION_INDEX = 6;
 
-  const VECTOR_TIP_BY_QUESTION = {
-    1: 'האותיות מהבקשה מתחברות ויוצרות את קווי המתאר הראשונים של הקמע.',
-    2: 'שכבת השם מתווספת למתאר - האותיות שלכם נרשמות על הקמע.',
-    3: 'נחרט על האבן למה דווקא עכשיו.\nבשאלה הזאת תבחרו את חומריות שכבת האבן.',
-    4: 'חומריות האבן נקבעת מהאמונה שלכם.\nבשאלה הזאת תבחרו את חומריות שכבת המתכת או הפולימר.',
-    5: 'חומריות המתכת או הפולימר נקבעת מהתחושה.\nבשאלה הזאת תבחרו את מידת הקוצניות של הקמע.',
-    6: 'מידת הקוצניות נקבעת לפי מה שחסר לכם.\nבשאלה הזאת תכתבו אילו צורות יוטבעו על פני הקמע.',
-    7: 'צורות מיוחדות מוטבעות על האבן לפי מה שישתנה.\nכעת הבקשה כמעט שלמה.',
+  /** Past tense — what changed after the previous answer (caption above dock on next frame). */
+  const PAST_STAGE_CAPTION_BY_QUESTION = {
+    1: 'האותיות מהבקשה התחברו ויצרו את קווי המתאר הראשונים של הקמע.',
+    2: 'שכבת השם התווספה למתאר, האותיות של שמכם יוצרות בסיס לקמע.',
+    3: 'נחרט על האבן למה דווקא עכשיו.',
+    4: 'חומריות האבן נקבעה מהאמונה שלכם.',
+    5: 'חומריות המתכת או הפולימר נקבעה מהתחושה שלכם.',
+    6: 'מידת הקוצניות נקבעה לפי מה שחסר לכם.',
   };
 
-  function getVectorTipText(questionIndex) {
+  function getPastStageCaptionText(questionIndex) {
     if (typeof questionIndex !== 'number' || questionIndex < 1) return '';
-    return VECTOR_TIP_BY_QUESTION[questionIndex] || VECTOR_TIP_DEFAULT;
+    return PAST_STAGE_CAPTION_BY_QUESTION[questionIndex] || '';
   }
 
   function isDockChoiceQuestionAt(index) {
@@ -250,6 +250,7 @@
 
   /** Q3–Q5: keep amulet at fixed Y — dock growth must not push it up. */
   function isDockAmuletLiftDisabled() {
+    if (document.body.classList.contains('is-choice-question')) return true;
     return activeIndex !== null && activeIndex >= 2 && activeIndex <= 4;
   }
 
@@ -374,8 +375,20 @@
     });
   }
 
+  function usesDockPlaceholderCycle(question) {
+    return (
+      isRequestFlowActive() &&
+      Array.isArray(question.placeholderExamples) &&
+      question.placeholderExamples.length >= 2
+    );
+  }
+
+  function usesDockTextareaField(question) {
+    return question.type === 'textarea' || (question.type === 'text' && usesDockPlaceholderCycle(question));
+  }
+
   async function runPlaceholderCycle(field, examples, token) {
-    if (!examples.length || !isPlaceholderSession(token)) return;
+    if (!examples.length || !isPlaceholderSession(token) || !field?.isConnected) return;
 
     if (!prefersPlaceholderMotion()) {
       if (isPlaceholderFieldIdle(field)) {
@@ -386,7 +399,7 @@
 
     let index = 0;
     while (isPlaceholderSession(token)) {
-      if (!isPlaceholderFieldIdle(field)) return;
+      if (!field.isConnected || !isPlaceholderFieldIdle(field)) return;
 
       const text = examples[index % examples.length];
       field.classList.add('is-typing-placeholder');
@@ -394,16 +407,16 @@
       const cursorChar = isRequestFlowActive() ? '' : PLACEHOLDER_CURSOR;
 
       for (let i = 0; i <= text.length; i += 1) {
-        if (!isPlaceholderSession(token) || !isPlaceholderFieldIdle(field)) return;
+        if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
         field.placeholder = i < text.length ? text.slice(0, i) + cursorChar : text;
         if (i < text.length) await placeholderSleep(PLACEHOLDER_CHAR_MS);
       }
 
       await placeholderSleep(PLACEHOLDER_HOLD_MS);
-      if (!isPlaceholderSession(token) || !isPlaceholderFieldIdle(field)) return;
+      if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
 
       for (let i = text.length; i >= 0; i -= 1) {
-        if (!isPlaceholderSession(token) || !isPlaceholderFieldIdle(field)) return;
+        if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
         field.placeholder = i > 0 ? text.slice(0, i) + cursorChar : '';
         if (i > 0) await placeholderSleep(PLACEHOLDER_ERASE_MS);
       }
@@ -422,7 +435,7 @@
       return;
     }
 
-    if (!Array.isArray(question.placeholderExamples) || question.placeholderExamples.length < 2) {
+    if (!usesDockPlaceholderCycle(question)) {
       field.placeholder = question.placeholder || examples[0] || '';
       return;
     }
@@ -448,7 +461,9 @@
       if (!isPlaceholderFieldIdle(field)) return;
       placeholderCycleToken += 1;
       const resumeToken = placeholderCycleToken;
-      void runPlaceholderCycle(field, examples, resumeToken);
+      requestAnimationFrame(function () {
+        void runPlaceholderCycle(field, examples, resumeToken);
+      });
     };
 
     field.addEventListener('focus', onFocus);
@@ -456,7 +471,12 @@
     field.addEventListener('blur', onBlur);
     placeholderFieldHandlers = { field: field, onFocus: onFocus, onInput: onInput, onBlur: onBlur };
 
-    void runPlaceholderCycle(field, examples, token);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (placeholderFieldHandlers?.field !== field || !field.isConnected) return;
+        void runPlaceholderCycle(field, examples, token);
+      });
+    });
   }
 
   let amuletModulesReady = null;
@@ -926,6 +946,9 @@
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
       document.body.classList.remove('is-amulet-rendering');
+      if (typeof window.amuletHideLoader === 'function') {
+        window.amuletHideLoader({ force: true });
+      }
       alert('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
       return;
     }
@@ -941,6 +964,9 @@
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
       document.body.classList.remove('is-amulet-rendering');
+      if (typeof window.amuletHideLoader === 'function') {
+        window.amuletHideLoader({ force: true });
+      }
       alert('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
     }
   }
@@ -1137,6 +1163,37 @@
   }
 
 
+  function hideFinalBuildQuestionChrome() {
+    if (!isCreateFlow()) return;
+    const copy = document.getElementById('questionCopyFrame');
+    const title = document.getElementById('questionText');
+    const desc = document.getElementById('questionDesc');
+    const tag = document.getElementById('questionTag');
+    const dock = document.querySelector('.figma-q__dock');
+    const about = document.getElementById('requestAboutBtn');
+    const vectorCopy = document.getElementById('questionVectorCopy');
+
+    if (title) title.textContent = '';
+    if (desc) {
+      desc.textContent = '';
+      desc.hidden = true;
+    }
+    if (tag) tag.hidden = true;
+    if (copy) copy.hidden = true;
+    if (dock) dock.hidden = true;
+    if (about) about.hidden = true;
+    if (vectorCopy) vectorCopy.hidden = true;
+    if (amuletStageCaptionEl) {
+      amuletStageCaptionEl.textContent = '';
+      amuletStageCaptionEl.hidden = true;
+    }
+    if (requestArtboard) {
+      requestArtboard.classList.remove('is-advancing');
+      requestArtboard.style.removeProperty('--figma-amulet-caption-top');
+    }
+    document.body.classList.remove('is-question-transition-loading');
+  }
+
   function saveAnswer(index, value) {
     const question = questions[index];
     if (!question) return;
@@ -1163,9 +1220,10 @@
           answers.completedAt = Date.now();
           saveAnswers(answers);
           closePanel();
+          hideFinalBuildQuestionChrome();
           mountAmuletInCreateSlot();
-          await runAmuletBuild(answers);
           document.body.classList.add('is-amulet-rendering');
+          await runAmuletBuild(answers, { showLoader: false, uiBlocking: false });
           await showFinishedAmuletNow(answers);
           return;
         }
@@ -1417,7 +1475,7 @@
     submitBtn.hidden = false;
     if (saveWrap) saveWrap.hidden = false;
 
-    const useTextareaField = question.type === 'textarea';
+    const useTextareaField = usesDockTextareaField(question);
 
     if (useTextareaField) {
       const el = document.createElement('textarea');
@@ -1481,24 +1539,34 @@
   }
 
   function syncVectorCopy(_explicitStage, questionIndex) {
-    if (!vectorCopyEl || !isRequestFlowActive()) return;
+    if (!isRequestFlowActive()) return;
     const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
 
-    syncAmuletStageCaption(0);
+    syncAmuletStageCaption(qIndex);
+    hideVectorTip();
+  }
 
-    if (qIndex === null || qIndex < 1) {
-      hideVectorTip();
+  function syncAmuletStageCaption(questionIndex) {
+    if (!amuletStageCaptionEl || !isRequestFlowActive()) return;
+    const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
+    const live = requestArtboard && requestArtboard.classList.contains('is-amulet-live');
+    const caption =
+      live &&
+      qIndex !== null &&
+      qIndex >= 1 &&
+      qIndex <= LAST_EXPLAINED_QUESTION_INDEX
+        ? getPastStageCaptionText(qIndex)
+        : '';
+
+    if (caption) {
+      amuletStageCaptionEl.textContent = caption;
+      amuletStageCaptionEl.hidden = false;
+      requestAnimationFrame(function () {
+        syncAmuletStageCaptionPosition();
+      });
       return;
     }
 
-    if (vectorCopyTextEl) {
-      vectorCopyTextEl.textContent = getVectorTipText(qIndex);
-    }
-    vectorCopyEl.hidden = false;
-  }
-
-  function syncAmuletStageCaption(_stage) {
-    if (!amuletStageCaptionEl || !isRequestFlowActive()) return;
     amuletStageCaptionEl.textContent = '';
     amuletStageCaptionEl.hidden = true;
     if (requestArtboard) {
@@ -1649,7 +1717,7 @@
         fieldEl.focus();
         return;
       }
-      if (!Array.isArray(question.placeholderExamples) || !question.placeholderExamples.length) {
+      if (!usesDockPlaceholderCycle(question)) {
         fieldEl.focus();
       }
     });
@@ -2489,12 +2557,15 @@
   async function restoreResultViewIfNeeded() {
     const params = new URLSearchParams(location.search);
     const forcePreview = params.get('result') === '1';
+    const sessionRestore =
+      typeof window.pagmarShouldRestoreResultView === 'function' &&
+      window.pagmarShouldRestoreResultView();
     const answers = loadAnswers();
-    const shouldRestore =
-      forcePreview ||
-      (typeof window.pagmarShouldRestoreResultView === 'function' &&
-        window.pagmarShouldRestoreResultView()) ||
-      (allAnswered(answers) && Boolean(answers.completedAt));
+    const resumeUnsavedResult =
+      allAnswered(answers) &&
+      Boolean(answers.completedAt) &&
+      !document.body.classList.contains('has-user-amulet');
+    const shouldRestore = forcePreview || sessionRestore || resumeUnsavedResult;
 
     if (!shouldRestore) return;
     if (!isIndexPage && !isCreatePage) return;
@@ -2523,23 +2594,31 @@
     }
 
     document.body.classList.add('is-amulet-rendering');
+    hideFinalBuildQuestionChrome();
     if (typeof window.amuletShowLoader === 'function') {
       await window.amuletShowLoader('טוען קמע', { fullscreen: true, gallery: true });
     }
 
     try {
       await ensureAmuletModules();
+
+      if (typeof window.pagmarRestoreResultView === 'function') {
+        await window.pagmarRestoreResultView(resolvedAnswers);
+        return;
+      }
+
+      await showFinishedAmuletNow(resolvedAnswers);
     } catch (err) {
-      console.error('[questionnaire] result restore modules failed', err);
-      return;
+      console.error('[questionnaire] result restore failed', err);
+      document.body.classList.remove('is-amulet-rendering');
+      if (isIndexPage && !sessionRestore && !forcePreview) {
+        document.body.classList.remove('is-create-mode');
+        if (indexCreateWorkspace) indexCreateWorkspace.hidden = true;
+      }
+      if (typeof window.amuletHideLoader === 'function') {
+        window.amuletHideLoader({ force: true });
+      }
     }
-
-    if (typeof window.pagmarRestoreResultView === 'function') {
-      await window.pagmarRestoreResultView(resolvedAnswers);
-      return;
-    }
-
-    await showFinishedAmuletNow(resolvedAnswers);
   }
 
   function restoreCompletedSession() {
@@ -2700,6 +2779,25 @@
     window.setTimeout(function () {
       void restoreResultViewIfNeeded();
     }, 320);
+  }
+
+  if (isIndexPage) {
+    window.setTimeout(function () {
+      const loader = document.getElementById('pagmarGalleryFullpageLoader');
+      if (
+        loader &&
+        !loader.hidden &&
+        document.body.classList.contains('is-amulet-rendering') &&
+        !document.body.classList.contains('is-result-overlay-open')
+      ) {
+        console.warn('[questionnaire] clearing stuck gallery loader');
+        document.body.classList.remove('is-amulet-rendering', 'is-create-mode');
+        if (indexCreateWorkspace) indexCreateWorkspace.hidden = true;
+        if (typeof window.amuletHideLoader === 'function') {
+          window.amuletHideLoader({ force: true });
+        }
+      }
+    }, 20000);
   }
 
   if (isIndexPage) {

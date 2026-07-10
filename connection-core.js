@@ -2,6 +2,19 @@
 
 const CANVAS = { W: 680, H: 680, CX: 340, CY: 340, DEFAULT_SIZE: 150 };
 
+/** Final Hebrew letters → regular forms (for connection lookup and glyphs). */
+const SOFIT_TO_REGULAR = Object.freeze({
+  '\u05DD': '\u05DE', // ם → מ
+  '\u05DF': '\u05E0', // ן → נ
+  '\u05E5': '\u05E6', // ץ → צ
+  '\u05DA': '\u05DB', // ך → כ
+  '\u05E3': '\u05E4' // ף → פ
+});
+
+function normalizeSofitLetter(ch) {
+  return SOFIT_TO_REGULAR[ch] || ch;
+}
+
 /** Dev cap — max letters per connected glyph chain (reduces SDF / render load). */
 const MAX_CONNECTED_LETTERS = 3;
 
@@ -284,8 +297,10 @@ function buildConnectionPayload(from, to, intent, glyphA, glyphB) {
 
 window.ConnectionCore = {
   CANVAS,
+  SOFIT_TO_REGULAR,
   MAX_CONNECTED_LETTERS,
   limitConnectedLetters,
+  normalizeSofitLetter,
   normalizeConnection,
   normalizeGlyph,
   findConnection,

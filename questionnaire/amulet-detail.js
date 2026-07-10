@@ -22,10 +22,18 @@
 
   function parseIndex() {
     const params = new URLSearchParams(window.location.search);
+    const entryId = parseEntryId();
+    if (
+      entryId != null &&
+      typeof window.pagmarIndexForEntryId === 'function'
+    ) {
+      var fromEntry = window.pagmarIndexForEntryId(entryId);
+      if (fromEntry != null) return fromEntry;
+    }
     const raw = params.get('id');
-    if (raw == null || raw === '') return 0;
+    if (raw == null || raw === '') return USER_AMULET_INDEX;
     const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+    return Number.isFinite(n) && n >= USER_AMULET_INDEX ? n : USER_AMULET_INDEX;
   }
 
   function indexLabel(index) {
@@ -117,28 +125,61 @@
     }
   }
 
-  function readNavEntryId() {
+  function readNavPayload(forIndex) {
     try {
       var raw = sessionStorage.getItem('pagmarAmuletDetailNav');
       if (!raw) return null;
       var nav = JSON.parse(raw);
-      return nav && nav.entryId != null ? nav.entryId : null;
+      if (!nav) return null;
+      var urlEntry = parseEntryId();
+      if (urlEntry != null && nav.entryId == urlEntry) return nav;
+      if (nav.entryId != null && nav.index === forIndex) return nav;
+      return null;
     } catch (_) {
       return null;
     }
   }
 
-  async function preloadDetailContext(index) {
-    resolvedDetailEntryId = parseEntryId() || readNavEntryId();
-    if (resolvedDetailEntryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
-      resolvedDetailEntryId = window.pagmarEntryIdForAmuletIndex(index);
-    }
+  function readNavPayloadForEntry(entryId) {
+    if (entryId == null) return null;
+    try {
+      var raw = sessionStorage.getItem('pagmarAmuletDetailNav');
+      if (!raw) return null;
+      var nav = JSON.parse(raw);
+      if (nav && nav.entryId == entryId) return nav;
+    } catch (_) {}
+    return null;
+  }
 
+  function readNavEntryId(forIndex) {
+    var urlEntry = parseEntryId();
+    if (urlEntry != null) return urlEntry;
+    var nav = readNavPayload(forIndex);
+    return nav && nav.entryId != null ? nav.entryId : null;
+  }
+
+  function resolveDetailIndex(urlIndex, entryId) {
+    if (
+      entryId != null &&
+      typeof window.pagmarIndexForEntryId === 'function'
+    ) {
+      var fromEntry = window.pagmarIndexForEntryId(entryId);
+      if (fromEntry != null) return fromEntry;
+    }
+    return urlIndex;
+  }
+
+  async function preloadDetailContext(index) {
     await import('./seed-bootstrap.js')
       .then(function (mod) {
         return mod.ensureSeedCollectionLoaded();
       })
       .catch(function () {});
+
+    resolvedDetailEntryId = parseEntryId() || readNavEntryId(index);
+    if (resolvedDetailEntryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+      resolvedDetailEntryId = window.pagmarEntryIdForAmuletIndex(index);
+    }
 
     if (resolvedDetailEntryId == null && typeof window.pagmarResolveCollectionEntry === 'function') {
       var resolved = window.pagmarResolveCollectionEntry(index);
@@ -147,14 +188,26 @@
     if (resolvedDetailEntryId == null) return;
 
     var entryId = resolvedDetailEntryId;
-
     window.__pagmarDetailAnswersByEntryId = window.__pagmarDetailAnswersByEntryId || {};
+    var navPayload = readNavPayloadForEntry(entryId) || readNavPayload(index);
+    var navAnswers =
+      navPayload &&
+      navPayload.entryId == entryId &&
+      navPayload.answers &&
+      navPayload.answers.q1Wish
+        ? navPayload.answers
+        : null;
+    if (navAnswers) {
+      window.__pagmarDetailAnswersByEntryId[entryId] = navAnswers;
+    }
 
     try {
       var store = await import('./amulet-glb-store.js');
-      var answersRaw = await store.loadSnapshot('answers-collection-' + entryId);
-      if (answersRaw) {
-        window.__pagmarDetailAnswersByEntryId[entryId] = JSON.parse(answersRaw);
+      if (!navAnswers) {
+        var answersRaw = await store.loadSnapshot('answers-collection-' + entryId);
+        if (answersRaw) {
+          window.__pagmarDetailAnswersByEntryId[entryId] = JSON.parse(answersRaw);
+        }
       }
     } catch (_) {}
 
@@ -166,10 +219,48 @@
         window.__pagmarDetailSnapshotByEntryId[entryId] = snapRaw;
       }
     } catch (_) {}
+
+    var composeAnswers =
+      window.__pagmarDetailAnswersByEntryId[entryId] ||
+      navAnswers ||
+      (typeof window.pagmarFindCollectionEntryById === 'function'
+        ? (window.pagmarFindCollectionEntryById(entryId) || {}).answers
+        : null);
+    if (composeAnswers && composeAnswers.q1Wish) {
+      try {
+        var vectorsMod = await import('./amulet-detail-vectors.js?v=20250710-vector-wrap');
+        window.pagmarDetailComposePreload = vectorsMod.preloadDetailCompose(entryId, composeAnswers);
+        await window.pagmarDetailComposePreload;
+      } catch (err) {
+        console.warn('[amulet-detail] compose preload failed', err);
+      }
+    }
   }
 
-  function resolveEntryForDetail() {
-    var entryId = resolvedDetailEntryId || parseEntryId() || readNavEntryId();
+  function authoritativeAnswersForEntry(entryId) {
+    if (entryId == null) return null;
+    if (
+      window.__pagmarDetailAnswersByEntryId &&
+      window.__pagmarDetailAnswersByEntryId[entryId] &&
+      window.__pagmarDetailAnswersByEntryId[entryId].q1Wish
+    ) {
+      return window.__pagmarDetailAnswersByEntryId[entryId];
+    }
+    var nav = readNavPayloadForEntry(entryId);
+    if (nav && nav.answers && nav.answers.q1Wish) return nav.answers;
+    return null;
+  }
+
+  function buildDetailEntry(entryId, collectionEntry) {
+    var answers = authoritativeAnswersForEntry(entryId);
+    if (answers) {
+      return Object.assign({}, collectionEntry || { id: entryId }, { id: entryId, answers: answers });
+    }
+    return collectionEntry;
+  }
+
+  function resolveEntryForDetail(index) {
+    var entryId = resolvedDetailEntryId || parseEntryId() || readNavEntryId(index);
     if (entryId == null) return null;
     if (typeof window.pagmarFindCollectionEntryById === 'function') {
       return window.pagmarFindCollectionEntryById(entryId);
@@ -188,15 +279,21 @@
   function renderDetail(index, entry) {
     if (typeof window.getAmuletSpec !== 'function') return;
 
-    var entryId = entry && entry.id != null ? entry.id : resolvedDetailEntryId || parseEntryId() || readNavEntryId();
-    var recordOverride =
-      entry && entry.answers
-        ? entry.answers
-        : entryId != null &&
-            window.__pagmarDetailAnswersByEntryId &&
-            window.__pagmarDetailAnswersByEntryId[entryId]
-          ? window.__pagmarDetailAnswersByEntryId[entryId]
-          : null;
+    var entryId =
+      entry && entry.id != null
+        ? entry.id
+        : resolvedDetailEntryId || parseEntryId() || readNavEntryId(index);
+    var recordOverride = authoritativeAnswersForEntry(entryId);
+    if (!recordOverride) {
+      recordOverride =
+        entry && entry.answers
+          ? entry.answers
+          : entryId != null &&
+              window.__pagmarDetailAnswersByEntryId &&
+              window.__pagmarDetailAnswersByEntryId[entryId]
+            ? window.__pagmarDetailAnswersByEntryId[entryId]
+            : null;
+    }
 
     const spec = window.getAmuletSpec(index, null, recordOverride || undefined);
     var imgSrc = null;
@@ -208,6 +305,12 @@
       imgSrc = window.__pagmarDetailSnapshotByEntryId[entryId];
     } else if (entry && entry.snapshot) {
       imgSrc = entry.snapshot;
+    } else if (typeof window.getAmuletImageSrc === 'function' && entryId != null) {
+      var entryIndex =
+        typeof window.pagmarIndexForEntryId === 'function'
+          ? window.pagmarIndexForEntryId(entryId)
+          : index;
+      if (entryIndex != null) imgSrc = window.getAmuletImageSrc(entryIndex);
     } else if (typeof window.getAmuletImageSrc === 'function') {
       imgSrc = window.getAmuletImageSrc(index);
     }
@@ -242,6 +345,7 @@
     try {
       window.dispatchEvent(new CustomEvent('pagmar:detail-rendered'));
     } catch (_) {}
+    scheduleDetailContentSpacingFit();
 
     if (detailAmuletImg && imgSrc) {
       detailAmuletImg.src = imgSrc;
@@ -270,7 +374,21 @@
   }
 
   async function bootContent() {
+    await import('./seed-bootstrap.js')
+      .then(function (mod) {
+        return mod.ensureSeedCollectionLoaded();
+      })
+      .catch(function () {});
+
+    const entryId = parseEntryId();
+    if (entryId == null) {
+      window.location.replace('index.html');
+      return;
+    }
+
+    resolvedDetailEntryId = entryId;
     const index = parseIndex();
+
     try {
       if (index < USER_AMULET_INDEX) {
         window.location.replace('index.html');
@@ -278,7 +396,19 @@
       }
 
       await preloadDetailContext(index);
-      renderDetail(index, resolveEntryForDetail());
+      var navPayload = readNavPayloadForEntry(resolvedDetailEntryId);
+      var displayIndex =
+        navPayload && typeof navPayload.labelIndex === 'number'
+          ? USER_AMULET_INDEX + navPayload.labelIndex
+          : resolveDetailIndex(index, resolvedDetailEntryId);
+      var collectionEntry = null;
+      if (typeof window.pagmarFindCollectionEntryById === 'function') {
+        collectionEntry = window.pagmarFindCollectionEntryById(resolvedDetailEntryId);
+      }
+      var entry = buildDetailEntry(resolvedDetailEntryId, collectionEntry);
+      if (!entry) entry = resolveEntryForDetail(displayIndex);
+      if (entry && entry.id != null) resolvedDetailEntryId = entry.id;
+      renderDetail(displayIndex, entry);
       await Promise.all([
         waitForImage(detailAmuletImg),
         waitForImage(document.getElementById('detailAmuletImgBack')),
@@ -318,6 +448,162 @@
   bootContent().catch(function () {
     if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('content');
   });
+
+  /* ── Dynamic spacing: shrink gaps when content is tall ── */
+  var DETAIL_SPACING_SCALE_MIN = 0.18;
+  var DETAIL_STORY_SCALE_MIN = 0.82;
+  var detailSpacingFitQueued = false;
+  var detailSpacingObserver = null;
+  var detailSpacingFitLock = false;
+  var lastDetailSpacingScale = 1;
+  var lastDetailStoryScale = 1;
+
+  function setDetailLayoutScales(spacingScale, storyScale, force) {
+    if (
+      !force &&
+      Math.abs(spacingScale - lastDetailSpacingScale) < 0.004 &&
+      Math.abs(storyScale - lastDetailStoryScale) < 0.004
+    ) {
+      return;
+    }
+    lastDetailSpacingScale = spacingScale;
+    lastDetailStoryScale = storyScale;
+    document.body.style.setProperty('--detail-spacing-scale', String(spacingScale));
+    document.body.style.setProperty('--detail-story-scale', String(storyScale));
+  }
+
+  function getDetailContentBottomLimit() {
+    var margin = 6;
+    var amulet = document.querySelector('.pagmar__detail-amulet');
+    if (amulet) return amulet.getBoundingClientRect().bottom - margin;
+
+    var canvas = document.getElementById('detailCanvas');
+    if (canvas) return canvas.getBoundingClientRect().bottom - margin;
+
+    return window.innerHeight - margin;
+  }
+
+  function measureDetailContentBottom() {
+    var meta = document.querySelector('.pagmar__detail-meta');
+    var content = document.querySelector('.pagmar__detail-content');
+    if (meta) return meta.getBoundingClientRect().bottom;
+    if (content) return content.getBoundingClientRect().bottom;
+    return 0;
+  }
+
+  function detailContentOverflows(limitBottom) {
+    return measureDetailContentBottom() > limitBottom + 0.5;
+  }
+
+  function binarySearchScale(min, max, applyScale, overflows) {
+    var lo = min;
+    var hi = max;
+    applyScale(hi);
+    if (!overflows()) return hi;
+
+    for (var i = 0; i < 16; i++) {
+      var mid = (lo + hi) / 2;
+      applyScale(mid);
+      if (overflows()) hi = mid;
+      else lo = mid;
+    }
+    applyScale(lo);
+    return lo;
+  }
+
+  function fitDetailContentSpacing() {
+    if (detailSpacingFitLock || document.body.classList.contains('is-detail-loading')) return;
+
+    var content = document.querySelector('.pagmar__detail-content');
+    if (!content) return;
+
+    detailSpacingFitLock = true;
+    if (detailSpacingObserver) detailSpacingObserver.disconnect();
+
+    try {
+      var limitBottom = getDetailContentBottomLimit();
+      if (limitBottom <= 0) return;
+
+      setDetailLayoutScales(1, 1, true);
+      void content.offsetHeight;
+
+      if (!detailContentOverflows(limitBottom)) return;
+
+      var spacingScale = binarySearchScale(
+        DETAIL_SPACING_SCALE_MIN,
+        1,
+        function (scale) {
+          setDetailLayoutScales(scale, 1, true);
+          void content.offsetHeight;
+        },
+        function () {
+          return detailContentOverflows(limitBottom);
+        }
+      );
+
+      if (!detailContentOverflows(limitBottom)) return;
+
+      binarySearchScale(
+        DETAIL_STORY_SCALE_MIN,
+        1,
+        function (storyScale) {
+          setDetailLayoutScales(spacingScale, storyScale, true);
+          void content.offsetHeight;
+        },
+        function () {
+          return detailContentOverflows(limitBottom);
+        }
+      );
+    } finally {
+      detailSpacingFitLock = false;
+      watchDetailContentLayout();
+    }
+  }
+
+  function scheduleDetailContentSpacingFit() {
+    if (detailSpacingFitQueued) return;
+    detailSpacingFitQueued = true;
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        detailSpacingFitQueued = false;
+        fitDetailContentSpacing();
+      });
+    });
+  }
+
+  function watchDetailContentLayout() {
+    var content = document.querySelector('.pagmar__detail-content');
+    if (!content || typeof ResizeObserver === 'undefined') return;
+    if (detailSpacingObserver) detailSpacingObserver.disconnect();
+    detailSpacingObserver = new ResizeObserver(function () {
+      scheduleDetailContentSpacingFit();
+    });
+    detailSpacingObserver.observe(content);
+  }
+
+  function bootDetailSpacingFit() {
+    watchDetailContentLayout();
+    scheduleDetailContentSpacingFit();
+  }
+
+  window.addEventListener('pagmar:detail-rendered', scheduleDetailContentSpacingFit);
+  window.addEventListener('pagmar:detail-vectors-ready', scheduleDetailContentSpacingFit);
+  window.addEventListener('resize', scheduleDetailContentSpacingFit);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(scheduleDetailContentSpacingFit).catch(function () {});
+  }
+
+  if (document.body.classList.contains('is-detail-loading')) {
+    var detailBootObserver = new MutationObserver(function () {
+      if (!document.body.classList.contains('is-detail-loading')) {
+        detailBootObserver.disconnect();
+        bootDetailSpacingFit();
+      }
+    });
+    detailBootObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  } else {
+    bootDetailSpacingFit();
+  }
 
   /* ── Drag to rotate the 3D coin ── */
   var coin = document.querySelector('.pagmar__detail-amulet-coin');

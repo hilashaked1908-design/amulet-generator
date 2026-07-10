@@ -1,24 +1,23 @@
 /**
- * K95-style glass pill - "360°" follows cursor on result overlay amulet hover.
- * Clone layer samples amulet/fog canvas; CSS filter distorts the clone.
+ * K95-style glass pill - "360°" follows cursor on export view amulet hover.
  */
-export function bootResultAmuletHover() {
-  if (window.__pagmarResultHoverBooted) return;
+export function bootExportAmuletHover() {
+  if (window.__pagmarExportHoverBooted) return;
 
-  const media = document.querySelector('.pagmar__result-amulet-frame');
+  const media = document.querySelector('.pagmar__export-amulet-frame');
   if (!media) return;
 
-  window.__pagmarResultHoverBooted = true;
+  window.__pagmarExportHoverBooted = true;
 
   const OFFSET_X = 20;
   const OFFSET_Y = -32;
   const SMOOTH = 0.32;
 
   const tip = document.createElement('div');
-  tip.className = 'pagmar__result-amulet-hover';
+  tip.className = 'pagmar__export-amulet-hover';
   tip.setAttribute('aria-hidden', 'true');
   tip.innerHTML =
-    '<div class="pagmar__result-amulet-hover__surface glass-lens" data-glass-source="result-amulet">' +
+    '<div class="pagmar__export-amulet-hover__surface glass-lens" data-glass-source="export-amulet">' +
     '<div class="glass-lens__backdrop" aria-hidden="true">' +
     '<div class="glass-clone" aria-hidden="true">' +
     '<canvas class="glass-clone__capture" aria-hidden="true"></canvas>' +
@@ -32,7 +31,7 @@ export function bootResultAmuletHover() {
     '</div>';
   document.body.appendChild(tip);
 
-  const surface = tip.querySelector('.pagmar__result-amulet-hover__surface');
+  const surface = tip.querySelector('.pagmar__export-amulet-hover__surface');
   if (window.pagmarGlassLens && surface) {
     window.pagmarGlassLens.register(surface);
   }
@@ -47,11 +46,7 @@ export function bootResultAmuletHover() {
   let pointerMoved = false;
 
   function canShow() {
-    return (
-      document.body.classList.contains('is-result-overlay-open') &&
-      !pointerDown &&
-      !pointerMoved
-    );
+    return document.body.classList.contains('is-export-view-open') && !pointerDown && !pointerMoved;
   }
 
   function setVisible(on, x, y) {
@@ -66,29 +61,15 @@ export function bootResultAmuletHover() {
     tip.classList.add('is-visible');
   }
 
-  function isOverMedia(clientX, clientY) {
-    const el = document.elementFromPoint(clientX, clientY);
-    return !!(el && media.contains(el));
-  }
-
   media.addEventListener('pointerenter', function (e) {
-    if (e.pointerType === 'touch') return;
+    if (!canShow()) return;
     setVisible(true, e.clientX, e.clientY);
+    sx = targetX;
+    sy = targetY;
   });
 
   media.addEventListener('pointerleave', function () {
     setVisible(false);
-    pointerMoved = false;
-  });
-
-  media.addEventListener('pointermove', function (e) {
-    if (e.pointerType === 'touch') return;
-    if (pointerDown) {
-      pointerMoved = true;
-      setVisible(false);
-      return;
-    }
-    setVisible(true, e.clientX, e.clientY);
   });
 
   media.addEventListener('pointerdown', function () {
@@ -97,25 +78,31 @@ export function bootResultAmuletHover() {
     setVisible(false);
   });
 
-  window.addEventListener('pointerup', function (e) {
+  media.addEventListener('pointermove', function (e) {
+    if (pointerDown) pointerMoved = true;
+    if (!visible || !canShow()) return;
+    targetX = e.clientX + OFFSET_X;
+    targetY = e.clientY + OFFSET_Y;
+  });
+
+  window.addEventListener('pointerup', function () {
     pointerDown = false;
-    if (isOverMedia(e.clientX, e.clientY) && !pointerMoved) {
-      setVisible(true, e.clientX, e.clientY);
-    }
-    pointerMoved = false;
+    window.setTimeout(function () {
+      pointerMoved = false;
+    }, 120);
   });
 
   function tick() {
     if (visible) {
       sx += (targetX - sx) * SMOOTH;
       sy += (targetY - sy) * SMOOTH;
-      tip.style.transform =
-        'translate3d(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px,0)';
+      fade = Math.min(1, fade + 0.12);
+    } else {
+      fade = Math.max(0, fade - 0.1);
     }
-    fade += ((visible ? 1 : 0) - fade) * 0.22;
     tip.style.opacity = String(fade);
+    tip.style.transform = 'translate3d(' + sx + 'px,' + sy + 'px,0)';
     requestAnimationFrame(tick);
   }
-
-  requestAnimationFrame(tick);
+  tick();
 }

@@ -19,11 +19,13 @@
   tip.setAttribute('aria-hidden', 'true');
   tip.innerHTML =
     '<div class="pagmar__detail-amulet-hover__surface glass-lens" data-glass-source="detail-amulet">' +
+    '<div class="glass-lens__backdrop" aria-hidden="true">' +
     '<div class="glass-clone" aria-hidden="true">' +
     '<canvas class="glass-clone__capture" aria-hidden="true"></canvas>' +
     '</div>' +
     '<div class="glass-lens__tint" aria-hidden="true"></div>' +
     '<div class="glass-chrome" aria-hidden="true"></div>' +
+    '</div>' +
     '<span class="pagmar__glass-pill__text">' +
     '360<span class="pagmar__glass-pill__deg" aria-hidden="true"></span>' +
     '</span>' +

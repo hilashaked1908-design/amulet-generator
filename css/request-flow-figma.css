@@ -37,13 +37,12 @@ body.pagmar-create {
     (var(--figma-amulet-bottom-y) + var(--figma-q-dock-top-y) - var(--figma-amulet-caption-line-h)) / 2
   );
   --figma-q-field-font: 55;
-  --figma-q-dock-bottom: 101.140625;
+  --figma-q-dock-bottom: 62;
   --figma-q-dock-lift: 0px;
   --figma-q-dock-w: 978.98046875;
   --figma-q-dock-h: 95;
   --figma-q-dock-radius: 100;
   --figma-q-dock-radius-choice: 30;
-  --figma-q-dock-pad-r-choice: 10;
   --figma-q-choice-col-w: 756;
   --figma-q-choice-gap: 6;
   --figma-q-choice-row-gap: 16;
@@ -53,6 +52,7 @@ body.pagmar-create {
   --figma-q-dock-pad-r: 40;
   --figma-q-dock-pad-b: 10;
   --figma-q-dock-pad-l: 10;
+  --figma-q-dock-pad-r-choice: var(--figma-q-dock-pad-l);
   --figma-q-dock-gap: 10;
   --figma-q-btn-w: 183;
   --figma-q-btn-h: 75;
@@ -135,9 +135,9 @@ body.pagmar-index.is-create-mode .pagmar__index-cta-pill {
 }
 
 body.pagmar-index.is-create-mode.is-panel-open .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__atmosphere--back,
-body.pagmar-index.is-create-mode:not(.is-create-exiting) .pagmar__atmosphere--fantik {
+body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__garden,
+body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__atmosphere--back,
+body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__atmosphere--fantik {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -413,7 +413,7 @@ body.pagmar-create .figma-amulet.is-amulet-loading .pagmar__amulet-frame-loader 
   visibility: visible;
 }
 
-/* Q1 idle morph - keep vessels visible above hidden preview while vectors build */
+/* Q1 idle vessel spin - keep vectors visible above hidden preview while vectors build */
 body.pagmar-index.is-create-mode .figma-amulet.is-amulet-loading .figma-amulet-stage__morph:not(.is-hidden),
 body.pagmar-create .figma-amulet.is-amulet-loading .figma-amulet-stage__morph:not(.is-hidden) {
   z-index: 6;
@@ -492,30 +492,18 @@ body.pagmar-create .pagmar__request-artboard:not(.is-amulet-live) .figma-amulet-
   visibility: visible;
 }
 
-.figma-amulet .figma-amulet-stage__morph .pagmar-vessel-morph,
-.pagmar__amulet-frame-loader__vessels .pagmar-vessel-morph,
-.pagmar__create-fullpage-loader__vessels .pagmar-vessel-morph {
+.figma-amulet .figma-amulet-stage__morph .pagmar__amulet-frame-loader__vessels {
   position: relative;
   inset: auto;
   flex: 0 0 auto;
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-.figma-amulet .figma-amulet-stage__morph .pagmar-vessel-morph,
-.pagmar__amulet-frame-loader__vessels .pagmar-vessel-morph {
   width: min(88%, calc(280 * var(--pagmar-margin-u, 1px)));
   height: min(88%, calc(280 * var(--pagmar-margin-u, 1px)));
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1;
-}
-
-.pagmar__amulet-frame-loader__vessels .pagmar-vessel-morph__svg,
-.figma-amulet .figma-amulet-stage__morph .pagmar-vessel-morph__svg {
-  width: 100%;
-  height: 100%;
-  margin: auto;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 .figma-amulet .figma-amulet-stage__morph.is-hidden {
@@ -935,10 +923,10 @@ body.is-choice-question .figma-q__dock .figma-q__btn-outer {
 }
 
 body.is-choice-question .figma-q__dock .figma-q__field-box {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   width: auto;
   min-width: 0;
-  max-width: calc(var(--figma-q-choice-col-w) * var(--fu));
+  max-width: none;
   margin-inline-start: auto;
   justify-content: flex-end;
   align-items: stretch;
@@ -948,9 +936,11 @@ body.is-choice-question .figma-q__dock .figma-q__field-box {
 body.is-choice-question .figma-q__dock .figma-q__field {
   min-height: 0;
   height: auto;
-  width: 100%;
-  align-items: flex-end;
-  justify-content: flex-start;
+  width: auto;
+  max-width: 100%;
+  flex: 1 1 auto;
+  align-items: stretch;
+  justify-content: flex-end;
 }
 
 .figma-q__head {
@@ -1075,6 +1065,8 @@ body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__sur
   gap: 0;
 }
 
+body.pagmar-index.is-create-mode .pagmar__request-vector-tip .glass-lens__backdrop,
+body.pagmar-create .pagmar__request-vector-tip .glass-lens__backdrop,
 body.pagmar-index.is-create-mode .pagmar__request-vector-tip .glass-clone,
 body.pagmar-create .pagmar__request-vector-tip .glass-clone {
   border-radius: 40px;
@@ -1100,6 +1092,7 @@ body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__req
   white-space: pre-line !important;
   overflow-wrap: break-word;
   word-break: normal;
+  text-wrap: pretty;
   font-family: "Narkiss Yair", "TheBasics Mono", monospace !important;
   font-size: calc(20 * var(--fu)) !important;
   font-weight: 400 !important;
@@ -1157,9 +1150,9 @@ body:not(.is-choice-question) .figma-q__field-box .intro__question-input {
 }
 
 .figma-q__field-box:has(.intro__choice-grid--dock) {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   min-width: 0;
-  justify-content: flex-start;
+  justify-content: flex-end;
   align-items: stretch;
 }
 
@@ -1186,7 +1179,7 @@ body.is-choice-question .figma-q__field {
   min-height: 0;
   height: auto;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .figma-q__field .intro__question-input,
@@ -1284,11 +1277,13 @@ body.pagmar-create.is-choice-question.is-choice-save .pagmar__request-artboard .
   align-items: stretch;
   justify-content: flex-start;
   gap: calc(var(--figma-q-choice-gap) * var(--fu));
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   min-height: 0;
   direction: rtl;
   opacity: 1;
-  padding-inline-start: 0;
+  margin-inline-start: auto;
+  padding-inline: 0;
   box-sizing: border-box;
 }
 
@@ -1460,7 +1455,7 @@ body.pagmar-create.is-choice-question.is-choice-save .pagmar__request-artboard .
 
 .figma-q__btn:hover:not(:disabled),
 .figma-q__btn:focus-visible:not(:disabled) {
-  background: #242018;
+  background: #000000;
   opacity: 1;
 }
 
@@ -1598,9 +1593,9 @@ body.pagmar-create.is-choice-question:not(.is-choice-save) .pagmar__request-artb
 
 body.pagmar-index.is-create-mode.is-choice-question .pagmar__request-artboard .figma-q__dock .figma-q__field-box,
 body.pagmar-create.is-choice-question .pagmar__request-artboard .figma-q__dock .figma-q__field-box {
-  flex: 1 1 auto !important;
+  flex: 1 1 0% !important;
   width: auto !important;
-  max-width: calc(var(--figma-q-choice-col-w) * var(--fu)) !important;
+  max-width: none !important;
   min-width: 0 !important;
   min-height: 0 !important;
   height: auto !important;
@@ -1614,9 +1609,11 @@ body.pagmar-index.is-create-mode.is-choice-question .pagmar__request-artboard .f
 body.pagmar-create.is-choice-question .pagmar__request-artboard .figma-q__dock .figma-q__field {
   min-height: 0 !important;
   height: auto !important;
-  width: 100% !important;
-  align-items: flex-end !important;
-  justify-content: flex-start !important;
+  width: auto !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+  align-items: stretch !important;
+  justify-content: flex-end !important;
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__field .intro__choice-grid--dock .intro__choice-btn__radio,
@@ -1781,5 +1778,13 @@ body.pagmar-create .pagmar__request-artboard .figma-q__btn {
   color: var(--request-btn-ink, var(--pagmar-yellow-white)) !important;
   background: var(--request-btn-bg, #181610) !important;
   border: none !important;
+  opacity: 1 !important;
+}
+
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn:hover:not(:disabled),
+body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__btn:focus-visible:not(:disabled),
+body.pagmar-create .pagmar__request-artboard .figma-q__btn:hover:not(:disabled),
+body.pagmar-create .pagmar__request-artboard .figma-q__btn:focus-visible:not(:disabled) {
+  background: #000000 !important;
   opacity: 1 !important;
 }

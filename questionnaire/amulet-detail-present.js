@@ -36,6 +36,9 @@ export async function mountDetailStyleAmulet(container, glbKey, options) {
   const mounted = mountDetailAmulet3D(container, loaded.scene, {
     materialOverrides: loaded.materialOverrides || [],
     useDetailPresentation: Boolean(options && options.useDetailPresentation),
+    autoRotate: Boolean(options && options.autoRotate),
+    autoRotateSpeed: options && options.autoRotateSpeed,
+    fitMargin: options && options.fitMargin,
   });
 
   disposeThreePbr();

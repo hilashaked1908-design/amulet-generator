@@ -1,4 +1,4 @@
-/* About overlay - Figma 2537:30533 @ 1920×1080 */
+/* About overlay - Figma 2696:46028 @ 1920×3775 */
 
 body.is-about-overlay-open {
   overflow: hidden;
@@ -9,14 +9,20 @@ body.is-about-overlay-open {
   inset: 0;
   z-index: 10050;
   box-sizing: border-box;
-  background: #F4F4E8;
+  background: #000000;
+  color: var(--pagmar-yellow-white);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   --about-w: 1920;
-  --about-h: 1080;
-  --about-ink: #030303;
-  --about-u: var(--pagmar-margin-u);
+  --about-h: 3775;
+  --about-ink: var(--pagmar-yellow-white);
+  --about-cell-bg: #1e1e1e;
+  --about-preview-bg: var(--pagmar-yellow-white);
+  --about-u: var(--pagmar-viewport-u);
   --pagmar-close-u: var(--about-u);
 }
 
@@ -29,55 +35,484 @@ body.is-about-overlay-open {
   display: none !important;
 }
 
-.pagmar__about-overlay .pagmar-canvas--about {
-  container-type: size;
-  position: relative;
+.pagmar__about-fog {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: #000000;
+}
+
+.pagmar__about-fog.pagmar__detail-fog--live {
+  opacity: 1;
+}
+
+.pagmar__about-fog .pagmar__detail-fog-canvas {
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+/* ── Top chrome - same anchors as amulet detail / result ── */
+.pagmar__about-chrome {
+  position: fixed;
+  z-index: 10060;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+  direction: ltr;
+}
+
+.pagmar__about-chrome-logo {
+  pointer-events: none;
+}
+
+.pagmar__about-chrome-close {
+  color: var(--about-ink);
+  pointer-events: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pagmar__about-chrome-close svg {
+  display: block;
+  width: calc(var(--pagmar-close-icon-w) * var(--pagmar-chrome-u));
+  height: calc(var(--pagmar-close-icon-h) * var(--pagmar-chrome-u));
+  flex-shrink: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__about-chrome-close svg path {
+  stroke-width: var(--pagmar-line-weight);
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+.pagmar__about-chrome-close:hover {
+  opacity: 0.65;
+}
+
+.pagmar__about-chrome-close:focus-visible {
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.45);
+  outline-offset: 4px;
+}
+
+.pagmar__about-overlay .pagmar-canvas--about {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   min-height: 100dvh;
-  overflow: hidden;
-  background: #F4F4E8;
+  overflow: visible;
+  background: transparent;
   direction: ltr;
   --u: var(--about-u);
 }
 
 .pagmar__about-stage {
+  position: relative;
+  width: calc(var(--about-w) * var(--u));
+  min-height: calc(var(--about-h) * var(--u));
+  margin: 0 auto;
+  color: var(--about-ink);
+}
+
+/* ── Hebrew text: RTL bidi so punctuation stays at sentence end ── */
+.pagmar__about-copy,
+.pagmar__about-letters-copy,
+.pagmar__about-letters-hint,
+.pagmar__about-project-copy,
+.pagmar__about-tag,
+.pagmar__about-credits-tag,
+.pagmar__about-credits-list,
+.pagmar__about-hero-word,
+.pagmar__about-footer-word,
+.pagmar__about-letters-title {
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+/* ── Text rhythm - match Figma line breaks, avoid orphan wraps ── */
+.pagmar__about-copy,
+.pagmar__about-letters-copy,
+.pagmar__about-project-copy {
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+
+.pagmar__about-copy-gap {
+  margin: 0;
+  height: calc(12 * var(--u));
+  line-height: 1.1;
+  visibility: hidden;
+}
+
+.pagmar__about-tag,
+.pagmar__about-credits-tag,
+.pagmar__about-credits-list li,
+.pagmar__about-hero-word,
+.pagmar__about-footer-word,
+.pagmar__about-letters-title {
+  white-space: nowrap;
+}
+
+/* ── Hero ── */
+.pagmar__about-hero {
   position: absolute;
-  top: var(--pagmar-margin-top);
-  right: var(--pagmar-margin-right);
-  bottom: var(--pagmar-margin-bottom);
-  left: var(--pagmar-margin-left);
-  color: var(--about-ink);
+  left: calc(104.12 * var(--u));
+  top: calc(319.18 * var(--u));
+  width: calc(1713.11 * var(--u));
+  height: calc(449.64 * var(--u));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: calc(50 * var(--u));
   pointer-events: none;
-  container-type: size;
-  --u: min(calc(100cqw / var(--about-w)), calc(100cqh / var(--about-h)));
 }
 
-.pagmar__about-stage * {
-  pointer-events: none !important;
-}
-
-/* ── Close - pagmar-chrome.css anchor; typography only here ── */
-.pagmar__about-dismiss {
+.pagmar__about-hero-word {
+  margin: 0;
+  font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
+  font-weight: 100;
+  font-size: calc(375 * var(--u));
+  line-height: 0.7;
+  letter-spacing: calc(-15 * var(--u));
   color: var(--about-ink);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pagmar__about-hero-word--left {
+  width: calc(642.6 * var(--u));
+}
+
+.pagmar__about-hero-word--right {
+  width: calc(520.87 * var(--u));
+}
+
+.pagmar__about-hero-emblem {
+  flex: 0 0 auto;
+  width: calc(449.64 * var(--u));
+  height: auto;
+  aspect-ratio: 425 / 234;
+  color: var(--about-ink);
+  background: transparent;
+  overflow: visible;
+}
+
+.pagmar__about-hero-emblem svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* ── Shared section + copy ── */
+.pagmar__about-section {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.pagmar__about-tag {
+  margin: 0;
+  font-family: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  font-size: calc(20 * var(--u));
+  line-height: 0.9;
+  letter-spacing: calc(0.6 * var(--u));
+  text-align: right;
+  color: var(--about-ink);
+}
+
+.pagmar__about-tag-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(7 * var(--u));
+  margin-top: calc(7 * var(--u));
+}
+
+.pagmar__about-tag-icons-row {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+}
+
+.pagmar__about-tag-icons img {
+  display: block;
+  width: calc(11.34 * var(--u));
+  height: calc(11.59 * var(--u));
+}
+
+.pagmar__about-copy {
   font-family: "TheBasics", "DavidLibre", serif;
-  font-size: calc(42 * var(--pagmar-chrome-u));
-  font-weight: 300;
-  line-height: 1;
-  -webkit-tap-highlight-color: transparent;
+  font-size: calc(27 * var(--u));
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-align: right;
+  color: var(--about-ink);
 }
 
-.pagmar__about-dismiss[hidden] {
-  display: none !important;
+.pagmar__about-copy p {
+  margin: 0 0 calc(12 * var(--u));
 }
 
-.pagmar__about-dismiss:hover {
-  opacity: 0.65;
+.pagmar__about-copy p:last-child {
+  margin-bottom: 0;
 }
 
-.pagmar__about-dismiss:focus-visible {
-  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.45);
-  outline-offset: 4px;
+/* ── Flex blocks (Figma Frame 484 auto-layout) ── */
+.pagmar__about-block {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(96.32 * var(--u));
+  width: 100%;
+}
+
+.pagmar__about-block--system {
+  flex: 0 1 calc(939.59 * var(--u));
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: calc(18 * var(--u));
+  width: calc(939.59 * var(--u));
+}
+
+.pagmar__about-block-copy {
+  flex: 0 0 calc(723 * var(--u));
+  width: calc(723 * var(--u));
+  order: 0;
+}
+
+.pagmar__about-block-tag,
+.pagmar__about-origin-tag,
+.pagmar__about-system-tag {
+  flex: 0 0 calc(149.9 * var(--u));
+  width: calc(149.9 * var(--u));
+  order: 2;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: calc(4 * var(--u)) 0 0;
+  box-sizing: border-box;
+}
+
+.pagmar__about-block-tag .pagmar__about-tag,
+.pagmar__about-origin-tag .pagmar__about-tag,
+.pagmar__about-system-tag .pagmar__about-tag {
+  width: 100%;
+  margin: 0;
+  text-align: right;
+}
+
+.pagmar__about-section-glyphs {
+  flex: 0 0 calc(32.69 * var(--u));
+  width: calc(32.69 * var(--u));
+  order: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: calc(8 * var(--u)) 0 0;
+  box-sizing: border-box;
+}
+
+.pagmar__about-section-glyphs .pagmar__about-tag-icons {
+  margin-top: 0;
+}
+
+.pagmar__about-system-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(89 * var(--u));
+  width: 100%;
+}
+
+/* ── Origin section (Figma Frame 484) ── */
+.pagmar__about-section--origin {
+  left: calc(833.89 * var(--u));
+  top: calc(978.32 * var(--u));
+  width: calc(939.59 * var(--u));
+  min-height: calc(240 * var(--u));
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: calc(18 * var(--u));
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.pagmar__about-origin-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(31 * var(--u));
+  width: calc(723 * var(--u));
+  flex: 0 0 calc(723 * var(--u));
+  order: 0;
+}
+
+.pagmar__about-origin-copy .pagmar__about-copy {
+  width: 100%;
+  margin: 0;
+}
+
+.pagmar__about-origin-glyphs .pagmar__about-tag-icons {
+  gap: calc(31 * var(--u));
+}
+
+.pagmar__about-origin-glyphs .pagmar__about-tag-icons-row {
+  gap: calc(10 * var(--u));
+}
+
+.pagmar__about-system-glyphs .pagmar__about-tag-icons {
+  gap: calc(7 * var(--u));
+}
+
+/* ── System section ── */
+.pagmar__about-section--system {
+  left: calc(50.68 * var(--u));
+  top: calc(1451.68 * var(--u));
+  width: calc(1818.64 * var(--u));
+}
+
+.pagmar__about-copy--system {
+  width: 100%;
+  font-size: calc(27 * var(--u));
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.pagmar__about-amulet-sample {
+  position: relative;
+  flex: 0 0 calc(640 * var(--u));
+  width: calc(640 * var(--u));
+  height: calc(640 * var(--u));
+  margin-top: calc(-165 * var(--u));
+  margin-left: calc(-210 * var(--u));
+  overflow: visible;
+  pointer-events: none;
+  background: transparent;
+}
+
+.pagmar__about-amulet-3d {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  background: transparent;
+  cursor: grab;
+}
+
+.pagmar__about-amulet-3d:active {
+  cursor: grabbing;
+}
+
+.pagmar__about-amulet-3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+}
+
+/* ── Letters section ── */
+.pagmar__about-section--letters {
+  left: calc(147.23 * var(--u));
+  top: calc(1969.04 * var(--u));
+  width: calc(1626 * var(--u));
+  padding-top: calc(130 * var(--u));
+  border-top: var(--pagmar-line-weight) solid var(--about-ink);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(116 * var(--u));
+  box-sizing: border-box;
+}
+
+.pagmar__about-connection-panel {
+  position: relative;
+  flex: 0 0 calc(880 * var(--u));
+  width: calc(880 * var(--u));
+  height: calc(924 * var(--u));
+  background: var(--about-preview-bg);
+  overflow: hidden;
+}
+
+.pagmar__about-connection-default,
+.pagmar__about-connection-svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pagmar__about-connection-default {
+  object-fit: contain;
+  opacity: 1;
+  transition: opacity 0.28s ease;
+}
+
+.pagmar__about-connection-svg {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.pagmar__about-connection-panel.is-live .pagmar__about-connection-default {
+  opacity: 0;
+}
+
+.pagmar__about-connection-panel.is-live .pagmar__about-connection-svg {
+  opacity: 1;
+}
+
+.pagmar__about-connection-panel.is-default .pagmar__about-connection-svg {
+  opacity: 0;
+}
+
+.pagmar__about-letter-grid-wrap {
+  position: relative;
+  align-self: flex-end;
+  width: calc(572.192 * var(--u));
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.pagmar__about-connection-panel.is-swapping .pagmar__about-connection-svg {
+  opacity: 0;
+}
+
+.pagmar__about-connection-panel .about-connection-draw {
+  opacity: 1;
+}
+
+.pagmar__about-connection-panel .about-connection-draw path,
+.pagmar__about-connection-panel .about-connection-draw circle,
+.pagmar__about-connection-panel .about-connection-draw ellipse,
+.pagmar__about-connection-panel .about-connection-draw line,
+.pagmar__about-connection-panel .about-connection-draw polyline,
+.pagmar__about-connection-panel .about-connection-draw polygon {
+  fill: none;
+  stroke: #1e1e1e;
+  stroke-width: 4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 body.is-about-overlay-open .pagmar__garden,
@@ -85,88 +520,242 @@ body.is-about-overlay-open .pagmar__garden canvas {
   pointer-events: none !important;
 }
 
-/* ── Kickers (David Libre Bold 40) ── */
-.pagmar__about-kicker {
-  position: absolute;
-  margin: 0;
-  max-width: calc(253 * var(--u));
-  font-family: "DavidLibre", "Ratzif22", serif;
-  font-weight: 700;
-  font-size: calc(40 * var(--u));
-  line-height: calc(123 * var(--u));
-  letter-spacing: calc(-0.4 * var(--u));
+.pagmar__about-letters-side {
+  flex: 0 0 calc(630 * var(--u));
+  width: calc(630 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.pagmar__about-letters-title {
+  width: 100%;
+  margin: 0 0 calc(32 * var(--u));
+  font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
+  font-weight: 400;
+  font-size: calc(75 * var(--u));
+  line-height: 1;
+  letter-spacing: calc(-0.75 * var(--u));
   text-align: right;
   color: var(--about-ink);
-  transform: translateX(-100%);
+}
+
+.pagmar__about-letters-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(8 * var(--u));
+  width: 100%;
+  margin: 0 0 calc(55 * var(--u));
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(27 * var(--u));
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-align: right;
+  color: var(--about-ink);
+}
+
+.pagmar__about-letters-copy p {
+  margin: 0;
+  width: 100%;
+  text-align: right;
+}
+
+.pagmar__about-letters-hint {
+  margin: 0;
+  font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
+  font-weight: 400;
+  text-align: right;
+  color: var(--about-ink);
+}
+
+.pagmar__about-letter-grid {
+  display: inline-grid;
+  grid-template-columns: max-content;
+  grid-template-rows: max-content;
+  width: 100%;
+  height: calc(214.572 * var(--u));
+  line-height: 0;
+}
+
+.pagmar__about-letter-cell {
+  --cell-ml: 0;
+  --cell-mt: 0;
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  box-sizing: border-box;
+  margin: calc(var(--cell-mt) * var(--u)) 0 0 calc(var(--cell-ml) * var(--u));
+  width: calc(71.524 * var(--u));
+  height: calc(71.524 * var(--u));
+  border: calc(0.681 * var(--u)) solid var(--about-ink);
+  background: var(--about-cell-bg);
+  color: var(--about-ink);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.pagmar__about-letter-cell--empty {
+  border-color: transparent;
+  background: transparent;
+  pointer-events: none;
+}
+
+.pagmar__about-letter-cell:hover:not(.is-selected) {
+  background: #525252;
+}
+
+.pagmar__about-letter-cell.is-selected,
+.pagmar__about-letter-cell.is-selected:hover {
+  background: var(--about-ink);
+  color: var(--about-cell-bg);
+  box-shadow: none;
+}
+
+.pagmar__about-letter-cell:focus-visible {
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.65);
+  outline-offset: calc(-3 * var(--u));
+}
+
+.pagmar__about-letter-glyph {
+  display: block;
+  width: 100%;
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(55 * var(--u));
+  line-height: 1.1;
+  letter-spacing: calc(-0.55 * var(--u));
+  text-align: center;
+  user-select: none;
+}
+
+/* ── Footer ── */
+.pagmar__about-footer {
+  position: absolute;
+  left: calc(49.89 * var(--u));
+  top: calc(3209.4 * var(--u));
+  width: calc(1820 * var(--u));
+  height: calc(424 * var(--u));
+}
+
+.pagmar__about-footer-hero {
+  position: absolute;
+  left: calc(470.22 * var(--u));
+  top: 0;
+  width: calc(879.77 * var(--u));
+  height: calc(230.92 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(25.68 * var(--u));
+  pointer-events: none;
+}
+
+.pagmar__about-footer-word {
+  margin: 0;
+  font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
+  font-weight: 100;
+  font-size: calc(192.58 * var(--u));
+  line-height: 0.7;
+  letter-spacing: calc(-7.7 * var(--u));
+  text-align: right;
+  color: var(--about-ink);
   white-space: nowrap;
 }
 
-.pagmar__about-kicker--security {
-  left: calc((1205.6 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((75.93 - var(--pagmar-design-inset, 30)) * var(--u));
+.pagmar__about-footer-emblem {
+  flex: 0 0 calc(230.92 * var(--u));
+  width: calc(230.92 * var(--u));
+  height: calc(230.92 * var(--u));
+  color: var(--about-ink);
+  background: transparent;
+  overflow: visible;
 }
 
-.pagmar__about-kicker--meaning {
-  left: calc((303 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((301.04 - var(--pagmar-design-inset, 30)) * var(--u));
+.pagmar__about-footer-emblem svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.pagmar__about-kicker--answer {
-  left: calc((1136.54 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((576.25 - var(--pagmar-design-inset, 30)) * var(--u));
+.pagmar__about-footer-emblem img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-/* ── Display words (TheBasics Display Thin 240) ── */
-.pagmar__about-display {
+.pagmar__about-credits {
   position: absolute;
+  top: calc(417.28 * var(--u));
+}
+
+.pagmar__about-credits--thanks {
+  left: 0;
+  width: calc(149 * var(--u));
+}
+
+.pagmar__about-credits-tag,
+.pagmar__about-credits-list {
   margin: 0;
-  font-family: "TheBasics Display Thin", "TheBasics", monospace;
-  font-weight: 400;
-  font-size: calc(240 * var(--u));
-  line-height: calc(123 * var(--u));
-  letter-spacing: calc(-2.4 * var(--u));
+  padding: 0;
+  list-style: none;
+  font-family: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  font-size: calc(20 * var(--u));
+  line-height: 0.9;
+  letter-spacing: calc(0.6 * var(--u));
   text-align: right;
   color: var(--about-ink);
-  transform: translateX(-100%);
+}
+
+.pagmar__about-credits-tag {
+  margin-bottom: calc(13 * var(--u));
+}
+
+.pagmar__about-credits-list li + li {
+  margin-top: calc(5 * var(--u));
+}
+
+.pagmar__about-credits--project {
+  left: calc(627 * var(--u));
+  width: calc(1193 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(89 * var(--u));
+}
+
+.pagmar__about-bezalel-logo {
+  display: block;
+  flex: 0 0 calc(627 * var(--u));
+  width: calc(627 * var(--u));
+  height: auto;
+}
+
+.pagmar__about-project-copy {
+  flex: 1 1 auto;
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(27 * var(--u));
+  line-height: 1.1;
+  text-align: right;
+  color: var(--about-ink);
+}
+
+.pagmar__about-project-copy p {
+  margin: 0 0 calc(8 * var(--u));
+}
+
+.pagmar__about-project-copy p:first-child {
   white-space: nowrap;
 }
 
-.pagmar__about-display--security {
-  left: calc((1859.87 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((124.7 - var(--pagmar-design-inset, 30)) * var(--u));
-}
-
-.pagmar__about-display--meaning {
-  left: calc((1087 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((351.1 - var(--pagmar-design-inset, 30)) * var(--u));
-}
-
-.pagmar__about-display--answer {
-  left: calc((1810.11 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((626.26 - var(--pagmar-design-inset, 30)) * var(--u));
-}
-
-/* ── Body copy (David Libre 32) ── */
-.pagmar__about-body {
-  position: absolute;
-  left: calc((1863.59 - var(--pagmar-design-inset, 30)) * var(--u));
-  top: calc((907 - var(--pagmar-design-inset, 30)) * var(--u));
-  width: calc(709.5 * var(--u));
-  transform: translateX(-100%);
-  font-family: "DavidLibre", "Ratzif22", serif;
-  font-weight: 400;
-  font-size: calc(32 * var(--u));
-  line-height: 1.2;
-  letter-spacing: calc(0.32 * var(--u));
-  text-align: right;
-  color: var(--about-ink);
-}
-
-.pagmar__about-body p {
-  margin: 0 0 calc(12 * var(--u));
-}
-
-.pagmar__about-body p:last-child {
+.pagmar__about-project-copy p:last-child {
   margin-bottom: 0;
 }
 
@@ -185,40 +774,233 @@ body.is-about-overlay-open .figma-close {
   pointer-events: none;
 }
 
+/* Glass request tooltip on about amulet hover */
+body.is-about-overlay-open .pagmar__about-amulet-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10070;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+body.is-about-overlay-open .pagmar__about-amulet-hover__surface,
+body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-hover__surface {
+  box-sizing: border-box;
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 400px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  vertical-align: top;
+  padding: 14px 24px !important;
+  border-radius: 40px !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  overflow: visible;
+  opacity: 1;
+  isolation: isolate;
+}
+
+body.is-about-overlay-open .pagmar__about-amulet-hover.is-anchor-left .pagmar__garden-amulet-hover__surface {
+  transform: translateX(-100%);
+}
+
+body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-hover__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+
+body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-hover__index,
+body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-hover__request {
+  margin: 0;
+  color: var(--about-ink);
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(18 * var(--about-u));
+  line-height: 1.15;
+  text-align: right;
+  direction: rtl;
+}
+
+body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-hover__index {
+  font-family: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  font-size: calc(16 * var(--about-u));
+  white-space: nowrap;
+}
+
 @media (max-width: 1100px) {
-  .pagmar__about-display {
-    font-size: calc(160 * var(--u));
-    line-height: 1;
+  .pagmar__about-hero-word {
+    font-size: calc(220 * var(--u));
   }
 
-  .pagmar__about-kicker {
-    font-size: calc(28 * var(--u));
-    line-height: 1.2;
+  .pagmar__about-section--letters {
+    flex-direction: column;
+    height: auto;
   }
 
-  .pagmar__about-body {
-    font-size: calc(24 * var(--u));
-    width: calc(520 * var(--u));
+  .pagmar__about-connection-panel,
+  .pagmar__about-letters-side {
+    width: 100%;
+    flex: none;
+  }
+
+  .pagmar__about-letters-side {
+    padding-top: 0;
+  }
+
+  .pagmar__about-letters-copy {
+    width: 100%;
   }
 }
 
 @media (max-width: 760px) {
-  .pagmar__about-display,
-  .pagmar__about-kicker {
-    white-space: normal;
+  .pagmar__about-stage {
+    width: 100%;
+    min-height: auto;
+    padding: calc(80 * var(--u)) calc(20 * var(--u)) calc(48 * var(--u));
+    box-sizing: border-box;
   }
 
-  .pagmar__about-body {
-    left: 50%;
+  .pagmar__about-hero,
+  .pagmar__about-section,
+  .pagmar__about-footer,
+  .pagmar__about-amulet-sample {
+    position: relative;
+    left: auto;
+    right: auto;
     top: auto;
-    bottom: calc(48 * var(--u));
-    width: min(calc(680 * var(--u)), calc(100vw - 32px));
-    transform: translateX(-50%);
+    width: 100%;
+    height: auto;
+    margin-bottom: calc(40 * var(--u));
+  }
+
+  .pagmar__about-section--origin {
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(24 * var(--u));
+  }
+
+  .pagmar__about-origin-copy,
+  .pagmar__about-section-glyphs,
+  .pagmar__about-origin-tag,
+  .pagmar__about-system-tag,
+  .pagmar__about-block-copy,
+  .pagmar__about-block--system {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: none;
+  }
+
+  .pagmar__about-hero {
+    flex-direction: column;
+    gap: calc(16 * var(--u));
+  }
+
+  .pagmar__about-hero-word,
+  .pagmar__about-hero-word--left,
+  .pagmar__about-hero-word--right {
+    width: auto;
+    font-size: calc(96 * var(--u));
+    text-align: center;
+  }
+
+  .pagmar__about-hero-emblem {
+    width: calc(180 * var(--u));
+    height: auto;
+  }
+
+  .pagmar__about-block,
+  .pagmar__about-system-layout {
+    flex-direction: column;
+    gap: calc(16 * var(--u));
+  }
+
+  .pagmar__about-block-copy,
+  .pagmar__about-block-tag,
+  .pagmar__about-block--system {
+    flex: none;
+    width: 100%;
+  }
+
+  .pagmar__about-amulet-sample {
+    margin-top: 0;
+  }
+
+  .pagmar__about-section--letters {
+    padding-top: calc(40 * var(--u));
+  }
+
+  .pagmar__about-connection-panel {
+    height: calc(360 * var(--u));
+  }
+
+  .pagmar__about-letters-title {
+    font-size: calc(48 * var(--u));
+  }
+
+  .pagmar__about-letters-copy,
+  .pagmar__about-copy,
+  .pagmar__about-copy--system,
+  .pagmar__about-project-copy {
+    font-size: calc(22 * var(--u));
+  }
+
+  .pagmar__about-letter-grid {
+    width: 100%;
+    height: auto;
+    transform: scale(0.92);
+    transform-origin: top right;
+  }
+
+  .pagmar__about-letter-glyph {
+    font-size: calc(40 * var(--u));
+  }
+
+  .pagmar__about-footer-hero,
+  .pagmar__about-credits--project,
+  .pagmar__about-credits--thanks {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: 100%;
+    margin-bottom: calc(24 * var(--u));
+  }
+
+  .pagmar__about-footer-hero {
+    flex-direction: column;
+  }
+
+  .pagmar__about-footer-word {
+    font-size: calc(72 * var(--u));
+    text-align: center;
+  }
+
+  .pagmar__about-credits--project {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagmar__about-bezalel-logo {
+    width: 100%;
+    flex: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pagmar__about-overlay {
-    transition-duration: 0.15s;
+  .pagmar__about-overlay,
+  .pagmar__about-letter-cell,
+  .pagmar__about-connection-panel .about-connection-draw,
+  .pagmar__about-connection-panel.is-swapping .pagmar__about-connection-svg {
+    transition-duration: 0.01ms !important;
   }
 }

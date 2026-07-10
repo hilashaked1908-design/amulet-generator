@@ -27,7 +27,10 @@ body.is-result-overlay-open {
   --result-fg: #F4F4E8;
   --result-ink-on-filled: #1e1e1e;
   --result-divider: #F4F4E8;
-  --result-tag-font: "Narkiss Yair", "TheBasics Mono", monospace;
+  --result-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --result-tag-size: 20;
+  --result-tag-line-height: 0.9;
+  --result-tag-tracking: 0.6;
   --result-body-font: "TheBasics", "TheBasics Mono", monospace;
   --result-story-font: "Lava Pro HL", "TheBasics Display Thin", serif;
   --pagmar-w: 1920;
@@ -137,12 +140,15 @@ body.is-result-overlay-open {
   display: block;
   color: var(--result-fg);
   font-family: var(--result-tag-font);
-  font-size: calc(20 * var(--u));
+  font-size: calc(var(--result-tag-size) * var(--u));
   font-weight: 400;
-  line-height: 0.9;
-  letter-spacing: calc(0.6 * var(--u));
+  font-style: normal;
+  line-height: var(--result-tag-line-height);
+  letter-spacing: calc(var(--result-tag-tracking) * var(--u));
   text-align: right;
   white-space: nowrap;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 .pagmar__result-tags .pagmar__result-tag,
@@ -171,6 +177,46 @@ body.is-result-overlay-open {
   align-items: flex-end;
   gap: 0;
   width: calc(179.255 * var(--u));
+}
+
+/* Criteria blocks - match amulet detail head + field spacing */
+.pagmar__result-criteria-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  width: calc(179.255 * var(--u));
+  min-width: 0;
+}
+
+.pagmar__result-criteria-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.pagmar__result-layer-source {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--result-fg);
+  font-family: var(--result-tag-font);
+  font-size: calc(20 * var(--u));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: calc(0.6 * var(--u));
+  text-align: right;
+  direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.pagmar__result-criteria-text .pagmar__result-field-text {
+  margin-top: calc(16 * var(--u));
 }
 
 .pagmar__result-section--ruled {
@@ -411,36 +457,50 @@ body.is-result-overlay-open {
   pointer-events: none;
 }
 
-/* [001] badge - Frame 402 */
-.pagmar__result-num {
+/* [001] badge - liquid glass clone layer (matches amulet detail) */
+.pagmar__result-num.glass-lens {
   position: absolute;
   z-index: 25;
   right: 0;
   top: calc(-1.453 * var(--u));
+  left: auto;
+  bottom: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
   padding: calc(14 * var(--u)) calc(24 * var(--u));
+  min-width: 0;
+  height: auto;
   border-radius: calc(40 * var(--u));
-  background: transparent;
-  color: var(--result-fg);
   pointer-events: none;
+  overflow: hidden;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
   white-space: nowrap;
 }
 
-.pagmar__result-num__bracket {
+.pagmar__result-num .glass-lens__backdrop,
+.pagmar__result-num .glass-clone,
+.pagmar__result-num .glass-chrome,
+.pagmar__result-num .glass-lens__tint {
+  border-radius: calc(40 * var(--u));
+}
+
+.pagmar__result-num__text {
+  position: relative;
+  z-index: 3;
   font-family: var(--result-body-font);
   font-size: calc(18 * var(--u));
   font-weight: 400;
   line-height: normal;
-}
-
-.pagmar__result-num__digits {
-  font-family: var(--result-tag-font);
-  font-size: calc(20 * var(--u));
-  font-weight: 400;
-  line-height: normal;
-  letter-spacing: calc(0.6 * var(--u));
+  letter-spacing: 0;
+  color: var(--result-fg);
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* Amulet - centered in Frame 405 */
@@ -484,7 +544,7 @@ body.is-result-overlay-open {
   height: 100% !important;
 }
 
-/* 360° hover pill on amulet */
+/* 360° hover pill on amulet - liquid glass clone (matches amulet detail) */
 .pagmar__result-amulet-hover {
   position: fixed;
   left: 0;
@@ -494,13 +554,38 @@ body.is-result-overlay-open {
   opacity: 0;
   transform: translate3d(-9999px, -9999px, 0);
   will-change: transform, opacity;
-  gap: 0;
+}
+
+.pagmar__result-amulet-hover__surface {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: calc(11 * var(--u, 1px)) calc(18 * var(--u, 1px)) calc(10 * var(--u, 1px)) calc(16 * var(--u, 1px));
+  border-radius: calc(40 * var(--u, 1px));
+  overflow: hidden;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.pagmar__result-amulet-hover__surface .glass-lens__backdrop,
+.pagmar__result-amulet-hover__surface .glass-clone,
+.pagmar__result-amulet-hover__surface .glass-chrome,
+.pagmar__result-amulet-hover__surface .glass-lens__tint {
+  border-radius: calc(40 * var(--u, 1px));
 }
 
 .pagmar__result-amulet-hover .pagmar__glass-pill__text {
+  position: relative;
+  z-index: 3;
+  font-family: var(--result-tag-font);
   font-size: calc(16 * var(--u, 1px));
+  font-weight: 400;
+  font-synthesis: none;
   letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
 }
 
 .pagmar__glass-pill__deg {
@@ -517,11 +602,11 @@ body.is-result-overlay-open {
   opacity: 0.95;
 }
 
-/* Action buttons - Frame 404 */
+/* Action buttons - Frame 404, anchored to bottom content margin */
 .pagmar__result-actions {
   position: absolute;
   left: 50%;
-  bottom: calc(-0.25 * var(--u));
+  bottom: 0;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -552,7 +637,10 @@ body.is-result-overlay-open {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: opacity 0.22s cubic-bezier(0.33, 0, 0.2, 1);
+  transition:
+    background 0.22s cubic-bezier(0.33, 0, 0.2, 1),
+    color 0.22s cubic-bezier(0.33, 0, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.33, 0, 0.2, 1);
 }
 
 .pagmar__result-pill--filled {
@@ -561,9 +649,18 @@ body.is-result-overlay-open {
   border-color: var(--result-fg);
 }
 
-.pagmar__result-pill:hover:not(:disabled),
-.pagmar__result-pill:focus-visible:not(:disabled) {
-  opacity: 0.85;
+.pagmar__result-pill--hover-fill:hover:not(:disabled),
+.pagmar__result-pill--hover-fill:focus-visible:not(:disabled) {
+  background: var(--result-fg);
+  color: var(--result-ink-on-filled);
+  border-color: var(--result-fg);
+}
+
+.pagmar__result-pill--hover-outline:hover:not(:disabled),
+.pagmar__result-pill--hover-outline:focus-visible:not(:disabled) {
+  background: transparent;
+  color: var(--result-fg);
+  border-color: var(--result-fg);
 }
 
 .pagmar__result-pill:disabled {
@@ -591,4 +688,134 @@ body.is-result-overlay-open #garden-stars {
 
 body.is-result-overlay-open #garden-stars {
   opacity: 1;
+}
+
+/* Glass question tooltip on [שייכות] / [תזמון] - matches amulet detail */
+body.is-result-overlay-open {
+  --figma402-head-gap: 8;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10001;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  width: auto;
+  max-width: none;
+  height: fit-content;
+  min-width: 0;
+  overflow: visible;
+  opacity: 1;
+  isolation: isolate;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover.is-anchor-left .pagmar__garden-amulet-hover__surface {
+  transform: translateX(-100%);
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__surface.glass-tooltip {
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 400px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  vertical-align: top;
+  padding: calc(14 * var(--pagmar-margin-u, 1px)) calc(24 * var(--pagmar-margin-u, 1px)) !important;
+  border-radius: calc(40 * var(--pagmar-margin-u, 1px)) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
+  position: relative !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  pointer-events: none;
+  gap: 0;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover.has-request .pagmar__garden-amulet-hover__surface.glass-tooltip {
+  gap: calc(var(--figma402-head-gap) * var(--pagmar-margin-u, 1px));
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__backdrop,
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-clone,
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-chrome {
+  border-radius: calc(40 * var(--pagmar-margin-u, 1px));
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__head {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(10 * var(--pagmar-margin-u, 1px));
+  direction: ltr;
+  margin: 0;
+  max-width: 100%;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__index,
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__request {
+  margin: 0;
+  font-family: var(--result-tag-font) !important;
+  font-size: calc(var(--result-tag-size) * var(--u, var(--pagmar-margin-u, 1px))) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  line-height: var(--result-tag-line-height) !important;
+  letter-spacing: calc(var(--result-tag-tracking) * var(--u, var(--pagmar-margin-u, 1px))) !important;
+  color: var(--result-fg) !important;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__index {
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__garden-amulet-hover__request {
+  position: relative;
+  z-index: 3;
+  display: block;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  text-align: right;
+  direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+body.is-result-overlay-open .pagmar__result-question-hover .pagmar__glass-pill__arrow {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  width: calc(13 * var(--pagmar-margin-u, 1px));
+  height: calc(13 * var(--pagmar-margin-u, 1px));
+  background: var(--pagmar-glass-pill-arrow) no-repeat center / contain;
+  opacity: 0.92;
+}
+
+body.is-result-overlay-open .pagmar__detail-question-target {
+  cursor: default;
 }

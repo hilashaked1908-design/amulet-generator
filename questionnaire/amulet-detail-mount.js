@@ -22,6 +22,9 @@ const state = {
   userRotX: 0.2,
   userRotY: 0,
   spinAnim: null,
+  autoRotate: false,
+  autoRotateSpeed: 0.1,
+  lastFrameMs: 0,
 };
 
 export function getDetailAmuletRenderState() {
@@ -97,15 +100,22 @@ function resizeDetailAmuletRenderer() {
 function startDetailAmuletRenderLoop() {
   if (state.loopStarted) return;
   state.loopStarted = true;
-  function frame() {
+  state.lastFrameMs = performance.now();
+  function frame(now) {
     requestAnimationFrame(frame);
+    const t = typeof now === 'number' ? now : performance.now();
+    const dt = Math.min(0.05, Math.max(0, (t - state.lastFrameMs) / 1000));
+    state.lastFrameMs = t;
+    if (state.autoRotate && state.group && !state.dragging && !state.spinAnim) {
+      state.userRotY += state.autoRotateSpeed * dt;
+    }
     if (state.renderer && state.scene && state.camera) {
       applyAmuletRotation();
       state.renderer.render(state.scene, state.camera);
       if (window.pagmarGlassLens) window.pagmarGlassLens.tick();
     }
   }
-  frame();
+  frame(state.lastFrameMs);
 }
 
 export function waitForContainerLayout(container, maxFrames) {
@@ -174,7 +184,12 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 1);
   const fov = 40;
-  const fitMargin = useDetailPresentation ? 1.34 : 1.05;
+  const fitMargin =
+    typeof options.fitMargin === 'number'
+      ? options.fitMargin
+      : useDetailPresentation
+        ? 1.34
+        : 1.05;
   const dist = (maxDim / 2) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * fitMargin;
 
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, dist * 4);
@@ -199,6 +214,11 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   state.group = group;
   state.userRotX = 0.2;
   state.userRotY = 0;
+  state.autoRotate = Boolean(options && options.autoRotate);
+  state.autoRotateSpeed =
+    typeof options.autoRotateSpeed === 'number' ? options.autoRotateSpeed : 0.1;
+  state.spinAnim = null;
+  state.lastFrameMs = performance.now();
 
   setupDragRotation(canvas);
   startDetailAmuletRenderLoop();
@@ -236,6 +256,9 @@ export function disposeDetailAmuletMount() {
   state.userRotX = 0.2;
   state.userRotY = 0;
   state.spinAnim = null;
+  state.autoRotate = false;
+  state.autoRotateSpeed = 0.1;
+  state.lastFrameMs = 0;
 }
 
 export function captureDetailAmuletSnapshot(options) {

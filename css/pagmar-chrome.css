@@ -82,13 +82,20 @@
   flex-shrink: 0;
 }
 
-/* About overlay dismiss - same anchor, elevated stack */
-.pagmar-chrome__close.pagmar__about-dismiss {
+.pagmar-chrome__close svg path {
+  stroke-width: var(--pagmar-line-weight);
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+/* About overlay chrome - same anchor, elevated stack */
+.pagmar__about-chrome .pagmar-chrome__about,
+.pagmar__about-chrome .pagmar-chrome__close {
   z-index: 100000;
 }
 
-body.is-about-overlay-open .pagmar-chrome__about,
-body.is-about-overlay-open .pagmar-chrome__close:not(.pagmar__about-dismiss) {
+body.is-about-overlay-open .pagmar-chrome__about:not(.pagmar__about-chrome-logo),
+body.is-about-overlay-open .pagmar-chrome__close:not(.pagmar__about-chrome-close) {
   z-index: 109;
 }
 

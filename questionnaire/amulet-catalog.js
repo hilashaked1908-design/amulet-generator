@@ -407,7 +407,17 @@
     if (entryId == null) return null;
     var collection = loadAmuletCollection();
     for (var i = 0; i < collection.length; i += 1) {
-      if (collection[i] && collection[i].id === entryId) return collection[i];
+      if (collection[i] && collection[i].id == entryId) return collection[i];
+    }
+    return null;
+  }
+
+  function indexForEntryId(entryId) {
+    if (entryId == null) return null;
+    var base = userAmuletBaseIndex();
+    var collection = loadAmuletCollection();
+    for (var i = 0; i < collection.length; i += 1) {
+      if (collection[i] && collection[i].id == entryId) return base + i;
     }
     return null;
   }
@@ -425,6 +435,7 @@
   }
 
   window.pagmarEntryIdForAmuletIndex = entryIdForAmuletIndex;
+  window.pagmarIndexForEntryId = indexForEntryId;
   window.pagmarFindCollectionEntryById = findCollectionEntryById;
   window.pagmarResolveCollectionEntry = function (index) {
     var entryId = entryIdForAmuletIndex(index);

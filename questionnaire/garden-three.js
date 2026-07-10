@@ -41,6 +41,8 @@ const NEW_AMULET_WING_ROW_GROW_PX = 95;
 const NEW_AMULET_DEPTH_BASE_PX = 50;
 const NEW_AMULET_DEPTH_ROW_PX = 110;
 const NEW_AMULET_DEPTH_JITTER_PX = [0, 34, 20, 48];
+/** Extra forward nudge only when placing a brand-new amulet (negative = toward camera). */
+const NEW_AMULET_PLACEMENT_FORWARD_BIAS_PX = -80;
 /** Scattered meadow slots (screen px from anchor [014]) - fills sides, forward, and back. */
 const SPREAD_MEADOW_SLOTS = [
   { side: -420, depth: 45 },
@@ -310,6 +312,8 @@ const SCALE_LERP = 0.18;
 const FOCUS_FADE_LERP = 0.22;
 /** Tighter screen bounds for hit tests and spec-panel anchoring (opaque content, not full quad). */
 const VISUAL_HIT_FACTOR = 0.38;
+/** Slightly larger bounds for hover detection — easier to "stand on" an amulet. */
+const HOVER_HIT_FACTOR = 0.48;
 /** Cyber Garden-style blue depth sheet - sprites pass through while scrolling. */
 const FOG_VEIL_AHEAD = 42;
 const SPRITE_ORDER_BEHIND_VEIL = 2;
@@ -329,6 +333,7 @@ const renderer = new THREE.WebGLRenderer({
   antialias: true,
   alpha: true,
   premultipliedAlpha: false,
+  preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 renderer.sortObjects = true;
@@ -381,6 +386,7 @@ let controlsEnabled =
   !document.body.classList.contains('is-about-overlay-open');
 let selectedIndex = null;
 let pointerDown = null;
+let lastHoveredAmuletSprite = null;
 let lastPointer = {
   x: typeof window !== 'undefined' ? window.innerWidth * 0.5 : 0,
   y: typeof window !== 'undefined' ? window.innerHeight * 0.5 : 0,
@@ -1503,6 +1509,8 @@ function upgradeSpriteTextureFromDataUrl(sprite, dataUrl, minPixelGain) {
 
 function snapshotKeyForSprite(sprite) {
   if (sprite.userData.isUserAmulet) return 'user-amulet';
+  const entryId = sprite.userData.collectionEntryId;
+  if (entryId != null) return 'collection-' + entryId;
   if (sprite.userData.isCollectionAmulet) {
     const collection = loadCollection();
     const entry = collection[sprite.userData.collectionIndex];
@@ -1790,6 +1798,12 @@ function userAmuletSlotPosition(selfRadius) {
   return findClearPosition(USER_AMULET_SLOT.x, USER_AMULET_SLOT.z, selfRadius);
 }
 
+function nudgeNewAmuletPlacementForward(x, z, pose) {
+  if (!NEW_AMULET_PLACEMENT_FORWARD_BIAS_PX) return { x, z };
+  const fwd = nudgeAlongOpeningViewPx(x, z, NEW_AMULET_PLACEMENT_FORWARD_BIAS_PX, pose);
+  return { x: fwd.x, z: fwd.z };
+}
+
 /** Place new amulet - [018]+ in wide spread meadow. */
 function resolveNewAmuletPlacement(selfRadius) {
   const occupied = collectOccupiedPositions(null);
@@ -1805,8 +1819,10 @@ function resolveNewAmuletPlacement(selfRadius) {
   }
 
   if (newLabel >= NEW_AMULET_FIRST_LABEL) {
-    const target = positionForNewAmulet(slotIndex, pose);
+    let target = positionForNewAmulet(slotIndex, pose);
     if (target) {
+      const biased = nudgeNewAmuletPlacementForward(target.x, target.z, pose);
+      target = { ...target, x: biased.x, z: biased.z };
       if (isPositionClear(target.x, target.z, selfRadius, occupied)) {
         return { x: target.x, z: target.z };
       }
@@ -1843,8 +1859,10 @@ function resolveNewAmuletPlacement(selfRadius) {
   }
 
   if (slotIndex > 0) {
-    const target = positionRelativeToPrevIndex(slotIndex - 1, slotIndex, pose);
+    let target = positionRelativeToPrevIndex(slotIndex - 1, slotIndex, pose);
     if (target) {
+      const biased = nudgeNewAmuletPlacementForward(target.x, target.z, pose);
+      target = { ...target, x: biased.x, z: biased.z };
       if (isPositionClear(target.x, target.z, selfRadius, occupied)) {
         return { x: target.x, z: target.z };
       }
@@ -2121,15 +2139,29 @@ async function buildCollectionEntryFromSprite(sprite, entryId) {
   }
 
   let composed3D = null;
-  try {
-    var raw3d = sessionStorage.getItem('amuletComposed3D') || localStorage.getItem('amuletComposed3D');
-    if (raw3d) composed3D = JSON.parse(raw3d);
-  } catch (_) {}
+  if (answers && answers.q1Wish) {
+    try {
+      const composeMod = await import('./amulet-compose.js');
+      await composeMod.initAmuletCompose();
+      composed3D = await composeMod.composeFullAmuletForPbr(answers);
+    } catch (err) {
+      console.warn('[garden-three] per-entry compose failed, falling back to global', err);
+    }
+  }
+  if (!composed3D) {
+    try {
+      var raw3d = sessionStorage.getItem('amuletComposed3D') || localStorage.getItem('amuletComposed3D');
+      if (raw3d) composed3D = JSON.parse(raw3d);
+    } catch (_) {}
+  }
 
   if (composed3D) {
     try {
       const store = await glbStore();
       await store.saveSnapshot('composed3d-' + entryId, JSON.stringify(composed3D));
+      if (answers) {
+        await store.saveSnapshot('answers-collection-' + entryId, JSON.stringify(answers));
+      }
     } catch (err) {
       console.warn('[garden-three] composed3D IDB save failed (non-fatal)', err);
     }
@@ -2359,11 +2391,15 @@ function applySlotToSprite(sprite, collectionIndex, entry) {
 
 function syncCollectionSpritePositions() {
   const collection = loadCollection();
-  for (const sprite of sprites) {
-    const qIdx = sprite.userData.questionIndex;
-    if (typeof qIdx !== 'number' || qIdx < USER_AMULET_INDEX) continue;
-    const collIdx = qIdx - USER_AMULET_INDEX;
+  for (const sprite of collectionSprites) {
+    const entryId = sprite.userData.collectionEntryId;
+    if (entryId == null) continue;
+    const collIdx = collection.findIndex(function (entry) {
+      return entry && entry.id == entryId;
+    });
     if (collIdx < 0) continue;
+    sprite.userData.collectionIndex = collIdx;
+    sprite.userData.questionIndex = USER_AMULET_INDEX + collIdx;
     applySlotToSprite(sprite, collIdx, collection[collIdx]);
   }
 }
@@ -2577,14 +2613,11 @@ function spriteRenderOrderForVeil(sprite) {
 }
 
 function spriteDisplayLabel(sprite) {
-  let index;
-  if (sprite.userData.isUserAmulet) {
-    index = USER_AMULET_INDEX + loadCollection().length;
-  } else if (sprite.userData.isCollectionAmulet) {
-    index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
-  } else {
-    index = sprite.userData.tex ?? sprite.userData.questionIndex;
+  if (typeof sprite.userData.collectionIndex === 'number') {
+    const index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
+    return '[' + String(index + 1).padStart(3, '0') + ']';
   }
+  const index = resolveSpriteNavigationTarget(sprite).index;
   return '[' + String(index + 1).padStart(3, '0') + ']';
 }
 
@@ -2594,12 +2627,8 @@ function spriteRequestText(sprite) {
     return String(answers.q1Wish).trim();
   }
 
-  let index;
-  if (sprite.userData.isUserAmulet) {
-    index = USER_AMULET_INDEX + loadCollection().length;
-  } else if (sprite.userData.isCollectionAmulet) {
-    index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
-  } else {
+  const index = resolveSpriteNavigationTarget(sprite).index;
+  if (!sprite.userData.isUserAmulet && !sprite.userData.isCollectionAmulet) {
     return '';
   }
 
@@ -2607,6 +2636,29 @@ function spriteRequestText(sprite) {
   const record = window.getAmuletRecord(index);
   if (!record || !record.q1Wish) return '';
   return String(record.q1Wish).trim();
+}
+
+function isSpriteHoverable(sprite) {
+  if (!sprite || !sprite.visible) return false;
+  if (sprite.userData.spin3dHidden) return false;
+  return (sprite.userData.focusMul ?? 1) > 0.02;
+}
+
+function ensureSpriteEntryId(sprite) {
+  if (!sprite) return null;
+  if (sprite.userData.collectionEntryId != null) return sprite.userData.collectionEntryId;
+  if (typeof sprite.userData.collectionIndex === 'number') {
+    const collection = loadCollection();
+    const entry = collection[sprite.userData.collectionIndex];
+    if (entry && entry.id != null) {
+      sprite.userData.collectionEntryId = entry.id;
+      if (!sprite.userData.answers && entry.answers) {
+        sprite.userData.answers = entry.answers;
+      }
+      return entry.id;
+    }
+  }
+  return null;
 }
 
 function canShowAmuletHover() {
@@ -2627,8 +2679,27 @@ function dispatchAmuletHover(detail) {
   );
 }
 
+function isPointerOverSprite(clientX, clientY, sprite) {
+  const bounds = spriteScreenBounds(sprite);
+  if (!bounds) return false;
+  return (
+    clientX >= bounds.left &&
+    clientX <= bounds.right &&
+    clientY >= bounds.top &&
+    clientY <= bounds.bottom
+  );
+}
+
+function pickAmuletAtPointer(clientX, clientY, preferSprite) {
+  if (preferSprite && isPointerOverSprite(clientX, clientY, preferSprite)) {
+    return preferSprite;
+  }
+  return pickAmulet(clientX, clientY, false);
+}
+
 function updateCursorFromPointer(clientX, clientY) {
   const hit = canShowAmuletHover() ? pickAmulet(clientX, clientY, false) : null;
+  lastHoveredAmuletSprite = hit;
   document.body.style.cursor = hit ? 'pointer' : controlsEnabled ? 'grab' : 'default';
   dispatchAmuletHover(
     hit
@@ -2655,9 +2726,7 @@ function getIndexCtaBodyRect() {
 }
 
 function spriteScreenBounds(sprite) {
-  if ((sprite.userData.focusMul ?? 1) < 0.06) return null;
-  if (sprite.userData.spin3dHidden) return null;
-  if (!sprite.visible) return null;
+  if (!isSpriteHoverable(sprite)) return null;
 
   const rect = canvas.getBoundingClientRect();
   _proj.copy(sprite.position);
@@ -2934,7 +3003,19 @@ const canvas = renderer.domElement;
 
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  pointerDown = { x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false };
+  const amuletAtDown =
+    lastHoveredAmuletSprite && isSpriteHoverable(lastHoveredAmuletSprite)
+      ? lastHoveredAmuletSprite
+      : pickAmulet(e.clientX, e.clientY, false);
+  if (amuletAtDown) ensureSpriteEntryId(amuletAtDown);
+  pointerDown = {
+    x: e.clientX,
+    y: e.clientY,
+    lastX: e.clientX,
+    lastY: e.clientY,
+    moved: false,
+    amulet: amuletAtDown,
+  };
   dispatchAmuletHover({ active: false });
 });
 
@@ -2970,6 +3051,7 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 canvas.addEventListener('pointerleave', () => {
+  lastHoveredAmuletSprite = null;
   if (controlsEnabled) document.body.style.cursor = 'grab';
   dispatchAmuletHover({ active: false });
 });
@@ -3065,20 +3147,18 @@ function spriteBoundsInCanvas(sprite) {
   };
 }
 
-/** Screen-space hit test - pick the amulet whose center is closest to the click. */
+/** Screen-space hit test — prefer the front-most amulet under the pointer. */
 function pickAmulet(clientX, clientY, tight) {
   const rect = canvas.getBoundingClientRect();
   const sx = clientX - rect.left;
   const sy = clientY - rect.top;
   if (sx < 0 || sy < 0 || sx > rect.width || sy > rect.height) return null;
 
-  const hitFactor = tight ? 0.34 : 0.48;
-  let best = null;
-  let bestDist = Infinity;
+  const hitFactor = tight ? VISUAL_HIT_FACTOR : HOVER_HIT_FACTOR;
+  const hits = [];
 
   for (const sprite of sprites) {
-    if ((sprite.userData.focusMul ?? 1) < 0.06) continue;
-    if (sprite.userData.spin3dHidden) continue;
+    if (!isSpriteHoverable(sprite)) continue;
 
     _proj.copy(sprite.position);
     _proj.project(camera);
@@ -3096,32 +3176,88 @@ function pickAmulet(clientX, clientY, tight) {
 
     if (sx < px - halfW || sx > px + halfW || sy < py - halfH || sy > py + halfH) continue;
 
-    const clickDist = Math.hypot(sx - px, sy - py);
-    if (clickDist < bestDist) {
-      bestDist = clickDist;
-      best = sprite;
-    }
+    hits.push({
+      sprite,
+      camDist: dist,
+      renderOrder: sprite.renderOrder ?? 0,
+      clickDist: Math.hypot(sx - px, sy - py),
+    });
   }
 
-  return best;
+  if (!hits.length) return null;
+
+  hits.sort(function (a, b) {
+    if (a.camDist !== b.camDist) return a.camDist - b.camDist;
+    if (a.renderOrder !== b.renderOrder) return b.renderOrder - a.renderOrder;
+    return a.clickDist - b.clickDist;
+  });
+
+  return hits[0].sprite;
+}
+
+function syncSpriteCollectionIndicesFromCollection() {
+  const collection = loadCollection();
+  for (const sprite of collectionSprites) {
+    const entryId = sprite.userData.collectionEntryId;
+    if (entryId == null) {
+      ensureSpriteEntryId(sprite);
+      continue;
+    }
+    const newIdx = collection.findIndex(function (entry) {
+      return entry && entry.id == entryId;
+    });
+    if (newIdx < 0) continue;
+    sprite.userData.collectionIndex = newIdx;
+    sprite.userData.questionIndex = USER_AMULET_INDEX + newIdx;
+    sprite.userData.isCollectionAmulet = true;
+  }
+}
+
+/** Stable { index, entryId, answers } — tied to the sprite under the pointer. */
+function resolveSpriteNavigationTarget(sprite) {
+  const entryId =
+    sprite.userData.collectionEntryId != null ? sprite.userData.collectionEntryId : null;
+  const answers = sprite.userData.answers || null;
+
+  let index = null;
+  if (typeof sprite.userData.collectionIndex === 'number') {
+    index = USER_AMULET_INDEX + sprite.userData.collectionIndex;
+  } else if (sprite.userData.isUserAmulet) {
+    const collection = loadCollection();
+    const liveIdx = collection.findIndex(function (entry) {
+      return entry && entry.isLive;
+    });
+    index =
+      liveIdx >= 0
+        ? USER_AMULET_INDEX + liveIdx
+        : USER_AMULET_INDEX + collection.length;
+  } else {
+    index = sprite.userData.tex ?? sprite.userData.questionIndex ?? 0;
+  }
+
+  if (entryId == null && index != null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+    const fromIndex = window.pagmarEntryIdForAmuletIndex(index);
+    if (fromIndex != null) return { index: index, entryId: fromIndex, answers: answers };
+  }
+
+  if (entryId != null && typeof window.pagmarIndexForEntryId === 'function') {
+    const fromEntry = window.pagmarIndexForEntryId(entryId);
+    if (fromEntry != null) return { index: fromEntry, entryId: entryId, answers: answers };
+  }
+
+  return { index: index, entryId: entryId, answers: answers };
 }
 
 function dispatchAmuletClick(sprite, index) {
   const anchor = spriteAnchorInCanvas(sprite);
   const tex = sprite.userData.tex;
-  let resolvedIndex;
-  if (sprite.userData.isUserAmulet) {
-    resolvedIndex = USER_AMULET_INDEX + loadCollection().length;
-  } else if (sprite.userData.isCollectionAmulet) {
-    resolvedIndex = USER_AMULET_INDEX + sprite.userData.collectionIndex;
-  } else {
-    resolvedIndex = typeof tex === 'number' ? tex : index;
-  }
+  const target = resolveSpriteNavigationTarget(sprite);
   window.dispatchEvent(
     new CustomEvent('questionnaire:star-click', {
       detail: {
         anchor,
-        index: resolvedIndex,
+        index: target.index,
+        entryId: target.entryId,
         tex,
         answers: sprite.userData.answers || null,
       },
@@ -3129,7 +3265,28 @@ function dispatchAmuletClick(sprite, index) {
   );
 }
 
-function navigateToAmuletDetail(index) {
+function resolveSpriteEntryId(sprite) {
+  return ensureSpriteEntryId(sprite);
+}
+
+function navigateToAmuletDetailFromSprite(sprite) {
+  if (!sprite) return;
+  const answers = sprite.userData.answers || null;
+  const entryId = resolveSpriteEntryId(sprite);
+  if (entryId == null) {
+    console.warn('[garden-three] cannot open detail — sprite missing collectionEntryId');
+    return;
+  }
+  const labelIndex =
+    typeof sprite.userData.collectionIndex === 'number'
+      ? sprite.userData.collectionIndex
+      : null;
+  let index =
+    labelIndex != null ? USER_AMULET_INDEX + labelIndex : USER_AMULET_INDEX;
+  navigateToAmuletDetail(index, entryId, answers, labelIndex);
+}
+
+function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIndexOverride) {
   if (typeof window.pagmarIndexChrome !== 'undefined' && window.pagmarIndexChrome.markTyped) {
     window.pagmarIndexChrome.markTyped();
   }
@@ -3137,10 +3294,10 @@ function navigateToAmuletDetail(index) {
   try {
     sessionStorage.setItem('pagmarAmuletNavAt', String(Date.now()));
   } catch (_) {}
-  var entryId =
-    typeof window.pagmarEntryIdForAmuletIndex === 'function'
-      ? window.pagmarEntryIdForAmuletIndex(index)
-      : null;
+  var entryId = entryIdOverride != null ? entryIdOverride : null;
+  if (entryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
+    entryId = window.pagmarEntryIdForAmuletIndex(index);
+  }
   if (entryId == null) {
     var base = USER_AMULET_INDEX;
     if (index >= base) {
@@ -3151,16 +3308,28 @@ function navigateToAmuletDetail(index) {
       }
     }
   }
-  var url = 'amulet.html?id=' + encodeURIComponent(index);
-  if (entryId != null) {
-    url += '&entry=' + encodeURIComponent(entryId);
-    try {
-      sessionStorage.setItem(
-        'pagmarAmuletDetailNav',
-        JSON.stringify({ index: index, entryId: entryId })
-      );
-    } catch (_) {}
+  if (entryId == null) {
+    console.warn('[garden-three] cannot open detail — missing entry id for index', index);
+    return;
   }
+  var navIndex = index;
+  if (typeof labelIndexOverride === 'number') {
+    navIndex = USER_AMULET_INDEX + labelIndexOverride;
+  }
+  var url = 'amulet.html?entry=' + encodeURIComponent(entryId);
+  if (navIndex != null && Number.isFinite(navIndex)) {
+    url += '&id=' + encodeURIComponent(navIndex);
+  }
+  try {
+    var navPayload = { index: navIndex, entryId: entryId };
+    if (typeof labelIndexOverride === 'number') {
+      navPayload.labelIndex = labelIndexOverride;
+    }
+    if (answersOverride && typeof answersOverride === 'object') {
+      navPayload.answers = answersOverride;
+    }
+    sessionStorage.setItem('pagmarAmuletDetailNav', JSON.stringify(navPayload));
+  } catch (_) {}
   window.location.href = url;
 }
 
@@ -3169,28 +3338,25 @@ window.pagmarNavigateToAmuletDetail = navigateToAmuletDetail;
 canvas.addEventListener('pointerup', (e) => {
   if (!pointerDown) return;
   const moved = pointerDown.moved;
+  const hit = pointerDown.amulet;
   pointerDown = null;
 
-  if (moved) return;
+  if (moved) {
+    updateCursorFromPointer(e.clientX, e.clientY);
+    return;
+  }
 
   if (document.body.classList.contains('is-create-mode')) return;
 
-  const hit = pickAmulet(e.clientX, e.clientY, false);
-  if (!hit) return;
+  if (!hit) {
+    updateCursorFromPointer(e.clientX, e.clientY);
+    return;
+  }
 
   startAmuletSpin(hit);
 
-  let index;
-  if (hit.userData.isUserAmulet) {
-    index = USER_AMULET_INDEX + loadCollection().length;
-  } else if (hit.userData.isCollectionAmulet) {
-    index = USER_AMULET_INDEX + hit.userData.collectionIndex;
-  } else {
-    index = hit.userData.tex ?? hit.userData.questionIndex;
-  }
-
   e.preventDefault();
-  navigateToAmuletDetail(index);
+  navigateToAmuletDetailFromSprite(hit);
 });
 
 window.addEventListener('questionnaire:create-open', () => {
@@ -3380,6 +3546,7 @@ function tick(now) {
   updateDepthFade(t);
   if (lucaFog) lucaFog.update(t * 0.001);
   renderer.render(scene, camera);
+  if (window.pagmarGlassLens) window.pagmarGlassLens.tick();
 }
 
 requestAnimationFrame(tick);
@@ -3421,7 +3588,6 @@ Promise.resolve()
         for (const sprite of collectionSprites) {
           if (sprite.userData.collectionIndex === liveIdx) {
             userAmuletSprite = sprite;
-            sprite.userData.isUserAmulet = true;
             return;
           }
         }
@@ -3430,6 +3596,7 @@ Promise.resolve()
         return restoreUserAmuletFromStorage();
       }
     }).then(function () {
+      syncSpriteCollectionIndicesFromCollection();
       syncCollectionSpritePositions();
     });
   })
@@ -3451,6 +3618,7 @@ Promise.resolve()
 
 window.addEventListener('pageshow', function (evt) {
   if (!evt.persisted || !window.__gardenReady) return;
+  syncSpriteCollectionIndicesFromCollection();
   restoreGardenReturnStateOnLoad();
 });
 
@@ -3499,12 +3667,13 @@ window.gardenHasUserAmuletSnapshot = hasUserAmuletSnapshot;
 window.gardenLoadCollection = loadCollection;
 window.gardenListAmuletIndices = function () {
   const indices = [];
+  const seen = new Set();
   for (const sprite of sprites) {
-    if (sprite.userData.isUserAmulet) {
-      indices.push(USER_AMULET_INDEX + loadCollection().length);
-    } else if (sprite.userData.isCollectionAmulet) {
-      indices.push(USER_AMULET_INDEX + sprite.userData.collectionIndex);
-    }
+    if (!sprite.userData.isUserAmulet && !sprite.userData.isCollectionAmulet) continue;
+    const index = resolveSpriteNavigationTarget(sprite).index;
+    if (seen.has(index)) continue;
+    seen.add(index);
+    indices.push(index);
   }
   return indices.sort(function (a, b) {
     return a - b;

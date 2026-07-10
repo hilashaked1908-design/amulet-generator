@@ -1,14 +1,27 @@
-/* Shared liquid glass - clone layer + CSS distortion (no backdrop-filter) */
+/* Shared liquid glass - clone captures what's behind; distortion + blur on display */
 :root {
   --liquid-glass-fill: rgba(30, 30, 30, 0.35);
-  --liquid-glass-clone-filter: url(#glass-distortion) blur(4px) saturate(150%);
+  --liquid-glass-blur: blur(6px);
+  --liquid-glass-saturate: saturate(150%);
+  --liquid-glass-clone-filter: url(#glass-distortion) var(--liquid-glass-blur) var(--liquid-glass-saturate);
 }
 
 .glass-lens {
   position: relative;
   overflow: hidden;
-  pointer-events: none;
   isolation: isolate;
+}
+
+/* Backdrop stack only — blur lives on .glass-clone (canvas capture + CSS filter) */
+.glass-lens__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 .glass-clone {
