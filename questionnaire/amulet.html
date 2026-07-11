@@ -203,6 +203,13 @@
       if (entryId != null && Number.isFinite(entryId)) {
         var preloadGlbUrl = '/questionnaire/seed/glbs/' + entryId + '.glb';
         try {
+          var glbMatch = location.search.match(/[?&]glb=([^&]+)/);
+          if (glbMatch && glbMatch[1]) {
+            var fromUrl = decodeURIComponent(glbMatch[1]);
+            if (fromUrl.indexOf('/' + entryId + '.glb') !== -1) preloadGlbUrl = fromUrl;
+          }
+        } catch (_) {}
+        try {
           var navRaw = sessionStorage.getItem('pagmarAmuletDetailNav');
           if (navRaw) {
             var nav = JSON.parse(navRaw);
@@ -509,7 +516,7 @@
   <script defer src="amulet-detail-hover.js?v=20250709-clone-all"></script>
   <script defer src="amulet-detail-question-hover.js?v=20250709-glass-question-tip"></script>
   <script type="module">
-    import('./amulet-detail-scene.js?v=20250711-glb-authority').catch(function (err) {
+    import('./amulet-detail-scene.js?v=20250711-glb-url-authority').catch(function (err) {
       console.warn('[amulet-detail] scene boot failed', err);
     });
   </script>

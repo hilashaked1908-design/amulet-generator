@@ -1,7 +1,7 @@
 /**
  * Amulet garden - Cyber Garden style (ground-plane pan + low camera + sprites).
  */
-console.log('%c[garden-three] v20250711-glb-authority loaded', 'color:lime;font-size:14px');
+console.log('%c[garden-three] v20250711-glb-url-authority loaded', 'color:lime;font-size:14px');
 import * as THREE from './vendor/three.module.js';
 import { createLucaFog } from './garden-fog.js';
 import {
@@ -3655,6 +3655,14 @@ function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIn
   var url = 'amulet.html?entry=' + encodeURIComponent(entryId);
   if (navIndex != null && Number.isFinite(navIndex)) {
     url += '&id=' + encodeURIComponent(navIndex);
+  }
+  var glbForUrl = glbUrlOverride;
+  if (!glbForUrl) {
+    var collEntryForUrl = collectionEntryById(entryId);
+    glbForUrl = glbUrlForCollectionEntry(collEntryForUrl);
+  }
+  if (glbForUrl && glbUrlMatchesEntryId(glbForUrl, entryId)) {
+    url += '&glb=' + encodeURIComponent(glbForUrl);
   }
   console.log(
     '%c[garden-three] navigateToAmuletDetail',

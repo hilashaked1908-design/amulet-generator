@@ -268,6 +268,7 @@
     } catch (_) {}
     if (entryId == null) return;
     var url = 'amulet.html?entry=' + encodeURIComponent(entryId) + '&id=' + encodeURIComponent(amuletIndex);
+    if (glbUrl) url += '&glb=' + encodeURIComponent(glbUrl);
     try {
       var navPayload = { index: amuletIndex, entryId: entryId };
       if (answers) navPayload.answers = answers;

@@ -163,6 +163,48 @@ export function readDetailNavGlbUrl(entryId) {
   return glbUrlMatchesEntryId(nav.glbUrl, entryId) ? nav.glbUrl : null;
 }
 
+export function parseGlbUrlFromLocation(entryId) {
+  if (entryId == null) return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('glb');
+    if (!raw) return null;
+    const decoded = decodeURIComponent(raw);
+    return glbUrlMatchesEntryId(decoded, entryId) ? decoded : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export function collectAuthoritativeGlbUrls(entryId, seedMap, entryRecord, navGlbUrl) {
+  const urls = [];
+  const seen = new Set();
+  function push(url) {
+    if (!url || !glbUrlMatchesEntryId(url, entryId) || seen.has(url)) return;
+    seen.add(url);
+    urls.push(url);
+  }
+  push(navGlbUrl);
+  push(parseGlbUrlFromLocation(entryId));
+  push(readDetailNavGlbUrl(entryId));
+  if (entryRecord && entryRecord.glbUrl) push(entryRecord.glbUrl);
+  push(authoritativeGlbUrlForEntry(entryId, seedMap, entryRecord));
+  push(bundledGlbUrlForEntry(entryRecord, entryId, seedMap));
+  push(canonicalSeedGlbUrl(entryId));
+  return urls;
+}
+
+export async function seedGlbFileExists(entryId) {
+  const url = canonicalSeedGlbUrl(entryId);
+  if (!url) return false;
+  try {
+    const res = await fetch(url, { method: 'HEAD', cache: 'force-cache' });
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 export function authoritativeAnswersForEntry(entryId, collection) {
   if (entryId == null) return null;
 

@@ -10,23 +10,22 @@ import { exportRendererTransparentPng, exportAmuletCanvasPng } from './amulet-ex
 import {
   authoritativeAnswersForEntry,
   authoritativeAnswersForEntryAsync,
-  authoritativeGlbUrlForEntry,
   bundledGlbUrlForEntry,
-  canonicalSeedGlbUrl,
   canonicalSeedSnapshotUrl,
+  collectAuthoritativeGlbUrls,
   displayLabelForEntryId,
   entryLooksLikeSeed,
   entryShouldUseBundledSeedGlb,
   ensureSeedEntryMap,
   glbUrlMatchesEntryId,
   loadLocalCollection,
+  parseGlbUrlFromLocation,
   readDetailNavGlbUrl,
   resolveEntryRecord,
+  seedGlbFileExists,
 } from './amulet-entry-resolve.js';
 
-console.log('%c[detail-scene] v20250711-glb-authority loaded', 'color:lime;font-size:14px');
-
-const DETAIL_PBR_MODULE = '../three-pbr-amulet.js?v=20250711-entry-authority';
+console.log('%c[detail-scene] v20250711-glb-url-authority loaded', 'color:lime;font-size:14px');
 
 if (document.body.classList.contains('pagmar-amulet-detail')) {
 
@@ -196,19 +195,6 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     bootDetailScene();
   });
 
-  async function readComposed3dForEntry(entryId) {
-    if (entryId == null) return null;
-    try {
-      const store = await import('./amulet-glb-store.js');
-      const raw = await store.loadSnapshot('composed3d-' + entryId);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed && parsed.svg ? parsed : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   async function bootDetailScene() {
     const bootToken = ++sceneBootToken;
     const entryId = parseEntryIdFromUrl();
@@ -229,7 +215,11 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     const entryRecord = await resolveEntryRecord(entryId);
     const seedMap = await ensureSeedEntryMap();
     const useBundledSeedGlb = entryShouldUseBundledSeedGlb(entryId, seedMap, entryRecord);
-    const isBundledSeed = entryLooksLikeSeed(entryRecord, entryId, seedMap) || useBundledSeedGlb;
+    const seedFileOnDisk = await seedGlbFileExists(entryId);
+    const isBundledSeed =
+      entryLooksLikeSeed(entryRecord, entryId, seedMap) ||
+      useBundledSeedGlb ||
+      seedFileOnDisk;
     const bundledGlbUrl = bundledGlbUrlForEntry(entryRecord, entryId, seedMap);
     const answersForEntry =
       (await authoritativeAnswersForEntryAsync(entryId, collection)) ||
@@ -245,9 +235,14 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
       displayLabel: displayLabel,
       isBundledSeed: isBundledSeed,
       navGlbUrl: readDetailNavGlbUrl(entryId),
-      authoritativeGlbUrl:
-        readDetailNavGlbUrl(entryId) ||
-        authoritativeGlbUrlForEntry(entryId, seedMap, entryRecord),
+      urlGlbParam: parseGlbUrlFromLocation(entryId),
+      seedFileOnDisk: seedFileOnDisk,
+      glbCandidates: collectAuthoritativeGlbUrls(
+        entryId,
+        seedMap,
+        entryRecord,
+        readDetailNavGlbUrl(entryId)
+      ),
       wish:
         answersForEntry && answersForEntry.q1Wish
           ? String(answersForEntry.q1Wish)
@@ -273,112 +268,6 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
       );
     }
 
-    function composePreloadMatchesEntry() {
-      return (
-        window.pagmarDetailComposePreload &&
-        window.pagmarDetailComposePreloadEntryId != null &&
-        window.pagmarDetailComposePreloadEntryId == entryId
-      );
-    }
-
-    function resolveComposePromise(answers) {
-      if (composePreloadMatchesEntry()) {
-        return window.pagmarDetailComposePreload.catch(function () {
-          return import('./amulet-detail-vectors.js?v=20250711-entry-authority').then(function (vectors) {
-            return vectors.getSharedDetailCompose(answers, { entryId: entryId });
-          });
-        });
-      }
-      return import('./amulet-detail-vectors.js?v=20250711-entry-authority').then(function (vectors) {
-        return vectors.getSharedDetailCompose(answers, { entryId: entryId });
-      });
-    }
-
-    function resolvePbrModule() {
-      return import(DETAIL_PBR_MODULE);
-    }
-
-    function renderPbrFromComposed(composed) {
-      if (blockPbrReplace()) {
-        console.info('[detail-scene] skip composed PBR — bundled GLB locked');
-        return Promise.resolve();
-      }
-      if (bootToken !== sceneBootToken) return Promise.resolve();
-      if (!composed || !composed.svg || !container3D) {
-        signalSceneReady();
-        return Promise.resolve();
-      }
-      return resolvePbrModule().then(function (pbr) {
-        if (blockPbrReplace() || bootToken !== sceneBootToken) return;
-        container3D.innerHTML = '';
-        container3D.style.display = '';
-        if (fallback2D) fallback2D.style.display = 'none';
-        return pbr.renderThreePbrAmuletInteractive({
-          svg: composed.svg,
-          style2: composed.style2,
-          style3: Object.assign({}, composed.style3, { l3MassScale: 0.37 }),
-          container: container3D,
-          questionnaire: composed.questionnaire,
-          domainHex: composed.domainHex,
-          ageNum: composed.ageNum,
-          l3MaterialMode: 'stone',
-        });
-      }).then(function () {
-        var cvs = container3D.querySelector('canvas');
-        if (cvs) {
-          cvs.style.pointerEvents = 'auto';
-          cvs.style.cursor = 'grab';
-          cvs.style.touchAction = 'none';
-        }
-        markAmulet3DReady();
-      });
-    }
-
-    function fallbackPbrRender(answers) {
-      if (blockPbrReplace()) {
-        console.info('[detail-scene] skip answers PBR — bundled GLB locked');
-        return;
-      }
-      if (bootToken !== sceneBootToken) return;
-      if (!answers || !answers.q1Wish || !container3D) {
-        signalSceneReady();
-        return;
-      }
-      Promise.all([resolveComposePromise(answers), resolvePbrModule()])
-        .then(function (modules) {
-          if (blockPbrReplace() || bootToken !== sceneBootToken) return;
-          var composed = modules[0];
-          var pbr = modules[1];
-          if (!composed || !composed.svg) throw new Error('compose failed');
-          container3D.innerHTML = '';
-          container3D.style.display = '';
-          if (fallback2D) fallback2D.style.display = 'none';
-          return pbr.renderThreePbrAmuletInteractive({
-            svg: composed.svg,
-            style2: composed.style2,
-            style3: Object.assign({}, composed.style3, { l3MassScale: 0.37 }),
-            container: container3D,
-            questionnaire: composed.questionnaire,
-            domainHex: composed.domainHex,
-            ageNum: composed.ageNum,
-            l3MaterialMode: 'stone',
-          });
-        })
-        .then(function () {
-          var cvs = container3D.querySelector('canvas');
-          if (cvs) {
-            cvs.style.pointerEvents = 'auto';
-            cvs.style.cursor = 'grab';
-            cvs.style.touchAction = 'none';
-          }
-          markAmulet3DReady();
-        })
-        .catch(function (err) {
-          console.warn('[detail-scene] PBR fallback render failed', err);
-          signalSceneReady();
-        });
-    }
-
     if (!container3D) {
       signalSceneReady();
       return;
@@ -387,11 +276,12 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
     const store = await import('./amulet-glb-store.js');
     await yieldToMain();
 
-    const navGlbUrl = readDetailNavGlbUrl(entryId);
-    const authoritativeGlbUrl =
-      navGlbUrl ||
-      authoritativeGlbUrlForEntry(entryId, seedMap, entryRecord) ||
-      (bundledGlbUrl && glbUrlMatchesEntryId(bundledGlbUrl, entryId) ? bundledGlbUrl : null);
+    const glbCandidates = collectAuthoritativeGlbUrls(
+      entryId,
+      seedMap,
+      entryRecord,
+      readDetailNavGlbUrl(entryId)
+    );
 
     async function loadAndMountBundledGlb(glbUrl, loadPathLabel) {
       if (!glbUrl || bootToken !== sceneBootToken) return false;
@@ -427,25 +317,25 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
         if (mounted) return true;
         logLoadResult(loadPathLabel + '-mount-failed', { glbUrl: glbUrl });
       } catch (err) {
-        console.warn('[detail-scene] bundled seed GLB failed', glbUrl, err);
+        console.warn('[detail-scene] bundled GLB failed', glbUrl, err);
         logLoadResult(loadPathLabel + '-error', { glbUrl: glbUrl, error: String(err) });
       }
       return false;
     }
 
-    if (authoritativeGlbUrl) {
-      const mountedAuthoritative = await loadAndMountBundledGlb(
-        authoritativeGlbUrl,
-        navGlbUrl ? 'nav-glb' : 'authoritative-glb'
+    for (let gi = 0; gi < glbCandidates.length; gi += 1) {
+      const glbUrl = glbCandidates[gi];
+      const mounted = await loadAndMountBundledGlb(
+        glbUrl,
+        gi === 0 ? 'authoritative-glb' : 'authoritative-glb-retry-' + gi
       );
-      if (mountedAuthoritative) return;
+      if (mounted) return;
     }
 
-    if (useBundledSeedGlb || isBundledSeed) {
+    if (isBundledSeed) {
       logLoadResult('seed-glb-unavailable-snapshot-only', {
         entryId: entryId,
-        glbUrl: authoritativeGlbUrl,
-        navGlbUrl: navGlbUrl,
+        glbCandidates: glbCandidates,
       });
       signalSceneReady();
       return;
@@ -453,60 +343,28 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
 
     unlockBundledGlbEntry();
 
-    if (!isBundledSeed) {
-      const skipIdbForSeedEntry =
-        useBundledSeedGlb ||
-        (entryRecord &&
-          entryRecord.glbUrl &&
-          String(entryRecord.glbUrl).indexOf('/seed/glbs/') !== -1);
-      if (!skipIdbForSeedEntry) {
-        try {
-          const userGlb = await store.loadUserEntryGlb(entryId);
-          if (userGlb && userGlb.scene) {
-            lockBundledGlbEntry(entryId);
-            var userRs = userGlb.rendererSettings || {};
-            if (!userRs.lighting && userGlb.lighting && userGlb.lighting.length) {
-              userRs.lighting = userGlb.lighting;
-            }
-            logLoadResult('user-idb-glb', {
-              idbKey: 'collection-' + entryId,
-              sha256: userGlb.bufferHash || null,
-              bytes: userGlb.byteLength || null,
-            });
-            setup3DAmulet(userGlb.scene, userRs, userGlb.materialOverrides || []);
-            return;
-          }
-          logLoadResult('user-idb-glb-missing', { idbKey: 'collection-' + entryId });
-        } catch (err) {
-          console.warn('[detail-scene] user GLB load failed', err);
+    try {
+      const userGlb = await store.loadUserEntryGlb(entryId);
+      if (userGlb && userGlb.scene) {
+        lockBundledGlbEntry(entryId);
+        var userRs = userGlb.rendererSettings || {};
+        if (!userRs.lighting && userGlb.lighting && userGlb.lighting.length) {
+          userRs.lighting = userGlb.lighting;
         }
-      } else {
-        logLoadResult('skip-idb-for-seed-entry', { entryId: entryId });
+        logLoadResult('user-idb-glb', {
+          idbKey: 'collection-' + entryId,
+          sha256: userGlb.bufferHash || null,
+          bytes: userGlb.byteLength || null,
+        });
+        setup3DAmulet(userGlb.scene, userRs, userGlb.materialOverrides || []);
+        return;
       }
-
-      const composed3d =
-        useBundledSeedGlb || isBundledSeed ? null : await readComposed3dForEntry(entryId);
-      if (composed3d) {
-        try {
-          logLoadResult('composed3d-fallback', { entryId: entryId });
-          await renderPbrFromComposed(composed3d);
-          return;
-        } catch (err) {
-          console.warn('[detail-scene] composed3d render failed', err);
-        }
-      }
+      logLoadResult('user-idb-glb-missing', { idbKey: 'collection-' + entryId });
+    } catch (err) {
+      console.warn('[detail-scene] user GLB load failed', err);
     }
 
-    if (answersForEntry && answersForEntry.q1Wish && !isBundledSeed && !useBundledSeedGlb) {
-      logLoadResult('pbr-from-answers-fallback', {
-        entryId: entryId,
-        wish: String(answersForEntry.q1Wish).slice(0, 60),
-      });
-      fallbackPbrRender(answersForEntry);
-      return;
-    }
-
-    logLoadResult('no-model-source', { entryId: entryId });
+    logLoadResult('snapshot-only-no-glb', { entryId: entryId });
     signalSceneReady();
   }
 
