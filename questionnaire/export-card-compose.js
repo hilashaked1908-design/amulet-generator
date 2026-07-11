@@ -103,7 +103,7 @@ export async function composeExportCardPng(options) {
   }
 
   const vectorIds = ['exportVectorQ1', 'exportVectorQ2', 'exportVectorQ3'];
-  const vectorX = 76;
+  const vectorX = 29;
   let vectorY = 29;
   for (let i = 0; i < vectorIds.length; i++) {
     const slot = document.getElementById(vectorIds[i]);

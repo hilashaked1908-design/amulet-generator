@@ -4,6 +4,11 @@ body.pagmar-index.is-create-mode,
 body.pagmar-create {
   --fu: var(--pagmar-viewport-u);
   --pagmar-close-u: var(--fu);
+  /* Figma text style: תגיות - Narkiss Yair Variable 20 / leading 90% */
+  --figma-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --figma-tag-size: 20;
+  --figma-tag-line-height: 0.9;
+  --figma-tag-tracking: 0.6;
   --figma-frame-w: 1920;
   --figma-frame-h: 1080;
   --figma-content-right: 1868.36;
@@ -52,7 +57,11 @@ body.pagmar-create {
   --figma-q-dock-pad-r: 40;
   --figma-q-dock-pad-b: 10;
   --figma-q-dock-pad-l: 10;
-  --figma-q-dock-pad-r-choice: var(--figma-q-dock-pad-l);
+  /* Q4–Q6 choice dock — +8px inset vs text questions */
+  --figma-q-dock-pad-t-choice: 18;
+  --figma-q-dock-pad-b-choice: 18;
+  --figma-q-dock-pad-l-choice: 18;
+  --figma-q-dock-pad-r-choice: 18;
   --figma-q-dock-gap: 10;
   --figma-q-btn-w: 183;
   --figma-q-btn-h: 75;
@@ -581,6 +590,8 @@ body.pagmar-index.is-create-mode .figma-amulet.is-vector-preview .pagmar__index-
   direction: ltr;
   justify-items: end;
   align-items: end;
+  justify-content: end;
+  align-content: end;
 }
 
 .pagmar__request-artboard.is-amulet-live .figma-q-vector-grid,
@@ -593,6 +604,9 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
 
 .figma-q-vector-thumb {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: calc(var(--figma-q-vector-thumb-w) * var(--fu));
   height: calc(var(--figma-q-vector-thumb-h) * var(--fu));
   overflow: visible;
@@ -617,6 +631,8 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
   width: 100%;
   height: 100%;
   overflow: visible;
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .figma-q-vector-thumb path {
@@ -788,6 +804,18 @@ body.is-question-transition-loading .pagmar__request-artboard .figma-q-vector-gr
   opacity: 0 !important;
 }
 
+body.is-question-transition-loading .pagmar__request-artboard > .figma-amulet-stage {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+body.is-question-transition-loading.pagmar-create.is-building .pagmar__request-artboard > .figma-amulet-stage,
+body.is-question-transition-loading.pagmar-index.is-create-mode.is-building .pagmar__request-artboard > .figma-amulet-stage,
+body.is-question-transition-loading.is-vector-frame-loading .pagmar__request-artboard > .figma-amulet-stage {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__btn-outer,
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__field .intro__question-input {
@@ -907,12 +935,23 @@ body.is-choice-question .figma-q__dock {
   max-height: min(72dvh, calc(100dvh - 120px));
   overflow: visible;
   padding:
-    calc(var(--figma-q-dock-pad-t) * var(--fu))
+    calc(var(--figma-q-dock-pad-t-choice) * var(--fu))
     calc(var(--figma-q-dock-pad-r-choice) * var(--fu))
-    calc(var(--figma-q-dock-pad-b) * var(--fu))
-    calc(var(--figma-q-dock-pad-l) * var(--fu));
+    calc(var(--figma-q-dock-pad-b-choice) * var(--fu))
+    calc(var(--figma-q-dock-pad-l-choice) * var(--fu));
   gap: calc(10 * var(--fu));
   border-radius: calc(var(--figma-q-dock-radius-choice) * var(--fu));
+}
+
+/* Q8 — multiline dock grows downward; keep submit pinned to bottom edge */
+body.pagmar-index.is-create-mode.is-dock-grow-down .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create.is-dock-grow-down .pagmar__request-artboard .figma-q__dock {
+  align-items: flex-end;
+}
+
+body.pagmar-index.is-create-mode.is-dock-grow-down .pagmar__request-artboard .figma-q__field-box,
+body.pagmar-create.is-dock-grow-down .pagmar__request-artboard .figma-q__field-box {
+  align-self: flex-start;
 }
 
 body.is-choice-question .figma-q__dock .figma-q__btn-outer {
@@ -967,12 +1006,12 @@ body.is-choice-question .figma-q__dock .figma-q__field {
   text-align: right;
   pointer-events: auto;
   overflow: visible;
-  font-family: "Narkiss Yair", "TheBasics Mono", monospace;
-  font-size: calc(20 * var(--fu));
+  font-family: var(--figma-tag-font);
+  font-size: calc(var(--figma-tag-size) * var(--fu));
   font-weight: 400;
   font-style: normal;
-  line-height: 0.9;
-  letter-spacing: calc(0.6 * var(--fu));
+  line-height: var(--figma-tag-line-height);
+  letter-spacing: calc(var(--figma-tag-tracking) * var(--fu));
   color: var(--request-tag-ink, var(--pagmar-yellow-white));
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
@@ -1078,7 +1117,9 @@ body.pagmar-create .pagmar__request-vector-tip .glass-chrome {
 }
 
 body.pagmar-index.is-create-mode .pagmar__request-vector-tip .pagmar__garden-amulet-hover__request,
-body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__request {
+body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__request,
+body.pagmar-index.is-create-mode .pagmar__request-vector-tip .figma-q__vector-copy-text,
+body.pagmar-create .pagmar__request-vector-tip .figma-q__vector-copy-text {
   position: relative;
   z-index: 3;
   display: block;
@@ -1093,12 +1134,12 @@ body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__req
   overflow-wrap: break-word;
   word-break: normal;
   text-wrap: pretty;
-  font-family: "Narkiss Yair", "TheBasics Mono", monospace !important;
-  font-size: calc(20 * var(--fu)) !important;
+  font-family: var(--figma-tag-font) !important;
+  font-size: calc(var(--figma-tag-size) * var(--fu)) !important;
   font-weight: 400 !important;
   font-style: normal !important;
-  line-height: 0.9 !important;
-  letter-spacing: calc(0.6 * var(--fu)) !important;
+  line-height: var(--figma-tag-line-height) !important;
+  letter-spacing: calc(var(--figma-tag-tracking) * var(--fu)) !important;
   color: var(--pagmar-yellow-white) !important;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
@@ -1277,12 +1318,12 @@ body.pagmar-create.is-choice-question.is-choice-save .pagmar__request-artboard .
   align-items: stretch;
   justify-content: flex-start;
   gap: calc(var(--figma-q-choice-gap) * var(--fu));
-  width: auto;
+  width: 100%;
   max-width: 100%;
   min-height: 0;
   direction: rtl;
   opacity: 1;
-  margin-inline-start: auto;
+  margin-inline-start: 0;
   padding-inline: 0;
   box-sizing: border-box;
 }
@@ -1575,14 +1616,21 @@ body.pagmar-create.is-choice-question .pagmar__request-artboard .figma-q__dock {
   max-height: min(72dvh, calc(100dvh - 120px)) !important;
   overflow: visible !important;
   padding:
-    calc(var(--figma-q-dock-pad-t) * var(--fu))
+    calc(var(--figma-q-dock-pad-t-choice) * var(--fu))
     calc(var(--figma-q-dock-pad-r-choice) * var(--fu))
-    calc(var(--figma-q-dock-pad-b) * var(--fu))
-    calc(var(--figma-q-dock-pad-l) * var(--fu)) !important;
+    calc(var(--figma-q-dock-pad-b-choice) * var(--fu))
+    calc(var(--figma-q-dock-pad-l-choice) * var(--fu)) !important;
   gap: calc(10 * var(--fu)) !important;
   border-radius: calc(var(--figma-q-dock-radius-choice) * var(--fu)) !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+body.pagmar-index.is-create-mode.is-choice-question .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create.is-choice-question .pagmar__request-artboard .figma-q__dock,
+body.pagmar-index.is-create-mode .pagmar__request-artboard.is-choice-question .figma-q__dock,
+body.pagmar-create .pagmar__request-artboard.is-choice-question .figma-q__dock {
+  padding-inline-end: calc(var(--figma-q-dock-pad-r-choice) * var(--fu)) !important;
 }
 
 body.pagmar-index.is-create-mode.is-choice-question:not(.is-choice-save) .pagmar__request-artboard .figma-q__dock .figma-q__btn-outer,
@@ -1683,11 +1731,12 @@ body.pagmar-create .pagmar__request-artboard .figma-q__tag {
   overflow: visible !important;
   text-align: right !important;
   direction: rtl !important;
-  font-family: "Narkiss Yair", "TheBasics Mono", monospace !important;
-  font-size: calc(20 * var(--fu)) !important;
+  font-family: var(--figma-tag-font) !important;
+  font-size: calc(var(--figma-tag-size) * var(--fu)) !important;
   font-weight: 400 !important;
-  line-height: 0.9 !important;
-  letter-spacing: calc(0.6 * var(--fu)) !important;
+  font-style: normal !important;
+  line-height: var(--figma-tag-line-height) !important;
+  letter-spacing: calc(var(--figma-tag-tracking) * var(--fu)) !important;
   color: var(--request-tag-ink, var(--pagmar-yellow-white)) !important;
   gap: calc(11.15 * var(--fu)) !important;
 }
@@ -1697,8 +1746,8 @@ body.pagmar-create .pagmar__request-artboard .figma-q__card {
   display: none !important;
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-artboard .figma-q__dock,
-body.pagmar-create .pagmar__request-artboard .figma-q__dock {
+body.pagmar-index.is-create-mode:not(.is-choice-question) .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create:not(.is-choice-question) .pagmar__request-artboard .figma-q__dock {
   border: none !important;
   background: var(--request-dock-bg, var(--pagmar-yellow-white)) !important;
   -webkit-backdrop-filter: none !important;

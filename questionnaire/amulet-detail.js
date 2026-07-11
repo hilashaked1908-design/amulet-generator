@@ -22,6 +22,11 @@
 
   function parseIndex() {
     const params = new URLSearchParams(window.location.search);
+    const raw = params.get('id');
+    if (raw != null && raw !== '') {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n >= USER_AMULET_INDEX) return n;
+    }
     const entryId = parseEntryId();
     if (
       entryId != null &&
@@ -30,10 +35,7 @@
       var fromEntry = window.pagmarIndexForEntryId(entryId);
       if (fromEntry != null) return fromEntry;
     }
-    const raw = params.get('id');
-    if (raw == null || raw === '') return USER_AMULET_INDEX;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= USER_AMULET_INDEX ? n : USER_AMULET_INDEX;
+    return USER_AMULET_INDEX;
   }
 
   function indexLabel(index) {
@@ -202,22 +204,38 @@
     }
 
     try {
-      var store = await import('./amulet-glb-store.js');
-      if (!navAnswers) {
-        var answersRaw = await store.loadSnapshot('answers-collection-' + entryId);
-        if (answersRaw) {
-          window.__pagmarDetailAnswersByEntryId[entryId] = JSON.parse(answersRaw);
-        }
-      }
-    } catch (_) {}
-
-    try {
       var storeMod = await import('./amulet-glb-store.js');
-      var snapRaw = await storeMod.loadSnapshot('collection-' + entryId);
-      if (snapRaw) {
-        window.__pagmarDetailSnapshotByEntryId = window.__pagmarDetailSnapshotByEntryId || {};
-        window.__pagmarDetailSnapshotByEntryId[entryId] = snapRaw;
+      var idbReads = [];
+      if (!navAnswers) {
+        idbReads.push(
+          storeMod.loadSnapshot('answers-collection-' + entryId).then(function (answersRaw) {
+            if (answersRaw) {
+              window.__pagmarDetailAnswersByEntryId[entryId] = JSON.parse(answersRaw);
+            }
+          })
+        );
       }
+      idbReads.push(
+        storeMod.loadSnapshot('collection-' + entryId).then(function (snapRaw) {
+          if (snapRaw) {
+            window.__pagmarDetailSnapshotByEntryId = window.__pagmarDetailSnapshotByEntryId || {};
+            window.__pagmarDetailSnapshotByEntryId[entryId] = snapRaw;
+          }
+        })
+      );
+      idbReads.push(
+        storeMod.loadSnapshot('composed3d-' + entryId).then(function (composedRaw) {
+          if (!composedRaw) return;
+          try {
+            var composedParsed = JSON.parse(composedRaw);
+            if (composedParsed && composedParsed.svg) {
+              window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
+              window.__pagmarDetailComposedByEntryId[entryId] = composedParsed;
+            }
+          } catch (_) {}
+        })
+      );
+      await Promise.all(idbReads);
     } catch (_) {}
 
     var composeAnswers =
@@ -228,9 +246,8 @@
         : null);
     if (composeAnswers && composeAnswers.q1Wish) {
       try {
-        var vectorsMod = await import('./amulet-detail-vectors.js?v=20250710-vector-wrap');
+        var vectorsMod = await import('./amulet-detail-vectors.js?v=20250711-fast-glb');
         window.pagmarDetailComposePreload = vectorsMod.preloadDetailCompose(entryId, composeAnswers);
-        await window.pagmarDetailComposePreload;
       } catch (err) {
         console.warn('[amulet-detail] compose preload failed', err);
       }
@@ -248,6 +265,10 @@
     }
     var nav = readNavPayloadForEntry(entryId);
     if (nav && nav.answers && nav.answers.q1Wish) return nav.answers;
+    if (typeof window.pagmarFindCollectionEntryById === 'function') {
+      var entry = window.pagmarFindCollectionEntryById(entryId);
+      if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
+    }
     return null;
   }
 
@@ -396,11 +417,7 @@
       }
 
       await preloadDetailContext(index);
-      var navPayload = readNavPayloadForEntry(resolvedDetailEntryId);
-      var displayIndex =
-        navPayload && typeof navPayload.labelIndex === 'number'
-          ? USER_AMULET_INDEX + navPayload.labelIndex
-          : resolveDetailIndex(index, resolvedDetailEntryId);
+      var displayIndex = index;
       var collectionEntry = null;
       if (typeof window.pagmarFindCollectionEntryById === 'function') {
         collectionEntry = window.pagmarFindCollectionEntryById(resolvedDetailEntryId);

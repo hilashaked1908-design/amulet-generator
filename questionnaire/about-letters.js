@@ -37,6 +37,7 @@
   const INTENT = 'protection';
   const STROKE_W = 4;
   const GLYPH_SCALE = 1.42;
+  const CANVAS_PAD = 24;
 
   let connections = [];
   let glyphCache = {};
@@ -123,33 +124,82 @@
     ];
   }
 
-  function centerPlacementsSymmetric(placements) {
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
+  function connectionStrokeAttrs() {
+    return (
+      'fill="none" stroke="#1E1E1E" stroke-width="' +
+      STROKE_W +
+      '" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"'
+    );
+  }
 
-    for (const p of placements) {
-      const half = p.sz / 2;
-      const xs = [p.x, CANVAS_W - p.x];
-      for (const x of xs) {
-        minX = Math.min(minX, x - half);
-        maxX = Math.max(maxX, x + half);
-      }
-      minY = Math.min(minY, p.y - half);
-      maxY = Math.max(maxY, p.y + half);
+  function measureDrawBBox(drawContent) {
+    const vb = '0 0 ' + CANVAS_W + ' ' + CANVAS_H;
+    const doc = new DOMParser().parseFromString(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' +
+        vb +
+        '"><g id="measure-root" ' +
+        connectionStrokeAttrs() +
+        '>' +
+        drawContent +
+        '</g></svg>',
+      'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) {
+      return { cx: CANVAS_W / 2, cy: CANVAS_H / 2, width: 0, height: 0 };
+    }
+    const svg = doc.documentElement;
+    svg.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(svg);
+    let bb;
+    try {
+      const root = svg.querySelector('#measure-root');
+      bb = root ? root.getBBox() : { x: 0, y: 0, width: 0, height: 0 };
+    } catch (_) {
+      bb = { x: 0, y: 0, width: 0, height: 0 };
+    }
+    document.body.removeChild(svg);
+    return {
+      cx: bb.x + bb.width / 2,
+      cy: bb.y + bb.height / 2,
+      width: bb.width,
+      height: bb.height
+    };
+  }
+
+  function centerDrawInCanvas(drawContent) {
+    const bb = measureDrawBBox(drawContent);
+    const targetCx = CANVAS_W / 2;
+    const targetCy = CANVAS_H / 2;
+    const availW = CANVAS_W - CANVAS_PAD * 2;
+    const availH = CANVAS_H - CANVAS_PAD * 2;
+    const scale =
+      bb.width > 0 && bb.height > 0
+        ? Math.min(1, availW / bb.width, availH / bb.height)
+        : 1;
+
+    if (
+      Math.abs(bb.cx - targetCx) < 0.01 &&
+      Math.abs(bb.cy - targetCy) < 0.01 &&
+      Math.abs(scale - 1) < 0.0001
+    ) {
+      return drawContent;
     }
 
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const dx = CANVAS_W / 2 - cx;
-    const dy = CANVAS_H / 2 - cy;
-
-    return placements.map((p) => ({
-      ...p,
-      x: p.x + dx,
-      y: p.y + dy
-    }));
+    return (
+      '<g transform="translate(' +
+      targetCx.toFixed(2) +
+      ',' +
+      targetCy.toFixed(2) +
+      ') scale(' +
+      scale.toFixed(4) +
+      ') translate(' +
+      (-bb.cx).toFixed(2) +
+      ',' +
+      (-bb.cy).toFixed(2) +
+      ')">' +
+      drawContent +
+      '</g>'
+    );
   }
 
   function scalePlacements(placements, factor) {
@@ -209,13 +259,10 @@
     const placements = placementsForPair(letterA, letterB);
     if (!placements) return null;
 
-    const centered = centerPlacementsSymmetric(scalePlacements(placements, GLYPH_SCALE));
-    const glyphs = await Promise.all(centered.map((p) => getParsedGlyph(p.letter)));
-    const paths = centered.map((p, i) => glyphPathsMarkup(p, glyphs[i])).join('');
-    const stroke =
-      'fill="none" stroke="#1E1E1E" stroke-width="' +
-      STROKE_W +
-      '" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
+    const scaled = scalePlacements(placements, GLYPH_SCALE);
+    const glyphs = await Promise.all(scaled.map((p) => getParsedGlyph(p.letter)));
+    const paths = scaled.map((p, i) => glyphPathsMarkup(p, glyphs[i])).join('');
+    const centeredDraw = centerDrawInCanvas(wrapSymmetric(paths));
 
     return {
       viewBox: '0 0 ' + PANEL_W + ' ' + PANEL_H,
@@ -231,9 +278,9 @@
         PANEL_PAD_Y +
         ')">' +
         '<g class="about-connection-draw" ' +
-        stroke +
+        connectionStrokeAttrs() +
         '>' +
-        wrapSymmetric(paths) +
+        centeredDraw +
         '</g></g>'
     };
   }

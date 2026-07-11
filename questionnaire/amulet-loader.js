@@ -166,6 +166,12 @@ function ensureGalleryFullpageLoader() {
       fog.setAttribute('aria-hidden', 'true');
       loader.insertBefore(fog, loader.firstChild);
     }
+    if (!loader.querySelector('.pagmar__detail-page-loader__percent')) {
+      const percent = document.createElement('p');
+      percent.className = 'pagmar__detail-page-loader__percent';
+      percent.textContent = '0%';
+      loader.appendChild(percent);
+    }
     return loader;
   }
 
@@ -196,12 +202,17 @@ function ensureGalleryFullpageLoader() {
     vessels.appendChild(img);
   });
 
+  const percent = document.createElement('p');
+  percent.className = 'pagmar__detail-page-loader__percent';
+  percent.textContent = '0%';
+
   const sr = document.createElement('span');
   sr.className = 'pagmar__detail-page-loader__sr';
-  sr.textContent = DEFAULT_LOADER_TEXT;
+  sr.textContent = '0% ' + DEFAULT_LOADER_TEXT;
 
   loader.appendChild(fog);
   loader.appendChild(vessels);
+  loader.appendChild(percent);
   loader.appendChild(sr);
   document.body.appendChild(loader);
   return loader;
@@ -408,10 +419,25 @@ function hideFullpageLoader(options) {
   return Promise.resolve(true);
 }
 
+function updateGalleryLoaderProgress(pct) {
+  const loader = document.getElementById('pagmarGalleryFullpageLoader');
+  if (!loader) return;
+  const percentEl = loader.querySelector('.pagmar__detail-page-loader__percent');
+  const sr = loader.querySelector('.pagmar__detail-page-loader__sr');
+  const label = pct + '%';
+  if (percentEl) percentEl.textContent = label;
+  if (sr) sr.textContent = label + ' ' + DEFAULT_LOADER_TEXT;
+}
+
 export function setAmuletLoaderProgress(frac) {
-  if (galleryFullpageActive) return;
   const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
   fullpageLoadProgress = Math.max(fullpageLoadProgress, pct / 100);
+
+  if (galleryFullpageActive) {
+    updateGalleryLoaderProgress(pct);
+    return;
+  }
+
   const loader = document.getElementById('pagmarCreateFullpageLoader');
   if (!loader) return;
 
@@ -441,9 +467,10 @@ export async function showAmuletLoader(text, options) {
     loader.hidden = false;
     void loader.offsetWidth;
     loader.setAttribute('aria-busy', 'true');
+    updateGalleryLoaderProgress(0);
     await startFullpageLoaderFog();
     const sr = loader.querySelector('.pagmar__detail-page-loader__sr');
-    if (sr) sr.textContent = label;
+    if (sr) sr.textContent = '0% ' + label;
   } else if (opts.fullscreen) {
     galleryFullpageActive = false;
     stopIdleVesselSpin();

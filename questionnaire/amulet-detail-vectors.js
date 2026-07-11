@@ -199,6 +199,11 @@ function authoritativeDetailAnswers(entryId, idx) {
     ) {
       return window.__pagmarDetailAnswersByEntryId[entryId];
     }
+    if (typeof window.pagmarFindCollectionEntryById === 'function') {
+      const entry = window.pagmarFindCollectionEntryById(entryId);
+      if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
+    }
+    return null;
   }
   return resolveDetailAnswers(idx);
 }
@@ -293,7 +298,7 @@ function composedSvgHasLayers(svgMarkup) {
 }
 
 export async function preloadDetailCompose(entryId, answers) {
-  if (!answers || !answers.q1Wish) return null;
+  if (entryId == null) return null;
   window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
   if (
     window.__pagmarDetailComposedByEntryId[entryId] &&
@@ -302,17 +307,12 @@ export async function preloadDetailCompose(entryId, answers) {
     return window.__pagmarDetailComposedByEntryId[entryId];
   }
   try {
-    await waitForFonts();
-    const compose = await import('./amulet-compose.js');
-    await compose.initAmuletCompose();
-    const composed = await getSharedDetailCompose(answers, { entryId: entryId });
-    if (composed?.svg && composedSvgHasLayers(composed.svg)) {
-      window.__pagmarDetailComposedByEntryId[entryId] = composed;
-      return composed;
+    const fromIdb = await readComposedForEntry(entryId);
+    if (fromIdb?.svg && composedSvgHasLayers(fromIdb.svg)) {
+      window.__pagmarDetailComposedByEntryId[entryId] = fromIdb;
+      return fromIdb;
     }
-  } catch (err) {
-    console.warn('[detail-vectors] preload compose failed', err);
-  }
+  } catch (_) {}
   return null;
 }
 
@@ -323,6 +323,15 @@ async function resolveDetailPageCompose(record, idx, entryIdOverride) {
   if (entryId != null && window.__pagmarDetailComposedByEntryId?.[entryId]) {
     const cached = window.__pagmarDetailComposedByEntryId[entryId];
     if (cached?.svg && composedSvgHasLayers(cached.svg)) return cached;
+  }
+
+  if (entryId != null) {
+    const perEntry = await readComposedForEntry(entryId);
+    if (perEntry?.svg && composedSvgHasLayers(perEntry.svg)) {
+      window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
+      window.__pagmarDetailComposedByEntryId[entryId] = perEntry;
+      return perEntry;
+    }
   }
 
   if (window.pagmarDetailComposePreload) {
@@ -345,13 +354,8 @@ async function resolveDetailPageCompose(record, idx, entryIdOverride) {
         return composed;
       }
     } catch (err) {
-      console.warn('[detail-vectors] compose from answers failed, trying IDB', err);
+      console.warn('[detail-vectors] compose from answers failed', err);
     }
-  }
-
-  if (entryId != null) {
-    const perEntry = await readComposedForEntry(entryId);
-    if (perEntry?.svg && composedSvgHasLayers(perEntry.svg)) return perEntry;
   }
 
   return getSharedDetailCompose(record, { entryId: entryId });
@@ -551,15 +555,14 @@ async function renderVectorsOnce(options) {
 async function renderVectors(options = {}) {
   const markBootDone = options.markBootDone !== false;
   try {
-    if (window.pagmarDetailComposePreload) {
-      try {
-        await window.pagmarDetailComposePreload;
-      } catch (_) {}
-    }
-
     let rendered = false;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       if (attempt > 0) {
+        if (window.pagmarDetailComposePreload) {
+          try {
+            await window.pagmarDetailComposePreload;
+          } catch (_) {}
+        }
         await waitForFonts();
         await waitForPaint();
         await new Promise(function (resolve) {
@@ -606,6 +609,12 @@ function clearDetailVectorSlots() {
 function parseAmuletIndex() {
   try {
     const params = new URLSearchParams(window.location.search);
+    const base = (window.AMULET_QUESTIONS || []).length;
+    const raw = params.get('id');
+    if (raw != null && raw !== '') {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n >= base) return n;
+    }
     const entryRaw = params.get('entry');
     if (entryRaw != null && entryRaw !== '') {
       const entryId = parseInt(entryRaw, 10);
@@ -617,10 +626,7 @@ function parseAmuletIndex() {
         if (fromEntry != null) return fromEntry;
       }
     }
-    const raw = params.get('id');
-    if (raw == null || raw === '') return 0;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+    return base;
   } catch (_) {
     return 0;
   }

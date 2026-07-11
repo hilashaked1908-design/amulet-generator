@@ -92,8 +92,10 @@ function thumbLayout(bounds) {
   const innerW = THUMB_BOX_W - pad * 2;
   const innerH = THUMB_BOX_H - pad * 2;
   const scale = Math.min(innerW / cw, innerH / ch);
-  const tx = THUMB_BOX_W - pad - maxX * scale;
-  const ty = THUMB_BOX_H - pad - maxY * scale;
+  const scaledW = cw * scale;
+  const scaledH = ch * scale;
+  const tx = pad + (innerW - scaledW) * 0.5 - minX * scale;
+  const ty = pad + (innerH - scaledH) * 0.5 - minY * scale;
   return {
     viewBox: '0 0 ' + THUMB_BOX_W + ' ' + THUMB_BOX_H,
     transform: 'translate(' + tx + ',' + ty + ') scale(' + scale + ')',
@@ -109,7 +111,7 @@ function mountThumbSvg(pathD, container) {
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
   svg.setAttribute('viewBox', layout.viewBox);
-  svg.setAttribute('preserveAspectRatio', 'xMaxYMax meet');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.setAttribute('fill', 'none');
   svg.setAttribute('overflow', 'visible');
   svg.classList.add('pagmar__choice-preset-vector');

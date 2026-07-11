@@ -2627,6 +2627,14 @@ function spriteRequestText(sprite) {
     return String(answers.q1Wish).trim();
   }
 
+  const entryId = ensureSpriteEntryId(sprite);
+  if (entryId != null && typeof window.pagmarFindCollectionEntryById === 'function') {
+    const entry = window.pagmarFindCollectionEntryById(entryId);
+    if (entry && entry.answers && entry.answers.q1Wish) {
+      return String(entry.answers.q1Wish).trim();
+    }
+  }
+
   const index = resolveSpriteNavigationTarget(sprite).index;
   if (!sprite.userData.isUserAmulet && !sprite.userData.isCollectionAmulet) {
     return '';
@@ -3240,11 +3248,6 @@ function resolveSpriteNavigationTarget(sprite) {
     if (fromIndex != null) return { index: index, entryId: fromIndex, answers: answers };
   }
 
-  if (entryId != null && typeof window.pagmarIndexForEntryId === 'function') {
-    const fromEntry = window.pagmarIndexForEntryId(entryId);
-    if (fromEntry != null) return { index: fromEntry, entryId: entryId, answers: answers };
-  }
-
   return { index: index, entryId: entryId, answers: answers };
 }
 
@@ -3269,14 +3272,26 @@ function resolveSpriteEntryId(sprite) {
   return ensureSpriteEntryId(sprite);
 }
 
+function collectionEntryById(entryId) {
+  if (entryId == null) return null;
+  var collection = loadCollection();
+  for (var i = 0; i < collection.length; i += 1) {
+    if (collection[i] && collection[i].id == entryId) return collection[i];
+  }
+  return null;
+}
+
 function navigateToAmuletDetailFromSprite(sprite) {
   if (!sprite) return;
-  const answers = sprite.userData.answers || null;
   const entryId = resolveSpriteEntryId(sprite);
   if (entryId == null) {
     console.warn('[garden-three] cannot open detail — sprite missing collectionEntryId');
     return;
   }
+  const answers =
+    sprite.userData.answers ||
+    (collectionEntryById(entryId) || {}).answers ||
+    null;
   const labelIndex =
     typeof sprite.userData.collectionIndex === 'number'
       ? sprite.userData.collectionIndex
@@ -3327,6 +3342,9 @@ function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIn
     }
     if (answersOverride && typeof answersOverride === 'object') {
       navPayload.answers = answersOverride;
+    } else {
+      var collectionEntry = collectionEntryById(entryId);
+      if (collectionEntry && collectionEntry.answers) navPayload.answers = collectionEntry.answers;
     }
     sessionStorage.setItem('pagmarAmuletDetailNav', JSON.stringify(navPayload));
   } catch (_) {}

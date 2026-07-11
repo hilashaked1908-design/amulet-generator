@@ -216,8 +216,16 @@
 
   function navigateToAmuletDetail(amuletIndex) {
     var entryId = entryIdForAmuletIndex(amuletIndex);
+    var answers = null;
+    if (entryId != null && typeof window.pagmarFindCollectionEntryById === 'function') {
+      var entry = window.pagmarFindCollectionEntryById(entryId);
+      if (entry && entry.answers) answers = entry.answers;
+    }
+    if (!answers && typeof window.getAmuletRecord === 'function') {
+      answers = window.getAmuletRecord(amuletIndex);
+    }
     if (typeof window.pagmarNavigateToAmuletDetail === 'function') {
-      window.pagmarNavigateToAmuletDetail(amuletIndex, entryId);
+      window.pagmarNavigateToAmuletDetail(amuletIndex, entryId, answers);
       return;
     }
     if (typeof window.gardenStashIndexReturnState === 'function') {

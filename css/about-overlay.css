@@ -1,4 +1,4 @@
-/* About overlay - Figma 2696:46028 @ 1920×3775 */
+/* About overlay - Figma 2696:46028 @ 1920×3875 */
 
 body.is-about-overlay-open {
   overflow: hidden;
@@ -18,7 +18,8 @@ body.is-about-overlay-open {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   --about-w: 1920;
-  --about-h: 3775;
+  --about-h: 3875;
+  --about-post-hero-shift: 100;
   --about-ink: var(--pagmar-yellow-white);
   --about-cell-bg: #1e1e1e;
   --about-preview-bg: var(--pagmar-yellow-white);
@@ -126,7 +127,7 @@ body.is-about-overlay-open {
 
 /* ── Hebrew text: RTL bidi so punctuation stays at sentence end ── */
 .pagmar__about-copy,
-.pagmar__about-letters-copy,
+.pagmar__about-letters-body,
 .pagmar__about-letters-hint,
 .pagmar__about-project-copy,
 .pagmar__about-tag,
@@ -141,7 +142,7 @@ body.is-about-overlay-open {
 
 /* ── Text rhythm - match Figma line breaks, avoid orphan wraps ── */
 .pagmar__about-copy,
-.pagmar__about-letters-copy,
+.pagmar__about-letters-body,
 .pagmar__about-project-copy {
   word-break: normal;
   overflow-wrap: normal;
@@ -279,18 +280,13 @@ body.is-about-overlay-open {
 }
 
 .pagmar__about-block--system {
-  flex: 0 1 calc(939.59 * var(--u));
+  flex: 0 1 calc(938.81 * var(--u));
   flex-direction: row;
   align-items: flex-start;
   justify-content: flex-end;
   gap: calc(18 * var(--u));
-  width: calc(939.59 * var(--u));
-}
-
-.pagmar__about-block-copy {
-  flex: 0 0 calc(723 * var(--u));
-  width: calc(723 * var(--u));
-  order: 0;
+  width: calc(938.81 * var(--u));
+  min-height: calc(331 * var(--u));
 }
 
 .pagmar__about-block-tag,
@@ -307,27 +303,20 @@ body.is-about-overlay-open {
   box-sizing: border-box;
 }
 
+.pagmar__about-system-tag {
+  flex: 0 0 calc(127.78 * var(--u));
+  width: calc(127.78 * var(--u));
+  order: 1;
+  justify-content: center;
+  align-items: center;
+}
+
 .pagmar__about-block-tag .pagmar__about-tag,
 .pagmar__about-origin-tag .pagmar__about-tag,
 .pagmar__about-system-tag .pagmar__about-tag {
   width: 100%;
   margin: 0;
   text-align: right;
-}
-
-.pagmar__about-section-glyphs {
-  flex: 0 0 calc(32.69 * var(--u));
-  width: calc(32.69 * var(--u));
-  order: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: calc(8 * var(--u)) 0 0;
-  box-sizing: border-box;
-}
-
-.pagmar__about-section-glyphs .pagmar__about-tag-icons {
-  margin-top: 0;
 }
 
 .pagmar__about-system-layout {
@@ -342,7 +331,7 @@ body.is-about-overlay-open {
 /* ── Origin section (Figma Frame 484) ── */
 .pagmar__about-section--origin {
   left: calc(833.89 * var(--u));
-  top: calc(978.32 * var(--u));
+  top: calc((978.32 + var(--about-post-hero-shift) - 5) * var(--u));
   width: calc(939.59 * var(--u));
   min-height: calc(240 * var(--u));
   height: auto;
@@ -355,45 +344,130 @@ body.is-about-overlay-open {
   box-sizing: border-box;
 }
 
-.pagmar__about-origin-copy {
+.pagmar__about-origin-stack {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: calc(31 * var(--u));
-  width: calc(723 * var(--u));
-  flex: 0 0 calc(723 * var(--u));
+  width: calc(771.69 * var(--u));
+  flex: none;
   order: 0;
 }
 
-.pagmar__about-origin-copy .pagmar__about-copy {
-  width: 100%;
+.pagmar__about-origin-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: calc(16 * var(--u));
+  width: calc(750.32 * var(--u));
+}
+
+.pagmar__about-origin-row--wide {
+  align-self: stretch;
+  width: calc(771.69 * var(--u));
+}
+
+.pagmar__about-origin-row .pagmar__about-copy {
+  flex: none;
+  width: calc(723 * var(--u));
   margin: 0;
 }
 
-.pagmar__about-origin-glyphs .pagmar__about-tag-icons {
-  gap: calc(31 * var(--u));
+.pagmar__about-origin-row-glyphs {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: calc(8 * var(--u)) 0 0;
+  flex: none;
+  box-sizing: border-box;
 }
 
-.pagmar__about-origin-glyphs .pagmar__about-tag-icons-row {
+.pagmar__about-origin-row-glyphs img {
+  display: block;
+  width: calc(11.32 * var(--u));
+  height: calc(11.59 * var(--u));
+}
+
+.pagmar__about-origin-row-glyphs--pair {
   gap: calc(10 * var(--u));
+  width: calc(32.69 * var(--u));
 }
 
-.pagmar__about-system-glyphs .pagmar__about-tag-icons {
-  gap: calc(7 * var(--u));
+.pagmar__about-origin-row-glyphs--pair img {
+  width: calc(11.34 * var(--u));
+}
+
+.pagmar__about-origin-tag {
+  order: 1;
+  justify-content: center;
+  align-items: center;
+}
+
+.pagmar__about-system-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(31 * var(--u));
+  width: calc(793.03 * var(--u));
+  flex: none;
+  order: 0;
+}
+
+.pagmar__about-system-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: calc(16 * var(--u));
+  width: calc(750.32 * var(--u));
+}
+
+.pagmar__about-system-row--wide {
+  align-self: stretch;
+  width: calc(793.03 * var(--u));
+}
+
+.pagmar__about-system-row .pagmar__about-copy {
+  flex: none;
+  width: calc(723 * var(--u));
+  margin: 0;
+}
+
+.pagmar__about-system-row-glyphs {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: calc(8 * var(--u)) 0 0;
+  flex: none;
+  box-sizing: border-box;
+}
+
+.pagmar__about-system-row-glyphs img {
+  display: block;
+  width: calc(11.32 * var(--u));
+  height: calc(11.59 * var(--u));
+}
+
+.pagmar__about-system-row-glyphs--pair {
+  gap: calc(10 * var(--u));
+  width: calc(32.69 * var(--u));
+}
+
+.pagmar__about-system-row-glyphs--pair img,
+.pagmar__about-system-row-glyphs--triple img {
+  width: calc(11.34 * var(--u));
+}
+
+.pagmar__about-system-row-glyphs--triple {
+  gap: calc(10 * var(--u));
+  width: calc(54.03 * var(--u));
 }
 
 /* ── System section ── */
 .pagmar__about-section--system {
+  position: absolute;
   left: calc(50.68 * var(--u));
-  top: calc(1451.68 * var(--u));
+  top: calc((1451.68 + var(--about-post-hero-shift)) * var(--u));
   width: calc(1818.64 * var(--u));
-}
-
-.pagmar__about-copy--system {
-  width: 100%;
-  font-size: calc(27 * var(--u));
-  line-height: 1.1;
-  letter-spacing: 0;
 }
 
 .pagmar__about-amulet-sample {
@@ -403,6 +477,9 @@ body.is-about-overlay-open {
   height: calc(640 * var(--u));
   margin-top: calc(-165 * var(--u));
   margin-left: calc(-210 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: visible;
   pointer-events: none;
   background: transparent;
@@ -410,9 +487,11 @@ body.is-about-overlay-open {
 
 .pagmar__about-amulet-3d {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
   width: 100%;
   height: 100%;
+  transform: translate(-50%, -50%);
   pointer-events: auto;
   background: transparent;
   cursor: grab;
@@ -432,7 +511,7 @@ body.is-about-overlay-open {
 /* ── Letters section ── */
 .pagmar__about-section--letters {
   left: calc(147.23 * var(--u));
-  top: calc(1969.04 * var(--u));
+  top: calc((1969.04 + var(--about-post-hero-shift)) * var(--u));
   width: calc(1626 * var(--u));
   padding-top: calc(130 * var(--u));
   border-top: var(--pagmar-line-weight) solid var(--about-ink);
@@ -485,14 +564,6 @@ body.is-about-overlay-open {
   opacity: 0;
 }
 
-.pagmar__about-letter-grid-wrap {
-  position: relative;
-  align-self: flex-end;
-  width: calc(572.192 * var(--u));
-  margin-left: auto;
-  margin-right: 0;
-}
-
 .pagmar__about-connection-panel.is-swapping .pagmar__about-connection-svg {
   opacity: 0;
 }
@@ -526,29 +597,36 @@ body.is-about-overlay-open .pagmar__garden canvas {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  justify-content: center;
+  gap: calc(32 * var(--u));
   box-sizing: border-box;
 }
 
 .pagmar__about-letters-title {
-  width: 100%;
-  margin: 0 0 calc(32 * var(--u));
+  align-self: stretch;
+  width: calc(630 * var(--u));
+  margin: 0;
   font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
   font-weight: 400;
   font-size: calc(75 * var(--u));
-  line-height: 1;
-  letter-spacing: calc(-0.75 * var(--u));
+  line-height: calc(72 * var(--u));
+  letter-spacing: -0.01em;
   text-align: right;
   color: var(--about-ink);
 }
 
-.pagmar__about-letters-copy {
+.pagmar__about-letters-body {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: calc(8 * var(--u));
-  width: 100%;
-  margin: 0 0 calc(55 * var(--u));
+  width: calc(567 * var(--u));
+  flex: none;
+  margin-top: calc(-5 * var(--u));
+}
+
+.pagmar__about-letters-body p {
+  margin: 0;
+  width: calc(567 * var(--u));
   font-family: "TheBasics", "DavidLibre", serif;
   font-size: calc(27 * var(--u));
   line-height: 1.1;
@@ -557,18 +635,24 @@ body.is-about-overlay-open .pagmar__garden canvas {
   color: var(--about-ink);
 }
 
-.pagmar__about-letters-copy p {
-  margin: 0;
-  width: 100%;
-  text-align: right;
-}
-
 .pagmar__about-letters-hint {
   margin: 0;
+  width: calc(567 * var(--u));
+  flex: none;
   font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
-  font-weight: 400;
+  font-weight: 100;
+  font-size: calc(32 * var(--u));
+  line-height: 1.1;
   text-align: right;
   color: var(--about-ink);
+}
+
+.pagmar__about-letter-grid-wrap {
+  position: relative;
+  align-self: flex-end;
+  width: calc(572.192 * var(--u));
+  margin-left: auto;
+  margin-right: 0;
 }
 
 .pagmar__about-letter-grid {
@@ -639,7 +723,7 @@ body.is-about-overlay-open .pagmar__garden canvas {
 .pagmar__about-footer {
   position: absolute;
   left: calc(49.89 * var(--u));
-  top: calc(3209.4 * var(--u));
+  top: calc((3209.4 + var(--about-post-hero-shift)) * var(--u));
   width: calc(1820 * var(--u));
   height: calc(424 * var(--u));
 }
@@ -857,7 +941,8 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
     padding-top: 0;
   }
 
-  .pagmar__about-letters-copy {
+  .pagmar__about-letters-body,
+  .pagmar__about-letters-hint {
     width: 100%;
   }
 }
@@ -889,11 +974,12 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
     gap: calc(24 * var(--u));
   }
 
-  .pagmar__about-origin-copy,
-  .pagmar__about-section-glyphs,
+  .pagmar__about-origin-stack,
+  .pagmar__about-origin-row,
+  .pagmar__about-system-stack,
+  .pagmar__about-system-row,
   .pagmar__about-origin-tag,
   .pagmar__about-system-tag,
-  .pagmar__about-block-copy,
   .pagmar__about-block--system {
     width: 100%;
     height: auto;
@@ -925,7 +1011,6 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
     gap: calc(16 * var(--u));
   }
 
-  .pagmar__about-block-copy,
   .pagmar__about-block-tag,
   .pagmar__about-block--system {
     flex: none;
@@ -948,9 +1033,10 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
     font-size: calc(48 * var(--u));
   }
 
-  .pagmar__about-letters-copy,
+  .pagmar__about-letters-body,
+  .pagmar__about-letters-body p,
+  .pagmar__about-letters-hint,
   .pagmar__about-copy,
-  .pagmar__about-copy--system,
   .pagmar__about-project-copy {
     font-size: calc(22 * var(--u));
   }

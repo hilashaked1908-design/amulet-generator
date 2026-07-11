@@ -149,17 +149,18 @@
   const CREATE_SAVE_LABEL_NEXT = 'לשאלה הבאה';
   const CREATE_SAVE_LABEL_FINAL = 'צור קמע';
 
-  /** Q8 (index 7) — no post-answer caption. */
-  const LAST_EXPLAINED_QUESTION_INDEX = 6;
+  /** Q8 (index 7) — last glass-bubble explanation in the questionnaire. */
+  const LAST_EXPLAINED_QUESTION_INDEX = 7;
 
-  /** Past tense — what changed after the previous answer (caption above dock on next frame). */
+  /** Past tense — what changed after the previous answer (glass bubble on next frame). */
   const PAST_STAGE_CAPTION_BY_QUESTION = {
     1: 'האותיות מהבקשה התחברו ויצרו את קווי המתאר הראשונים של הקמע.',
     2: 'שכבת השם התווספה למתאר, האותיות של שמכם יוצרות בסיס לקמע.',
-    3: 'נחרט על האבן למה דווקא עכשיו.',
+    3: 'האותיות מהתשובה שלכם הוטבעו על האבן.',
     4: 'חומריות האבן נקבעה מהאמונה שלכם.',
     5: 'חומריות המתכת או הפולימר נקבעה מהתחושה שלכם.',
     6: 'מידת הקוצניות נקבעה לפי מה שחסר לכם.',
+    7: 'אותיות מהשינוי הוטבעו במעגל על האבן.',
   };
 
   function getPastStageCaptionText(questionIndex) {
@@ -170,6 +171,14 @@
   function isDockChoiceQuestionAt(index) {
     const question = questions[index];
     return Boolean(question && question.type === 'choice' && isRequestFlowActive());
+  }
+
+  function waitNextPaint() {
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(resolve);
+      });
+    });
   }
 
   const PLACEHOLDER_CHAR_MS = 46;
@@ -222,7 +231,13 @@
   function resetDockAmuletLift() {
     if (requestArtboard) {
       requestArtboard.style.removeProperty('--figma-amulet-lift');
+      requestArtboard.style.removeProperty('--figma-q-dock-lift');
     }
+  }
+
+  /** Q8 — dock grows downward; amulet stays fixed. */
+  function isDockGrowDownQuestion() {
+    return activeIndex === 7;
   }
 
   function syncAmuletStageCaptionPosition() {
@@ -278,6 +293,18 @@
     const current = dock.getBoundingClientRect().height;
     const extra = Math.max(0, current - baseline);
 
+    if (isDockGrowDownQuestion()) {
+      requestArtboard.style.removeProperty('--figma-amulet-lift');
+      if (extra > 0.5) {
+        requestArtboard.style.setProperty('--figma-q-dock-lift', '-' + extra + 'px');
+      } else {
+        requestArtboard.style.removeProperty('--figma-q-dock-lift');
+      }
+      syncAmuletStageCaptionPosition();
+      syncRequestQuestionTextLayout();
+      return;
+    }
+
     if (extra > 0.5) {
       requestArtboard.style.setProperty('--figma-amulet-lift', extra + 'px');
     } else {
@@ -312,12 +339,12 @@
   function getDockInputOneLineHeightPx(field) {
     const styles = window.getComputedStyle(field);
     const fontSize = parseFloat(styles.fontSize);
-    if (!Number.isFinite(fontSize)) return 55;
+    const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 55;
     const lineHeight = styles.lineHeight;
-    if (lineHeight === 'normal') return fontSize;
+    if (lineHeight === 'normal') return safeFontSize;
     const parsed = parseFloat(lineHeight);
-    if (Number.isFinite(parsed) && String(lineHeight).endsWith('px')) return parsed;
-    return fontSize;
+    if (Number.isFinite(parsed) && parsed > 0 && String(lineHeight).endsWith('px')) return parsed;
+    return safeFontSize;
   }
 
   function resizeDockQuestionInput(field) {
@@ -440,6 +467,8 @@
       return;
     }
 
+    field.placeholder = examples[0] || question.placeholder || '';
+
     const token = placeholderCycleToken;
 
     const onFocus = function () {
@@ -471,12 +500,16 @@
     field.addEventListener('blur', onBlur);
     placeholderFieldHandlers = { field: field, onFocus: onFocus, onInput: onInput, onBlur: onBlur };
 
+    const kickPlaceholderCycle = function () {
+      if (placeholderFieldHandlers?.field !== field || !field.isConnected) return;
+      if (!isPlaceholderFieldIdle(field)) return;
+      void runPlaceholderCycle(field, examples, token);
+    };
+
     requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        if (placeholderFieldHandlers?.field !== field || !field.isConnected) return;
-        void runPlaceholderCycle(field, examples, token);
-      });
+      requestAnimationFrame(kickPlaceholderCycle);
     });
+    window.setTimeout(kickPlaceholderCycle, REQUEST_TRANSITION_MS + 32);
   }
 
   let amuletModulesReady = null;
@@ -702,10 +735,8 @@
     requestArtboard.classList.add('is-advancing');
 
     requestTransitionTimer = window.setTimeout(function () {
+      requestArtboard.classList.remove('is-advancing');
       if (onSwap) onSwap();
-      requestAnimationFrame(function () {
-        requestArtboard.classList.remove('is-advancing');
-      });
     }, REQUEST_TRANSITION_MS);
   }
 
@@ -1264,18 +1295,22 @@
 
           await runAmuletBuild(answers, {
             uiBlocking: allowUiBlock !== false,
-            showLoader: true,
+            showLoader: allowUiBlock !== false,
           });
         }
 
-        async function transitionNeedsLoader(answeredIndex, data) {
-          const needsChoiceVector =
+        function transitionNeedsChoiceThumbSync(answeredIndex, data) {
+          return Boolean(
             (answeredIndex === 3 && data.q4Belief) ||
-            (answeredIndex === 4 && data.q5Feeling);
+              (answeredIndex === 4 && data.q5Feeling)
+          );
+        }
+
+        async function transitionNeedsVectorBuild(data) {
           try {
             await ensureAmuletModules();
           } catch (_err) {
-            return needsChoiceVector;
+            return false;
           }
           const willShowNewLayer =
             typeof window.amuletWillShowNewVectorLayer === 'function' &&
@@ -1283,56 +1318,48 @@
           const needsCatchup =
             typeof window.amuletNeedsVectorCatchup === 'function' &&
             window.amuletNeedsVectorCatchup(data);
-          return Boolean(willShowNewLayer || needsCatchup || needsChoiceVector);
+          return Boolean(willShowNewLayer || needsCatchup);
         }
 
-        const needsLoader = await transitionNeedsLoader(index, answers);
-        const nextIsDockChoice = isDockChoiceQuestionAt(nextIndex);
+        function beginVectorTransitionHide() {
+          document.body.classList.add('is-question-transition-loading');
+          if (requestArtboard) requestArtboard.classList.add('is-advancing');
+          hideVectorTip();
+          hideAmuletStageCaption();
+        }
 
         function revealNextQuestion() {
-          populateCreateQuestion(nextIndex);
           document.body.classList.remove('is-question-transition-loading');
           if (requestArtboard) requestArtboard.classList.remove('is-advancing');
+          populateCreateQuestion(nextIndex);
         }
 
-        async function runTransitionBuild() {
-          try {
-            if (!needsLoader) return;
-            await buildVectorIfNeeded(!nextIsDockChoice);
-            await syncChoicePresetVectorsFromAnswers(answers);
-            if (!nextIsDockChoice && typeof window.amuletWaitFrameLoaderIdle === 'function') {
+        async function prepareNextQuestionScreen(answeredIndex, data) {
+          const needsVectorBuild = await transitionNeedsVectorBuild(data);
+          if (needsVectorBuild) {
+            await buildVectorIfNeeded(true);
+            if (typeof window.amuletWaitFrameLoaderIdle === 'function') {
               await window.amuletWaitFrameLoaderIdle();
             }
-            if (!nextIsDockChoice) {
-              await new Promise(function (resolve) {
-                requestAnimationFrame(function () {
-                  requestAnimationFrame(resolve);
-                });
-              });
-            }
-          } catch (err) {
-            console.error('[questionnaire] question transition build failed', err);
+            await waitNextPaint();
+          }
+
+          if (transitionNeedsChoiceThumbSync(answeredIndex, data)) {
+            await syncChoicePresetVectorsFromAnswers(data);
           }
         }
 
         if (isQuestionTransition) {
-          if (nextIsDockChoice) {
-            if (needsLoader) {
-              revealNextQuestion();
-              void runTransitionBuild();
-            } else {
-              animateRequestQuestionChange(revealNextQuestion);
-            }
-          } else if (needsLoader) {
-            document.body.classList.add('is-question-transition-loading');
-            await runTransitionBuild();
-            revealNextQuestion();
-          } else {
-            animateRequestQuestionChange(revealNextQuestion);
+          beginVectorTransitionHide();
+          try {
+            await prepareNextQuestionScreen(index, answers);
+          } catch (err) {
+            console.error('[questionnaire] question transition prepare failed', err);
           }
+          revealNextQuestion();
         } else {
           revealNextQuestion();
-          if (needsLoader) void runTransitionBuild();
+          void prepareNextQuestionScreen(index, answers);
         }
 
         if (index >= 3 && index <= 6) {
@@ -1538,17 +1565,23 @@
     if (vectorCopyEl) vectorCopyEl.hidden = true;
   }
 
+  function hideAmuletStageCaption() {
+    if (!amuletStageCaptionEl) return;
+    amuletStageCaptionEl.textContent = '';
+    amuletStageCaptionEl.hidden = true;
+    if (requestArtboard) {
+      requestArtboard.style.removeProperty('--figma-amulet-caption-top');
+    }
+  }
+
   function syncVectorCopy(_explicitStage, questionIndex) {
     if (!isRequestFlowActive()) return;
     const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
 
-    syncAmuletStageCaption(qIndex);
-    hideVectorTip();
-  }
+    hideAmuletStageCaption();
 
-  function syncAmuletStageCaption(questionIndex) {
-    if (!amuletStageCaptionEl || !isRequestFlowActive()) return;
-    const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
+    if (!vectorCopyEl) return;
+
     const live = requestArtboard && requestArtboard.classList.contains('is-amulet-live');
     const caption =
       live &&
@@ -1558,20 +1591,24 @@
         ? getPastStageCaptionText(qIndex)
         : '';
 
-    if (caption) {
-      amuletStageCaptionEl.textContent = caption;
-      amuletStageCaptionEl.hidden = false;
-      requestAnimationFrame(function () {
-        syncAmuletStageCaptionPosition();
-      });
+    if (!caption) {
+      hideVectorTip();
       return;
     }
 
-    amuletStageCaptionEl.textContent = '';
-    amuletStageCaptionEl.hidden = true;
-    if (requestArtboard) {
-      requestArtboard.style.removeProperty('--figma-amulet-caption-top');
+    if (vectorCopyTextEl) {
+      vectorCopyTextEl.textContent = caption;
     }
+    vectorCopyEl.hidden = false;
+
+    const surface = vectorCopyEl.querySelector('.pagmar__garden-amulet-hover__surface');
+    if (window.pagmarGlassLens && surface) {
+      window.pagmarGlassLens.register(surface);
+    }
+  }
+
+  function syncAmuletStageCaption() {
+    hideAmuletStageCaption();
   }
 
   function setCreateQuestionText(question, index) {
@@ -1662,6 +1699,7 @@
     document.body.classList.toggle('is-choice-question', isDockChoiceQuestion);
     document.body.classList.toggle('is-choice-save', isChoiceSaveQuestion);
     document.body.classList.toggle('is-semantic-questions', index >= 3);
+    document.body.classList.toggle('is-dock-grow-down', index === 7);
     if (indexCreateWorkspace) {
       indexCreateWorkspace.classList.toggle('is-choice-question', isDockChoiceQuestion);
       indexCreateWorkspace.classList.toggle('is-choice-save', isChoiceSaveQuestion);

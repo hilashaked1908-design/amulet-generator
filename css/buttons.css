@@ -139,9 +139,9 @@
 }
 
 .pagmar__glass-pill__text {
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1;
   letter-spacing: 0.04em;
   color: var(--pagmar-yellow-white);

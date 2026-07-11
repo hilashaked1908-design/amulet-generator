@@ -170,6 +170,13 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
 
   function getAnswersForIndex(index, entryId) {
     if (entryId != null) {
+      if (
+        window.__pagmarDetailAnswersByEntryId &&
+        window.__pagmarDetailAnswersByEntryId[entryId] &&
+        window.__pagmarDetailAnswersByEntryId[entryId].q1Wish
+      ) {
+        return window.__pagmarDetailAnswersByEntryId[entryId];
+      }
       try {
         const navRaw = sessionStorage.getItem('pagmarAmuletDetailNav');
         if (navRaw) {
@@ -181,8 +188,16 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
       } catch (_) {}
       if (typeof window.pagmarFindCollectionEntryById === 'function') {
         const entry = window.pagmarFindCollectionEntryById(entryId);
-        if (entry && entry.answers) return entry.answers;
+        if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
       }
+      const collection = loadDetailCollection();
+      for (let i = 0; i < collection.length; i += 1) {
+        const entry = collection[i];
+        if (entry && entry.id == entryId && entry.answers && entry.answers.q1Wish) {
+          return entry.answers;
+        }
+      }
+      return null;
     }
     if (typeof window.getAmuletRecord === 'function') {
       return window.getAmuletRecord(index);
@@ -191,86 +206,86 @@ if (document.body.classList.contains('pagmar-amulet-detail')) {
   }
 
   function bootDetailScene() {
-    const entryId = resolveSceneEntryId(amuletIndex);
-    const sceneIndex =
-      entryId != null && typeof window.pagmarIndexForEntryId === 'function'
-        ? window.pagmarIndexForEntryId(entryId) ?? amuletIndex
-        : amuletIndex;
+    const sceneIndex = parseIndex();
+    const entryId = parseEntryIdFromUrl();
     const glbKeyNow =
       entryId != null ? 'collection-' + entryId : getGlbKey(sceneIndex);
 
-  function fallbackPbrRender(answers) {
-    if (!answers || !container3D) {
-      signalSceneReady();
-      return;
-    }
-    Promise.all([
-      import('./amulet-detail-vectors.js?v=20250708-vector-raster-fix').then(function (vectors) {
-        return vectors.getSharedDetailCompose(answers);
-      }),
-      import('../three-pbr-amulet.js'),
-    ]).then(function (modules) {
-      var composed = modules[0];
-      var pbr = modules[1];
-      if (!composed) throw new Error('compose failed');
-      container3D.innerHTML = '';
-      container3D.style.display = '';
-      if (fallback2D) fallback2D.style.display = 'none';
-      return pbr.renderThreePbrAmuletInteractive({
-        svg: composed.svg,
-        style2: composed.style2,
-        style3: Object.assign({}, composed.style3, { l3MassScale: 0.37 }),
-        container: container3D,
-        questionnaire: composed.questionnaire,
-        domainHex: composed.domainHex,
-        ageNum: composed.ageNum,
-        l3MaterialMode: 'stone',
-      });
-    }).then(function () {
-      var cvs = container3D.querySelector('canvas');
-      if (cvs) {
-        cvs.style.pointerEvents = 'auto';
-        cvs.style.cursor = 'grab';
-        cvs.style.touchAction = 'none';
+    function fallbackPbrRender(fallbackAnswers) {
+      if (!fallbackAnswers || !fallbackAnswers.q1Wish || !container3D) {
+        signalSceneReady();
+        return;
       }
-      markAmulet3DReady();
-    }).catch(function (err) {
-      console.warn('[detail-scene] PBR fallback render failed', err);
-      signalSceneReady();
-    });
-  }
+      Promise.all([
+        import('./amulet-detail-vectors.js?v=20250711-fast-glb').then(function (vectors) {
+          return vectors.getSharedDetailCompose(fallbackAnswers, { entryId: entryId });
+        }),
+        import('../three-pbr-amulet.js'),
+      ])
+        .then(function (modules) {
+          var composed = modules[0];
+          var pbr = modules[1];
+          if (!composed || !composed.svg) throw new Error('compose failed');
+          container3D.innerHTML = '';
+          container3D.style.display = '';
+          if (fallback2D) fallback2D.style.display = 'none';
+          return pbr.renderThreePbrAmuletInteractive({
+            svg: composed.svg,
+            style2: composed.style2,
+            style3: Object.assign({}, composed.style3, { l3MassScale: 0.37 }),
+            container: container3D,
+            questionnaire: composed.questionnaire,
+            domainHex: composed.domainHex,
+            ageNum: composed.ageNum,
+            l3MaterialMode: 'stone',
+          });
+        })
+        .then(function () {
+          var cvs = container3D.querySelector('canvas');
+          if (cvs) {
+            cvs.style.pointerEvents = 'auto';
+            cvs.style.cursor = 'grab';
+            cvs.style.touchAction = 'none';
+          }
+          markAmulet3DReady();
+        })
+        .catch(function (err) {
+          console.warn('[detail-scene] PBR fallback render failed', err);
+          signalSceneReady();
+        });
+    }
 
-  if (glbKeyNow && container3D) {
-    import('./amulet-glb-store.js')
-      .then(function (store) {
-        return store.loadGlb(glbKeyNow);
-      })
-      .then(function (result) {
-        if (!result) {
+    if (glbKeyNow && container3D) {
+      import('./amulet-glb-store.js')
+        .then(function (store) {
+          return store.loadGlb(glbKeyNow);
+        })
+        .then(function (result) {
+          if (!result) {
+            var answers = getAnswersForIndex(sceneIndex, entryId);
+            if (answers && answers.q1Wish) fallbackPbrRender(answers);
+            else signalSceneReady();
+            return;
+          }
+          var rs = result.rendererSettings || {};
+          if (!rs.lighting && result.lighting && result.lighting.length) {
+            rs.lighting = result.lighting;
+          }
+          setup3DAmulet(result.scene, rs, result.materialOverrides || []);
+        })
+        .catch(function (err) {
+          console.warn('[detail-scene] GLB load failed, trying PBR fallback', err);
           var answers = getAnswersForIndex(sceneIndex, entryId);
-          if (answers) fallbackPbrRender(answers);
+          if (answers && answers.q1Wish) fallbackPbrRender(answers);
           else signalSceneReady();
-          return;
-        }
-        var rs = result.rendererSettings || {};
-        if (!rs.lighting && result.lighting && result.lighting.length) {
-          rs.lighting = result.lighting;
-        }
-        setup3DAmulet(result.scene, rs, result.materialOverrides || []);
-      })
-      .catch(function (err) {
-        console.warn('[detail-scene] GLB load failed, trying PBR fallback', err);
-        var answers = getAnswersForIndex(sceneIndex, entryId);
-        if (answers) fallbackPbrRender(answers);
-        else signalSceneReady();
-      });
-  } else if (container3D) {
-    var answers = getAnswersForIndex(sceneIndex, entryId);
-    if (answers) fallbackPbrRender(answers);
-    else signalSceneReady();
-  } else {
-    signalSceneReady();
-  }
+        });
+    } else if (container3D) {
+      var answers = getAnswersForIndex(sceneIndex, entryId);
+      if (answers && answers.q1Wish) fallbackPbrRender(answers);
+      else signalSceneReady();
+    } else {
+      signalSceneReady();
+    }
   } /* bootDetailScene */
 
   function setup3DAmulet(glbScene, _rs, materialOverrides) {
