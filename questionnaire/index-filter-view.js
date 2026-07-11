@@ -214,18 +214,47 @@
     return null;
   }
 
+  function glbUrlForEntry(entry) {
+    if (!entry || entry.id == null) return null;
+    if (
+      entry.glbUrl &&
+      String(entry.glbUrl).indexOf('/' + entry.id + '.glb') !== -1
+    ) {
+      return entry.glbUrl;
+    }
+    if (
+      entry.snapshot &&
+      String(entry.snapshot).indexOf('/seed/snapshots/' + entry.id) !== -1
+    ) {
+      return '/questionnaire/seed/glbs/' + entry.id + '.glb';
+    }
+    return null;
+  }
+
   function navigateToAmuletDetail(amuletIndex) {
     var entryId = entryIdForAmuletIndex(amuletIndex);
+    var entry = null;
     var answers = null;
     if (entryId != null && typeof window.pagmarFindCollectionEntryById === 'function') {
-      var entry = window.pagmarFindCollectionEntryById(entryId);
+      entry = window.pagmarFindCollectionEntryById(entryId);
       if (entry && entry.answers) answers = entry.answers;
     }
     if (!answers && typeof window.getAmuletRecord === 'function') {
       answers = window.getAmuletRecord(amuletIndex);
     }
+    var glbUrl = glbUrlForEntry(entry);
+    console.log(
+      '%c[index-filter] OPEN DETAIL from filter card',
+      'color:#fc9;background:#222;font-size:13px;padding:2px 6px;',
+      {
+        amuletIndex: amuletIndex,
+        entryId: entryId,
+        glbUrl: glbUrl,
+        wish: answers && answers.q1Wish ? String(answers.q1Wish).slice(0, 60) : null,
+      }
+    );
     if (typeof window.pagmarNavigateToAmuletDetail === 'function') {
-      window.pagmarNavigateToAmuletDetail(amuletIndex, entryId, answers);
+      window.pagmarNavigateToAmuletDetail(amuletIndex, entryId, answers, null, glbUrl);
       return;
     }
     if (typeof window.gardenStashIndexReturnState === 'function') {
@@ -240,10 +269,10 @@
     if (entryId == null) return;
     var url = 'amulet.html?entry=' + encodeURIComponent(entryId) + '&id=' + encodeURIComponent(amuletIndex);
     try {
-      sessionStorage.setItem(
-        'pagmarAmuletDetailNav',
-        JSON.stringify({ index: amuletIndex, entryId: entryId })
-      );
+      var navPayload = { index: amuletIndex, entryId: entryId };
+      if (answers) navPayload.answers = answers;
+      if (glbUrl) navPayload.glbUrl = glbUrl;
+      sessionStorage.setItem('pagmarAmuletDetailNav', JSON.stringify(navPayload));
     } catch (_) {}
     window.location.href = url;
   }
@@ -396,6 +425,11 @@
   window.addEventListener('resize', function () {
     if (!document.body.classList.contains('is-filter-page')) return;
     scheduleFilterGridLayout();
+  });
+
+  window.addEventListener('pagmar:collection-changed', function () {
+    if (!activeFilterLabels.length) return;
+    renderGrid(activeFilterLabels);
   });
 
   window.pagmarFilterPage = {

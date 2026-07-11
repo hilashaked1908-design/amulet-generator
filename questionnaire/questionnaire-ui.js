@@ -235,9 +235,40 @@
     }
   }
 
-  /** Q8 — dock grows downward; amulet stays fixed. */
-  function isDockGrowDownQuestion() {
-    return activeIndex === 7;
+  function syncDockAmuletLift() {
+    if (!requestArtboard || !isRequestFlowActive()) {
+      resetDockAmuletLift();
+      return;
+    }
+
+    const dock = document.querySelector('.figma-q__dock');
+    if (!dock) {
+      resetDockAmuletLift();
+      return;
+    }
+
+    // Keep amulet frame + vector fog locked — never push them with dock height.
+    requestArtboard.style.removeProperty('--figma-amulet-lift');
+
+    if (document.body.classList.contains('is-choice-question')) {
+      requestArtboard.style.removeProperty('--figma-q-dock-lift');
+      syncAmuletStageCaptionPosition();
+      syncRequestQuestionTextLayout();
+      return;
+    }
+
+    const styles = window.getComputedStyle(dock);
+    const baseline = parseFloat(styles.minHeight) || 0;
+    const current = dock.getBoundingClientRect().height;
+    const extra = Math.max(0, current - baseline);
+
+    if (extra > 0.5) {
+      requestArtboard.style.setProperty('--figma-q-dock-lift', '-' + extra + 'px');
+    } else {
+      requestArtboard.style.removeProperty('--figma-q-dock-lift');
+    }
+    syncAmuletStageCaptionPosition();
+    syncRequestQuestionTextLayout();
   }
 
   function syncAmuletStageCaptionPosition() {
@@ -263,57 +294,6 @@
     requestArtboard.style.setProperty('--figma-amulet-caption-top', top + 'px');
   }
 
-  /** Q3–Q5: keep amulet at fixed Y — dock growth must not push it up. */
-  function isDockAmuletLiftDisabled() {
-    if (document.body.classList.contains('is-choice-question')) return true;
-    return activeIndex !== null && activeIndex >= 2 && activeIndex <= 4;
-  }
-
-  function syncDockAmuletLift() {
-    if (!requestArtboard || !isRequestFlowActive()) {
-      resetDockAmuletLift();
-      return;
-    }
-
-    if (isDockAmuletLiftDisabled()) {
-      resetDockAmuletLift();
-      syncAmuletStageCaptionPosition();
-      syncRequestQuestionTextLayout();
-      return;
-    }
-
-    const dock = document.querySelector('.figma-q__dock');
-    if (!dock) {
-      resetDockAmuletLift();
-      return;
-    }
-
-    const styles = window.getComputedStyle(dock);
-    const baseline = parseFloat(styles.minHeight) || 0;
-    const current = dock.getBoundingClientRect().height;
-    const extra = Math.max(0, current - baseline);
-
-    if (isDockGrowDownQuestion()) {
-      requestArtboard.style.removeProperty('--figma-amulet-lift');
-      if (extra > 0.5) {
-        requestArtboard.style.setProperty('--figma-q-dock-lift', '-' + extra + 'px');
-      } else {
-        requestArtboard.style.removeProperty('--figma-q-dock-lift');
-      }
-      syncAmuletStageCaptionPosition();
-      syncRequestQuestionTextLayout();
-      return;
-    }
-
-    if (extra > 0.5) {
-      requestArtboard.style.setProperty('--figma-amulet-lift', extra + 'px');
-    } else {
-      resetDockAmuletLift();
-    }
-    syncAmuletStageCaptionPosition();
-    syncRequestQuestionTextLayout();
-  }
-
   function ensureDockLiftObserver() {
     const dock = document.querySelector('.figma-q__dock');
     if (!dock) return;
@@ -336,72 +316,6 @@
     resetDockAmuletLift();
   }
 
-  function getDockInputOneLineHeightPx(field) {
-    const styles = window.getComputedStyle(field);
-    const fontSize = parseFloat(styles.fontSize);
-    const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 55;
-    const lineHeight = styles.lineHeight;
-    if (lineHeight === 'normal') return safeFontSize;
-    const parsed = parseFloat(lineHeight);
-    if (Number.isFinite(parsed) && parsed > 0 && String(lineHeight).endsWith('px')) return parsed;
-    return safeFontSize;
-  }
-
-  function resizeDockQuestionInput(field) {
-    if (!field || field.tagName !== 'TEXTAREA' || !isRequestFlowActive()) return;
-    if (document.body.classList.contains('is-choice-question')) return;
-
-    const fieldWrap = field.closest('.figma-q__field');
-    const oneLineHeight = getDockInputOneLineHeightPx(field);
-    const styles = window.getComputedStyle(field);
-    const maxHeight = parseFloat(styles.maxHeight);
-    const hasMax = Number.isFinite(maxHeight) && maxHeight > 0;
-
-    field.style.setProperty('min-height', '0');
-    field.style.setProperty('height', 'auto');
-    field.style.overflow = 'hidden';
-
-    const contentHeight = field.scrollHeight;
-    const growsPastDock = hasMax && contentHeight > maxHeight;
-    const isMultiLine = !growsPastDock && contentHeight > oneLineHeight + 2;
-
-    field.style.removeProperty('min-height');
-
-    if (growsPastDock) {
-      field.style.setProperty('height', maxHeight + 'px', 'important');
-      field.style.overflow = 'auto';
-      field.classList.add('is-dock-scrollable');
-      if (fieldWrap) fieldWrap.classList.add('is-dock-multiline');
-    } else if (isMultiLine) {
-      field.style.setProperty('height', contentHeight + 'px', 'important');
-      field.style.overflow = 'hidden';
-      field.classList.remove('is-dock-scrollable');
-      if (fieldWrap) fieldWrap.classList.add('is-dock-multiline');
-    } else {
-      field.style.setProperty('height', oneLineHeight + 'px', 'important');
-      field.style.overflow = 'hidden';
-      field.classList.remove('is-dock-scrollable');
-      if (fieldWrap) fieldWrap.classList.remove('is-dock-multiline');
-    }
-    syncDockAmuletLift();
-  }
-
-  function bindDockQuestionInputGrow(field) {
-    if (!field || field.tagName !== 'TEXTAREA' || !isRequestFlowActive()) return;
-    if (field.dataset.dockGrowBound === '1') return;
-    field.dataset.dockGrowBound = '1';
-
-    const onResize = function () {
-      resizeDockQuestionInput(field);
-    };
-
-    field.addEventListener('input', onResize);
-    field.addEventListener('change', onResize);
-    requestAnimationFrame(function () {
-      requestAnimationFrame(onResize);
-    });
-  }
-
   function usesDockPlaceholderCycle(question) {
     return (
       isRequestFlowActive() &&
@@ -410,41 +324,63 @@
     );
   }
 
-  function usesDockTextareaField(question) {
-    return question.type === 'textarea' || (question.type === 'text' && usesDockPlaceholderCycle(question));
+  function ensureDockPlaceholderExample(field, examples, preferredIndex) {
+    if (!field || field.value.trim() || !examples.length) return;
+    field.classList.remove('is-typing-placeholder');
+    const idx = typeof preferredIndex === 'number' ? preferredIndex : 0;
+    field.placeholder = examples[idx % examples.length] || examples[0];
   }
 
   async function runPlaceholderCycle(field, examples, token) {
     if (!examples.length || !isPlaceholderSession(token) || !field?.isConnected) return;
 
     if (!prefersPlaceholderMotion()) {
-      if (isPlaceholderFieldIdle(field)) {
-        field.placeholder = examples[0];
-      }
+      ensureDockPlaceholderExample(field, examples, 0);
       return;
     }
 
+    const requestFlow = isRequestFlowActive();
     let index = 0;
+
     while (isPlaceholderSession(token)) {
-      if (!field.isConnected || !isPlaceholderFieldIdle(field)) return;
+      if (!field.isConnected) return;
+
+      if (!isPlaceholderFieldIdle(field)) {
+        ensureDockPlaceholderExample(field, examples, index);
+        return;
+      }
 
       const text = examples[index % examples.length];
-      field.classList.add('is-typing-placeholder');
 
-      const cursorChar = isRequestFlowActive() ? '' : PLACEHOLDER_CURSOR;
+      if (requestFlow) {
+        field.classList.remove('is-typing-placeholder');
+        field.placeholder = text;
+      } else {
+        field.classList.add('is-typing-placeholder');
+        const cursorChar = PLACEHOLDER_CURSOR;
 
-      for (let i = 0; i <= text.length; i += 1) {
-        if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
-        field.placeholder = i < text.length ? text.slice(0, i) + cursorChar : text;
-        if (i < text.length) await placeholderSleep(PLACEHOLDER_CHAR_MS);
+        for (let i = 0; i <= text.length; i += 1) {
+          if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) {
+            ensureDockPlaceholderExample(field, examples, index);
+            return;
+          }
+          field.placeholder = i < text.length ? text.slice(0, i) + cursorChar : text;
+          if (i < text.length) await placeholderSleep(PLACEHOLDER_CHAR_MS);
+        }
       }
 
       await placeholderSleep(PLACEHOLDER_HOLD_MS);
-      if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
+      if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) {
+        ensureDockPlaceholderExample(field, examples, index);
+        return;
+      }
 
       for (let i = text.length; i >= 0; i -= 1) {
-        if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) return;
-        field.placeholder = i > 0 ? text.slice(0, i) + cursorChar : '';
+        if (!isPlaceholderSession(token) || !field.isConnected || !isPlaceholderFieldIdle(field)) {
+          ensureDockPlaceholderExample(field, examples, index);
+          return;
+        }
+        field.placeholder = i > 0 ? text.slice(0, i) : '';
         if (i > 0) await placeholderSleep(PLACEHOLDER_ERASE_MS);
       }
 
@@ -472,11 +408,8 @@
     const token = placeholderCycleToken;
 
     const onFocus = function () {
-      field.classList.remove('is-typing-placeholder');
       placeholderCycleToken += 1;
-      if (!field.value.trim()) {
-        field.placeholder = examples[0] || question.placeholder || '';
-      }
+      ensureDockPlaceholderExample(field, examples, 0);
     };
 
     const onInput = function () {
@@ -518,7 +451,7 @@
     if (amuletModulesReady) return amuletModulesReady;
     amuletModulesReady = Promise.all([
       import('./amulet-build.js?v=20250709-full-site'),
-      import('./amulet-show.js?v=20250709-full-site'),
+      import('./amulet-show.js?v=20250711-result-amulet-scale'),
     ]).catch(function (err) {
       amuletModulesReady = null;
       throw err;
@@ -990,7 +923,7 @@
     }
 
     try {
-      const mod = await import('./amulet-show.js?v=20250708-figma-2604');
+      const mod = await import('./amulet-show.js?v=20250711-result-amulet-scale');
       await mod.showFinishedAmulet(answers);
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
@@ -1026,17 +959,39 @@
     } catch (_) {}
   }
 
+  function stopCreateFlowEffects() {
+    stopRequestFlowFogIfNeeded();
+    stopCreateAmuletMorph();
+    if (typeof window.amuletBuildCancel === 'function') {
+      window.amuletBuildCancel();
+    }
+    document.body.classList.remove(
+      'is-building',
+      'is-amulet-rendering',
+      'is-create-fullpage-loading',
+      'is-amulet-ready',
+      'is-create-amulet-ready',
+      'is-vector-frame-loading',
+      'is-question-transition-loading'
+    );
+    if (typeof window.amuletHideLoader === 'function') {
+      window.amuletHideLoader({ force: true });
+    }
+  }
+
   function resetCreateHistoryAfterSave() {
     createHistoryPushed = false;
-    createPopstateIgnore = 2;
-    try {
-      history.go(-2);
-    } catch (_) {
-      createPopstateIgnore = 0;
+    window.setTimeout(function () {
+      createPopstateIgnore = 2;
       try {
-        history.replaceState(null, '');
-      } catch (_e) {}
-    }
+        history.go(-2);
+      } catch (_) {
+        createPopstateIgnore = 0;
+        try {
+          history.replaceState(null, '');
+        } catch (_e) {}
+      }
+    }, 0);
   }
 
   function cancelCreateBuildIfNeeded() {
@@ -1119,6 +1074,9 @@
 
   function setBuilding(isBuilding) {
     if (!isCreateFlow()) return;
+    if (isBuilding && document.body.classList.contains('is-semantic-questions')) {
+      isBuilding = false;
+    }
     document.body.classList.toggle('is-building', Boolean(isBuilding));
     const zone = document.querySelector(
       isRequestFlowActive()
@@ -1194,6 +1152,67 @@
   }
 
 
+  function ensureQuestionInteractive() {
+    document.body.classList.remove('is-question-transition-loading', 'is-vector-frame-loading');
+    if (requestArtboard) requestArtboard.classList.remove('is-advancing');
+    setBuilding(false);
+    unlockSemanticQuestionUi();
+    if (typeof window.amuletClearBuildUi === 'function') {
+      window.amuletClearBuildUi();
+    }
+  }
+
+  function hideQuestionForAdvance() {
+    document.body.classList.add('is-question-transition-loading');
+    if (requestArtboard) requestArtboard.classList.add('is-advancing');
+    hideVectorTip();
+    hideAmuletStageCaption();
+  }
+
+  function waitForNextVectorReady(timeoutMs) {
+    const maxMs = typeof timeoutMs === 'number' ? timeoutMs : 5000;
+    return new Promise(function (resolve) {
+      let settled = false;
+      function finish() {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('questionnaire:vector-ready', onReady);
+        resolve();
+      }
+      const timer = window.setTimeout(finish, maxMs);
+      function onReady() {
+        window.clearTimeout(timer);
+        finish();
+      }
+      window.addEventListener('questionnaire:vector-ready', onReady);
+    });
+  }
+
+  function waitQuestionTransitionMin(startedAt) {
+    const elapsed = performance.now() - startedAt;
+    const remaining = REQUEST_TRANSITION_MS - elapsed;
+    if (remaining <= 0) return Promise.resolve();
+    return placeholderSleep(remaining);
+  }
+
+  function revealQuestionAfterAdvance(nextIndex) {
+    ensureQuestionInteractive();
+    if (nextIndex >= 3) {
+      document.body.classList.add('is-semantic-questions');
+    }
+    populateCreateQuestion(nextIndex);
+    ensureQuestionInteractive();
+    const question = questions[nextIndex];
+    if (!question || !fieldWrap) return;
+    if (question.type === 'choice') return;
+    requestAnimationFrame(function () {
+      const input = fieldWrap.querySelector('.intro__question-input');
+      if (input && typeof input.focus === 'function') {
+        input.focus({ preventScroll: true });
+      }
+    });
+  }
+
   function hideFinalBuildQuestionChrome() {
     if (!isCreateFlow()) return;
     const copy = document.getElementById('questionCopyFrame');
@@ -1228,6 +1247,7 @@
   function saveAnswer(index, value) {
     const question = questions[index];
     if (!question) return;
+    if (document.body.classList.contains('is-question-transition-loading')) return;
 
     keepIndexCreateOpen();
 
@@ -1259,8 +1279,6 @@
           return;
         }
         const nextIndex = nextUnansweredIndex(answers);
-        const isQuestionTransition =
-          isRequestFlowActive() && activeIndex !== null && activeIndex !== nextIndex;
 
         mountAmuletInCreateSlot();
 
@@ -1321,26 +1339,13 @@
           return Boolean(willShowNewLayer || needsCatchup);
         }
 
-        function beginVectorTransitionHide() {
-          document.body.classList.add('is-question-transition-loading');
-          if (requestArtboard) requestArtboard.classList.add('is-advancing');
-          hideVectorTip();
-          hideAmuletStageCaption();
-        }
-
-        function revealNextQuestion() {
-          document.body.classList.remove('is-question-transition-loading');
-          if (requestArtboard) requestArtboard.classList.remove('is-advancing');
-          populateCreateQuestion(nextIndex);
-        }
-
         async function prepareNextQuestionScreen(answeredIndex, data) {
           const needsVectorBuild = await transitionNeedsVectorBuild(data);
           if (needsVectorBuild) {
-            await buildVectorIfNeeded(true);
-            if (typeof window.amuletWaitFrameLoaderIdle === 'function') {
-              await window.amuletWaitFrameLoaderIdle();
-            }
+            if (isRequestFlowActive()) hideQuestionForAdvance();
+            const vectorDone = waitForNextVectorReady();
+            await buildVectorIfNeeded(false);
+            await vectorDone;
             await waitNextPaint();
           }
 
@@ -1349,18 +1354,12 @@
           }
         }
 
-        if (isQuestionTransition) {
-          beginVectorTransitionHide();
-          try {
-            await prepareNextQuestionScreen(index, answers);
-          } catch (err) {
-            console.error('[questionnaire] question transition prepare failed', err);
-          }
-          revealNextQuestion();
-        } else {
-          revealNextQuestion();
-          void prepareNextQuestionScreen(index, answers);
+        try {
+          await prepareNextQuestionScreen(index, answers);
+        } catch (err) {
+          console.error('[questionnaire] question transition prepare failed', err);
         }
+        revealQuestionAfterAdvance(nextIndex);
 
         if (index >= 3 && index <= 6) {
           schedulePostVectorPrecompose(answers, index);
@@ -1431,15 +1430,14 @@
     const value = answers[question.key] || '';
     const useDockChoiceGrid =
       question.type === 'choice' && isRequestFlowActive();
-    const useSaveForChoice = useDockChoiceGrid;
-    const hideChoiceSubmit = useDockChoiceGrid && !useSaveForChoice;
+    const hideChoiceSubmit = false;
 
     if (question.type === 'choice') {
       if (submitBtn) submitBtn.hidden = hideChoiceSubmit;
       if (saveWrap) saveWrap.hidden = hideChoiceSubmit;
 
       let selectedValue = value;
-      if (useSaveForChoice && selectedValue) {
+      if (useDockChoiceGrid && selectedValue) {
         fieldWrap.dataset.choiceValue = selectedValue;
       }
 
@@ -1458,15 +1456,7 @@
       function bindChoiceButton(btn, opt) {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
-          if (useSaveForChoice) {
-            selectedValue = opt.value;
-            fieldWrap.dataset.choiceValue = opt.value;
-            grid.querySelectorAll('.intro__choice-btn--figma').forEach(function (b) {
-              b.classList.toggle('is-selected', b === btn);
-            });
-              if (submitBtn) submitBtn.disabled = !validate(question, opt.value);
-              return;
-          }
+          if (document.body.classList.contains('is-question-transition-loading')) return;
           saveAnswer(index, opt.value);
         });
       }
@@ -1502,31 +1492,15 @@
     submitBtn.hidden = false;
     if (saveWrap) saveWrap.hidden = false;
 
-    const useTextareaField = usesDockTextareaField(question);
-
-    if (useTextareaField) {
-      const el = document.createElement('textarea');
-      el.className = 'intro__question-input';
-      el.rows = 1;
+    if (question.type === 'text' || question.type === 'textarea') {
+      const el = document.createElement('input');
+      el.type = 'text';
+      el.className = 'intro__question-input intro__question-input--single';
       el.placeholder = '';
       el.value = value;
-      if (question.type === 'text') {
-        el.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') e.preventDefault();
-        });
-      }
       fieldWrap.appendChild(el);
-      bindDockQuestionInputGrow(el);
       return el;
     }
-
-    const el = document.createElement('input');
-    el.type = 'text';
-    el.className = 'intro__question-input intro__question-input--single';
-    el.placeholder = '';
-    el.value = value;
-    fieldWrap.appendChild(el);
-    return el;
   }
 
   function applyRequestQuestionLayout(question) {
@@ -1679,14 +1653,16 @@
     const question = questions[index];
     if (!question || !frame) return;
 
+    ensureQuestionInteractive();
+    resetDockAmuletLift();
+
     if (index >= 3) {
       unlockSemanticQuestionUi();
     }
 
     const isDockChoiceQuestion =
       question.type === 'choice' && isRequestFlowActive();
-    const isChoiceSaveQuestion =
-      question.type === 'choice' && isRequestFlowActive();
+    const isChoiceSaveQuestion = isDockChoiceQuestion;
 
     ensureCreateSaveVisible(question, index);
 
@@ -1699,7 +1675,6 @@
     document.body.classList.toggle('is-choice-question', isDockChoiceQuestion);
     document.body.classList.toggle('is-choice-save', isChoiceSaveQuestion);
     document.body.classList.toggle('is-semantic-questions', index >= 3);
-    document.body.classList.toggle('is-dock-grow-down', index === 7);
     if (indexCreateWorkspace) {
       indexCreateWorkspace.classList.toggle('is-choice-question', isDockChoiceQuestion);
       indexCreateWorkspace.classList.toggle('is-choice-save', isChoiceSaveQuestion);
@@ -1722,11 +1697,8 @@
     if (fieldEl) {
       startPlaceholderCycle(fieldEl, question);
       submitBtn.disabled = !validate(question, fieldEl.value.trim());
-      resizeDockQuestionInput(fieldEl);
       fieldEl.addEventListener('input', function () {
-        if (document.body.classList.contains('is-building') && index < 3) return;
         submitBtn.disabled = !validate(question, fieldEl.value.trim());
-        resizeDockQuestionInput(fieldEl);
       });
     } else {
       stopPlaceholderCycle();
@@ -1747,16 +1719,21 @@
     requestAnimationFrame(function () {
       syncDockAmuletLift();
       syncRequestQuestionTextLayout();
+      ensureQuestionInteractive();
     });
 
     requestAnimationFrame(function () {
       if (!fieldEl) return;
+      if (isRequestFlowActive() && (question.type === 'text' || question.type === 'textarea')) {
+        fieldEl.focus({ preventScroll: true });
+        return;
+      }
       if (fieldEl.value.trim()) {
-        fieldEl.focus();
+        fieldEl.focus({ preventScroll: true });
         return;
       }
       if (!usesDockPlaceholderCycle(question)) {
-        fieldEl.focus();
+        fieldEl.focus({ preventScroll: true });
       }
     });
   }
@@ -2506,6 +2483,7 @@
   if (submitBtn) {
     submitBtn.addEventListener('click', function () {
       if (activeIndex === null || !frame) return;
+      if (document.body.classList.contains('is-question-transition-loading')) return;
       if (document.body.classList.contains('is-building')) {
         if (typeof window.amuletBuildCancel === 'function') {
           window.amuletBuildCancel();
@@ -2540,9 +2518,7 @@
     }
     if (activeIndex !== null && isRequestFlowActive()) {
       updateRequestStepRail(activeIndex);
-      const dockInput = fieldWrap && fieldWrap.querySelector('.intro__question-input');
-      if (dockInput) resizeDockQuestionInput(dockInput);
-      else syncDockAmuletLift();
+      syncDockAmuletLift();
       syncRequestQuestionTextLayout();
       syncAmuletStageCaptionPosition();
     }
@@ -2611,7 +2587,7 @@
     let resolvedAnswers = answers;
     if (forcePreview && !allAnswered(resolvedAnswers)) {
       try {
-        const mod = await import('./amulet-show.js?v=20250709-full-site');
+        const mod = await import('./amulet-show.js?v=20250711-result-amulet-scale');
         resolvedAnswers = mod.DEMO_RESULT_ANSWERS;
         saveAnswers(resolvedAnswers);
       } catch (err) {
@@ -2814,8 +2790,19 @@
   bindFigmaSubmitButtonHover();
 
   if (isIndexPage || isCreatePage) {
-    window.setTimeout(function () {
-      void restoreResultViewIfNeeded();
+    window.setTimeout(async function () {
+      let savedFromExport = false;
+      try {
+        const mod = await import('./amulet-show.js?v=20250711-result-amulet-scale');
+        if (typeof mod.finishPendingSaveOnIndex === 'function') {
+          savedFromExport = await mod.finishPendingSaveOnIndex();
+        }
+      } catch (err) {
+        console.warn('[questionnaire] export save hook failed', err);
+      }
+      if (!savedFromExport) {
+        void restoreResultViewIfNeeded();
+      }
     }, 320);
   }
 
@@ -2850,6 +2837,15 @@
         window.setTimeout(function () {
           startIndexCreateFlow();
         }, 0);
+      } else if (sessionStorage.getItem('pagmarRestartQuestionnaireOnLoad') === '1') {
+        sessionStorage.removeItem('pagmarRestartQuestionnaireOnLoad');
+        window.setTimeout(function () {
+          if (typeof window.pagmarRestartQuestionnaire === 'function') {
+            window.pagmarRestartQuestionnaire();
+          } else {
+            startIndexCreateFlow();
+          }
+        }, 0);
       } else if (sessionStorage.getItem('pagmarOpenCreateOnLoad') === '1') {
         sessionStorage.removeItem('pagmarOpenCreateOnLoad');
         window.setTimeout(function () {
@@ -2861,5 +2857,6 @@
 
   window.pagmarPushResultHistory = pushResultHistory;
   window.pagmarResetCreateHistoryAfterSave = resetCreateHistoryAfterSave;
+  window.pagmarStopCreateFlowEffects = stopCreateFlowEffects;
   window.pagmarRestartQuestionnaire = restartQuestionnaireFromResult;
 })();

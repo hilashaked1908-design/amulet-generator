@@ -121,16 +121,48 @@ export async function saveGlb(amuletId, sceneOrObject, opts = {}) {
 }
 
 /**
- * Load a GLB + lighting from IndexedDB.
- * @returns {Promise<{ scene: THREE.Group, lighting: Array, rendererSettings: Object } | null>}
+ * Load a GLB + lighting.
+ * User amulets: IndexedDB first (archived GLB is authoritative).
+ * Bundled seeds (preferBundledSeed / glbUrl): bundled file only — never stale IDB.
  */
-export async function loadGlb(amuletId) {
+export async function loadGlb(amuletId, opts) {
+  opts = opts || {};
+  const preferBundledSeed = Boolean(opts.preferBundledSeed || opts.glbUrl);
+
+  async function fromBundled() {
+    if (opts.glbUrl) return loadGlbFromUrl(opts.glbUrl);
+    return loadGlbFromSeed(amuletId);
+  }
+
+  if (preferBundledSeed) {
+    return fromBundled();
+  }
+
   const fromIdb = await loadGlbFromIdb(amuletId);
   if (fromIdb) return fromIdb;
-  return loadGlbFromSeed(amuletId);
+  return null;
 }
 
-async function loadGlbFromIdb(amuletId) {
+/** Load the archived GLB for a user collection entry (IndexedDB only). */
+export async function loadUserEntryGlb(entryId) {
+  if (entryId == null) return null;
+  return loadGlbFromIdb('collection-' + entryId);
+}
+
+/** Load a bundled seed GLB from its canonical URL (never IndexedDB). */
+export async function loadBundledSeedGlb(glbUrl, entryId) {
+  if (!glbUrl) return null;
+  if (entryId != null && !String(glbUrl).includes('/' + entryId + '.glb')) {
+    console.error('[glb-store] refusing GLB — URL does not match entryId', {
+      entryId: entryId,
+      glbUrl: glbUrl,
+    });
+    return null;
+  }
+  return loadGlbFromUrl(glbUrl);
+}
+
+export async function loadGlbFromIdb(amuletId) {
   const db = await openDB();
   const raw = await idbGet(db, amuletId);
   db.close();
@@ -138,6 +170,9 @@ async function loadGlbFromIdb(amuletId) {
 
   const buffer = raw instanceof ArrayBuffer ? raw : raw.glb;
   if (!buffer) return null;
+
+  const bufferHash = await hashArrayBuffer(buffer);
+  const byteLength = buffer.byteLength;
 
   const loader = new GLTFLoader();
   const scene = await new Promise((resolve, reject) => {
@@ -153,6 +188,8 @@ async function loadGlbFromIdb(amuletId) {
     lighting: raw.lighting || [],
     rendererSettings: raw.rendererSettings || {},
     materialOverrides: raw.materialOverrides || [],
+    bufferHash: bufferHash,
+    byteLength: byteLength,
   };
 }
 
@@ -162,12 +199,10 @@ function seedIdFromAmuletId(amuletId) {
   return m ? m[1] : null;
 }
 
-async function loadGlbFromSeed(amuletId) {
-  const seedId = seedIdFromAmuletId(amuletId);
-  if (!seedId) return null;
+export async function loadGlbFromUrl(glbUrl) {
+  if (!glbUrl || typeof glbUrl !== 'string') return null;
 
-  const glbUrl = '/questionnaire/seed/glbs/' + seedId + '.glb';
-  const metaUrl = '/questionnaire/seed/glbs/' + seedId + '.json';
+  const metaUrl = glbUrl.replace(/\.glb(\?.*)?$/i, '.json');
 
   let glbRes;
   try {
@@ -178,6 +213,8 @@ async function loadGlbFromSeed(amuletId) {
   if (!glbRes.ok) return null;
 
   const buffer = await glbRes.arrayBuffer();
+  const bufferHash = await hashArrayBuffer(buffer);
+  const byteLength = buffer.byteLength;
   let meta = {};
   try {
     const metaRes = await fetch(metaUrl, { cache: 'force-cache' });
@@ -193,13 +230,24 @@ async function loadGlbFromSeed(amuletId) {
     );
   });
 
-  console.log('[glb-store] loaded seed GLB', glbUrl);
+  console.log('[glb-store] loaded GLB from URL', glbUrl, {
+    sha256: bufferHash,
+    bytes: byteLength,
+  });
   return {
     scene: scene,
     lighting: meta.lighting || [],
     rendererSettings: meta.rendererSettings || {},
     materialOverrides: meta.materialOverrides || [],
+    bufferHash: bufferHash,
+    byteLength: byteLength,
   };
+}
+
+async function loadGlbFromSeed(amuletId) {
+  const seedId = seedIdFromAmuletId(amuletId);
+  if (!seedId) return null;
+  return loadGlbFromUrl('/questionnaire/seed/glbs/' + seedId + '.glb');
 }
 
 /**
@@ -219,6 +267,86 @@ export async function listGlbKeys() {
   const keys = await idbAllKeys(db);
   db.close();
   return keys;
+}
+
+/** SHA-256 hex digest (FNV-1a fallback when subtle crypto unavailable). */
+export async function hashArrayBuffer(buffer) {
+  if (!buffer) return null;
+  if (globalThis.crypto && globalThis.crypto.subtle) {
+    try {
+      const hash = await crypto.subtle.digest('SHA-256', buffer);
+      return Array.from(new Uint8Array(hash))
+        .map(function (b) {
+          return b.toString(16).padStart(2, '0');
+        })
+        .join('');
+    } catch (_) {}
+  }
+  const view = new Uint8Array(buffer);
+  let h = 2166136261;
+  for (let i = 0; i < view.length; i += 1) {
+    h ^= view[i];
+    h = Math.imul(h, 16777619);
+  }
+  return 'fnv1a-' + (h >>> 0).toString(16);
+}
+
+/** Entry ids already used in local collection and IndexedDB `collection-*` keys. */
+export async function collectUsedEntryIds() {
+  const ids = new Set();
+  try {
+    if (typeof window.gardenLoadCollection === 'function') {
+      window.gardenLoadCollection().forEach(function (entry) {
+        if (entry && entry.id != null) ids.add(Number(entry.id));
+      });
+    }
+  } catch (_) {}
+  try {
+    const raw =
+      localStorage.getItem('amuletCollection') || sessionStorage.getItem('amuletCollection');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        arr.forEach(function (entry) {
+          if (entry && entry.id != null) ids.add(Number(entry.id));
+        });
+      }
+    }
+  } catch (_) {}
+  try {
+    const keys = await listGlbKeys();
+    keys.forEach(function (key) {
+      if (typeof key !== 'string' || !key.startsWith('collection-')) return;
+      const n = parseInt(key.slice('collection-'.length), 10);
+      if (Number.isFinite(n)) ids.add(n);
+    });
+  } catch (_) {}
+  return ids;
+}
+
+/** Allocate an entry id that is not already in collection or IndexedDB. */
+export async function allocateUniqueEntryId() {
+  const used = await collectUsedEntryIds();
+  let id = Date.now();
+  let bump = 0;
+  while (used.has(id) && bump < 10000) {
+    bump += 1;
+    id = Date.now() + bump;
+  }
+  if (used.has(id)) {
+    id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    while (used.has(id)) id += 1;
+  }
+  if (bump > 0) {
+    console.warn('[glb-store] entryId collision avoided — bumped to', id, '(attempts:', bump + ')');
+  }
+  return id;
+}
+
+export async function entryStoreKeyExists(entryId) {
+  if (entryId == null) return false;
+  const raw = await loadGlbRaw('collection-' + entryId);
+  return Boolean(raw && raw.glb);
 }
 
 /**

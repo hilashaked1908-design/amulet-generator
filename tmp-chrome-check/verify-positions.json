@@ -1,0 +1,38 @@
+{
+  "index": {
+    "title": "\u05e7\u05de\u05e2 \u2014 \u05d0\u05d9\u05e0\u05d3\u05e7\u05e1",
+    "bodyClass": "pagmar-index",
+    "about": {
+      "id": "indexAboutBtn",
+      "left": 50,
+      "top": 50,
+      "right": 110,
+      "bottom": 110,
+      "width": 60,
+      "height": 60
+    },
+    "close": null
+  },
+  "create": {
+    "title": "\u05e7\u05de\u05e2 \u2014 \u05d9\u05e6\u05d9\u05e8\u05d4",
+    "bodyClass": "pagmar-create has-user-amulet is-panel-open",
+    "about": {
+      "id": "requestAboutBtn",
+      "left": 50,
+      "top": 50,
+      "right": 110,
+      "bottom": 110,
+      "width": 60,
+      "height": 60
+    },
+    "close": {
+      "id": "requestCloseBtn",
+      "left": 1820,
+      "top": 50,
+      "right": 1870,
+      "bottom": 100,
+      "width": 50,
+      "height": 50
+    }
+  }
+}

@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-export-view">
   <link rel="stylesheet" href="../css/buttons.css?v=20250710-export-view">
   <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250710-export-view">
-  <link rel="stylesheet" href="../css/export-view.css?v=20250710-export-view">
+  <link rel="stylesheet" href="../css/export-view.css?v=20250711-export-amulet-scale">
 </head>
 <body class="pagmar-export-view">
 
@@ -52,13 +52,15 @@
     </header>
 
     <main class="pagmar__export-main" aria-label="ייצוא קמע">
-      <div class="pagmar__export-card" id="exportCard">
+      <div class="pagmar__export-stage">
+        <div class="pagmar__export-card" id="exportCard">
         <div class="pagmar__export-vectors" aria-hidden="true">
           <div class="pagmar__export-vector" id="exportVectorQ1"></div>
           <div class="pagmar__export-vector" id="exportVectorQ2"></div>
           <div class="pagmar__export-vector" id="exportVectorQ3"></div>
         </div>
 
+        <div class="pagmar__export-name-bg" aria-hidden="true"></div>
         <p class="pagmar__export-name" id="exportName"></p>
 
         <div class="pagmar__export-timing-block">
@@ -73,16 +75,21 @@
         <div class="pagmar__export-amulet-frame" aria-label="קמע מסתובב">
           <div class="pagmar__export-amulet-slot" id="exportAmulet3D"></div>
         </div>
+        </div>
       </div>
 
-      <button type="button" class="pagmar__export-image-btn" id="exportImageBtn">
-        <span class="pagmar__export-image-btn__label">יצא תמונה</span>
-      </button>
+      <div class="pagmar__export-actions">
+        <button type="button" class="pagmar__export-action-btn" id="exportImageBtn">
+          <span class="pagmar__export-image-btn__label">ייצא קמע</span>
+        </button>
+        <button type="button" class="pagmar__export-action-btn" id="exportSaveBtn">שמור קמע</button>
+        <button type="button" class="pagmar__export-action-btn pagmar__export-action-btn--filled" id="exportCreateAnotherBtn">צור קמע נוסף</button>
+      </div>
     </main>
   </div>
 
   <script src="glass-lens.js?v=20250710-export-view"></script>
   <script src="questions.js?v=20250710-export-view"></script>
-  <script type="module" src="export-view.js?v=20250710-export-view"></script>
+  <script type="module" src="export-view.js?v=20250711-export-figma3"></script>
 </body>
 </html>

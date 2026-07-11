@@ -2,14 +2,89 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=index.html">
-  <title>קמע - מעבר…</title>
-  <script src="pagmar-boot.js?v=20250709-full-site"></script>
-  <script>
-    location.replace('index.html' + (location.search || '') + (location.hash || ''));
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>קמע - פתיחה</title>
+  <link rel="preload" as="image" href="seed/snapshots/1783268062084.png">
+  <script src="pagmar-boot.js?v=20250711-open-perf"></script>
+  <link rel="stylesheet" href="../css/fonts.css?v=20250711-open-restore">
+  <link rel="stylesheet" href="../css/glass-lens.css?v=20250711-open-restore">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250711-open-restore">
+  <link rel="stylesheet" href="../css/site-open.css?v=20250711-open-glass-fix">
 </head>
-<body>
-  <p><a href="index.html">לכניסה לקמע</a></p>
+<body class="pagmar-open">
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter
+        id="glass-distortion"
+        x="-20%"
+        y="-20%"
+        width="140%"
+        height="140%"
+        color-interpolation-filters="sRGB"
+      >
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.008 0.008"
+          numOctaves="2"
+          seed="5"
+          result="noise"
+        />
+        <feGaussianBlur in="noise" stdDeviation="2" result="blurredNoise" />
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="blurredNoise"
+          scale="55"
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="pagmar-open__viewport">
+    <main class="pagmar-open__stage" aria-label="פתיחה">
+      <header class="pagmar-open__hero" aria-label="אות אמת">
+        <p class="pagmar-open__hero-word pagmar-open__hero-word--left" dir="rtl">אמת</p>
+        <span class="pagmar-open__hero-spacer" aria-hidden="true"></span>
+        <p class="pagmar-open__hero-word pagmar-open__hero-word--right" dir="rtl">אות</p>
+      </header>
+
+      <div class="pagmar-open__amulet" aria-hidden="true">
+        <div class="pagmar-open__amulet-3d" id="openAmulet3D">
+          <img
+            class="pagmar-open__amulet-placeholder"
+            src="seed/snapshots/1783268062084.png"
+            alt=""
+            width="1349"
+            height="1349"
+            decoding="async"
+            draggable="false"
+          >
+        </div>
+      </div>
+
+      <p class="pagmar-open__enter-hint" dir="rtl">לחץ לכניסה לאתר</p>
+    </main>
+  </div>
+
+  <script src="glass-lens.js?v=20250711-open-glass-fix"></script>
+  <script src="open-glass-capture.js?v=20250711-open-glass-fix"></script>
+  <script src="open-cursor-hint.js?v=20250711-open-glass-fix"></script>
+  <script src="open-page.js?v=20250711-open-restore"></script>
+  <script type="module">
+    function bootOpenAmulet3D() {
+      import('./open-amulet-3d.js?v=20250711-open-perf').catch(function (err) {
+        console.error('[open-amulet-3d] failed to load', err);
+      });
+    }
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(bootOpenAmulet3D, { timeout: 3000 });
+    } else {
+      window.setTimeout(bootOpenAmulet3D, 800);
+    }
+  </script>
 </body>
 </html>

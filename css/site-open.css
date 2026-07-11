@@ -1,0 +1,334 @@
+/* Site opening - Figma 2739:46677 (אודות splash) @ 1920×1080 */
+
+html:has(body.pagmar-open) {
+  background: #000000;
+}
+
+body.pagmar-open {
+  margin: 0;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #000000;
+  color: var(--pagmar-yellow-white);
+  cursor: pointer;
+  --open-w: 1920;
+  --open-h: 1080;
+  --open-u: var(--pagmar-viewport-u);
+  --open-ink: var(--pagmar-yellow-white);
+  --open-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --open-tag-size: 20;
+  --open-tag-line-height: 0.9;
+  --open-tag-tracking: 0.6;
+  --open-body-size: 18;
+  --open-glass-radius: 40;
+  --open-glass-pad-y: 14;
+  --open-glass-pad-x: 24;
+}
+
+.pagmar-open__viewport {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: max(16px, calc(20 * var(--open-u))) 0;
+}
+
+.pagmar-open__stage {
+  position: relative;
+  width: calc(var(--open-w) * var(--open-u));
+  min-height: calc(var(--open-h) * var(--open-u));
+  flex: 0 0 auto;
+  direction: ltr;
+}
+
+/* ── Hero: אמת + emblem + אות ── */
+.pagmar-open__hero {
+  position: absolute;
+  left: 50%;
+  top: calc(298.15 * var(--open-u));
+  width: calc(1683.11 * var(--open-u));
+  height: calc(449.64 * var(--open-u));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(20 * var(--open-u));
+  pointer-events: none;
+}
+
+.pagmar-open__hero-word {
+  position: relative;
+  z-index: 4;
+  margin: 0;
+  font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
+  font-weight: 100;
+  font-size: calc(375 * var(--open-u));
+  line-height: 0.7;
+  letter-spacing: calc(-15 * var(--open-u));
+  color: var(--open-ink);
+  text-align: right;
+  white-space: nowrap;
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.pagmar-open__hero-word--left {
+  flex: 0 0 calc(642.6 * var(--open-u));
+  width: calc(642.6 * var(--open-u));
+}
+
+.pagmar-open__hero-word--right {
+  flex: 0 0 calc(520.87 * var(--open-u));
+  width: calc(520.87 * var(--open-u));
+}
+
+.pagmar-open__hero-spacer {
+  flex: 0 0 calc(449.64 * var(--open-u));
+  width: calc(449.64 * var(--open-u));
+  height: 1px;
+  pointer-events: none;
+}
+
+/* ── 3D amulet [021] — Figma slot, words above on sides ── */
+.pagmar-open__amulet {
+  position: absolute;
+  left: 50%;
+  top: calc(66.88 * var(--open-u));
+  width: calc(912.186 * var(--open-u));
+  height: calc(912.186 * var(--open-u));
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pagmar-open__amulet-3d {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 1px;
+  min-height: 1px;
+  background: transparent;
+}
+
+.pagmar-open__amulet-placeholder {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pagmar-open__amulet-3d.is-3d-ready .pagmar-open__amulet-placeholder {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s ease;
+}
+
+.pagmar-open__amulet-3d canvas {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  pointer-events: none;
+}
+
+/* ── Bottom enter hint ── */
+.pagmar-open__enter-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(988.02 * var(--open-u));
+  width: calc(362.535 * var(--open-u));
+  margin: 0;
+  transform: translateX(-50%);
+  font-family: var(--open-tag-font);
+  font-size: calc(var(--open-tag-size) * var(--open-u));
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  line-height: var(--open-tag-line-height);
+  letter-spacing: calc(var(--open-tag-tracking) * var(--open-u));
+  text-align: center;
+  color: var(--open-ink);
+  direction: rtl;
+  unicode-bidi: isolate;
+  pointer-events: none;
+  z-index: 4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Hidden capture layer for liquid glass ── */
+.pagmar-open__glass-capture {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+
+/* ── Cursor-following liquid glass (garden hover stack) ── */
+body.pagmar-open .pagmar-open__cursor-hint.pagmar__garden-amulet-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
+}
+
+body.pagmar-open .pagmar__garden-amulet-hover__surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  width: auto;
+  max-width: none;
+  height: fit-content;
+  min-width: 0;
+  overflow: visible;
+  opacity: 1;
+  isolation: isolate;
+}
+
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip {
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: calc(362.535 * var(--open-u)) !important;
+  width: auto !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  vertical-align: top;
+  padding:
+    calc(var(--open-glass-pad-y) * var(--open-u))
+    calc(var(--open-glass-pad-x) * var(--open-u)) !important;
+  border-radius: calc(var(--open-glass-radius) * var(--open-u)) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: var(--pagmar-line-weight) solid transparent !important;
+  background-clip: padding-box !important;
+  position: relative !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  pointer-events: none;
+  gap: 0;
+}
+
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__backdrop,
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-clone,
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-chrome,
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__tint {
+  border-radius: calc(var(--open-glass-radius) * var(--open-u));
+}
+
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-lens__backdrop,
+body.pagmar-open .pagmar__garden-amulet-hover__surface.glass-tooltip .glass-chrome {
+  border-radius: calc(var(--open-glass-radius) * var(--open-u));
+}
+
+body.pagmar-open .pagmar-open__cursor-hint__copy,
+body.pagmar-open .pagmar__garden-amulet-hover__request {
+  position: relative;
+  z-index: 3;
+  display: block;
+  margin: 0;
+  font-family: "TheBasics", sans-serif;
+  font-weight: 400;
+  font-size: calc(var(--open-body-size) * var(--open-u));
+  line-height: normal;
+  letter-spacing: 0;
+  text-align: right;
+  color: var(--open-ink);
+  direction: rtl;
+  unicode-bidi: isolate;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal !important;
+  width: auto !important;
+  max-width: 100% !important;
+}
+
+body.pagmar-open .pagmar-open__cursor-hint__copy p {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .pagmar-open__hero {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: min(100%, calc(1683.11 * var(--open-u)));
+    height: auto;
+    margin: 0 auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: calc(24 * var(--open-u));
+  }
+
+  .pagmar-open__hero-word--left,
+  .pagmar-open__hero-word--right {
+    flex: 0 1 auto;
+    width: auto;
+    font-size: calc(180 * var(--open-u));
+  }
+
+  .pagmar-open__hero-spacer {
+    flex-basis: calc(280 * var(--open-u));
+    width: calc(280 * var(--open-u));
+  }
+
+  .pagmar-open__amulet {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: min(92vw, calc(520 * var(--open-u)));
+    height: min(92vw, calc(520 * var(--open-u)));
+    margin: calc(24 * var(--open-u)) auto 0;
+  }
+
+  .pagmar-open__enter-hint {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: min(92vw, calc(362.535 * var(--open-u)));
+    margin: calc(48 * var(--open-u)) auto calc(32 * var(--open-u));
+  }
+
+  .pagmar-open__stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: auto;
+    width: 100%;
+    padding: 0 calc(20 * var(--open-u));
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pagmar-open {
+    transition: none;
+  }
+}

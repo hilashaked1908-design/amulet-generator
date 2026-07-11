@@ -41,6 +41,9 @@ body.pagmar-export-view {
   --pagmar-h: 1080;
   --export-fg: #f4f4e8;
   --export-tag-font: "Narkiss Yair Variable", "Narkiss Yair", "TheBasics Mono", monospace;
+  --export-tag-size: 20;
+  --export-tag-line-height: 0.9;
+  --export-tag-tracking: 0.6;
   --export-body-font: "TheBasics", "TheBasics Mono", monospace;
   --export-wish-font: "Lava Pro HL", "TheBasics Display Thin", serif;
 }
@@ -49,16 +52,18 @@ body.pagmar-export-view {
   position: relative;
   width: 100%;
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   container-type: size;
-  --u: min(calc(100cqw / var(--pagmar-w)), calc(100cqh / var(--pagmar-h)));
-  padding:
-    calc(50 * var(--u))
-    calc(50 * var(--u))
-    calc(80 * var(--u));
+  --vu: min(calc(100cqw / var(--pagmar-w)), calc(100cqh / var(--pagmar-h)));
+}
+
+.pagmar__export-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pagmar__export-stage .pagmar__export-card {
+  pointer-events: auto;
 }
 
 .pagmar__export-chrome {
@@ -73,24 +78,26 @@ body.pagmar-export-view {
   pointer-events: auto;
 }
 
-/* ── 800×800 card - Figma 2604:42787 ── */
+/* ── 800×800 card - Figma ייצא קמע- תמונה ── */
 .pagmar__export-card {
-  position: relative;
+  position: absolute;
+  --u: var(--vu);
+  left: calc(50% - 400 * var(--u));
+  top: calc(50% - 400 * var(--u) - 23.33 * var(--u));
   width: calc(800 * var(--u));
   height: calc(800 * var(--u));
-  flex: 0 0 auto;
   border: calc(1 * var(--u)) solid var(--export-fg);
   overflow: hidden;
-  background: transparent;
+  background: #000000;
   direction: rtl;
 }
 
-/* Vectors - top left, aligned to frame inset */
+/* Vectors - top left */
 .pagmar__export-vectors {
   position: absolute;
   z-index: 4;
-  top: calc(29 * var(--u));
-  left: calc(29 * var(--u));
+  top: calc(30 * var(--u));
+  left: calc(30 * var(--u));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -122,108 +129,75 @@ body.pagmar-export-view {
   vector-effect: non-scaling-stroke;
 }
 
-/* Name - top right, Figma 2604:42791 */
+/* Name background strip - Rectangle 2017 */
+.pagmar__export-name-bg {
+  position: absolute;
+  z-index: 3;
+  left: calc(583.05 * var(--u));
+  top: 0;
+  width: calc(102.77 * var(--u));
+  height: calc(40.52 * var(--u));
+  background: #060607;
+  pointer-events: none;
+}
+
+/* Name - top right */
 .pagmar__export-name {
   position: absolute;
   z-index: 4;
-  top: calc(38 * var(--u));
-  right: calc(29 * var(--u));
+  top: calc(27 * var(--u));
+  right: calc(30 * var(--u));
   margin: 0;
   max-width: calc(173 * var(--u));
   color: var(--export-fg);
   font-family: var(--export-tag-font);
   font-size: calc(18 * var(--u));
   font-weight: 700;
-  line-height: 1.1;
+  line-height: calc(24 / 18);
   text-align: right;
   pointer-events: none;
 }
 
-/* Timing - bottom left, Figma 2604:42790 */
-.pagmar__export-timing-block {
-  position: absolute;
-  z-index: 4;
-  left: calc(29 * var(--u));
-  bottom: calc(168 * var(--u));
-  width: calc(233 * var(--u));
-  pointer-events: none;
-}
-
-.pagmar__export-tag {
-  display: block;
-  margin: 0 0 calc(8 * var(--u));
-  color: var(--export-fg);
-  font-family: var(--export-tag-font);
-  font-size: calc(18 * var(--u));
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: calc(0.5 * var(--u));
-  text-align: right;
-}
-
-.pagmar__export-timing {
-  margin: 0;
-  color: var(--export-fg);
-  font-family: var(--export-body-font);
-  font-size: calc(27 * var(--u));
-  font-weight: 400;
-  line-height: 1.1;
-  text-align: right;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Outcome - bottom left lower, Figma 2604:42792 */
+.pagmar__export-timing-block,
 .pagmar__export-outcome {
-  position: absolute;
-  z-index: 4;
-  left: calc(29 * var(--u));
-  bottom: calc(56 * var(--u));
-  width: calc(233 * var(--u));
-  margin: 0;
-  color: var(--export-fg);
-  font-family: var(--export-body-font);
-  font-size: calc(27 * var(--u));
-  font-weight: 400;
-  line-height: 1.1;
-  text-align: right;
-  white-space: pre-wrap;
-  word-break: break-word;
-  pointer-events: none;
+  display: none;
 }
 
-/* Wish - bottom right, Figma 2604:42789 */
+/* Wish - Figma: 739×70 @ top 700.33 */
 .pagmar__export-wish {
   position: absolute;
   z-index: 4;
-  right: calc(29 * var(--u));
-  bottom: calc(56 * var(--u));
-  width: calc(360 * var(--u));
-  max-height: calc(280 * var(--u));
+  left: calc(30 * var(--u));
+  top: calc(700.33 * var(--u));
+  width: calc(739 * var(--u));
+  height: calc(70 * var(--u));
   margin: 0;
-  color: var(--export-fg);
+  color: #ffffff;
   font-family: var(--export-wish-font);
   font-size: calc(90 * var(--u));
   font-weight: 100;
   font-style: normal;
-  line-height: 1;
-  letter-spacing: calc(-1.8 * var(--u));
+  line-height: calc(70 / 90);
+  letter-spacing: -0.02em;
   text-align: right;
   direction: rtl;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   pointer-events: none;
 }
 
-/* Amulet - מיקום קמע 536×536, Figma 2704:46454 */
+/* Amulet - 700×695 @ top 82 */
 .pagmar__export-amulet-frame {
   position: absolute;
   z-index: 2;
   left: 50%;
-  top: calc(70.33 * var(--u));
-  width: calc(536 * var(--u));
-  height: calc(536 * var(--u));
+  top: calc(82 * var(--u));
+  width: calc(700 * var(--u));
+  height: calc(695 * var(--u));
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -260,8 +234,8 @@ body.pagmar-export-view {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: calc(11 * var(--u, 1px)) calc(18 * var(--u, 1px)) calc(10 * var(--u, 1px)) calc(16 * var(--u, 1px));
-  border-radius: calc(40 * var(--u, 1px));
+  padding: calc(11 * var(--vu, 1px)) calc(18 * var(--vu, 1px)) calc(10 * var(--vu, 1px)) calc(16 * var(--vu, 1px));
+  border-radius: calc(40 * var(--vu, 1px));
   overflow: hidden;
   background: transparent !important;
   backdrop-filter: none !important;
@@ -274,57 +248,82 @@ body.pagmar-export-view {
 .pagmar__export-amulet-hover__surface .glass-clone,
 .pagmar__export-amulet-hover__surface .glass-chrome,
 .pagmar__export-amulet-hover__surface .glass-lens__tint {
-  border-radius: calc(40 * var(--u, 1px));
+  border-radius: calc(40 * var(--vu, 1px));
 }
 
 .pagmar__export-amulet-hover .pagmar__glass-pill__text {
   position: relative;
   z-index: 3;
   font-family: var(--export-tag-font);
-  font-size: calc(16 * var(--u, 1px));
+  font-size: calc(var(--export-tag-size) * var(--vu, 1px));
   font-weight: 400;
+  font-style: normal;
   font-synthesis: none;
-  letter-spacing: 0.02em;
+  line-height: var(--export-tag-line-height);
+  letter-spacing: calc(var(--export-tag-tracking) * var(--vu, 1px));
   color: var(--export-fg);
   -webkit-font-smoothing: antialiased;
 }
 
-.pagmar__export-amulet-hover .pagmar__glass-pill__deg {
-  font-size: 0.72em;
-  vertical-align: super;
+/* Frame 404 - buttons @ top 976, width 546, gap 30 */
+.pagmar__export-actions {
+  position: absolute;
+  z-index: 5;
+  left: calc(50% - 273 * var(--vu));
+  top: calc(976 * var(--vu));
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(30 * var(--vu));
+  width: calc(546 * var(--vu));
+  max-width: calc(100% - 32px);
+  min-height: calc(54 * var(--vu));
+  direction: ltr;
 }
 
-/* Export button - Figma 2702:46435 */
-.pagmar__export-image-btn {
-  position: relative;
-  z-index: 5;
-  margin-top: calc(50 * var(--u));
-  padding: calc(14 * var(--u)) calc(30 * var(--u)) calc(15 * var(--u));
-  border: none;
-  border-radius: calc(70 * var(--u));
-  background: #f4f4e8;
-  color: #1e1e1e;
+.pagmar__export-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(54 * var(--vu));
+  padding: calc(14 * var(--vu)) calc(30 * var(--vu)) calc(15 * var(--vu));
+  border-radius: calc(70 * var(--vu));
+  border: calc(1 * var(--vu)) solid var(--export-fg);
+  background: transparent;
+  color: var(--export-fg);
   font-family: var(--export-body-font);
-  font-size: calc(24 * var(--u));
+  font-size: calc(24 * var(--vu));
   font-weight: 400;
-  letter-spacing: calc(-0.24 * var(--u));
-  line-height: 1;
+  letter-spacing: -0.01em;
+  line-height: calc(25 / 24);
   cursor: pointer;
+  white-space: nowrap;
   -webkit-appearance: none;
   appearance: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.pagmar__export-image-btn:hover {
+.pagmar__export-action-btn:hover:not(:disabled) {
   opacity: 0.88;
 }
 
-.pagmar__export-image-btn:focus-visible {
-  outline: calc(2 * var(--u)) solid rgba(244, 244, 232, 0.45);
-  outline-offset: calc(3 * var(--u));
+.pagmar__export-action-btn--filled {
+  background: #f4f4e8;
+  color: #1e1e1e;
+  border-color: #f4f4e8;
 }
 
-.pagmar__export-image-btn:disabled {
+.pagmar__export-action-btn--filled:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.pagmar__export-action-btn:focus-visible {
+  outline: calc(2 * var(--vu)) solid rgba(244, 244, 232, 0.45);
+  outline-offset: calc(3 * var(--vu));
+}
+
+.pagmar__export-action-btn:disabled {
   opacity: 0.45;
   cursor: wait;
 }
@@ -334,15 +333,17 @@ body.pagmar-export-view {
 }
 
 @media (max-width: 720px) {
-  .pagmar__export-main {
-    padding:
-      calc(72 * var(--u))
-      calc(16 * var(--u))
-      calc(40 * var(--u));
-  }
-
   .pagmar__export-card {
+    left: calc(50% - min(400 * var(--u), calc((100vw - 32px) / 2)));
     width: min(calc(800 * var(--u)), calc(100vw - 32px));
     height: min(calc(800 * var(--u)), calc(100vw - 32px));
+  }
+
+  .pagmar__export-actions {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(calc(546 * var(--vu)), calc(100% - 32px));
+    flex-wrap: wrap;
+    gap: calc(12 * var(--vu));
   }
 }

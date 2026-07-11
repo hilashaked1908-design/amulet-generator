@@ -8,7 +8,7 @@ import {
   setAmuletLoaderProgress,
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
-import { captureLiveAmuletSnapshot } from '../three-pbr-amulet.js';
+import { captureLiveAmuletSnapshot, zoomActivePbrPresentation } from '../three-pbr-amulet.js';
 import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-vector-raster-fix';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
@@ -320,7 +320,7 @@ function fitResultStoryTypography() {
   const u = getResultUnitPx();
   const tagEl = requestEl.querySelector('.pagmar__result-tag');
   const tagH = tagEl ? tagEl.offsetHeight : 0;
-  const gap = 16 * u;
+  const gap = 32 * u;
   const blockH = requestBlock ? requestBlock.clientHeight : 0;
   const vectorH = vectorEl ? vectorEl.offsetHeight : 132.379 * u;
   const vectorGap = 32 * u;
@@ -384,6 +384,61 @@ function readComposed3DForSave() {
   }
 }
 
+async function allocateSaveEntryId() {
+  const store = await import('./amulet-glb-store.js');
+  const id = await store.allocateUniqueEntryId();
+  try {
+    sessionStorage.setItem('pagmarPendingEntryId', String(id));
+  } catch (_) {}
+  console.log('[amulet-show] allocated save entryId', id);
+  return id;
+}
+
+async function consumePendingEntryId() {
+  const peeked = peekPendingEntryId();
+  if (peeked != null) {
+    try {
+      sessionStorage.removeItem('pagmarPendingEntryId');
+    } catch (_) {}
+    return peeked;
+  }
+  const store = await import('./amulet-glb-store.js');
+  const id = await store.allocateUniqueEntryId();
+  console.warn('[amulet-show] consumePendingEntryId had no pending id — allocated', id);
+  return id;
+}
+
+function peekPendingEntryId() {
+  try {
+    const raw = sessionStorage.getItem('pagmarPendingEntryId');
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n)) return n;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function gardenSaveOptions(answers, entryIdOverride) {
+  let entryId = entryIdOverride;
+  if (entryId == null) {
+    const peeked = peekPendingEntryId();
+    if (peeked != null) {
+      entryId = peeked;
+      try {
+        sessionStorage.removeItem('pagmarPendingEntryId');
+      } catch (_) {}
+    } else {
+      entryId = await consumePendingEntryId();
+    }
+  }
+  return {
+    answers: answers || loadAnswers(),
+    composed3D: readComposed3DForSave(),
+    entryId: entryId,
+  };
+}
+
 async function waitForOverlayLayout() {
   return new Promise(function (resolve) {
     requestAnimationFrame(function () {
@@ -400,9 +455,8 @@ function waitForMs(ms) {
 
 const RESULT_OVERLAY_FADE_MS = 400;
 
-function isSheshAmulet(answers) {
-  return answers?.q4Belief === 'doubt';
-}
+const RESULT_AMULET_FIT_MARGIN = 1.08;
+const RESULT_LIVE_CANVAS_ZOOM = 1.24;
 
 function mountLiveCreateCanvasInSlot(slot, sourceCanvas) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) {
@@ -413,15 +467,23 @@ function mountLiveCreateCanvasInSlot(slot, sourceCanvas) {
     return cloneCanvasSnapshot(sourceCanvas);
   };
   disposePresentedAmulet = null;
+  zoomActivePbrPresentation(RESULT_LIVE_CANVAS_ZOOM);
 }
 
-async function mountResultAmuletLikeDetail(slot, glbKey) {
+async function mountResultAmuletLikeDetail(slot, glbKey, options) {
   const present = await import('./amulet-detail-present.js?v=20250705-save-fix5');
+  const mountOpts = Object.assign(
+    {
+      useDetailPresentation: true,
+      fitMargin: RESULT_AMULET_FIT_MARGIN,
+    },
+    options || {}
+  );
   capturePresentedSnapshot = present.capturePresentedAmuletSnapshot;
   disposePresentedAmulet = present.disposePresentedAmulet;
 
   try {
-    await present.mountDetailStyleAmulet(slot, glbKey, { useDetailPresentation: true });
+    await present.mountDetailStyleAmulet(slot, glbKey, mountOpts);
     return true;
   } catch (err) {
     console.warn('[amulet-show] detail mount failed, retrying once', err);
@@ -431,19 +493,28 @@ async function mountResultAmuletLikeDetail(slot, glbKey) {
     window.setTimeout(resolve, 80);
   });
 
-  await present.mountDetailStyleAmulet(slot, glbKey, { useDetailPresentation: true });
+  await present.mountDetailStyleAmulet(slot, glbKey, mountOpts);
   return true;
+}
+
+function yieldToMainThread() {
+  return new Promise(function (resolve) {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(resolve);
+    });
+  });
 }
 
 async function resolveCanvasForGardenSave(slot, container, options) {
   const opts = options || {};
+  const targetPx = typeof opts.targetPx === 'number' ? opts.targetPx : 2048;
   if (!opts.fresh) {
     const cached = getSavedSnapshotIfCurrent();
     if (cached?.width && cached?.height) return cached;
   }
   if (capturePresentedSnapshot) {
     try {
-      const snap = capturePresentedSnapshot({ targetPx: 2048 });
+      const snap = capturePresentedSnapshot({ targetPx: targetPx });
       if (snap?.width && snap?.height) return snap;
     } catch (err) {
       console.warn('[amulet-show] presented snapshot capture failed', err);
@@ -483,10 +554,14 @@ async function showResultOverlay(container, answers) {
   }
 
   try {
-    if (isSheshAmulet(answers)) {
-      await mountResultAmuletLikeDetail(slot, 'user-amulet');
-    } else {
-      const liveCanvas = container?.querySelector('canvas');
+    const liveCanvas = container?.querySelector('canvas');
+    let mounted = false;
+    try {
+      mounted = await mountResultAmuletLikeDetail(slot, 'user-amulet');
+    } catch (detailErr) {
+      console.warn('[amulet-show] result detail mount failed, using live canvas', detailErr);
+    }
+    if (!mounted) {
       mountLiveCreateCanvasInSlot(slot, liveCanvas);
     }
   } catch (err) {
@@ -500,6 +575,7 @@ async function showResultOverlay(container, answers) {
           return cloneCanvasSnapshot(liveCanvas);
         };
         disposePresentedAmulet = null;
+        zoomActivePbrPresentation(RESULT_LIVE_CANVAS_ZOOM);
       } catch (fallbackErr) {
         console.error('[amulet-show] canvas fallback failed', fallbackErr);
         overlay.hidden = true;
@@ -680,7 +756,7 @@ async function waitForGardenAdd(maxMs) {
   return typeof window.gardenAddUserAmulet === 'function';
 }
 
-async function placeIndexAmuletInGarden(container, answers) {
+async function placeIndexAmuletInGarden(container, answers, entryIdOverride) {
   const liveCanvas = container?.querySelector('canvas');
   const canvas = captureGardenSnapshotFromCanvas(liveCanvas);
   if (!canvas) {
@@ -702,10 +778,10 @@ async function placeIndexAmuletInGarden(container, answers) {
     window.gardenCapturePlacementAnchor();
   }
   try {
-    await window.gardenAddUserAmulet(canvas, {
-      answers: answers || loadAnswers(),
-      composed3D: readComposed3DForSave(),
-    });
+    await window.gardenAddUserAmulet(canvas, Object.assign(await gardenSaveOptions(answers, entryIdOverride), {
+      focusAfterPlace: true,
+      finalize: true,
+    }));
     document.body.classList.add('has-user-amulet');
     return true;
   } catch (err) {
@@ -729,18 +805,16 @@ function focusGardenOnSavedAmulet(sprite) {
   }
 
   tryFocus();
-  [120, 350, 700].forEach(function (delayMs) {
-    window.setTimeout(tryFocus, delayMs);
-  });
+  window.setTimeout(tryFocus, 400);
 }
 
 function returnToIndexHomeAfterSave(container, answers) {
   hideResultOverlay();
   hideAmuletLoader({ force: true });
-  closeIndexCreateAfterAmulet(container, answers);
-  if (typeof window.pagmarResetCreateHistoryAfterSave === 'function') {
-    window.pagmarResetCreateHistoryAfterSave();
+  if (typeof window.pagmarStopCreateFlowEffects === 'function') {
+    window.pagmarStopCreateFlowEffects();
   }
+  closeIndexCreateAfterAmulet(container, answers);
 }
 
 async function saveAmuletAndReturnHome(container, answers, options) {
@@ -748,7 +822,10 @@ async function saveAmuletAndReturnHome(container, answers, options) {
   const slot = opts.slot || document.getElementById('resultAmulet3D');
   const finalAnswers = answers || pendingAnswers || loadAnswers();
 
-  let canvasForGarden = await resolveCanvasForGardenSave(slot, container, { fresh: true });
+  let canvasForGarden = await resolveCanvasForGardenSave(slot, container, {
+    fresh: true,
+    targetPx: 2048,
+  });
   if (!canvasForGarden?.width || !canvasForGarden?.height) {
     console.warn('[amulet-show] no canvas for save');
     setStatus('לא הצלחנו לשמור את הקמע', true);
@@ -757,6 +834,7 @@ async function saveAmuletAndReturnHome(container, answers, options) {
 
   clearSavedSnapshot();
   returnToIndexHomeAfterSave(container, finalAnswers);
+  await yieldToMainThread();
 
   const gardenReady = await waitForGardenAdd(5000);
   if (!gardenReady) {
@@ -765,12 +843,10 @@ async function saveAmuletAndReturnHome(container, answers, options) {
   }
 
   try {
-    const sprite = await window.gardenAddUserAmulet(canvasForGarden, {
-      answers: finalAnswers,
-      composed3D: readComposed3DForSave(),
+    const sprite = await window.gardenAddUserAmulet(canvasForGarden, Object.assign(await gardenSaveOptions(finalAnswers), {
       focusAfterPlace: true,
       finalize: true,
-    });
+    }));
     if (!sprite) {
       setStatus('לא הצלחנו לשמור את הקמע', true);
       return false;
@@ -782,6 +858,11 @@ async function saveAmuletAndReturnHome(container, answers, options) {
     }, 0);
     focusGardenOnSavedAmulet(sprite);
     setStatus('', false);
+    if (typeof window.pagmarResetCreateHistoryAfterSave === 'function') {
+      window.setTimeout(function () {
+        window.pagmarResetCreateHistoryAfterSave();
+      }, 0);
+    }
     return true;
   } catch (err) {
     console.error('[amulet-show] garden save failed', err);
@@ -818,7 +899,10 @@ function closeIndexCreateAfterAmulet(container, answers) {
     'is-create-amulet-ready',
     'is-create-complete',
     'is-choice-question',
-    'is-result-overlay-open'
+    'is-result-overlay-open',
+    'is-create-fullpage-loading',
+    'is-vector-frame-loading',
+    'is-question-transition-loading'
   );
   document.body.classList.add('is-create-exiting');
   document.body.style.background = '';
@@ -851,8 +935,14 @@ function closeIndexCreateAfterAmulet(container, answers) {
     window.questionnaireStar.resumeFloat();
   }
 
+  if (typeof window.gardenResetSpriteFocus === 'function') {
+    window.gardenResetSpriteFocus();
+  }
+
   window.dispatchEvent(new CustomEvent('questionnaire:close-panel'));
-  window.dispatchEvent(new CustomEvent('questionnaire:create-close'));
+  window.dispatchEvent(
+    new CustomEvent('questionnaire:create-close', { detail: { afterSave: true } })
+  );
   window.dispatchEvent(new CustomEvent('questionnaire:user-amulet-ready'));
 }
 
@@ -960,10 +1050,11 @@ export async function showFinishedAmulet(answersOverride) {
     }
     console.log('[amulet] starting prototype PBR render');
 
+    const saveEntryId = await allocateSaveEntryId();
     await renderFinalAmuletLikePrototype(answers, container, function (frac) {
       if (token !== renderToken) return;
       setAmuletLoaderProgress(frac);
-    });
+    }, { entryId: saveEntryId });
 
     if (token !== renderToken) return;
 
@@ -989,7 +1080,7 @@ export async function showFinishedAmulet(answersOverride) {
         showCreateCompletePanel(wasIndexCreate);
         if (wasIndexCreate) {
           showIndexCreateActionButtons();
-          const placed = await placeIndexAmuletInGarden(container, answers);
+          const placed = await placeIndexAmuletInGarden(container, answers, saveEntryId);
           if (!placed) {
             setStatus('לא הצלחנו להציג את מסך התוצאה. נסי שוב או רענני.', true);
           }
@@ -1196,3 +1287,102 @@ export async function restoreResultViewFromSession(answersOverride) {
 }
 
 window.pagmarRestoreResultView = restoreResultViewFromSession;
+
+export async function prepareSaveFromExportPage(presentMod, answers) {
+  const slot = document.getElementById('exportAmulet3D');
+  let canvas = null;
+  if (presentMod?.capturePresentedAmuletSnapshot) {
+    canvas = presentMod.capturePresentedAmuletSnapshot({ targetPx: 2048 });
+  }
+  if (!canvas?.width && slot) {
+    canvas = captureGardenSnapshotFromCanvas(slot.querySelector('canvas'));
+  }
+  if (!canvas?.width) return false;
+
+  const finalAnswers = answers || loadAnswers();
+  persistCompletedQuestionnaire(finalAnswers);
+  persistRenderedAmuletSnapshot(canvas);
+
+  try {
+    sessionStorage.setItem('pagmarFinishSaveOnIndex', '1');
+    sessionStorage.removeItem('pagmarExportViewActive');
+    clearResultViewActive();
+  } catch (_) {}
+
+  window.location.href = 'index.html';
+  return true;
+}
+
+export function startCreateAnotherFromExportPage() {
+  try {
+    sessionStorage.removeItem('pagmarExportViewActive');
+    clearResultViewActive();
+    sessionStorage.removeItem('pagmarFinishSaveOnIndex');
+    sessionStorage.setItem('pagmarRestartQuestionnaireOnLoad', '1');
+  } catch (_) {}
+  window.location.href = 'index.html';
+}
+
+function loadSnapshotCanvasFromStorage() {
+  let dataUrl = null;
+  try {
+    dataUrl =
+      sessionStorage.getItem(SNAPSHOT_KEY) ||
+      localStorage.getItem(SNAPSHOT_KEY);
+  } catch (_) {}
+  if (!dataUrl) return Promise.resolve(null);
+
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      resolve(canvas);
+    };
+    img.onerror = function () {
+      resolve(null);
+    };
+    img.src = dataUrl;
+  });
+}
+
+export async function finishPendingSaveOnIndex() {
+  try {
+    if (sessionStorage.getItem('pagmarFinishSaveOnIndex') !== '1') return false;
+    sessionStorage.removeItem('pagmarFinishSaveOnIndex');
+  } catch (_) {
+    return false;
+  }
+
+  const answers = loadAnswers();
+  if (!allAnswered(answers)) return false;
+
+  const canvas = await loadSnapshotCanvasFromStorage();
+  if (!canvas?.width) return false;
+
+  const gardenReady = await waitForGardenAdd(8000);
+  if (!gardenReady) return false;
+
+  try {
+    const sprite = await window.gardenAddUserAmulet(canvas, Object.assign(await gardenSaveOptions(answers), {
+      focusAfterPlace: true,
+      finalize: true,
+    }));
+    if (!sprite) return false;
+    document.body.classList.add('has-user-amulet');
+    persistCompletedQuestionnaire(answers);
+    focusGardenOnSavedAmulet(sprite);
+    if (typeof window.amuletHideLoader === 'function') {
+      window.amuletHideLoader({ force: true });
+    }
+    document.body.classList.remove('is-amulet-rendering', 'is-create-mode');
+    return true;
+  } catch (err) {
+    console.error('[amulet-show] finish pending export save failed', err);
+    return false;
+  }
+}
+
+window.pagmarFinishPendingSaveOnIndex = finishPendingSaveOnIndex;

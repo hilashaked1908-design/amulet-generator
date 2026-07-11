@@ -273,11 +273,20 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
-        if parsed_path in ("/open", "/open/", "/questionnaire/open", "/questionnaire/open.html"):
+        if parsed_path in ("/open", "/open/"):
             self.send_response(302)
             self.send_header(
                 "Location",
-                f"http://127.0.0.1:8080/questionnaire/index.html?pagmarFresh={PAGMAR_BUILD}",
+                f"http://127.0.0.1:8080/questionnaire/open.html?pagmarFresh={PAGMAR_BUILD}",
+            )
+            self.end_headers()
+            return
+
+        if parsed_path in ("/questionnaire/open", "/questionnaire/open/"):
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"/questionnaire/open.html?pagmarFresh={PAGMAR_BUILD}",
             )
             self.end_headers()
             return
@@ -298,7 +307,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_response(302)
             self.send_header(
                 "Location",
-                f"http://127.0.0.1:8080/questionnaire/index.html?pagmarFresh={PAGMAR_BUILD}",
+                f"http://127.0.0.1:8080/questionnaire/open.html?pagmarFresh={PAGMAR_BUILD}",
             )
             self.end_headers()
             return

@@ -1560,7 +1560,8 @@ body.pagmar-index .pagmar__index-filter-sidebar {
   width: var(--index-filter-column-width);
   max-height: var(--index-filter-toolbar-height);
   overflow: hidden;
-  pointer-events: auto;
+  /* Pass clicks through to garden canvas; interactive children opt back in */
+  pointer-events: none;
   direction: ltr;
   isolation: isolate;
   transition: max-height var(--index-transition-duration) var(--index-transition-ease);
@@ -1584,6 +1585,8 @@ body.pagmar-index .pagmar__index-filter-sidebar .pagmar__index-filter-glass-lens
   border-radius: 0;
   transition: opacity var(--index-transition-duration) var(--index-transition-ease);
   overflow: hidden;
+  /* Decorative full-height panel — must not steal garden hover/click */
+  pointer-events: none;
 }
 
 body.pagmar-index .pagmar__index-filter-sidebar.is-expanded .pagmar__index-filter-glass-lens {
@@ -3363,6 +3366,27 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   pointer-events: none;
 }
 
+.pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  background: #000000;
+}
+
+.pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog.pagmar__detail-fog--live {
+  opacity: 1;
+}
+
+.pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog .pagmar__detail-fog-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessels {
   position: relative;
   width: calc(305 * var(--loader-u));
@@ -3372,12 +3396,6 @@ body.pagmar-index.is-create-mode .pagmar__index-create-status[hidden] {
   isolation: isolate;
   transform: translateZ(0);
   z-index: 1;
-}
-
-.pagmar__detail-page-loader--create .pagmar__create-fullpage-loader__fog {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
 }
 
 .pagmar__detail-page-loader--create .pagmar__detail-page-loader__vessel {
@@ -3631,20 +3649,20 @@ body.pagmar-index.is-create-mode.is-amulet-rendering {
   background: #000000 !important;
 }
 
-/* Q8 → result on index: garden atmosphere behind gallery loader (not black) */
-body.pagmar-index.is-create-mode.is-amulet-rendering,
-body.pagmar-index.is-create-mode.is-create-fullpage-loading {
-  background: transparent !important;
+/* Final build loader — hide garden; loader carries black + fog like the garden backdrop */
+body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__stage .pagmar__garden,
+body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__stage .pagmar__garden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
-body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__stage .pagmar__garden,
-body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__stage .pagmar__garden,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--back,
 body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--fantik,
 body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__atmosphere--back,
 body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__atmosphere--fantik {
-  opacity: 1 !important;
-  visibility: visible !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
   pointer-events: none !important;
 }
 
@@ -3657,13 +3675,6 @@ body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__request-fog,
 body.pagmar-index.is-create-mode.is-create-fullpage-loading .pagmar__request-fog {
   opacity: 0 !important;
   visibility: hidden !important;
-}
-
-body.is-create-fullpage-loading .pagmar__atmosphere--back,
-body.pagmar-create.is-amulet-rendering .pagmar__atmosphere--back,
-body.pagmar-index.is-create-mode.is-amulet-rendering .pagmar__atmosphere--back {
-  background: transparent;
-  opacity: 1 !important;
 }
 
 body.is-create-fullpage-loading .pagmar__request-artboard > .figma-close {
@@ -4659,14 +4670,40 @@ body.pagmar-create .pagmar__export-btn[hidden] {
 }
 
 body.pagmar-create.is-building .pagmar__create-save,
-body.pagmar-create.is-building .intro__choice-btn {
+body.pagmar-index.is-create-mode.is-building .pagmar__create-save,
+body.pagmar-create.is-building .intro__choice-btn,
+body.pagmar-index.is-create-mode.is-building .intro__choice-btn,
+body.pagmar-create.is-building .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode.is-building .pagmar__create-question-field .intro__choice-btn--figma,
+body.pagmar-create.is-building .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-create.is-building .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q__btn-outer {
+  pointer-events: auto;
+}
+
+/* Legacy create stack only — request-flow dock stays interactive above */
+body.pagmar-create.is-building .pagmar__create-save:not(.figma-q__btn-outer),
+body.pagmar-index.is-create-mode.is-building .pagmar__create-save:not(.figma-q__btn-outer) {
   pointer-events: none;
 }
 
-body.pagmar-create.is-building .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
-body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
-body.pagmar-index.is-create-mode.is-building .pagmar__create-question-field .intro__choice-btn--figma {
+/* Q4+ — vectors already on screen; keep questions interactive during background work */
+body.pagmar-create.is-semantic-questions.is-building .pagmar__create-save,
+body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__create-save,
+body.pagmar-create.is-semantic-questions.is-building .intro__choice-btn,
+body.pagmar-index.is-create-mode.is-semantic-questions.is-building .intro__choice-btn,
+body.pagmar-create.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-create.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__request-artboard .figma-q__field .intro__question-input {
   pointer-events: auto;
+}
+
+body.pagmar-create.is-semantic-questions.is-building .pagmar__create-save .pagmar__create-save-label,
+body.pagmar-index.is-create-mode.is-semantic-questions.is-building .pagmar__create-save .pagmar__create-save-label {
+  opacity: 1;
 }
 
 body.pagmar-create.is-amulet-rendering .pagmar__export-btn {

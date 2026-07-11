@@ -6,13 +6,17 @@
 (function () {
   'use strict';
 
-  if (
-    !document.body.classList.contains('pagmar-index') &&
-    !document.body.classList.contains('pagmar-create') &&
-    !document.body.classList.contains('pagmar-amulet-detail')
-  ) {
-    return;
+  function shouldRun() {
+    if (!document.body) return false;
+    return (
+      document.body.classList.contains('pagmar-index') ||
+      document.body.classList.contains('pagmar-create') ||
+      document.body.classList.contains('pagmar-amulet-detail')
+    );
   }
+
+  function boot() {
+    if (!shouldRun()) return;
 
   const PIXEL_DENSITY = 0.85;
   const PALETTE = [
@@ -208,10 +212,10 @@
     if (body.classList.contains('pagmar-index')) {
       return 0.48;
     }
-    if (
-      body.classList.contains('pagmar-create') ||
-      body.classList.contains('pagmar-amulet-detail')
-    ) {
+    if (body.classList.contains('pagmar-amulet-detail')) {
+      return body.classList.contains('is-detail-loading') ? 0.48 : 0;
+    }
+    if (body.classList.contains('pagmar-create')) {
       return 0;
     }
     return 0.78;
@@ -220,6 +224,12 @@
   function fogBand() {
     const body = document.body;
     if (body.classList.contains('pagmar-index')) {
+      return [0.46, 0.62];
+    }
+    if (
+      body.classList.contains('pagmar-amulet-detail') &&
+      body.classList.contains('is-detail-loading')
+    ) {
       return [0.46, 0.62];
     }
     return [-1, -0.5];
@@ -286,4 +296,13 @@
   requestAnimationFrame(loop);
 
   window.gardenAtmosphere = { on };
+  }
+
+  if (document.body && shouldRun()) {
+    boot();
+  } else if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 })();

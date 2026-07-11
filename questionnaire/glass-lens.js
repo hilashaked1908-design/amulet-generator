@@ -93,6 +93,15 @@
       return fogHost ? fogHost.querySelector('.pagmar__detail-fog-canvas') : null;
     }
 
+    if (mode === 'open-amulet') {
+      const captureCanvas = document.getElementById('openGlassCapture');
+      if (captureCanvas && captureCanvas.width > 0) return captureCanvas;
+
+      const amuletCanvas = document.querySelector('.pagmar-open__amulet-3d canvas');
+      if (amuletCanvas && amuletCanvas.width > 0) return amuletCanvas;
+      return null;
+    }
+
     if (mode === 'export-fog') {
       const fogHost = document.getElementById('exportFogHost');
       return fogHost ? fogHost.querySelector('.pagmar__detail-fog-canvas') : null;
@@ -123,6 +132,9 @@
     const aboutHover = lensEl.closest('.pagmar__about-amulet-hover');
     if (aboutHover && parseFloat(aboutHover.style.opacity || '0') < 0.04) return false;
 
+    const openHint = lensEl.closest('.pagmar-open__cursor-hint');
+    if (openHint && parseFloat(openHint.style.opacity || '0') < 0.04) return false;
+
     if (document.body.classList.contains('is-detail-loading')) {
       const detailNum = lensEl.closest('.pagmar__detail-num');
       if (!detailNum) return false;
@@ -135,11 +147,10 @@
   function paintGlassClone(lensEl) {
     const source = getCaptureSource(lensEl);
     const capture = lensEl.querySelector('.glass-clone__capture');
-    if (!source || !capture || capture.tagName !== 'CANVAS' || !shouldPaint(lensEl)) return;
+    if (!capture || capture.tagName !== 'CANVAS' || !shouldPaint(lensEl)) return;
 
     const lensRect = lensEl.getBoundingClientRect();
-    const srcRect = source.getBoundingClientRect();
-    if (srcRect.width < 1 || srcRect.height < 1) return;
+    if (lensRect.width < 1 || lensRect.height < 1) return;
 
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(lensRect.width * dpr));
@@ -152,15 +163,20 @@
       capture.style.height = lensRect.height + 'px';
     }
 
+    const ctx = capture.getContext('2d');
+    if (!ctx) return;
+
+    if (!source) return;
+
+    const srcRect = source.getBoundingClientRect();
+    if (srcRect.width < 1 || srcRect.height < 1) return;
+
     const scaleX = source.width / srcRect.width;
     const scaleY = source.height / srcRect.height;
     const sx = (lensRect.left - srcRect.left) * scaleX;
     const sy = (lensRect.top - srcRect.top) * scaleY;
     const sw = lensRect.width * scaleX;
     const sh = lensRect.height * scaleY;
-
-    const ctx = capture.getContext('2d');
-    if (!ctx) return;
 
     try {
       ctx.clearRect(0, 0, w, h);

@@ -26,7 +26,11 @@ export function capturePresentedAmuletSnapshot(options) {
 export async function mountDetailStyleAmulet(container, glbKey, options) {
   if (!container) throw new Error('container missing');
 
-  const loaded = await loadGlb(glbKey);
+  const preferBundledSeed =
+    Boolean(options && options.preferBundledSeed) ||
+    /^collection-\d+$/.test(String(glbKey));
+
+  const loaded = await loadGlb(glbKey, { preferBundledSeed });
   if (!loaded?.scene) throw new Error('GLB missing for ' + glbKey);
 
   disposePresentedAmulet();

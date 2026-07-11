@@ -1,9 +1,21 @@
 /**
  * Amulet garden - Cyber Garden style (ground-plane pan + low camera + sprites).
  */
-console.log('%c[garden-three] v20250707-white-fog-v2 loaded', 'color:lime;font-size:14px');
+console.log('%c[garden-three] v20250711-glb-authority loaded', 'color:lime;font-size:14px');
 import * as THREE from './vendor/three.module.js';
 import { createLucaFog } from './garden-fog.js';
+import {
+  cropAndSquare,
+  downscaleCanvas,
+  previewSnapshotForLocalStorage,
+  compressSnapshotDataUrl,
+  compressSnapshotForLocalStorage,
+} from './snapshot-process.js';
+import { PERMANENTLY_REMOVED_LABELS } from './permanently-removed-labels.js';
+import {
+  canonicalSeedGlbUrl,
+  glbUrlMatchesEntryId,
+} from './amulet-entry-resolve.js';
 
 function glbStore() { return import('./amulet-glb-store.js'); }
 
@@ -28,8 +40,6 @@ const PLACEMENT_ANCHOR_KEY = 'amuletUserPlacementAnchor';
 const POSITION_VERSION_KEY = 'amuletUserPositionVersion';
 const POSITION_VERSION = '20250705-placement-anchor';
 const COLLECTION_KEY = 'amuletCollection';
-/** Tiny JPEG thumb kept in localStorage; full image lives in IndexedDB. */
-const COLLECTION_LS_THUMB_PX = 280;
 const COLLECTION_LS_SNAPSHOT_MAX_CHARS = 96000;
 /** Fixed garden slot for user-created amulets - same depth as gallery row 1. */
 const USER_AMULET_SLOT = { x: 4.0, z: 2.5 };
@@ -42,7 +52,7 @@ const NEW_AMULET_DEPTH_BASE_PX = 50;
 const NEW_AMULET_DEPTH_ROW_PX = 110;
 const NEW_AMULET_DEPTH_JITTER_PX = [0, 34, 20, 48];
 /** Extra forward nudge only when placing a brand-new amulet (negative = toward camera). */
-const NEW_AMULET_PLACEMENT_FORWARD_BIAS_PX = -80;
+const NEW_AMULET_PLACEMENT_FORWARD_BIAS_PX = 0;
 /** Scattered meadow slots (screen px from anchor [014]) - fills sides, forward, and back. */
 const SPREAD_MEADOW_SLOTS = [
   { side: -420, depth: 45 },
@@ -74,7 +84,15 @@ const SPREAD_MEADOW_SLOTS = [
   { side: -440, depth: -20 },
   { side: 440, depth: 10 },
 ];
+/** Depth row for brand-new placement — same line as [009]/[014]/[017], spread sideways only. */
+const NEW_AMULET_DEPTH_ROW_REF_LABELS = [9, 14, 17];
+const NEW_AMULET_DEPTH_ROW_SIDE_STEPS_PX = [
+  190, -190, 340, -340, 490, -490, 640, -640, 790, -790, 940, -940,
+  250, -250, 400, -400, 550, -550, 700, -700, 850, -850, 1000, -1000,
+];
 const SPREAD_GRID_LAYOUT_TAG = 'spread-grid-v12';
+/** Tag for brand-new forward-row placement — blocks backward meadow migration. */
+const LIVE_FORWARD_ROW_TAG = 'live-forward-row-v1';
 const CHAIN_CLEARANCE = 0.55;
 const CHAIN_WIDE_ROW_ANCHOR_LABEL = 14;
 const REVERT_V10_LAYOUT_PREFIX = 'chain-wide-v10';
@@ -310,6 +328,25 @@ const AMULET_SPIN_MS = 2800;
 const SELECTED_SCALE = 1.05;
 const SCALE_LERP = 0.18;
 const FOCUS_FADE_LERP = 0.22;
+const GARDEN_SPRITE_MAX_PX = 2048;
+
+function yieldToMain() {
+  return new Promise(function (resolve) {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(resolve);
+    });
+  });
+}
+
+function resetAllSpriteFocus() {
+  for (const sprite of sprites) {
+    sprite.userData.focusMul = 1;
+    if (sprite.material) {
+      sprite.material.opacity = 1;
+      sprite.visible = !sprite.userData.spin3dHidden;
+    }
+  }
+}
 /** Tighter screen bounds for hit tests and spec-panel anchoring (opaque content, not full quad). */
 const VISUAL_HIT_FACTOR = 0.38;
 /** Slightly larger bounds for hover detection — easier to "stand on" an amulet. */
@@ -789,10 +826,85 @@ function disposeGardenSprite(sprite) {
 
 const PURGE_LABELS_021_KEY = 'purge-labels-021-022-023-v1';
 
+function notifyCollectionChanged() {
+  window.dispatchEvent(new CustomEvent('pagmar:collection-changed'));
+}
+
+function questionIndexForDisplayLabel(label) {
+  return label - 1;
+}
+
+function spritesMatchRemoveLabels(labelSet, removedIds) {
+  const targetIndices = new Set();
+  labelSet.forEach(function (label) {
+    targetIndices.add(questionIndexForDisplayLabel(label));
+  });
+  for (const sprite of collectionSprites) {
+    const entryId = sprite.userData.collectionEntryId;
+    if (entryId != null && removedIds.has(entryId)) return true;
+    const qi = sprite.userData.questionIndex;
+    if (typeof qi === 'number' && targetIndices.has(qi)) return true;
+  }
+  if (userAmuletSprite) {
+    const entryId = userAmuletSprite.userData.collectionEntryId;
+    if (entryId != null && removedIds.has(entryId)) return true;
+    const qi = userAmuletSprite.userData.questionIndex;
+    if (typeof qi === 'number' && targetIndices.has(qi)) return true;
+  }
+  return false;
+}
+
+function purgeSpritesForRemoveLabels(labelSet, removedIds) {
+  const targetIndices = new Set();
+  labelSet.forEach(function (label) {
+    targetIndices.add(questionIndexForDisplayLabel(label));
+  });
+
+  for (const sprite of collectionSprites.slice()) {
+    const entryId = sprite.userData.collectionEntryId;
+    const qi = sprite.userData.questionIndex;
+    const shouldRemove =
+      (entryId != null && removedIds.has(entryId)) ||
+      (typeof qi === 'number' && targetIndices.has(qi));
+    if (!shouldRemove) continue;
+    disposeGardenSprite(sprite);
+    const ci = collectionSprites.indexOf(sprite);
+    if (ci >= 0) collectionSprites.splice(ci, 1);
+  }
+
+  if (userAmuletSprite) {
+    const entryId = userAmuletSprite.userData.collectionEntryId;
+    const qi = userAmuletSprite.userData.questionIndex;
+    const shouldRemove =
+      (entryId != null && removedIds.has(entryId)) ||
+      (typeof qi === 'number' && targetIndices.has(qi));
+    if (shouldRemove) {
+      disposeGardenSprite(userAmuletSprite);
+      userAmuletSprite = null;
+      removeStoredItem(SNAPSHOT_KEY);
+      removeStoredItem(POSITION_KEY);
+      removeStoredItem(USER_ANSWERS_KEY);
+      removeStoredItem(PLACEMENT_ANCHOR_KEY);
+      livePlacementAnchor = null;
+      document.body.classList.remove('has-user-amulet');
+    }
+  }
+}
+
+function deleteIdbKeysForEntry(store, entryId) {
+  if (entryId == null) return Promise.resolve();
+  const snapKey = 'collection-' + entryId;
+  return Promise.all([
+    store.deleteGlb(snapKey).catch(function () {}),
+    store.deleteGlb('snap-' + snapKey).catch(function () {}),
+    store.deleteGlb('snap-composed3d-' + entryId).catch(function () {}),
+    store.deleteGlb('snap-answers-collection-' + entryId).catch(function () {}),
+  ]);
+}
+
 function removeCollectionEntriesByLabels(labels) {
   const labelSet = new Set(labels.map(Number));
   const collection = loadCollection();
-  if (!collection.length) return Promise.resolve([]);
 
   const removed = [];
   const kept = [];
@@ -804,34 +916,30 @@ function removeCollectionEntriesByLabels(labels) {
       kept.push(collection[i]);
     }
   }
-  if (!removed.length) return Promise.resolve([]);
 
   const removedIds = new Set(
     removed.map(function (item) { return item.entry && item.entry.id; }).filter(function (id) { return id != null; })
   );
 
+  if (!removed.length && !spritesMatchRemoveLabels(labelSet, removedIds)) {
+    return Promise.resolve([]);
+  }
+
   return glbStore().then(function (store) {
     return Promise.all(removed.map(function (item) {
       const id = item.entry && item.entry.id;
-      if (id == null) return Promise.resolve();
-      const snapKey = 'collection-' + id;
-      return Promise.all([
-        store.deleteGlb(snapKey).catch(function () {}),
-        store.deleteGlb('snap-' + snapKey).catch(function () {}),
-      ]);
+      return deleteIdbKeysForEntry(store, id);
     }));
   }).then(function () {
-    runtimeCollection = kept;
-    saveCollection(kept);
+    if (removed.length) {
+      runtimeCollection = kept;
+      saveCollection(kept);
+    }
 
-    for (const sprite of collectionSprites.slice()) {
+    purgeSpritesForRemoveLabels(labelSet, removedIds);
+
+    for (const sprite of collectionSprites) {
       const entryId = sprite.userData.collectionEntryId;
-      if (removedIds.has(entryId)) {
-        disposeGardenSprite(sprite);
-        const ci = collectionSprites.indexOf(sprite);
-        if (ci >= 0) collectionSprites.splice(ci, 1);
-        continue;
-      }
       const newIdx = kept.findIndex(function (entry) { return entry && entry.id === entryId; });
       if (newIdx >= 0) {
         sprite.userData.collectionIndex = newIdx;
@@ -839,25 +947,43 @@ function removeCollectionEntriesByLabels(labels) {
       }
     }
 
-    if (userAmuletSprite && removedIds.has(userAmuletSprite.userData.collectionEntryId)) {
-      disposeGardenSprite(userAmuletSprite);
-      userAmuletSprite = null;
-      removeStoredItem(SNAPSHOT_KEY);
-      removeStoredItem(POSITION_KEY);
-      removeStoredItem(USER_ANSWERS_KEY);
-      removeStoredItem(PLACEMENT_ANCHOR_KEY);
-      livePlacementAnchor = null;
-      document.body.classList.remove('has-user-amulet');
-    }
-
     updateCameraScrollLimits();
-    console.log(
-      '[garden-three] removed amulet(s):',
-      removed.map(function (item) {
-        return '[' + String(item.label).padStart(3, '0') + ']';
-      }).join(', ')
-    );
-    return removed;
+    notifyCollectionChanged();
+    if (removed.length) {
+      console.log(
+        '[garden-three] removed amulet(s):',
+        removed.map(function (item) {
+          return '[' + String(item.label).padStart(3, '0') + ']';
+        }).join(', ')
+      );
+    } else {
+      console.log(
+        '[garden-three] purged garden sprite(s):',
+        Array.from(labelSet).map(function (label) {
+          return '[' + String(label).padStart(3, '0') + ']';
+        }).join(', ')
+      );
+    }
+    return removed.length
+      ? removed
+      : Array.from(labelSet).map(function (label) {
+          return { entry: null, label: label };
+        });
+  });
+}
+
+function applyRemoveLabelFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const raw = params.get('removeLabel');
+  if (!raw) return Promise.resolve();
+  const label = parseInt(raw, 10);
+  if (!Number.isFinite(label)) return Promise.resolve();
+  return removeCollectionEntriesByLabels([label]).then(function (removed) {
+    if (!removed.length) return;
+    params.delete('removeLabel');
+    const qs = params.toString();
+    const nextUrl = location.pathname + (qs ? '?' + qs : '') + location.hash;
+    history.replaceState(null, '', nextUrl);
   });
 }
 
@@ -885,6 +1011,10 @@ function purgeAmulets021022023Once() {
     }
     return removed;
   });
+}
+
+function purgePermanentlyRemovedLabels() {
+  return removeCollectionEntriesByLabels(PERMANENTLY_REMOVED_LABELS);
 }
 
 function afterPxForChainSlot(slotIndex) {
@@ -1187,16 +1317,16 @@ function migrateSpreadGridLayoutOnce() {
     const entry = collection[idx];
     const label = collectionDisplayLabel(idx);
     if (label < NEW_AMULET_FIRST_LABEL || label === 21) continue;
-    if (entry.layoutNudge === SPREAD_GRID_LAYOUT_TAG) continue;
+    if (entry.layoutNudge) continue;
+    if (hasSavedPosition(entry?.position)) continue;
 
     const target = positionForNewAmulet(idx, pose);
     if (!target) continue;
 
-    const prevSelf = normalizeSavedPosition(entry.position);
     entry.position = {
       x: target.x,
       z: target.z,
-      yWorld: prevSelf?.yWorld ?? target.yWorld,
+      yWorld: target.yWorld,
     };
     entry.layoutNudge = SPREAD_GRID_LAYOUT_TAG;
     dirty = true;
@@ -1204,7 +1334,7 @@ function migrateSpreadGridLayoutOnce() {
 
   if (dirty) {
     saveCollection(collection);
-    console.log('[garden-three] migrated [018]+ to wide spread grid');
+    console.log('[garden-three] migrated [018]+ to wide spread meadow');
   }
 }
 
@@ -1275,11 +1405,24 @@ function applyPositionToSprite(sprite, pos, collectionIndex) {
 function fillMissingCollectionPositionsInStorage() {
   const collection = loadCollection();
   if (!collection.length) return;
+  const pose = openingCameraPose();
+  const selfRadius = SPRITE_SIZE * 0.42;
   let dirty = false;
   for (let index = 0; index < collection.length; index += 1) {
     const entry = collection[index];
     if (!entry || typeof entry !== 'object') continue;
     if (hasSavedPosition(entry.position)) continue;
+    const label = collectionDisplayLabel(index);
+    if (label >= NEW_AMULET_FIRST_LABEL) {
+      const occupied = collectOccupiedPositions(null);
+      const spot = resolveLiveNewAmuletSpot(label, pose, selfRadius, occupied);
+      if (spot) {
+        entry.position = { x: spot.x, z: spot.z };
+        entry.layoutNudge = LIVE_FORWARD_ROW_TAG;
+        dirty = true;
+        continue;
+      }
+    }
     const slot = collectionSlotPosition(index);
     entry.position = { x: slot.x, z: slot.z };
     if (slot.yWorld != null) entry.position.yWorld = slot.yWorld;
@@ -1483,7 +1626,7 @@ function replaceSpriteTexture(sprite, canvas) {
 }
 
 function upgradeSpriteTextureFromDataUrl(sprite, dataUrl, minPixelGain) {
-  minPixelGain = minPixelGain || 1.15;
+  minPixelGain = minPixelGain == null ? 1 : minPixelGain;
   return new Promise(function (resolve) {
     const img = new Image();
     img.onload = function () {
@@ -1583,75 +1726,7 @@ function snapshotCanvas(sourceCanvas) {
   return snapshot;
 }
 
-function cropAndSquare(canvas) {
-  var w = canvas.width, h = canvas.height;
-  if (!w || !h) return canvas;
-
-  var maxScan = 512;
-  if (Math.max(w, h) > maxScan) {
-    var scale = maxScan / Math.max(w, h);
-    var scaled = document.createElement('canvas');
-    scaled.width = Math.max(1, Math.round(w * scale));
-    scaled.height = Math.max(1, Math.round(h * scale));
-    scaled.getContext('2d').drawImage(canvas, 0, 0, scaled.width, scaled.height);
-    canvas = scaled;
-    w = scaled.width;
-    h = scaled.height;
-  }
-
-  var ctx = canvas.getContext('2d', { willReadFrequently: true });
-  var data = ctx.getImageData(0, 0, w, h).data;
-  var minX = w, minY = h, maxX = -1, maxY = -1;
-  for (var y = 0; y < h; y++) {
-    for (var x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 8) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-  if (maxX < 0) return canvas;
-  var contentW = maxX - minX + 1;
-  var contentH = maxY - minY + 1;
-  var side = Math.max(contentW, contentH);
-  var pad = Math.round(side * 0.09);
-  side += pad * 2;
-  var out = document.createElement('canvas');
-  out.width = side;
-  out.height = side;
-  var ox = Math.round((side - contentW) / 2);
-  var oy = Math.round((side - contentH) / 2);
-  out.getContext('2d').drawImage(canvas, minX, minY, contentW, contentH, ox, oy, contentW, contentH);
-  return out;
-}
-
-function downscaleCanvas(canvas, maxDim) {
-  var cropped = cropAndSquare(canvas);
-  let w = cropped.width;
-  let h = cropped.height;
-  if (w <= maxDim && h <= maxDim) return cropped;
-  const ratio = Math.min(maxDim / w, maxDim / h);
-  w = Math.round(w * ratio);
-  h = Math.round(h * ratio);
-  const out = document.createElement('canvas');
-  out.width = w;
-  out.height = h;
-  const ctx = out.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(cropped, 0, 0, w, h);
-  return out;
-}
-
-function tinyThumbFromCanvas(canvas, maxDim) {
-  const scaled = downscaleCanvas(canvas, maxDim || COLLECTION_LS_THUMB_PX);
-  return scaled.toDataURL('image/jpeg', 0.82);
-}
-
-function dataUrlToTinyThumb(dataUrl) {
+function dataUrlToPreviewSnapshot(dataUrl) {
   return new Promise(function (resolve) {
     if (!dataUrl || typeof dataUrl !== 'string') {
       resolve('');
@@ -1662,8 +1737,10 @@ function dataUrlToTinyThumb(dataUrl) {
       const c = document.createElement('canvas');
       c.width = img.width;
       c.height = img.height;
-      c.getContext('2d').drawImage(img, 0, 0);
-      resolve(tinyThumbFromCanvas(c));
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0);
+      resolve(previewSnapshotForLocalStorage(c));
     };
     img.onerror = function () {
       resolve('');
@@ -1690,9 +1767,9 @@ function migrateCollectionSnapshotsToIdb() {
           return store.saveSnapshot(snapKey, snap);
         }
       }).then(function () {
-        return dataUrlToTinyThumb(snap);
-      }).then(function (thumb) {
-        entry.snapshot = thumb || '';
+        return dataUrlToPreviewSnapshot(snap);
+      }).then(function (preview) {
+        entry.snapshot = preview || '';
         entry.snapshotInIdb = true;
         return true;
       });
@@ -1702,16 +1779,6 @@ function migrateCollectionSnapshotsToIdb() {
   })).then(function (flags) {
     if (flags.some(Boolean)) saveCollection(collection);
   });
-}
-
-function compressSnapshotDataUrl(canvas) {
-  const hi = downscaleCanvas(canvas, 4096);
-  return hi.toDataURL('image/png');
-}
-
-function compressSnapshotForLocalStorage(canvas) {
-  const lo = downscaleCanvas(canvas, 1536);
-  return lo.toDataURL('image/png');
 }
 
 function persistUserAmuletSnapshot(sourceCanvas) {
@@ -1804,7 +1871,90 @@ function nudgeNewAmuletPlacementForward(x, z, pose) {
   return { x: fwd.x, z: fwd.z };
 }
 
-/** Place new amulet - [018]+ in wide spread meadow. */
+function seededShuffle(items, seed) {
+  const arr = items.slice();
+  let s = seed >>> 0;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+function gardenPositionForLabel(label) {
+  const idx = collectionIndexForLabel(label);
+  if (idx < 0) return null;
+  const collection = loadCollection();
+  const saved = normalizeSavedPosition(collection[idx]?.position);
+  if (saved) return { x: saved.x, z: saved.z };
+  for (let i = 0; i < collectionSprites.length; i += 1) {
+    const sprite = collectionSprites[i];
+    if (sprite.userData.collectionIndex === idx) {
+      return {
+        x: sprite.userData.floatAnchorX ?? sprite.position.x,
+        z: sprite.userData.floatAnchorZ ?? sprite.position.z,
+      };
+    }
+  }
+  return null;
+}
+
+/** Exact depth rows from [009]/[014]/[017] — brand-new placement only. */
+function referenceDepthRows() {
+  const rows = [];
+  for (let i = 0; i < NEW_AMULET_DEPTH_ROW_REF_LABELS.length; i += 1) {
+    const label = NEW_AMULET_DEPTH_ROW_REF_LABELS[i];
+    const pos = gardenPositionForLabel(label);
+    if (pos) rows.push({ label: label, x: pos.x, z: pos.z });
+  }
+  if (!rows.length) {
+    const focus = openingFrameCentroid();
+    rows.push({ label: 0, x: focus.x, z: focus.z });
+  }
+  return rows;
+}
+
+function lateralSideStepsForLabel(label) {
+  return seededShuffle(NEW_AMULET_DEPTH_ROW_SIDE_STEPS_PX, label * 7919 + 17);
+}
+
+/** Brand-new amulet only — on [009]/[014]/[017] depth rows, spread left/right. */
+function resolveLiveNewAmuletSpot(label, pose, selfRadius, occupied) {
+  const rows = referenceDepthRows();
+  const rowOrder = seededShuffle(
+    rows.map(function (_, idx) { return idx; }),
+    label * 13 + 7
+  );
+  const sideSteps = lateralSideStepsForLabel(label);
+
+  for (let r = 0; r < rowOrder.length; r += 1) {
+    const row = rows[rowOrder[r]];
+    for (let ring = 0; ring < 4; ring += 1) {
+      const scale = 1 + ring * 0.35;
+      for (let i = 0; i < sideSteps.length; i += 1) {
+        const sidePx = Math.round(sideSteps[i] * scale);
+        const side = nudgeScreenRightPx(row.x, row.z, sidePx, pose);
+        if (isPositionClear(side.x, side.z, selfRadius, occupied)) {
+          return { x: side.x, z: side.z };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function depthRowPlacementSeed(slotIndex, pose) {
+  const rows = referenceDepthRows();
+  const row = rows[slotIndex % rows.length];
+  const sidePx = (slotIndex % 2 === 0 ? 1 : -1) * (220 + (slotIndex % 10) * 130);
+  return nudgeScreenRightPx(row.x, row.z, sidePx, pose);
+}
+
+/** Place new amulet — forward depth rows, sideways fill; never re-layout saved amulets. */
 function resolveNewAmuletPlacement(selfRadius) {
   const occupied = collectOccupiedPositions(null);
   const collection = loadCollection();
@@ -1818,61 +1968,27 @@ function resolveNewAmuletPlacement(selfRadius) {
     return findClearPosition(base.x, base.z, selfRadius, occupied);
   }
 
-  if (newLabel >= NEW_AMULET_FIRST_LABEL) {
-    let target = positionForNewAmulet(slotIndex, pose);
-    if (target) {
-      const biased = nudgeNewAmuletPlacementForward(target.x, target.z, pose);
-      target = { ...target, x: biased.x, z: biased.z };
-      if (isPositionClear(target.x, target.z, selfRadius, occupied)) {
-        return { x: target.x, z: target.z };
-      }
-      const { sidePx } = newAmuletSpreadOffset(newLabel);
-      const gapFills = [
-        { side: sidePx > 0 ? NEW_AMULET_WING_ROW_GROW_PX : -NEW_AMULET_WING_ROW_GROW_PX, depth: 0 },
-        { side: -sidePx * 0.3, depth: 0 },
-        { side: NEW_AMULET_WING_BASE_PX * 0.45, depth: NEW_AMULET_DEPTH_ROW_PX * 0.35 },
-        { side: -NEW_AMULET_WING_BASE_PX * 0.45, depth: NEW_AMULET_DEPTH_ROW_PX * 0.35 },
-        { side: 0, depth: NEW_AMULET_DEPTH_ROW_PX },
-        { side: 0, depth: -NEW_AMULET_DEPTH_ROW_PX * 0.55 },
-        { side: sidePx * 0.5, depth: NEW_AMULET_DEPTH_ROW_PX * 0.6 },
-        { side: -sidePx * 0.5, depth: -NEW_AMULET_DEPTH_ROW_PX * 0.4 },
-      ];
-      for (const fill of gapFills) {
-        let x = target.x;
-        let z = target.z;
-        if (fill.depth) {
-          const depth = nudgeAlongOpeningViewPx(x, z, fill.depth, pose);
-          x = depth.x;
-          z = depth.z;
-        }
-        if (fill.side) {
-          const side = nudgeScreenRightPx(x, z, fill.side, pose);
-          x = side.x;
-          z = side.z;
-        }
-        if (isPositionClear(x, z, selfRadius, occupied)) {
-          return { x, z };
+  const liveSpot = resolveLiveNewAmuletSpot(newLabel, pose, selfRadius, occupied);
+  if (liveSpot) return liveSpot;
+
+  const seed = depthRowPlacementSeed(slotIndex, pose);
+  if (isPositionClear(seed.x, seed.z, selfRadius, occupied)) {
+    return { x: seed.x, z: seed.z };
+  }
+
+  const rows = referenceDepthRows();
+  for (let r = 0; r < rows.length; r += 1) {
+    for (let sidePx = 1100; sidePx <= 1700; sidePx += 140) {
+      for (const sign of [1, -1]) {
+        const side = nudgeScreenRightPx(rows[r].x, rows[r].z, sidePx * sign, pose);
+        if (isPositionClear(side.x, side.z, selfRadius, occupied)) {
+          return { x: side.x, z: side.z };
         }
       }
-      return findClearPosition(target.x, target.z, selfRadius, occupied);
     }
   }
 
-  if (slotIndex > 0) {
-    let target = positionRelativeToPrevIndex(slotIndex - 1, slotIndex, pose);
-    if (target) {
-      const biased = nudgeNewAmuletPlacementForward(target.x, target.z, pose);
-      target = { ...target, x: biased.x, z: biased.z };
-      if (isPositionClear(target.x, target.z, selfRadius, occupied)) {
-        return { x: target.x, z: target.z };
-      }
-      return findClearPosition(target.x, target.z, selfRadius, occupied);
-    }
-  }
-
-  const anchor = loadPlacementAnchor();
-  const base = anchor || { x: USER_AMULET_SLOT.x, z: USER_AMULET_SLOT.z };
-  return findClearPosition(base.x, base.z, selfRadius, occupied);
+  return { x: seed.x, z: seed.z };
 }
 
 function resolveUserAmuletLayout(selfRadius, restore, options) {
@@ -2041,29 +2157,44 @@ function extractSpriteSnapshotUrl(sprite) {
   }
 }
 
+function snapshotUrlsFromSprite(sprite) {
+  const tex = sprite.material?.map?.image;
+  if (!tex) return { preview: '', hiRes: '' };
+  const w = tex.width || tex.naturalWidth;
+  const h = tex.height || tex.naturalHeight;
+  if (!w || !h) return { preview: '', hiRes: '' };
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(tex, 0, 0);
+  const cropped = cropAndSquare(canvas);
+  return {
+    preview: previewSnapshotForLocalStorage(cropped),
+    hiRes: compressSnapshotDataUrl(cropped),
+  };
+}
+
 function buildQuickCollectionEntry(sprite, entryId) {
   const answers = sprite.userData.answers || loadUserAmuletAnswers() || loadAnswers();
   const archivedPosition = spritePositionPayload(sprite);
-  let thumbUrl = '';
-  try {
-    const img = sprite.material?.map?.image;
-    if (img && (img instanceof HTMLCanvasElement || img instanceof HTMLImageElement)) {
-      const c = document.createElement('canvas');
-      c.width = img.width || img.naturalWidth;
-      c.height = img.height || img.naturalHeight;
-      if (c.width && c.height) {
-        c.getContext('2d').drawImage(img, 0, 0);
-        thumbUrl = tinyThumbFromCanvas(c);
-      }
-    }
-  } catch (_) {}
+  const snapUrls = snapshotUrlsFromSprite(sprite);
+  if (snapUrls.hiRes && entryId != null) {
+    void glbStore().then(function (store) {
+      return store.saveSnapshot('collection-' + entryId, snapUrls.hiRes);
+    }).catch(function (err) {
+      console.warn('[garden-three] quick collection snapshot IDB save failed', err);
+    });
+  }
   return {
     id: entryId,
-    snapshot: thumbUrl,
+    snapshot: snapUrls.preview || '',
     snapshotInIdb: true,
     answers: answers,
     createdAt: answers.completedAt || Date.now(),
     position: archivedPosition,
+    layoutNudge: LIVE_FORWARD_ROW_TAG,
   };
 }
 
@@ -2083,7 +2214,14 @@ function enrichCollectionEntryInBackground(sprite, entryId) {
 
 async function buildCollectionEntryFromSprite(sprite, entryId) {
   let snapshotUrl = extractSpriteSnapshotUrl(sprite) || loadUserAmuletSnapshotUrl();
-  const answers = sprite.userData.answers || loadUserAmuletAnswers() || loadAnswers();
+  let answers = sprite.userData.answers || null;
+  if (!answers || !answers.q1Wish) {
+    const collection = loadCollection();
+    const collIdx = collection.findIndex(function (e) { return e && e.id === entryId; });
+    if (collIdx >= 0 && collection[collIdx].answers) {
+      answers = collection[collIdx].answers;
+    }
+  }
   const archivedPosition = spritePositionPayload(sprite);
   const snapKey = 'collection-' + entryId;
 
@@ -2099,13 +2237,13 @@ async function buildCollectionEntryFromSprite(sprite, entryId) {
         c.height = img.height || img.naturalHeight;
         c.getContext('2d').drawImage(img, 0, 0);
         const hiResSnapshotUrl = compressSnapshotDataUrl(c);
-        thumbUrl = tinyThumbFromCanvas(c);
+        thumbUrl = previewSnapshotForLocalStorage(c);
         idbSnapshotUrl = hiResSnapshotUrl || snapshotUrl;
       } else {
-        thumbUrl = await dataUrlToTinyThumb(snapshotUrl);
+        thumbUrl = await dataUrlToPreviewSnapshot(snapshotUrl);
       }
     } catch (_) {
-      thumbUrl = await dataUrlToTinyThumb(snapshotUrl);
+      thumbUrl = await dataUrlToPreviewSnapshot(snapshotUrl);
     }
   }
 
@@ -2118,22 +2256,6 @@ async function buildCollectionEntryFromSprite(sprite, entryId) {
     if (idbSnapshotUrl) {
       await store.saveSnapshot(snapKey, idbSnapshotUrl);
     }
-    let copied = false;
-    try {
-      await store.copyGlb('user-amulet', snapKey);
-      copied = true;
-    } catch (_) {}
-    if (!copied) {
-      try {
-        await store.copyGlb('user-amulet-prev', snapKey);
-        copied = true;
-      } catch (_) {}
-    }
-    if (copied) {
-      try {
-        await store.deleteGlb('user-amulet-prev');
-      } catch (_) {}
-    }
   } catch (err) {
     console.warn('[garden-three] IndexedDB collection save failed (non-fatal)', err);
   }
@@ -2145,14 +2267,8 @@ async function buildCollectionEntryFromSprite(sprite, entryId) {
       await composeMod.initAmuletCompose();
       composed3D = await composeMod.composeFullAmuletForPbr(answers);
     } catch (err) {
-      console.warn('[garden-three] per-entry compose failed, falling back to global', err);
+      console.warn('[garden-three] per-entry compose failed', err);
     }
-  }
-  if (!composed3D) {
-    try {
-      var raw3d = sessionStorage.getItem('amuletComposed3D') || localStorage.getItem('amuletComposed3D');
-      if (raw3d) composed3D = JSON.parse(raw3d);
-    } catch (_) {}
   }
 
   if (composed3D) {
@@ -2186,14 +2302,20 @@ function persistLiveAmuletToCollection(sprite) {
     if (entry && entry.isLive) entry.isLive = false;
   }
 
-  const entryId = sprite.userData.collectionEntryId || Date.now();
-  sprite.userData.collectionEntryId = entryId;
+  const entryId = sprite.userData.collectionEntryId;
+  if (entryId == null) {
+    console.error(
+      '[garden-three] persistLiveAmuletToCollection — sprite missing collectionEntryId; using Date.now() fallback (collision risk)'
+    );
+  }
+  const resolvedEntryId = entryId != null ? entryId : Date.now();
+  sprite.userData.collectionEntryId = resolvedEntryId;
 
   let collIdx = typeof sprite.userData.collectionIndex === 'number'
     ? sprite.userData.collectionIndex
-    : collection.findIndex(function (e) { return e && e.id === entryId; });
+    : collection.findIndex(function (e) { return e && e.id === resolvedEntryId; });
 
-  const built = buildQuickCollectionEntry(sprite, entryId);
+  const built = buildQuickCollectionEntry(sprite, resolvedEntryId);
   built.isLive = true;
 
   const prevEntry = collIdx >= 0 && collection[collIdx]
@@ -2228,7 +2350,8 @@ function persistLiveAmuletToCollection(sprite) {
     delete sprite.userData.collectionIndex;
     console.error('[garden-three] failed to save new amulet to collection - do not refresh');
   } else {
-    enrichCollectionEntryInBackground(sprite, entryId);
+    enrichCollectionEntryInBackground(sprite, resolvedEntryId);
+    void snapshotUserGlbToCollectionEntry(resolvedEntryId);
   }
   updateCameraScrollLimits();
   return ok;
@@ -2257,6 +2380,7 @@ async function archiveUserAmuletToCollection() {
       return false;
     }
     enrichCollectionEntryInBackground(sprite, entryId);
+    snapshotUserGlbToCollectionEntry(entryId);
     sprite.userData.isUserAmulet = false;
     sprite.userData.isCollectionAmulet = true;
     if (!collectionSprites.includes(sprite)) {
@@ -2295,10 +2419,12 @@ async function addUserAmuletSprite(sourceCanvas, options) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) return null;
 
   if (userAmuletSprite) {
+    await yieldToMain();
     const archived = await archiveUserAmuletToCollection();
     if (!archived) {
       throw new Error('failed to archive previous amulet');
     }
+    await yieldToMain();
   }
 
   var rawSnapshot = snapshotCanvas(sourceCanvas);
@@ -2309,11 +2435,15 @@ async function addUserAmuletSprite(sourceCanvas, options) {
     }, 0);
   }
   var croppedSnapshot = cropAndSquare(rawSnapshot);
+  const texCanvas =
+    croppedSnapshot.width > GARDEN_SPRITE_MAX_PX || croppedSnapshot.height > GARDEN_SPRITE_MAX_PX
+      ? downscaleCanvas(croppedSnapshot, GARDEN_SPRITE_MAX_PX)
+      : croppedSnapshot;
   const answers = (options && options.answers) || loadAnswers();
   if (Object.keys(answers).length) {
     persistUserAmuletAnswers(answers);
   }
-  const texture = configureSpriteTexture(new THREE.CanvasTexture(croppedSnapshot));
+  const texture = configureSpriteTexture(new THREE.CanvasTexture(texCanvas));
   texture.needsUpdate = true;
 
   const collectionCount = loadCollection().length;
@@ -2329,9 +2459,18 @@ async function addUserAmuletSprite(sourceCanvas, options) {
   }
   userAmuletSprite.userData.isUserAmulet = true;
   userAmuletSprite.userData.answers = answers;
+  userAmuletSprite.userData.focusMul = 1;
+
+  if (!restore && options && options.entryId != null) {
+    userAmuletSprite.userData.collectionEntryId = options.entryId;
+  }
 
   if (!restore) {
     upgradeSpriteFromIndexedDb(userAmuletSprite).catch(function () {});
+    if (options && options.focusAfterPlace) {
+      focusCameraOnAmulet(userAmuletSprite, { animate: true });
+    }
+    await yieldToMain();
     const saved = persistLiveAmuletToCollection(userAmuletSprite);
     if (!saved) {
       const failedSprite = userAmuletSprite;
@@ -2339,9 +2478,16 @@ async function addUserAmuletSprite(sourceCanvas, options) {
       disposeGardenSprite(failedSprite);
       throw new Error('failed to save amulet to collection');
     }
-    if (options && options.focusAfterPlace) {
-      focusCameraOnAmulet(userAmuletSprite, { animate: true });
+    const entryId = userAmuletSprite.userData.collectionEntryId;
+    if (options && options.composed3D) {
+      void persistComposed3dForEntry(entryId, options.composed3D);
     }
+    if (answers && answers.q1Wish) {
+      void glbStore().then(function (store) {
+        return store.saveSnapshot('answers-collection-' + entryId, JSON.stringify(answers));
+      }).catch(function () {});
+    }
+    void snapshotUserGlbToCollectionEntry(entryId);
   }
 
   updateCameraScrollLimits();
@@ -2406,6 +2552,7 @@ function syncCollectionSpritePositions() {
 
 function restoreCollectionFromStorage() {
   const collection = loadCollection();
+  auditCollectionEntryIdCollisions();
   if (!collection.length) return Promise.resolve();
   updateCameraScrollLimit(collection.length);
 
@@ -2652,20 +2799,127 @@ function isSpriteHoverable(sprite) {
   return (sprite.userData.focusMul ?? 1) > 0.02;
 }
 
-function ensureSpriteEntryId(sprite) {
-  if (!sprite) return null;
-  if (sprite.userData.collectionEntryId != null) return sprite.userData.collectionEntryId;
-  if (typeof sprite.userData.collectionIndex === 'number') {
-    const collection = loadCollection();
-    const entry = collection[sprite.userData.collectionIndex];
-    if (entry && entry.id != null) {
-      sprite.userData.collectionEntryId = entry.id;
-      if (!sprite.userData.answers && entry.answers) {
-        sprite.userData.answers = entry.answers;
-      }
-      return entry.id;
+function snapshotUserGlbToCollectionEntry(entryId) {
+  if (entryId == null) return Promise.resolve(false);
+  const snapKey = 'collection-' + entryId;
+  return glbStore()
+    .then(function (store) {
+      return store.loadGlbRaw(snapKey).then(function (existing) {
+        if (existing && existing.glb) return true;
+        console.warn('[garden-three] no GLB for', snapKey, '— detail page will use composed3d fallback');
+        return false;
+      });
+    })
+    .catch(function (err) {
+      console.warn('[garden-three] GLB verify failed', err);
+      return false;
+    });
+}
+
+function persistComposed3dForEntry(entryId, composed3D) {
+  if (entryId == null || !composed3D || !composed3D.svg) return Promise.resolve(false);
+  return glbStore()
+    .then(function (store) {
+      return store.saveSnapshot('composed3d-' + entryId, JSON.stringify(composed3D));
+    })
+    .then(function () {
+      return true;
+    })
+    .catch(function (err) {
+      console.warn('[garden-three] composed3d save failed', err);
+      return false;
+    });
+}
+
+function auditCollectionEntryIdCollisions() {
+  const collection = loadCollection();
+  const byId = new Map();
+  const dupes = [];
+  for (let i = 0; i < collection.length; i += 1) {
+    const entry = collection[i];
+    if (!entry || entry.id == null) continue;
+    if (byId.has(entry.id)) {
+      dupes.push({
+        entryId: entry.id,
+        collectionIndices: [byId.get(entry.id), i],
+      });
+    } else {
+      byId.set(entry.id, i);
     }
   }
+  if (dupes.length) {
+    console.error('[garden-three] DUPLICATE entryIds in amuletCollection — data may be corrupted', dupes);
+  }
+}
+
+function describeSpriteNavState(sprite) {
+  if (!sprite) return null;
+  const collection = loadCollection();
+  const collIdx =
+    typeof sprite.userData.collectionIndex === 'number' ? sprite.userData.collectionIndex : null;
+  const entryAtIdx = collIdx != null ? collection[collIdx] : null;
+  const spriteEntryId = sprite.userData.collectionEntryId ?? null;
+  const entryIdAtIdx = entryAtIdx && entryAtIdx.id != null ? entryAtIdx.id : null;
+  const labelAtIdx =
+    collIdx != null ? USER_AMULET_INDEX + collIdx + 1 : null;
+  return {
+    spriteEntryId: spriteEntryId,
+    collectionIndex: collIdx,
+    questionIndex: sprite.userData.questionIndex ?? null,
+    entryIdAtCollectionIndex: entryIdAtIdx,
+    labelAtCollectionIndex: labelAtIdx,
+    wishOnSprite:
+      sprite.userData.answers && sprite.userData.answers.q1Wish
+        ? String(sprite.userData.answers.q1Wish).slice(0, 60)
+        : null,
+    wishAtCollectionIndex:
+      entryAtIdx && entryAtIdx.answers && entryAtIdx.answers.q1Wish
+        ? String(entryAtIdx.answers.q1Wish).slice(0, 60)
+        : null,
+    entryIdMismatch:
+      spriteEntryId != null &&
+      entryIdAtIdx != null &&
+      String(spriteEntryId) !== String(entryIdAtIdx),
+    isUserAmulet: Boolean(sprite.userData.isUserAmulet),
+    isCollectionAmulet: Boolean(sprite.userData.isCollectionAmulet),
+  };
+}
+
+function ensureSpriteEntryId(sprite) {
+  if (!sprite) return null;
+
+  const collection = loadCollection();
+  const collIdx =
+    typeof sprite.userData.collectionIndex === 'number' ? sprite.userData.collectionIndex : null;
+  const entryAtIdx = collIdx != null ? collection[collIdx] : null;
+
+  // Collection sprites: snapshot texture always came from collection[collectionIndex].
+  if (sprite.userData.isCollectionAmulet && entryAtIdx && entryAtIdx.id != null) {
+    const storedId = sprite.userData.collectionEntryId ?? null;
+    if (storedId != null && String(storedId) !== String(entryAtIdx.id)) {
+      console.warn(
+        '[garden-three] sprite entryId corrected from collection index',
+        describeSpriteNavState(sprite)
+      );
+    }
+    sprite.userData.collectionEntryId = entryAtIdx.id;
+    if (!sprite.userData.answers && entryAtIdx.answers) {
+      sprite.userData.answers = entryAtIdx.answers;
+    }
+    return entryAtIdx.id;
+  }
+
+  const storedId = sprite.userData.collectionEntryId ?? null;
+  if (storedId != null) return storedId;
+
+  if (entryAtIdx && entryAtIdx.id != null) {
+    sprite.userData.collectionEntryId = entryAtIdx.id;
+    if (!sprite.userData.answers && entryAtIdx.answers) {
+      sprite.userData.answers = entryAtIdx.answers;
+    }
+    return entryAtIdx.id;
+  }
+
   return null;
 }
 
@@ -3012,9 +3266,10 @@ const canvas = renderer.domElement;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   const amuletAtDown =
-    lastHoveredAmuletSprite && isSpriteHoverable(lastHoveredAmuletSprite)
+    pickAmulet(e.clientX, e.clientY, false) ||
+    (lastHoveredAmuletSprite && isSpriteHoverable(lastHoveredAmuletSprite)
       ? lastHoveredAmuletSprite
-      : pickAmulet(e.clientX, e.clientY, false);
+      : null);
   if (amuletAtDown) ensureSpriteEntryId(amuletAtDown);
   pointerDown = {
     x: e.clientX,
@@ -3248,6 +3503,11 @@ function resolveSpriteNavigationTarget(sprite) {
     if (fromIndex != null) return { index: index, entryId: fromIndex, answers: answers };
   }
 
+  if (entryId != null && typeof window.pagmarIndexForEntryId === 'function') {
+    const fromEntry = window.pagmarIndexForEntryId(entryId);
+    if (fromEntry != null) return { index: fromEntry, entryId: entryId, answers: answers };
+  }
+
   return { index: index, entryId: entryId, answers: answers };
 }
 
@@ -3281,27 +3541,85 @@ function collectionEntryById(entryId) {
   return null;
 }
 
-function navigateToAmuletDetailFromSprite(sprite) {
-  if (!sprite) return;
-  const entryId = resolveSpriteEntryId(sprite);
-  if (entryId == null) {
-    console.warn('[garden-three] cannot open detail — sprite missing collectionEntryId');
-    return;
+function resolveNavigationIndexForEntry(entryId, sprite) {
+  if (entryId != null && typeof window.pagmarIndexForEntryId === 'function') {
+    const fromEntry = window.pagmarIndexForEntryId(entryId);
+    if (fromEntry != null) {
+      return { index: fromEntry, labelIndex: fromEntry - USER_AMULET_INDEX };
+    }
   }
-  const answers =
-    sprite.userData.answers ||
-    (collectionEntryById(entryId) || {}).answers ||
-    null;
   const labelIndex =
-    typeof sprite.userData.collectionIndex === 'number'
+    sprite && typeof sprite.userData.collectionIndex === 'number'
       ? sprite.userData.collectionIndex
       : null;
-  let index =
+  const index =
     labelIndex != null ? USER_AMULET_INDEX + labelIndex : USER_AMULET_INDEX;
-  navigateToAmuletDetail(index, entryId, answers, labelIndex);
+  return { index: index, labelIndex: labelIndex };
 }
 
-function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIndexOverride) {
+function spriteCollectionEntry(sprite) {
+  if (!sprite || typeof sprite.userData.collectionIndex !== 'number') return null;
+  const collection = loadCollection();
+  const entry = collection[sprite.userData.collectionIndex];
+  return entry && entry.id != null ? entry : null;
+}
+
+function glbUrlForCollectionEntry(entry) {
+  if (!entry || entry.id == null) return null;
+  if (entry.glbUrl && glbUrlMatchesEntryId(entry.glbUrl, entry.id)) {
+    return entry.glbUrl;
+  }
+  if (
+    entry.snapshot &&
+    String(entry.snapshot).indexOf('/seed/snapshots/' + entry.id) !== -1
+  ) {
+    return canonicalSeedGlbUrl(entry.id);
+  }
+  return null;
+}
+
+function navigateToAmuletDetailFromSprite(sprite) {
+  if (!sprite) return;
+  syncSpriteCollectionIndicesFromCollection();
+  ensureSpriteEntryId(sprite);
+
+  const entry =
+    spriteCollectionEntry(sprite) ||
+    collectionEntryById(resolveSpriteEntryId(sprite));
+  if (!entry || entry.id == null) {
+    console.warn('[garden-three] cannot open detail — no collection entry for sprite', {
+      collectionIndex: sprite.userData.collectionIndex,
+    });
+    return;
+  }
+
+  const entryId = entry.id;
+  sprite.userData.collectionEntryId = entryId;
+  if (!sprite.userData.answers && entry.answers) {
+    sprite.userData.answers = entry.answers;
+  }
+
+  const glbUrl = glbUrlForCollectionEntry(entry);
+  const nav = resolveNavigationIndexForEntry(entryId, sprite);
+  console.log(
+    '%c[garden-three] OPEN DETAIL from sprite',
+    'color:#ff9;background:#222;font-size:13px;padding:2px 6px;',
+    {
+      entryId: entryId,
+      glbUrl: glbUrl,
+      navIndex: nav.index,
+      labelIndex: nav.labelIndex,
+      collectionIndex: sprite.userData.collectionIndex,
+      wish:
+        entry.answers && entry.answers.q1Wish
+          ? String(entry.answers.q1Wish).slice(0, 60)
+          : null,
+    }
+  );
+  navigateToAmuletDetail(nav.index, entryId, entry.answers, nav.labelIndex, glbUrl);
+}
+
+function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIndexOverride, glbUrlOverride) {
   if (typeof window.pagmarIndexChrome !== 'undefined' && window.pagmarIndexChrome.markTyped) {
     window.pagmarIndexChrome.markTyped();
   }
@@ -3328,23 +3646,39 @@ function navigateToAmuletDetail(index, entryIdOverride, answersOverride, labelIn
     return;
   }
   var navIndex = index;
-  if (typeof labelIndexOverride === 'number') {
+  if (entryId != null && typeof window.pagmarIndexForEntryId === 'function') {
+    var fromEntry = window.pagmarIndexForEntryId(entryId);
+    if (fromEntry != null) navIndex = fromEntry;
+  } else if (typeof labelIndexOverride === 'number') {
     navIndex = USER_AMULET_INDEX + labelIndexOverride;
   }
   var url = 'amulet.html?entry=' + encodeURIComponent(entryId);
   if (navIndex != null && Number.isFinite(navIndex)) {
     url += '&id=' + encodeURIComponent(navIndex);
   }
+  console.log(
+    '%c[garden-three] navigateToAmuletDetail',
+    'color:#9f9;background:#222;font-size:13px;padding:2px 6px;',
+    { url: url, entryId: entryId, navIndex: navIndex, wish: answersOverride && answersOverride.q1Wish ? String(answersOverride.q1Wish).slice(0, 60) : null }
+  );
   try {
     var navPayload = { index: navIndex, entryId: entryId };
-    if (typeof labelIndexOverride === 'number') {
-      navPayload.labelIndex = labelIndexOverride;
+    if (navIndex >= USER_AMULET_INDEX) {
+      navPayload.labelIndex = navIndex - USER_AMULET_INDEX;
     }
     if (answersOverride && typeof answersOverride === 'object') {
       navPayload.answers = answersOverride;
     } else {
       var collectionEntry = collectionEntryById(entryId);
       if (collectionEntry && collectionEntry.answers) navPayload.answers = collectionEntry.answers;
+    }
+    var resolvedGlbUrl = glbUrlOverride;
+    if (!resolvedGlbUrl) {
+      var collEntry = collectionEntryById(entryId);
+      resolvedGlbUrl = glbUrlForCollectionEntry(collEntry);
+    }
+    if (resolvedGlbUrl && glbUrlMatchesEntryId(resolvedGlbUrl, entryId)) {
+      navPayload.glbUrl = resolvedGlbUrl;
     }
     sessionStorage.setItem('pagmarAmuletDetailNav', JSON.stringify(navPayload));
   } catch (_) {}
@@ -3356,7 +3690,6 @@ window.pagmarNavigateToAmuletDetail = navigateToAmuletDetail;
 canvas.addEventListener('pointerup', (e) => {
   if (!pointerDown) return;
   const moved = pointerDown.moved;
-  const hit = pointerDown.amulet;
   pointerDown = null;
 
   if (moved) {
@@ -3366,11 +3699,16 @@ canvas.addEventListener('pointerup', (e) => {
 
   if (document.body.classList.contains('is-create-mode')) return;
 
+  const hit =
+    pickAmulet(e.clientX, e.clientY, true) ||
+    pickAmuletAtPointer(e.clientX, e.clientY, null);
   if (!hit) {
     updateCursorFromPointer(e.clientX, e.clientY);
     return;
   }
 
+  syncSpriteCollectionIndicesFromCollection();
+  ensureSpriteEntryId(hit);
   startAmuletSpin(hit);
 
   e.preventDefault();
@@ -3386,11 +3724,15 @@ window.addEventListener('questionnaire:create-open', () => {
   updateFocusVisuals();
 });
 
-window.addEventListener('questionnaire:create-close', () => {
-  if (preCreateGardenState) {
+window.addEventListener('questionnaire:create-close', (evt) => {
+  const afterSave = evt.detail && evt.detail.afterSave;
+  if (!afterSave && preCreateGardenState) {
     applyGardenViewState(preCreateGardenState);
     preCreateGardenState = null;
+  } else if (afterSave) {
+    preCreateGardenState = null;
   }
+  resetAllSpriteFocus();
   updateFocusVisuals();
 });
 
@@ -3587,6 +3929,9 @@ Promise.resolve()
     return purgeAmulets021022023Once();
   })
   .then(() => {
+    return purgePermanentlyRemovedLabels();
+  })
+  .then(() => {
     revertOpeningGlobalDownOnce();
     migrateForwardNudgeLabels();
     forceRepositionLabel021Once();
@@ -3616,6 +3961,7 @@ Promise.resolve()
     }).then(function () {
       syncSpriteCollectionIndicesFromCollection();
       syncCollectionSpritePositions();
+      return applyRemoveLabelFromUrl();
     });
   })
   .then(() => {
@@ -3672,6 +4018,7 @@ window.gardenRestoreViewState = function gardenRestoreViewState(state) {
 window.gardenAddUserAmulet = function (sourceCanvas, options) {
   return addUserAmuletSprite(sourceCanvas, options);
 };
+window.gardenResetSpriteFocus = resetAllSpriteFocus;
 window.gardenCapturePlacementAnchor = capturePlacementAnchor;
 window.gardenFocusUserAmulet = focusUserAmulet;
 window.gardenFocusSavedAmulet = focusSavedAmulet;
@@ -3679,6 +4026,23 @@ window.gardenFocusSprite = function (sprite) {
   return focusCameraOnAmulet(sprite, { animate: true });
 };
 window.gardenPersistUserAmuletSnapshot = persistUserAmuletSnapshot;
+window.gardenUpgradeCollectionSnapshot = function (entryId) {
+  if (entryId == null) return Promise.resolve(false);
+  const sprite =
+    collectionSprites.find(function (s) {
+      return s.userData.collectionEntryId == entryId;
+    }) ||
+    (userAmuletSprite && userAmuletSprite.userData.collectionEntryId == entryId
+      ? userAmuletSprite
+      : null);
+  if (!sprite) return Promise.resolve(false);
+  return upgradeSpriteFromIndexedDb(sprite);
+};
+window.addEventListener('pagmar:snapshot-repaired', function (event) {
+  const entryId = event && event.detail ? event.detail.entryId : null;
+  if (entryId == null) return;
+  window.gardenUpgradeCollectionSnapshot(entryId).catch(function () {});
+});
 window.gardenPersistUserAmuletAnswers = persistUserAmuletAnswers;
 window.gardenLoadUserAmuletAnswers = loadUserAmuletAnswers;
 window.gardenHasUserAmuletSnapshot = hasUserAmuletSnapshot;

@@ -210,6 +210,11 @@ function attachMeteoriteCraterCatalog(params, slabMode) {
   return params;
 }
 
+function slabBackPad(roundR, params) {
+  const mul = params?.slabBackPadMul ?? 0.5;
+  return roundR * mul;
+}
+
 function isMeteoriteStoneOptions(options, slabMode) {
   return (
     slabMode &&
@@ -967,7 +972,7 @@ function slabMaskPlateauSdfAt(x, y, z, params) {
   hSurf += inlayGrooveShoulderAt(x, y, params);
   hSurf = Math.max(baseH * 0.94, hSurf);
   hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
-  const basePad = roundR * 0.5;
+  const basePad = slabBackPad(roundR, params);
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   const phi2d = roundR - din;
   return applyStoneEmbossUnion(Math.max(phi2d, sdfZ) - roundR * 0.06, x, y, z, params);
@@ -1111,7 +1116,7 @@ function slabTubeStoneSdfAt(x, y, z, params) {
   hSurf -= effectiveEngraveDepthAt(x, y, params);
   hSurf += inlayGrooveShoulderAt(x, y, params);
 
-  const basePad = roundR * 0.5;
+  const basePad = slabBackPad(roundR, params);
   const sdfZ = Math.max(z - hSurf, -(z + basePad));
   let letterSdf = Math.max(phi2d, sdfZ) - roundR * soft.letterRound;
 
@@ -1707,7 +1712,7 @@ function stoneSdfAt(x, y, z, params) {
     hSurf += inlayGrooveShoulderAt(x, y, params);
     hSurf = Math.max(baseH * 0.94, hSurf);
     hSurf = addSlabSurfaceRelief(hSurf, x, y, din, roundR, params);
-    const basePad = roundR * 0.5;
+    const basePad = slabBackPad(roundR, params);
     const sdfZ = Math.max(z - hSurf, -(z + basePad));
     const machineEngrave =
       (params.engraveOverlays || []).some((ov) => ov.machineCut) ||

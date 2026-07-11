@@ -291,6 +291,11 @@ body.pagmar-create .pagmar__request-flow {
   pointer-events: auto;
 }
 
+/* Pass clicks through amulet stage; dock/field opt in via their own pointer-events */
+.pagmar__request-artboard > .figma-amulet-stage {
+  pointer-events: none;
+}
+
 .pagmar__request-artboard > .pagmar__request-fog {
   pointer-events: none !important;
 }
@@ -323,7 +328,7 @@ body.pagmar-create .pagmar__request-flow {
   position: fixed;
   left: 50%;
   right: auto;
-  top: calc(var(--figma-amulet-y) * var(--fu) - var(--figma-amulet-lift, 0px));
+  top: calc(var(--figma-amulet-y) * var(--fu));
   width: calc(var(--figma-amulet-w) * var(--fu));
   height: calc(var(--figma-amulet-h) * var(--fu));
   transform: translateX(-50%);
@@ -333,7 +338,6 @@ body.pagmar-create .pagmar__request-flow {
   visibility: hidden;
   opacity: 0;
   transition:
-    top var(--figma-transition, 220ms cubic-bezier(0.33, 0, 0.2, 1)),
     opacity var(--figma-transition, 220ms cubic-bezier(0.33, 0, 0.2, 1)),
     visibility var(--figma-transition, 220ms cubic-bezier(0.33, 0, 0.2, 1));
 }
@@ -786,17 +790,18 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 .pagmar__request-artboard.is-advancing .figma-q__copy,
 .pagmar__request-artboard.is-advancing .figma-q__dock {
   opacity: 0;
+  visibility: hidden;
   filter: blur(calc(5 * var(--fu)));
   pointer-events: none;
 }
 
-/* Between questions - hide copy frame + dock while vectors load */
+/* Between questions - hide question + dock while the next vector prepares */
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__copy,
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__dock {
-  visibility: hidden;
-  opacity: 0;
+  visibility: hidden !important;
+  opacity: 0 !important;
   filter: blur(calc(5 * var(--fu)));
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 body.is-question-transition-loading .pagmar__request-artboard .figma-q-vector-grid {
@@ -805,8 +810,8 @@ body.is-question-transition-loading .pagmar__request-artboard .figma-q-vector-gr
 }
 
 body.is-question-transition-loading .pagmar__request-artboard > .figma-amulet-stage {
-  visibility: hidden !important;
-  opacity: 0 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 body.is-question-transition-loading.pagmar-create.is-building .pagmar__request-artboard > .figma-amulet-stage,
@@ -816,10 +821,19 @@ body.is-question-transition-loading.is-vector-frame-loading .pagmar__request-art
   opacity: 1 !important;
 }
 
-body.is-question-transition-loading .pagmar__request-artboard .figma-q__btn-outer,
-body.is-question-transition-loading .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
-body.is-question-transition-loading .pagmar__request-artboard .figma-q__field .intro__question-input {
-  pointer-events: none;
+/* Question dock - interactive only when question is visible (not between questions) */
+body.pagmar-index.is-create-mode:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__dock {
+  pointer-events: auto !important;
+}
+
+body.pagmar-index.is-create-mode:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
+body.pagmar-create:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-create:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field .intro__question-input,
+body.pagmar-index.is-create-mode:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-create:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__btn-outer {
+  pointer-events: auto !important;
 }
 
 /* Frame 395 - tag + title + desc + vector grid */
@@ -924,6 +938,10 @@ body.pagmar-create .pagmar__request-artboard .figma-q__dock,
   pointer-events: auto;
   overflow: visible;
   z-index: 34;
+  transition:
+    opacity var(--figma-transition),
+    visibility var(--figma-transition),
+    filter var(--figma-transition);
 }
 
 body.is-choice-question .figma-q__dock {
@@ -1174,13 +1192,14 @@ body.is-question-transition-loading .pagmar__request-vector-tip {
   background: transparent;
   align-self: stretch;
   margin: 0;
+  pointer-events: auto;
 }
 
 body:not(.is-choice-question) .figma-q__field-box {
   flex: 0 0 auto;
   width: calc(var(--figma-q-field-w) * var(--fu));
   min-height: calc(var(--figma-q-btn-h) * var(--fu));
-  height: auto;
+  height: calc(var(--figma-q-btn-h) * var(--fu));
   align-self: center;
 }
 
@@ -1209,11 +1228,14 @@ body.is-choice-question:not(.is-choice-save) .figma-q__dock .figma-q__btn-outer 
   align-items: center;
   justify-content: flex-start;
   overflow: visible;
+  pointer-events: auto;
 }
 
 body:not(.is-choice-question) .figma-q__field {
   align-self: center;
   width: 100%;
+  height: calc(var(--figma-q-btn-h) * var(--fu));
+  min-height: calc(var(--figma-q-btn-h) * var(--fu));
 }
 
 body.is-choice-question .figma-q__field {
@@ -1786,7 +1808,9 @@ body.pagmar-create:not(.is-choice-question) .pagmar__request-artboard .figma-q__
   height: calc(var(--figma-q-btn-h) * var(--fu)) !important;
   line-height: calc(var(--figma-q-btn-h) * var(--fu)) !important;
   padding: 0 !important;
+  white-space: nowrap !important;
   overflow: hidden !important;
+  text-overflow: clip !important;
 }
 
 body.pagmar-index.is-create-mode:not(.is-choice-question) .pagmar__request-artboard .figma-q__field textarea.intro__question-input:not(.is-dock-scrollable),
@@ -1836,4 +1860,22 @@ body.pagmar-create .pagmar__request-artboard .figma-q__btn:hover:not(:disabled),
 body.pagmar-create .pagmar__request-artboard .figma-q__btn:focus-visible:not(:disabled) {
   background: #000000 !important;
   opacity: 1 !important;
+}
+
+/* Q4–Q8: dock + answers clickable the moment the question is shown */
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__dock,
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__field,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__field,
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__field-box,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__field-box,
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .intro__question-input,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .intro__question-input,
+body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__btn-outer {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }

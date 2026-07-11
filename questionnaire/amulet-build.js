@@ -296,7 +296,11 @@ export async function updateAmuletPreview(answers, options = {}) {
   const shouldShowLoader = showLoader && newLayerVisible;
 
   if (shouldShowLoader) {
-    await showAmuletLoader('טוען קמע', { keepPreview: false });
+    await showAmuletLoader('טוען קמע', { keepPreview: true });
+  }
+
+  if (newLayerVisible && typeof window.pagmarHideCreateAmuletMorph === 'function') {
+    window.pagmarHideCreateAmuletMorph();
   }
 
   if (uiBlocking && shouldShowLoader) {

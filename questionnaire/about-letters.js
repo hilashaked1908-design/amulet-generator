@@ -29,9 +29,9 @@
   ];
   const GLYPHS_DIR = '../glyphs';
   const PANEL_W = 880;
-  const PANEL_H = 924;
+  const PANEL_H = 730;
   const CANVAS_W = 820;
-  const CANVAS_H = 820;
+  const CANVAS_H = 670;
   const PANEL_PAD_X = (PANEL_W - CANVAS_W) / 2;
   const PANEL_PAD_Y = (PANEL_H - CANVAS_H) / 2;
   const INTENT = 'protection';

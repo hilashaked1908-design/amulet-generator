@@ -9,6 +9,11 @@ import {
 } from './export-view-fog.js?v=20250710-export-view';
 import { bootExportAmuletHover } from './export-view-hover.js?v=20250710-export-view';
 import { composeExportCardPng } from './export-card-compose.js?v=20250710-export-view';
+import {
+  applyFittedTextToElement,
+  EXPORT_CARD_LAYOUT,
+  fitExportText,
+} from './export-text-fit.js?v=20250711-export-text-fit';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
 const EXPORT_VIEW_KEY = 'pagmarExportViewActive';
@@ -49,6 +54,11 @@ function formatExportName(name) {
 }
 
 function getExportUnitPx() {
+  const card = document.getElementById('exportCard');
+  if (card) {
+    const w = card.getBoundingClientRect().width;
+    if (w > 0) return w / 800;
+  }
   const main = document.querySelector('.pagmar__export-main');
   if (!main) return 1;
   const w = main.clientWidth / 1920;
@@ -56,29 +66,20 @@ function getExportUnitPx() {
   return Math.min(w, h) || 1;
 }
 
-function fitExportWishTypography() {
-  const wishEl = document.getElementById('exportWish');
-  const card = document.getElementById('exportCard');
-  if (!wishEl || !card) return;
-
+function fitExportCardTypography() {
   const u = getExportUnitPx();
-  const maxH = 280 * u;
-  const maxW = 360 * u;
-  let sizePx = 90 * u;
-  const minPx = 28 * u;
+  const L = EXPORT_CARD_LAYOUT;
+  const wishEl = document.getElementById('exportWish');
 
-  wishEl.style.fontSize = sizePx + 'px';
-  wishEl.style.lineHeight = '1';
-
-  let guard = 0;
-  while (
-    (wishEl.scrollHeight > maxH + 1 || wishEl.scrollWidth > maxW + 1) &&
-    sizePx > minPx &&
-    guard < 100
-  ) {
-    sizePx -= 1;
-    wishEl.style.fontSize = sizePx + 'px';
-    guard += 1;
+  if (wishEl?.textContent) {
+    const fit = fitExportText(
+      wishEl.textContent,
+      L.wishWidth * u,
+      L.wishHeight * u,
+      'wish',
+      u
+    );
+    applyFittedTextToElement(wishEl, fit, 'wish');
   }
 }
 
@@ -93,12 +94,15 @@ function populateExportFields(answers) {
   if (outcomeEl) outcomeEl.textContent = normalizeText(answers.q7Change) || '-';
   if (wishEl) wishEl.textContent = normalizeText(answers.q1Wish) || '-';
 
-  fitExportWishTypography();
+  fitExportCardTypography();
 }
 
 async function mountExportAmulet(slot) {
   const present = await import('./amulet-detail-present.js?v=20250710-export-view');
-  await present.mountDetailStyleAmulet(slot, 'user-amulet', { useDetailPresentation: true });
+  await present.mountDetailStyleAmulet(slot, 'user-amulet', {
+    useDetailPresentation: true,
+    fitMargin: 1.18,
+  });
   return present;
 }
 
@@ -134,6 +138,38 @@ function bindExportButton(presentMod) {
   });
 }
 
+function bindExportActions(presentMod, answers) {
+  bindExportButton(presentMod);
+
+  const saveBtn = document.getElementById('exportSaveBtn');
+  const createAnotherBtn = document.getElementById('exportCreateAnotherBtn');
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async function () {
+      saveBtn.disabled = true;
+      try {
+        const mod = await import('./amulet-show.js?v=20250710-export-view');
+        await mod.prepareSaveFromExportPage(presentMod, answers);
+      } catch (err) {
+        console.error('[export-view] save failed', err);
+        saveBtn.disabled = false;
+      }
+    });
+  }
+
+  if (createAnotherBtn) {
+    createAnotherBtn.addEventListener('click', async function () {
+      try {
+        const mod = await import('./amulet-show.js?v=20250710-export-view');
+        mod.startCreateAnotherFromExportPage();
+      } catch (err) {
+        console.error('[export-view] create another failed', err);
+        window.location.href = 'index.html?create=1';
+      }
+    });
+  }
+}
+
 async function bootExportView() {
   const answers = loadAnswers();
   if (!allAnswered(answers)) {
@@ -146,6 +182,11 @@ async function bootExportView() {
   } catch (_) {}
 
   document.body.classList.add('is-export-view-open');
+
+  try {
+    if (document.fonts?.ready) await document.fonts.ready;
+  } catch (_) {}
+
   populateExportFields(answers);
   bindChrome();
 
@@ -171,13 +212,13 @@ async function bootExportView() {
     console.warn('[export-view] vectors failed', err);
   }
 
-  fitExportWishTypography();
+  fitExportCardTypography();
   bootExportAmuletHover();
-  bindExportButton(presentMod);
+  bindExportActions(presentMod, answers);
 
   window.addEventListener('resize', function () {
     resizeExportViewFog();
-    fitExportWishTypography();
+    fitExportCardTypography();
   });
 }
 

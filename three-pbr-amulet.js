@@ -35,6 +35,9 @@ const FRAME_PAD = 40;
 const SUMMONING_FRAME_PAD = 30;
 const PATH_MAIN_W = L3_STROKE_WIDTH;
 const MASK_SCALE = 2;
+/** Coarser raster for back-cap hole detection — keeps GLB mount responsive. */
+const BACK_CAP_MASK_SCALE = 1;
+const BACK_CAP_MASK_MAX_PX = 240;
 const MASK_MESH_STEP = 2;
 /** z — L2 מלפנים; אבן L3 מאחור; מסגרת שכבה תחתונה (מאחורי הכל). */
 const L2_SURFACE_Z = 8;
@@ -3451,7 +3454,7 @@ function buildBasaltStoneMaterial() {
     normalScale: new THREE.Vector2(spec.normalScale ?? 1.2, spec.normalScale ?? 1.2),
     flatShading: false,
     vertexColors: false,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     depthWrite: true,
     envMap: null,
     envMapIntensity: 0,
@@ -3577,7 +3580,7 @@ function buildTerracottaStoneMaterial(envMap = null) {
     normalScale: new THREE.Vector2(spec.normalScale ?? 0.6, spec.normalScale ?? 0.6),
     flatShading: false,
     vertexColors: false,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     depthWrite: true,
     envMap: ibl,
     envMapIntensity: spec.envMapIntensity ?? 1.15,
@@ -3690,7 +3693,7 @@ function buildGravelStoneMaterial() {
     normalScale: new THREE.Vector2(spec.normalScale ?? 1.38, spec.normalScale ?? 1.38),
     flatShading: false,
     vertexColors: false,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     depthWrite: true,
     envMap: null,
     envMapIntensity: 0,
@@ -3807,7 +3810,7 @@ function buildMeteoriteStoneMaterial(envMap = null) {
     normalScale: new THREE.Vector2(spec.normalScale ?? 1.55, spec.normalScale ?? 1.55),
     flatShading: false,
     vertexColors: true,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     depthWrite: true,
     envMap: ibl,
     envMapIntensity: spec.envMapIntensity ?? 0.9,
@@ -3848,7 +3851,7 @@ function buildPremiumStoneMaterial(presetId, style2 = null, envMap = null, _ston
     metalness: spec.metalness ?? 0,
     flatShading: false,
     vertexColors: !isSage,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     depthWrite: true,
     envMap: isSage || !(spec.envMapIntensity ?? 0) ? null : ibl,
     envMapIntensity: isSage || !(spec.envMapIntensity ?? 0) ? 0 : (spec.envMapIntensity ?? 0),
@@ -6841,13 +6844,14 @@ function pointInTriangle(px, py, ax, ay, bx, by, cx, cy) {
 }
 
 /** Rasterize rendered stone mesh XY silhouette (world space, follows every curve). */
-function rasterizeStoneMeshSilhouette(stoneMesh) {
+function rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale = MASK_SCALE, maxPx = 0) {
   if (!stoneMesh?.geometry?.attributes?.position) return null;
   stoneMesh.updateMatrixWorld(true);
   const geom = stoneMesh.geometry;
   const pos = geom.attributes.position;
   const index = geom.index;
   const v = new THREE.Vector3();
+  let ms = maskScale || MASK_SCALE;
 
   let minX = Infinity;
   let minY = Infinity;
@@ -6870,8 +6874,14 @@ function rasterizeStoneMeshSilhouette(stoneMesh) {
     minY: minY - pad,
     maxY: maxY + pad,
   };
-  const w = Math.max(96, Math.ceil((maskOrigin.maxX - maskOrigin.minX) * MASK_SCALE));
-  const h = Math.max(96, Math.ceil((maskOrigin.maxY - maskOrigin.minY) * MASK_SCALE));
+  let w = Math.max(96, Math.ceil((maskOrigin.maxX - maskOrigin.minX) * ms));
+  let h = Math.max(96, Math.ceil((maskOrigin.maxY - maskOrigin.minY) * ms));
+  if (maxPx > 0 && (w > maxPx || h > maxPx)) {
+    const shrink = maxPx / Math.max(w, h);
+    ms *= shrink;
+    w = Math.max(96, Math.ceil((maskOrigin.maxX - maskOrigin.minX) * ms));
+    h = Math.max(96, Math.ceil((maskOrigin.maxY - maskOrigin.minY) * ms));
+  }
   const grid = new Uint8Array(w * h);
 
   const worldVert = (i) => {
@@ -6884,14 +6894,14 @@ function rasterizeStoneMeshSilhouette(stoneMesh) {
     const tmaxX = Math.max(a.x, b.x, c.x);
     const tminY = Math.min(a.y, b.y, c.y);
     const tmaxY = Math.max(a.y, b.y, c.y);
-    const px0 = Math.max(0, Math.floor((tminX - maskOrigin.minX) * MASK_SCALE));
-    const px1 = Math.min(w - 1, Math.ceil((tmaxX - maskOrigin.minX) * MASK_SCALE));
-    const py0 = Math.max(0, Math.floor((maskOrigin.maxY - tmaxY) * MASK_SCALE));
-    const py1 = Math.min(h - 1, Math.ceil((maskOrigin.maxY - tminY) * MASK_SCALE));
+    const px0 = Math.max(0, Math.floor((tminX - maskOrigin.minX) * ms));
+    const px1 = Math.min(w - 1, Math.ceil((tmaxX - maskOrigin.minX) * ms));
+    const py0 = Math.max(0, Math.floor((maskOrigin.maxY - tmaxY) * ms));
+    const py1 = Math.min(h - 1, Math.ceil((maskOrigin.maxY - tminY) * ms));
     for (let py = py0; py <= py1; py++) {
-      const sy = maskOrigin.maxY - (py + 0.5) / MASK_SCALE;
+      const sy = maskOrigin.maxY - (py + 0.5) / ms;
       for (let px = px0; px <= px1; px++) {
-        const sx = maskOrigin.minX + (px + 0.5) / MASK_SCALE;
+        const sx = maskOrigin.minX + (px + 0.5) / ms;
         if (pointInTriangle(sx, sy, a.x, a.y, b.x, b.y, c.x, c.y)) {
           grid[py * w + px] = 1;
         }
@@ -6910,8 +6920,22 @@ function rasterizeStoneMeshSilhouette(stoneMesh) {
   }
 
   if (!grid.some((v) => v)) return null;
-  fillMaskInteriorHoles(grid, w, h);
-  return { grid, w, h, maskOrigin };
+  return { grid, w, h, maskOrigin, maskScale: ms };
+}
+
+function rasterizeStoneMeshSilhouette(stoneMesh, maskScale = MASK_SCALE, maxPx = 0) {
+  const stamp = rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale, maxPx);
+  if (!stamp) return null;
+  const filled = stamp.grid.slice();
+  fillMaskInteriorHoles(filled, stamp.w, stamp.h);
+  return {
+    grid: filled,
+    rawGrid: stamp.grid,
+    w: stamp.w,
+    h: stamp.h,
+    maskOrigin: stamp.maskOrigin,
+    maskScale: stamp.maskScale,
+  };
 }
 
 /**
@@ -6965,6 +6989,414 @@ function buildSlabEqualGapFrameContour(rootSvg, slabMask, style3, style2, questi
     style2,
     SLAB_STONE_XY_SCALE
   );
+}
+
+/** Flat stone slab back thickness (scene units along -Z). */
+const STONE_BACK_CAP_DEPTH = 6.5;
+
+function worldPointsToMeshLocal(points, mesh) {
+  if (!mesh || !points?.length) return points;
+  mesh.updateMatrixWorld(true);
+  const inv = mesh.matrixWorld.clone().invert();
+  const v = new THREE.Vector3();
+  return points.map(function (p) {
+    v.set(p.x, p.y, 0).applyMatrix4(inv);
+    return new THREE.Vector3(v.x, v.y, 0);
+  });
+}
+
+function traceAllHoleBoundaries(holeMask) {
+  if (!holeMask?.grid) return [];
+  const grid = holeMask.grid;
+  const w = holeMask.w;
+  const h = holeMask.h;
+  const labeled = labelConnectedComponents(grid, w, h);
+  const contours = [];
+  for (let label = 1; label <= labeled.componentCount; label += 1) {
+    const comp = new Uint8Array(grid.length);
+    for (let i = 0; i < grid.length; i += 1) {
+      comp[i] = labeled.labels[i] === label ? 1 : 0;
+    }
+    const contour = traceLargestMaskBoundary(comp, w, h);
+    if (contour.length >= 3) contours.push(contour);
+  }
+  return contours;
+}
+
+function maskContourToScenePoints(contour, maskOrigin, pixelScale, rasterScale) {
+  const rs = rasterScale || MASK_SCALE;
+  const ps = pixelScale || 1;
+  return contour.map(function (p) {
+    return new THREE.Vector3(
+      maskOrigin.minX + (p.x * ps) / rs,
+      maskOrigin.maxY - (p.y * ps) / rs,
+      0
+    );
+  });
+}
+
+function appendShapePath(path, points) {
+  if (!points?.length) return;
+  path.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    path.lineTo(points[i].x, points[i].y);
+  }
+  path.closePath();
+}
+
+function resolveSlabBackMask(slabMask, stoneMesh) {
+  if (slabMask?.grid) return slabMask;
+  const saved = stoneMesh?.userData?.slabBackMask;
+  if (!saved) return null;
+  return {
+    grid: saved.grid || null,
+    pierceHoleMask: saved.pierceHoleMask || null,
+    maskOrigin: saved.maskOrigin || null,
+    w: saved.w,
+    h: saved.h,
+  };
+}
+
+function traceAllSilhouetteBoundaries(grid, w, h) {
+  const visited = new Uint8Array(w * h);
+  const contours = [];
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!isMaskBoundaryPixel(grid, w, h, x, y) || visited[y * w + x]) continue;
+      const contour = traceMaskBoundaryLoop(grid, w, h, x, y);
+      for (const p of contour) {
+        const px = Math.floor(p.x);
+        const py = Math.floor(p.y);
+        if (px >= 0 && px < w && py >= 0 && py < h) visited[py * w + px] = 1;
+      }
+      if (contour.length >= 3) contours.push(contour);
+    }
+  }
+  contours.sort(function (a, b) {
+    return b.length - a.length;
+  });
+  return contours;
+}
+
+/** Pixels inside the amulet footprint but with no stone mesh above — through-holes. */
+function buildHoleMaskFromSilhouetteGap(silPack) {
+  const rawGrid = silPack.rawGrid || silPack.grid;
+  if (!rawGrid) return null;
+  const w = silPack.w;
+  const h = silPack.h;
+  const component = keepLargestMaskComponent(rawGrid, w, h);
+  const outerFilled = fillMaskInteriorHoles(component, w, h);
+  const holes = new Uint8Array(w * h);
+  let any = false;
+  for (let i = 0; i < holes.length; i += 1) {
+    if (outerFilled[i] && !rawGrid[i]) {
+      holes[i] = 1;
+      any = true;
+    }
+  }
+  if (!any) return null;
+  const dilated = dilateMaskGrid(holes, w, h, Math.max(1, Math.round(MASK_SCALE * 0.35)));
+  return { grid: dilated, w: w, h: h, maskOrigin: silPack.maskOrigin };
+}
+
+function mergeHoleMasks(a, b) {
+  if (!a?.grid) return b || null;
+  if (!b?.grid) return a;
+  if (a.w !== b.w || a.h !== b.h) return a;
+  const out = new Uint8Array(a.w * a.h);
+  let any = false;
+  for (let i = 0; i < out.length; i += 1) {
+    if (a.grid[i] || b.grid[i]) {
+      out[i] = 1;
+      any = true;
+    }
+  }
+  return any ? { grid: out, w: a.w, h: a.h, maskOrigin: a.maskOrigin } : null;
+}
+
+function silhouettePackFromSlabMask(slabMask, stoneMesh) {
+  if (slabMask?.grid) {
+    return {
+      grid: slabMask.grid,
+      w: slabMask.w,
+      h: slabMask.h,
+      maskOrigin: slabMask.maskOrigin,
+      maskScale: MASK_SCALE,
+    };
+  }
+  return rasterizeStoneMeshSilhouette(stoneMesh, BACK_CAP_MASK_SCALE, BACK_CAP_MASK_MAX_PX);
+}
+
+function contourSignedArea(pts) {
+  let sum = 0;
+  for (let i = 0; i < pts.length; i += 1) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    sum += (b.x - a.x) * (b.y + a.y);
+  }
+  return sum * 0.5;
+}
+
+function normalizeHoleWinding(holePts, outerPts) {
+  if (!holePts?.length || !outerPts?.length) return holePts;
+  const outerArea = contourSignedArea(outerPts);
+  const holeArea = contourSignedArea(holePts);
+  if (outerArea === 0 || holeArea === 0) return holePts;
+  if (Math.sign(outerArea) === Math.sign(holeArea)) {
+    return holePts.slice().reverse();
+  }
+  return holePts;
+}
+
+function buildStoneBackCapShape(slabMask, stoneMesh) {
+  const silPack = silhouettePackFromSlabMask(slabMask, stoneMesh);
+  if (!silPack?.grid) return null;
+
+  const boundaries = traceAllSilhouetteBoundaries(silPack.grid, silPack.w, silPack.h);
+  if (!boundaries.length) return null;
+
+  const maskOrigin = silPack.maskOrigin;
+  const rasterScale = silPack.maskScale || MASK_SCALE;
+  const outerContour = subsampleContourPtsPreserveCorners(
+    maskContourToScenePoints(boundaries[0], maskOrigin, 1, rasterScale),
+    2.6
+  );
+
+  let holeMask = buildHoleMaskFromSilhouetteGap(silPack);
+  const maskPack = resolveSlabBackMask(slabMask, stoneMesh);
+
+  const holeSources = [];
+  if (holeMask?.grid) {
+    holeSources.push({ mask: holeMask, origin: maskOrigin, rasterScale: rasterScale });
+  }
+  if (maskPack?.pierceHoleMask?.grid) {
+    const pierce = maskPack.pierceHoleMask;
+    const sameGrid =
+      holeMask?.grid && holeMask.w === pierce.w && holeMask.h === pierce.h;
+    if (!sameGrid) {
+      holeSources.push({
+        mask: pierce,
+        origin: pierce.maskOrigin || maskOrigin,
+        rasterScale: MASK_SCALE,
+      });
+    } else {
+      const merged = mergeHoleMasks(holeMask, pierce);
+      if (merged) {
+        holeSources[0] = {
+          mask: merged,
+          origin: pierce.maskOrigin || maskOrigin,
+          rasterScale: rasterScale,
+        };
+      }
+    }
+  }
+
+  let holeContours = [];
+  for (const src of holeSources) {
+    for (const contour of traceAllHoleBoundaries(src.mask)) {
+      holeContours.push({
+        contour: contour,
+        origin: src.origin,
+        rasterScale: src.rasterScale || rasterScale,
+      });
+    }
+  }
+  if (!holeContours.length && boundaries.length > 1) {
+    holeContours = boundaries.slice(1).map(function (contour) {
+      return { contour: contour, origin: maskOrigin, rasterScale: rasterScale };
+    });
+  }
+
+  const shape = new THREE.Shape();
+  appendShapePath(shape, outerContour);
+
+  for (const holeEntry of holeContours) {
+    const holeRaster = holeEntry.rasterScale || rasterScale;
+    let holePts = subsampleContourPtsPreserveCorners(
+      maskContourToScenePoints(holeEntry.contour, holeEntry.origin, 1, holeRaster),
+      2.0
+    );
+    if (holePts.length < 3) continue;
+    holePts = normalizeHoleWinding(holePts, outerContour);
+    const holePath = new THREE.Path();
+    appendShapePath(holePath, holePts);
+    shape.holes.push(holePath);
+  }
+
+  return shape;
+}
+
+function applyBackCapVertexColors(capGeom, stoneMesh, material) {
+  if (!material?.vertexColors) return;
+  const stoneColors = stoneMesh.geometry?.attributes?.color;
+  const capPos = capGeom.attributes.position;
+  if (!stoneColors || !capPos) return;
+
+  stoneMesh.geometry.computeBoundingBox();
+  const minZ = stoneMesh.geometry.boundingBox.min.z;
+  const zBand = Math.max(STONE_BACK_CAP_DEPTH * 1.5, 4);
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  const pos = stoneMesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i += 1) {
+    if (pos.getZ(i) > minZ + zBand) continue;
+    r += stoneColors.getX(i);
+    g += stoneColors.getY(i);
+    b += stoneColors.getZ(i);
+    n += 1;
+  }
+  if (!n) {
+    for (let i = 0; i < stoneColors.count; i += 1) {
+      r += stoneColors.getX(i);
+      g += stoneColors.getY(i);
+      b += stoneColors.getZ(i);
+      n += 1;
+    }
+  }
+  r /= n;
+  g /= n;
+  b /= n;
+
+  const colors = new Float32Array(capPos.count * 3);
+  for (let i = 0; i < capPos.count; i += 1) {
+    const x = capPos.getX(i);
+    const y = capPos.getY(i);
+    const grain = 0.985 + 0.015 * Math.sin(x * 0.035 + y * 0.028);
+    colors[i * 3] = r * grain;
+    colors[i * 3 + 1] = g * grain;
+    colors[i * 3 + 2] = b * grain;
+  }
+  capGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function removeStoneBackCapFromMesh(stoneMesh) {
+  if (!stoneMesh) return;
+  const existing = stoneMesh.userData.stoneBackCap;
+  if (existing) {
+    stoneMesh.remove(existing);
+    existing.geometry?.dispose?.();
+    stoneMesh.userData.stoneBackCap = null;
+  }
+  const children = stoneMesh.children ? stoneMesh.children.slice() : [];
+  for (const child of children) {
+    if (child.name === 'stoneBackCap') {
+      stoneMesh.remove(child);
+      child.geometry?.dispose?.();
+    }
+  }
+}
+
+function buildStoneSilhouetteContour(slabMask, stoneMesh) {
+  if (slabMask?.grid) {
+    const raw = traceLargestMaskBoundary(slabMask.grid, slabMask.w, slabMask.h);
+    if (raw.length >= 3) {
+      return raw.map(function (p) {
+        return slabMaskPointToScene(p.x, p.y, slabMask.maskOrigin, 1);
+      });
+    }
+  }
+  if (!stoneMesh) return null;
+  const pack = rasterizeStoneMeshSilhouette(stoneMesh);
+  if (!pack?.grid) return null;
+  const raw = traceLargestMaskBoundary(pack.grid, pack.w, pack.h);
+  if (raw.length < 3) return null;
+  const worldPts = raw.map(function (p) {
+    return slabMaskPointToScene(p.x, p.y, pack.maskOrigin, 1);
+  });
+  return worldPointsToMeshLocal(worldPts, stoneMesh);
+}
+
+function findPrimaryStoneMesh(root) {
+  if (!root) return null;
+  let best = null;
+  let bestCount = 0;
+  root.traverse(function (obj) {
+    if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
+    if (obj.name === 'stoneBackCap') return;
+    const mat = obj.material;
+    const metalness = mat?.metalness ?? 0;
+    if (metalness > 0.35) return;
+    const count = obj.geometry.attributes.position.count;
+    if (count > bestCount) {
+      bestCount = count;
+      best = obj;
+    }
+  });
+  return best;
+}
+
+function sceneHasStoneBackCap(root) {
+  let found = false;
+  if (!root) return false;
+  root.traverse(function (obj) {
+    if (obj.name === 'stoneBackCap') found = true;
+  });
+  return found;
+}
+
+/** Thin flat back cap — same stone material + pierce holes as the slab. */
+function buildStoneSlabBackCapMesh(stoneMesh, slabMask, material) {
+  if (!stoneMesh?.geometry || !material) return null;
+  const shape = buildStoneBackCapShape(slabMask, stoneMesh);
+  if (!shape) return null;
+
+  stoneMesh.geometry.computeBoundingBox();
+  const backZ = stoneMesh.geometry.boundingBox.min.z;
+
+  const capGeom = new THREE.ExtrudeGeometry(shape, {
+    depth: STONE_BACK_CAP_DEPTH,
+    bevelEnabled: false,
+    curveSegments: 8,
+    steps: 1,
+  });
+  capGeom.translate(0, 0, backZ - STONE_BACK_CAP_DEPTH);
+  capGeom.computeVertexNormals();
+  applyBackCapVertexColors(capGeom, stoneMesh, material);
+
+  const capMesh = new THREE.Mesh(capGeom, material);
+  capMesh.name = 'stoneBackCap';
+  capMesh.renderOrder = (stoneMesh.renderOrder || STONE_RENDER_ORDER) - 1;
+  capMesh.layers.mask = stoneMesh.layers.mask;
+  return capMesh;
+}
+
+function attachStoneSlabBackCap(stoneMesh, slabMask, material) {
+  if (!stoneMesh) return null;
+  removeStoneBackCapFromMesh(stoneMesh);
+  if (slabMask) {
+    stoneMesh.userData.slabBackMask = {
+      pierceHoleMask: slabMask.pierceHoleMask || null,
+      maskOrigin: slabMask.maskOrigin || null,
+      w: slabMask.w,
+      h: slabMask.h,
+      grid: slabMask.grid || null,
+    };
+  }
+  const backCap = buildStoneSlabBackCapMesh(stoneMesh, slabMask, material);
+  if (!backCap) return null;
+  stoneMesh.add(backCap);
+  stoneMesh.userData.stoneBackCap = backCap;
+  return backCap;
+}
+
+/** Add a flat stone back to loaded GLB scenes that were saved before this feature. */
+export function ensureStoneBackCapForScene(root) {
+  if (!root) return false;
+  if (sceneHasStoneBackCap(root)) return true;
+  const stoneMesh = findPrimaryStoneMesh(root);
+  if (!stoneMesh?.material) return false;
+  const material = stoneMesh.material;
+  requestAnimationFrame(function () {
+    try {
+      if (sceneHasStoneBackCap(root)) return;
+      attachStoneSlabBackCap(stoneMesh, null, material);
+    } catch (err) {
+      console.warn('[stoneBackCap] deferred build failed', err);
+    }
+  });
+  return true;
 }
 
 /** Outer contour of stone slab mask — equal gap fallback when mesh contour unavailable. */
@@ -8233,6 +8665,7 @@ async function buildUnifiedLayer3Geometry(
         stoneRoughness: resolveStoneRoughness(style2, questionnaire),
         slabThornIntensity: resolveSlabThornIntensity(questionnaire),
         slabThornSeed: slabThornSeedFromQ6(questionnaire?.q6Difficulty),
+        slabBackPadMul: 0.58,
         basePlateHeight: stoneTubeR * 1.35 * 0.36,
         metalPlateCradle: plateCradle,
         metalHaloWrap,
@@ -8537,9 +8970,11 @@ async function addUnifiedSolidFromLayer(
     stoneMesh.layers.set(0);
     stoneMesh.renderOrder = STONE_RENDER_ORDER;
     scene.add(stoneMesh);
+    const stoneBackCap = attachStoneSlabBackCap(stoneMesh, slabMask, material);
     return {
       count: 1,
       stoneMesh,
+      stoneBackCap,
       slabMask: slabMask ?? null,
       metalPack: metalPack ?? null,
     };
@@ -9082,6 +9517,15 @@ export async function renderThreePbrAmulet(opts) {
 }
 
 export async function renderThreePbrAmuletInteractive(opts) {
+  if (opts?.container?.id === 'detailAmulet3D') {
+    if (
+      window.__pagmarDetailBundledGlbEntryId != null ||
+      window.__pagmarDetailGlbMounted
+    ) {
+      console.info('[pbr] skip detail container replace — saved GLB is authoritative');
+      return { pbr: true, interactive: true, blocked: true };
+    }
+  }
   let mount = null;
   try {
     if (opts?.container) opts.container.innerHTML = '';
@@ -9281,6 +9725,25 @@ export function getActivePbrCamera() {
   return active.camera ?? null;
 }
 
+/** Tighten orthographic framing after moving the live canvas to the result overlay. */
+export function zoomActivePbrPresentation(factor) {
+  const zoom = Number(factor);
+  if (!Number.isFinite(zoom) || zoom <= 0 || zoom === 1) return false;
+
+  const camera = active.camera;
+  const renderer = active.renderer;
+  const scene = active.scene;
+  if (!camera?.isOrthographicCamera || !renderer || !scene) return false;
+
+  camera.left /= zoom;
+  camera.right /= zoom;
+  camera.top /= zoom;
+  camera.bottom /= zoom;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  return true;
+}
+
 export function captureLiveAmuletSnapshot() {
   const renderer = active.renderer;
   const scene = active.scene;
@@ -9347,6 +9810,7 @@ export function cloneActivePbrSceneForGarden() {
   if (!src) return null;
   const clone = src.clone(true);
   clone.rotation.copy(src.rotation);
+  ensureStoneBackCapForScene(clone);
   return clone;
 }
 
@@ -9356,6 +9820,7 @@ export async function buildPbrSceneCloneForGarden(opts) {
   const mount = core.mount;
   const clone = core.scene.clone(true);
   clone.rotation.copy(core.scene.rotation);
+  ensureStoneBackCapForScene(clone);
   core.renderer.dispose();
   disposeScene(core.scene);
   if (mount?.parentNode) mount.parentNode.removeChild(mount);

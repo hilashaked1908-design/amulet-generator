@@ -2,6 +2,12 @@
  * Compose the export card frame to a downloadable PNG.
  */
 import { exportCanvasAsTransparentPng } from './amulet-export.js';
+import {
+  drawFittedTextBlock,
+  EXPORT_CARD_LAYOUT,
+  fitExportText,
+  getExportTextSpec,
+} from './export-text-fit.js?v=20250711-export-text-fit';
 
 function loadImage(src) {
   return new Promise(function (resolve, reject) {
@@ -25,29 +31,14 @@ function svgElementToImage(svgEl, width, height) {
   return loadImage(url);
 }
 
-function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = String(text || '').trim().split(/\s+/);
-  if (!words.length || words[0] === '') return y;
-
-  let line = '';
-  let cursorY = y;
-
-  words.forEach(function (word, index) {
-    const test = line ? line + ' ' + word : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      ctx.fillText(line, x, cursorY);
-      line = word;
-      cursorY += lineHeight;
-    } else {
-      line = test;
-    }
-    if (index === words.length - 1) {
-      ctx.fillText(line, x, cursorY);
-      cursorY += lineHeight;
-    }
-  });
-
-  return cursorY;
+function drawWrappedText(ctx, text, x, boxBottom, maxWidth, maxHeight, specKey) {
+  const spec = getExportTextSpec(specKey);
+  const fit = fitExportText(text, maxWidth, maxHeight, specKey);
+  ctx.font = spec.weight + ' ' + fit.fontSize + 'px ' + spec.family;
+  if (typeof ctx.letterSpacing === 'string' && spec.letterSpacingEm) {
+    ctx.letterSpacing = fit.fontSize * spec.letterSpacingEm + 'px';
+  }
+  drawFittedTextBlock(ctx, fit, x, boxBottom, true);
 }
 
 function getUnitScale(cardEl) {
@@ -70,7 +61,8 @@ export async function composeExportCardPng(options) {
   const scale = outW / 800;
 
   ctx.scale(scale, scale);
-  ctx.clearRect(0, 0, 800, 800);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, 800, 800);
 
   const fogCanvas = document.querySelector('#exportFogHost .pagmar__detail-fog-canvas');
   if (fogCanvas?.width) {
@@ -86,11 +78,13 @@ export async function composeExportCardPng(options) {
 
   const amuletSnap = options.amuletSnapshot;
   if (amuletSnap?.width) {
-    const slotW = 536;
-    const slotH = 536;
+    const slotW = EXPORT_CARD_LAYOUT.amuletWidth;
+    const slotH = EXPORT_CARD_LAYOUT.amuletHeight;
     const slotX = (800 - slotW) / 2;
-    const slotY = 70.33;
-    const fit = Math.min(slotW / amuletSnap.width, slotH / amuletSnap.height) * 0.92;
+    const slotY = EXPORT_CARD_LAYOUT.amuletTop;
+    const fit =
+      Math.min(slotW / amuletSnap.width, slotH / amuletSnap.height) *
+      EXPORT_CARD_LAYOUT.amuletDrawFit;
     const drawW = amuletSnap.width * fit;
     const drawH = amuletSnap.height * fit;
     ctx.drawImage(
@@ -103,8 +97,8 @@ export async function composeExportCardPng(options) {
   }
 
   const vectorIds = ['exportVectorQ1', 'exportVectorQ2', 'exportVectorQ3'];
-  const vectorX = 29;
-  let vectorY = 29;
+  const vectorX = EXPORT_CARD_LAYOUT.vectorLeft;
+  let vectorY = EXPORT_CARD_LAYOUT.vectorTop;
   for (let i = 0; i < vectorIds.length; i++) {
     const slot = document.getElementById(vectorIds[i]);
     const svg = slot?.querySelector('svg');
@@ -121,30 +115,36 @@ export async function composeExportCardPng(options) {
 
   const nameEl = document.getElementById('exportName');
   if (nameEl?.textContent) {
+    ctx.fillStyle = '#060607';
+    ctx.fillRect(583.05, 0, 102.77, 40.52);
+    ctx.fillStyle = '#f4f4e8';
     ctx.font = '700 18px "Narkiss Yair Variable", "Narkiss Yair", sans-serif';
-    ctx.fillText(nameEl.textContent, 800 - 29, 52);
+    ctx.fillText(nameEl.textContent, 800 - EXPORT_CARD_LAYOUT.rightInset, EXPORT_CARD_LAYOUT.nameTop + 18);
   }
 
-  const timingEl = document.getElementById('exportTiming');
-  const outcomeEl = document.getElementById('exportOutcome');
   const wishEl = document.getElementById('exportWish');
-
-  if (timingEl?.textContent) {
-    ctx.font = '400 18px "Narkiss Yair Variable", "Narkiss Yair", sans-serif';
-    ctx.fillText('[תזמון]', 29 + 233, 800 - 168 - 24);
-    ctx.font = '400 27px "TheBasics", sans-serif';
-    drawWrappedText(ctx, timingEl.textContent, 29 + 233, 800 - 168, 233, 30);
-  }
-
-  if (outcomeEl?.textContent) {
-    ctx.font = '400 27px "TheBasics", sans-serif';
-    drawWrappedText(ctx, outcomeEl.textContent, 29 + 233, 800 - 56, 233, 30);
-  }
+  const L = EXPORT_CARD_LAYOUT;
 
   if (wishEl?.textContent) {
-    const sizePx = parseFloat(getComputedStyle(wishEl).fontSize) / u || 90;
-    ctx.font = '100 ' + sizePx + 'px "Lava Pro HL", serif';
-    drawWrappedText(ctx, wishEl.textContent, 800 - 29, 800 - 56, 360, sizePx * 1.05);
+    ctx.fillStyle = '#ffffff';
+    const wishSpec = getExportTextSpec('wish');
+    const wishFit = fitExportText(
+      wishEl.textContent,
+      L.wishWidth,
+      L.wishHeight,
+      'wish'
+    );
+    ctx.font = wishSpec.weight + ' ' + wishFit.fontSize + 'px ' + wishSpec.family;
+    if (typeof ctx.letterSpacing === 'string' && wishSpec.letterSpacingEm) {
+      ctx.letterSpacing = wishFit.fontSize * wishSpec.letterSpacingEm + 'px';
+    }
+    drawFittedTextBlock(
+      ctx,
+      wishFit,
+      L.wishLeft + L.wishWidth,
+      L.wishTop + L.wishHeight,
+      true
+    );
   }
 
   exportCanvasAsTransparentPng(canvas, { filename: options.filename || 'amulet-card' });

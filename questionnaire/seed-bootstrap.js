@@ -1,6 +1,11 @@
 /**
  * Load bundled seed collection (Netlify / Render) into localStorage before other scripts run.
  */
+import {
+  PERMANENTLY_REMOVED_LABELS,
+  isPermanentlyRemovedLabel,
+} from './permanently-removed-labels.js';
+
 const SEED_COLLECTION_URL = '/questionnaire/seed/collection.json';
 const COLLECTION_KEY = 'amuletCollection';
 
@@ -60,20 +65,98 @@ function writeCollection(collection) {
 
 let seedPromise = null;
 
+const USER_AMULET_INDEX = 8;
+
+function collectionDisplayLabel(collectionIndex) {
+  return USER_AMULET_INDEX + collectionIndex + 1;
+}
+
+function filterPermanentlyRemovedEntries(collection) {
+  const removed = [];
+  const kept = collection.filter(function (entry, i) {
+    if (isPermanentlyRemovedLabel(collectionDisplayLabel(i))) {
+      removed.push(entry);
+      return false;
+    }
+    return true;
+  });
+  return { kept: kept, removed: removed };
+}
+
+async function purgePermanentlyRemovedLabels() {
+  const collection = parseCollectionRaw(
+    localStorage.getItem(COLLECTION_KEY) || sessionStorage.getItem(COLLECTION_KEY)
+  );
+  const { kept, removed } = filterPermanentlyRemovedEntries(collection);
+  if (!removed.length) return kept;
+
+  try {
+    const { deleteGlb } = await import('./amulet-glb-store.js');
+    await Promise.all(
+      removed.flatMap(function (entry) {
+        if (!entry || entry.id == null) return [];
+        const id = entry.id;
+        const snapKey = 'collection-' + id;
+        return [
+          deleteGlb(snapKey).catch(function () {}),
+          deleteGlb('snap-' + snapKey).catch(function () {}),
+          deleteGlb('snap-composed3d-' + id).catch(function () {}),
+          deleteGlb('snap-answers-collection-' + id).catch(function () {}),
+        ];
+      })
+    );
+  } catch (_) {}
+
+  writeCollection(kept);
+  console.log(
+    '[seed-bootstrap] purged amulet(s):',
+    PERMANENTLY_REMOVED_LABELS.map(function (label) {
+      return '[' + String(label).padStart(3, '0') + ']';
+    }).join(', ')
+  );
+  try {
+    window.dispatchEvent(new CustomEvent('pagmar:collection-changed'));
+  } catch (_) {}
+  return kept;
+}
+
+const purgeRemovedPromise = purgePermanentlyRemovedLabels().catch(function () {});
+
 export function ensureSeedCollectionLoaded() {
   if (seedPromise) return seedPromise;
-  seedPromise = fetch(SEED_COLLECTION_URL, { cache: 'no-store' })
+  seedPromise = purgeRemovedPromise.then(function () {
+    return fetch(SEED_COLLECTION_URL, { cache: 'no-store' });
+  })
     .then(function (res) {
       if (!res.ok) return null;
       return res.json();
     })
-    .then(function (seed) {
+    .then(async function (seed) {
       if (!Array.isArray(seed) || !seed.length) return false;
       const local = parseCollectionRaw(
         localStorage.getItem(COLLECTION_KEY) || sessionStorage.getItem(COLLECTION_KEY)
       );
       const merged = local.length ? mergeCollectionEntries(local, seed) : seed;
-      writeCollection(merged);
+      const { kept, removed } = filterPermanentlyRemovedEntries(merged);
+      if (removed.length) {
+        try {
+          const { deleteGlb } = await import('./amulet-glb-store.js');
+          await Promise.all(
+            removed.flatMap(function (entry) {
+              if (!entry || entry.id == null) return [];
+              const id = entry.id;
+              const snapKey = 'collection-' + id;
+              return [
+                deleteGlb(snapKey).catch(function () {}),
+                deleteGlb('snap-' + snapKey).catch(function () {}),
+                deleteGlb('snap-composed3d-' + id).catch(function () {}),
+                deleteGlb('snap-answers-collection-' + id).catch(function () {}),
+              ];
+            })
+          );
+        } catch (_) {}
+      }
+      writeCollection(kept);
       window.__seedCollectionLoaded = true;
       console.log('[seed-bootstrap] loaded', seed.length, 'seed amulet(s)');
       return true;

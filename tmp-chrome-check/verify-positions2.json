@@ -1,0 +1,38 @@
+{
+  "create": {
+    "bodyClass": "pagmar-create has-user-amulet is-panel-open",
+    "about": {
+      "id": "requestAboutBtn",
+      "left": 50,
+      "top": 50,
+      "right": 110,
+      "bottom": 110
+    },
+    "close": {
+      "id": "requestCloseBtn",
+      "left": 1820,
+      "top": 50,
+      "right": 1870,
+      "bottom": 100
+    },
+    "filterTrigger": null
+  },
+  "detail": {
+    "bodyClass": "pagmar-index has-user-amulet",
+    "about": {
+      "id": "indexAboutBtn",
+      "left": 50,
+      "top": 50,
+      "right": 110,
+      "bottom": 110
+    },
+    "close": null,
+    "filterTrigger": {
+      "id": "indexFilterTrigger",
+      "left": 1842.34,
+      "top": 50,
+      "right": 1870,
+      "bottom": 100
+    }
+  }
+}

@@ -1,4 +1,4 @@
-/* About overlay - Figma 2696:46028 @ 1920×3875 */
+/* About overlay - Figma 2696:46028 @ 1920×3589 */
 
 body.is-about-overlay-open {
   overflow: hidden;
@@ -18,7 +18,8 @@ body.is-about-overlay-open {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   --about-w: 1920;
-  --about-h: 3875;
+  --about-bottom-inset: 49.89;
+  --about-h: calc(3015.4 + var(--about-post-hero-shift) + 424 + var(--about-bottom-inset));
   --about-post-hero-shift: 100;
   --about-ink: var(--pagmar-yellow-white);
   --about-cell-bg: #1e1e1e;
@@ -165,27 +166,31 @@ body.is-about-overlay-open {
   white-space: nowrap;
 }
 
-/* ── Hero ── */
+/* ── Hero (Frame 477) ── */
 .pagmar__about-hero {
   position: absolute;
-  left: calc(104.12 * var(--u));
+  left: calc(50% + 0.68 * var(--u));
   top: calc(319.18 * var(--u));
   width: calc(1713.11 * var(--u));
   height: calc(449.64 * var(--u));
+  transform: translateX(-50%);
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
   gap: calc(50 * var(--u));
+  padding: 0;
+  box-sizing: border-box;
   pointer-events: none;
 }
 
 .pagmar__about-hero-word {
   margin: 0;
+  flex: none;
   font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
   font-weight: 100;
   font-size: calc(375 * var(--u));
   line-height: 0.7;
-  letter-spacing: calc(-15 * var(--u));
+  letter-spacing: -0.04em;
   color: var(--about-ink);
   text-align: right;
   white-space: nowrap;
@@ -193,27 +198,76 @@ body.is-about-overlay-open {
 
 .pagmar__about-hero-word--left {
   width: calc(642.6 * var(--u));
+  height: calc(262 * var(--u));
 }
 
 .pagmar__about-hero-word--right {
   width: calc(520.87 * var(--u));
+  height: calc(262 * var(--u));
 }
 
 .pagmar__about-hero-emblem {
-  flex: 0 0 auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: calc(449.64 * var(--u));
-  height: auto;
-  aspect-ratio: 425 / 234;
+  height: calc(449.64 * var(--u));
   color: var(--about-ink);
   background: transparent;
   overflow: visible;
 }
 
-.pagmar__about-hero-emblem svg {
+.pagmar__about-hero-emblem__stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pagmar__about-hero-emblem__vector {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  height: auto;
-  overflow: visible;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  animation-name: pagmar-about-component33-slot;
+  animation-duration: 7s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: paused;
+}
+
+body.is-about-overlay-open .pagmar__about-hero-emblem__vector {
+  animation-play-state: running;
+}
+
+.pagmar__about-hero-emblem__vector--1 { animation-delay: 0s; }
+.pagmar__about-hero-emblem__vector--2 { animation-delay: -1s; }
+.pagmar__about-hero-emblem__vector--3 { animation-delay: -2s; }
+.pagmar__about-hero-emblem__vector--4 { animation-delay: -3s; }
+.pagmar__about-hero-emblem__vector--5 { animation-delay: -4s; }
+.pagmar__about-hero-emblem__vector--6 { animation-delay: -5s; }
+.pagmar__about-hero-emblem__vector--7 { animation-delay: -6s; }
+
+@keyframes pagmar-about-component33-slot {
+  0%, 14.285% { opacity: 1; }
+  14.286%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagmar__about-hero-emblem__vector {
+    animation: none;
+    opacity: 0;
+  }
+
+  .pagmar__about-hero-emblem__vector--1 {
+    opacity: 1;
+  }
 }
 
 /* ── Shared section + copy ── */
@@ -331,7 +385,7 @@ body.is-about-overlay-open {
 /* ── Origin section (Figma Frame 484) ── */
 .pagmar__about-section--origin {
   left: calc(833.89 * var(--u));
-  top: calc((978.32 + var(--about-post-hero-shift) - 5) * var(--u));
+  top: calc((983.32 + var(--about-post-hero-shift)) * var(--u));
   width: calc(939.59 * var(--u));
   min-height: calc(240 * var(--u));
   height: auto;
@@ -526,7 +580,7 @@ body.is-about-overlay-open {
   position: relative;
   flex: 0 0 calc(880 * var(--u));
   width: calc(880 * var(--u));
-  height: calc(924 * var(--u));
+  height: calc(730 * var(--u));
   background: var(--about-preview-bg);
   overflow: hidden;
 }
@@ -594,16 +648,33 @@ body.is-about-overlay-open .pagmar__garden canvas {
 .pagmar__about-letters-side {
   flex: 0 0 calc(630 * var(--u));
   width: calc(630 * var(--u));
+  height: calc(538.58 * var(--u));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: calc(55 * var(--u));
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.pagmar__about-letters-intro {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  align-self: stretch;
   gap: calc(32 * var(--u));
+  width: calc(630 * var(--u));
+  height: calc(269 * var(--u));
+  flex: none;
+  padding: 0;
   box-sizing: border-box;
 }
 
 .pagmar__about-letters-title {
   align-self: stretch;
   width: calc(630 * var(--u));
+  height: calc(72 * var(--u));
   margin: 0;
   font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
   font-weight: 400;
@@ -612,6 +683,7 @@ body.is-about-overlay-open .pagmar__garden canvas {
   letter-spacing: -0.01em;
   text-align: right;
   color: var(--about-ink);
+  flex: none;
 }
 
 .pagmar__about-letters-body {
@@ -620,24 +692,37 @@ body.is-about-overlay-open .pagmar__garden canvas {
   align-items: flex-start;
   gap: calc(8 * var(--u));
   width: calc(567 * var(--u));
+  height: calc(98 * var(--u));
   flex: none;
-  margin-top: calc(-5 * var(--u));
 }
 
 .pagmar__about-letters-body p {
   margin: 0;
   width: calc(567 * var(--u));
   font-family: "TheBasics", "DavidLibre", serif;
+  font-weight: 400;
   font-size: calc(27 * var(--u));
   line-height: 1.1;
   letter-spacing: 0;
   text-align: right;
   color: var(--about-ink);
+  flex: none;
+}
+
+.pagmar__about-letters-hint-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(8 * var(--u));
+  width: calc(567 * var(--u));
+  height: calc(35 * var(--u));
+  flex: none;
 }
 
 .pagmar__about-letters-hint {
   margin: 0;
   width: calc(567 * var(--u));
+  height: calc(35 * var(--u));
   flex: none;
   font-family: "Lava Pro HL", "TheBasics Display Thin", serif;
   font-weight: 100;
@@ -650,9 +735,9 @@ body.is-about-overlay-open .pagmar__garden canvas {
 .pagmar__about-letter-grid-wrap {
   position: relative;
   align-self: flex-end;
-  width: calc(572.192 * var(--u));
-  margin-left: auto;
-  margin-right: 0;
+  width: calc(572.54 * var(--u));
+  height: calc(214.58 * var(--u));
+  flex: none;
 }
 
 .pagmar__about-letter-grid {
@@ -660,7 +745,7 @@ body.is-about-overlay-open .pagmar__garden canvas {
   grid-template-columns: max-content;
   grid-template-rows: max-content;
   width: 100%;
-  height: calc(214.572 * var(--u));
+  height: 100%;
   line-height: 0;
 }
 
@@ -675,9 +760,9 @@ body.is-about-overlay-open .pagmar__garden canvas {
   place-items: center;
   box-sizing: border-box;
   margin: calc(var(--cell-mt) * var(--u)) 0 0 calc(var(--cell-ml) * var(--u));
-  width: calc(71.524 * var(--u));
-  height: calc(71.524 * var(--u));
-  border: calc(0.681 * var(--u)) solid var(--about-ink);
+  width: calc(71.52 * var(--u));
+  height: calc(71.52 * var(--u));
+  border: calc(0.681185 * var(--u)) solid var(--about-ink);
   background: var(--about-cell-bg);
   color: var(--about-ink);
   cursor: pointer;
@@ -712,9 +797,10 @@ body.is-about-overlay-open .pagmar__garden canvas {
   display: block;
   width: 100%;
   font-family: "TheBasics", "DavidLibre", serif;
+  font-weight: 400;
   font-size: calc(55 * var(--u));
   line-height: 1.1;
-  letter-spacing: calc(-0.55 * var(--u));
+  letter-spacing: -0.01em;
   text-align: center;
   user-select: none;
 }
@@ -723,15 +809,23 @@ body.is-about-overlay-open .pagmar__garden canvas {
 .pagmar__about-footer {
   position: absolute;
   left: calc(49.89 * var(--u));
-  top: calc((3209.4 + var(--about-post-hero-shift)) * var(--u));
-  width: calc(1820 * var(--u));
+  right: calc(49.89 * var(--u));
+  top: auto;
+  bottom: calc(var(--about-bottom-inset) * var(--u));
+  width: auto;
   height: calc(424 * var(--u));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  box-sizing: border-box;
 }
 
 .pagmar__about-footer-hero {
-  position: absolute;
-  left: calc(470.22 * var(--u));
-  top: 0;
+  position: relative;
+  left: auto;
+  top: auto;
+  align-self: center;
   width: calc(879.77 * var(--u));
   height: calc(230.92 * var(--u));
   display: flex;
@@ -739,6 +833,7 @@ body.is-about-overlay-open .pagmar__garden canvas {
   justify-content: center;
   gap: calc(25.68 * var(--u));
   pointer-events: none;
+  flex: 0 0 auto;
 }
 
 .pagmar__about-footer-word {
@@ -776,14 +871,24 @@ body.is-about-overlay-open .pagmar__garden canvas {
   object-fit: contain;
 }
 
+.pagmar__about-footer-credits {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex: 0 0 auto;
+}
+
 .pagmar__about-credits {
-  position: absolute;
-  top: calc(417.28 * var(--u));
+  position: relative;
+  top: auto;
 }
 
 .pagmar__about-credits--thanks {
-  left: 0;
-  width: calc(149 * var(--u));
+  left: auto;
+  width: auto;
+  flex: 0 0 auto;
+  max-width: calc(149 * var(--u));
 }
 
 .pagmar__about-credits-tag,
@@ -807,14 +912,6 @@ body.is-about-overlay-open .pagmar__garden canvas {
   margin-top: calc(5 * var(--u));
 }
 
-.pagmar__about-credits--project {
-  left: calc(627 * var(--u));
-  width: calc(1193 * var(--u));
-  display: flex;
-  align-items: center;
-  gap: calc(89 * var(--u));
-}
-
 .pagmar__about-bezalel-logo {
   display: block;
   flex: 0 0 calc(627 * var(--u));
@@ -823,7 +920,9 @@ body.is-about-overlay-open .pagmar__garden canvas {
 }
 
 .pagmar__about-project-copy {
-  flex: 1 1 auto;
+  flex: 0 1 calc(477 * var(--u));
+  max-width: calc(477 * var(--u));
+  min-width: 0;
   font-family: "TheBasics", "DavidLibre", serif;
   font-size: calc(27 * var(--u));
   line-height: 1.1;
@@ -938,10 +1037,16 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
   }
 
   .pagmar__about-letters-side {
+    height: auto;
     padding-top: 0;
   }
 
+  .pagmar__about-letters-intro {
+    height: auto;
+  }
+
   .pagmar__about-letters-body,
+  .pagmar__about-letters-hint-wrap,
   .pagmar__about-letters-hint {
     width: 100%;
   }
@@ -988,6 +1093,8 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
   }
 
   .pagmar__about-hero {
+    left: auto;
+    transform: none;
     flex-direction: column;
     gap: calc(16 * var(--u));
   }
@@ -996,13 +1103,14 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
   .pagmar__about-hero-word--left,
   .pagmar__about-hero-word--right {
     width: auto;
+    height: auto;
     font-size: calc(96 * var(--u));
     text-align: center;
   }
 
   .pagmar__about-hero-emblem {
     width: calc(180 * var(--u));
-    height: auto;
+    height: calc(180 * var(--u));
   }
 
   .pagmar__about-block,
@@ -1026,7 +1134,7 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
   }
 
   .pagmar__about-connection-panel {
-    height: calc(360 * var(--u));
+    height: calc(284 * var(--u));
   }
 
   .pagmar__about-letters-title {
@@ -1035,6 +1143,7 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
 
   .pagmar__about-letters-body,
   .pagmar__about-letters-body p,
+  .pagmar__about-letters-hint-wrap,
   .pagmar__about-letters-hint,
   .pagmar__about-copy,
   .pagmar__about-project-copy {
@@ -1053,13 +1162,19 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
   }
 
   .pagmar__about-footer-hero,
-  .pagmar__about-credits--project,
+  .pagmar__about-footer-credits,
   .pagmar__about-credits--thanks {
     position: relative;
     left: auto;
     top: auto;
     width: 100%;
     margin-bottom: calc(24 * var(--u));
+  }
+
+  .pagmar__about-footer-credits {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(24 * var(--u));
   }
 
   .pagmar__about-footer-hero {
@@ -1071,9 +1186,8 @@ body.is-about-overlay-open .pagmar__about-amulet-hover .pagmar__garden-amulet-ho
     text-align: center;
   }
 
-  .pagmar__about-credits--project {
-    flex-direction: column;
-    align-items: flex-start;
+  .pagmar__about-project-copy {
+    max-width: 100%;
   }
 
   .pagmar__about-bezalel-logo {

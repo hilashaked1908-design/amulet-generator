@@ -10,7 +10,7 @@
   <script src="pagmar-boot.js?v=20250709-full-site"></script>
   <link rel="stylesheet" href="../css/fonts.css?v=20250709-full-site">
   <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-glass-blur-distort">
-  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250710-text-right">
+  <link rel="stylesheet" href="../css/amulet-detail.css?v=20250711-glass-360-tag">
   <link rel="stylesheet" href="../css/buttons.css?v=20250710-glass-blur-distort">
   <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250709-full-site">
   <style>
@@ -39,13 +39,13 @@
       25%, 100% { opacity: 0; }
     }
   </style>
-  <script src="garden-atmosphere.js?v=20250708-detail-garden-bg"></script>
+  <script src="garden-atmosphere.js?v=20250711-detail-body-guard"></script>
   <script>
     (function () {
       document.documentElement.classList.add('pagmar-detail-booting');
       window.pagmarDetailBoot = {
         _startedAt: Date.now(),
-        MIN_MS: 350,
+        MIN_MS: 200,
         FAILSAFE_MS: 45000,
         _pending: { fonts: 1, content: 1, scene: 1, vectors: 1 },
         _finished: false,
@@ -53,6 +53,12 @@
           if (this._finished || !this._pending[key]) return;
           delete this._pending[key];
           if (!Object.keys(this._pending).length) this.finish();
+        },
+        forceReveal: function (reason) {
+          if (this._finished) return;
+          if (reason) console.info('[amulet-detail] force reveal:', reason);
+          this._pending = {};
+          this._finishNow();
         },
         finish: function () {
           if (this._finished) return;
@@ -65,24 +71,31 @@
         _finishNow: function () {
           if (this._finished) return;
           this._finished = true;
+          this._pending = {};
           var loader = document.getElementById('detailPageLoader');
-          var body = document.body;
           if (loader) loader.classList.add('is-leaving');
           window.setTimeout(function () {
+            var body = document.body;
             if (body) body.classList.remove('is-detail-loading');
             document.documentElement.classList.remove('pagmar-detail-booting');
             if (loader) {
               loader.hidden = true;
               loader.setAttribute('aria-busy', 'false');
             }
-          }, 320);
+            try {
+              window.dispatchEvent(new CustomEvent('pagmar:detail-boot-complete'));
+            } catch (_) {}
+          }, 220);
         },
       };
 
       window.setTimeout(function () {
         if (!window.pagmarDetailBoot || window.pagmarDetailBoot._finished) return;
-        console.warn('[amulet-detail] loader failsafe - still pending:', Object.keys(window.pagmarDetailBoot._pending));
-        window.pagmarDetailBoot._finishNow();
+        console.warn(
+          '[amulet-detail] loader failsafe - still pending:',
+          Object.keys(window.pagmarDetailBoot._pending)
+        );
+        window.pagmarDetailBoot.forceReveal('failsafe');
       }, window.pagmarDetailBoot.FAILSAFE_MS);
 
       (function stashNavAnswersEarly() {
@@ -121,46 +134,60 @@
         } catch (_) {}
       })();
 
-      (function prefetchComposedEarly() {
+      (function startDetailWarmup() {
         var entryMatch = location.search.match(/[?&]entry=(\d+)/);
-        if (!entryMatch) return;
-        var entryId = parseInt(entryMatch[1], 10);
-        if (!Number.isFinite(entryId)) return;
-        window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
-        import('./amulet-glb-store.js')
-          .then(function (store) {
-            return store.loadSnapshot('composed3d-' + entryId);
-          })
-          .then(function (raw) {
-            if (!raw) return;
-            var parsed = JSON.parse(raw);
-            if (parsed && parsed.svg) {
-              window.__pagmarDetailComposedByEntryId[entryId] = parsed;
-            }
-          })
-          .catch(function () {});
+        var entryId = entryMatch ? parseInt(entryMatch[1], 10) : null;
+        var seedP = import('./seed-bootstrap.js').then(function (mod) {
+          return mod.ensureSeedCollectionLoaded();
+        });
+        var warmup = {
+          seed: seedP,
+          modules: import('./amulet-glb-store.js'),
+        };
+        if (entryId != null && Number.isFinite(entryId)) {
+          warmup.snapshot = '/questionnaire/seed/snapshots/' + entryId + '.png';
+          warmup.lock = seedP
+            .then(function () {
+              return import('./amulet-entry-resolve.js');
+            })
+            .then(function (mod) {
+              return mod.ensureSeedEntryMap().then(function (map) {
+                var entry = mod.findCollectionEntryById(entryId) || map.get(entryId);
+                if (mod.entryShouldUseBundledSeedGlb(entryId, map, entry)) {
+                  window.__pagmarDetailBundledGlbEntryId = entryId;
+                  window.__pagmarDetailGlbMounted = false;
+                  window.pagmarDetailComposePreload = null;
+                  window.pagmarDetailComposePreloadEntryId = null;
+                }
+              });
+            })
+            .catch(function () {});
+        }
+        window.pagmarDetailWarmup = warmup;
       })();
 
       import('./amulet-detail-fog.js')
         .then(function (mod) {
-          var host = document.getElementById('detailFogHost');
-          if (!host || typeof mod.bootDetailFogWebGL !== 'function') return;
-          mod.bootDetailFogWebGL(host);
+          function bootFog() {
+            var host = document.getElementById('detailFogHost');
+            if (!host || typeof mod.bootDetailFogWebGL !== 'function') return;
+            mod.bootDetailFogWebGL(host);
+          }
+          if (document.body) bootFog();
+          else document.addEventListener('DOMContentLoaded', bootFog, { once: true });
         })
         .catch(function (err) {
           console.warn('[amulet-detail] fog WebGL boot failed', err);
         });
 
-      import('./amulet-detail-vectors.js?v=20250711-fast-glb')
+      import('./amulet-detail-vectors.js?v=20250711-entry-authority')
         .then(function (mod) {
           if (typeof mod.bootDetailVectors === 'function') {
             return mod.bootDetailVectors();
           }
-          if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('vectors');
         })
         .catch(function (err) {
           console.warn('[amulet-detail] vectors boot failed', err);
-          if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('vectors');
         });
 
       if (document.fonts && document.fonts.ready) {
@@ -171,18 +198,44 @@
         window.pagmarDetailBoot.done('fonts');
       }
 
-      var idMatch = location.search.match(/[?&]id=(\d+)/);
-      var detailId = idMatch ? parseInt(idMatch[1], 10) : 0;
-      if (Number.isFinite(detailId) && detailId >= 0) {
-        ['fetch', 'image'].forEach(function (as) {
+      var entryMatch = location.search.match(/[?&]entry=(\d+)/);
+      var entryId = entryMatch ? parseInt(entryMatch[1], 10) : null;
+      if (entryId != null && Number.isFinite(entryId)) {
+        var preloadGlbUrl = '/questionnaire/seed/glbs/' + entryId + '.glb';
+        try {
+          var navRaw = sessionStorage.getItem('pagmarAmuletDetailNav');
+          if (navRaw) {
+            var nav = JSON.parse(navRaw);
+            if (
+              nav &&
+              nav.entryId == entryId &&
+              nav.glbUrl &&
+              String(nav.glbUrl).indexOf('/' + entryId + '.glb') !== -1
+            ) {
+              preloadGlbUrl = nav.glbUrl;
+            }
+          }
+        } catch (_) {}
+        [
+          { as: 'fetch', href: preloadGlbUrl },
+          { as: 'image', href: '/questionnaire/seed/snapshots/' + entryId + '.png' },
+        ].forEach(function (item) {
           var link = document.createElement('link');
           link.rel = 'preload';
-          link.as = as;
-          link.href = as === 'fetch'
-            ? '/public/amulets/amulet-' + detailId + '.answers.json?v=1'
-            : '/public/amulets/amulet-' + detailId + '.png';
+          link.as = item.as;
+          link.href = item.href;
           document.head.appendChild(link);
         });
+      } else {
+        var idMatch = location.search.match(/[?&]id=(\d+)/);
+        var detailId = idMatch ? parseInt(idMatch[1], 10) : -1;
+        if (Number.isFinite(detailId) && detailId >= 0 && detailId <= 6) {
+          var legacyPng = document.createElement('link');
+          legacyPng.rel = 'preload';
+          legacyPng.as = 'image';
+          legacyPng.href = '/public/amulets/amulet-' + detailId + '.png';
+          document.head.appendChild(legacyPng);
+        }
       }
 
       [
@@ -452,13 +505,12 @@
   <script defer src="amulet-catalog.js?v=20250710-detail-entry"></script>
   <script defer src="../connection-core.js"></script>
   <script defer src="glass-lens.js?v=20250710-glass-blur-distort"></script>
-  <script defer src="amulet-detail.js?v=20250711-fast-glb"></script>
+  <script defer src="amulet-detail.js?v=20250711-entry-authority"></script>
   <script defer src="amulet-detail-hover.js?v=20250709-clone-all"></script>
   <script defer src="amulet-detail-question-hover.js?v=20250709-glass-question-tip"></script>
   <script type="module">
-    import('./amulet-detail-scene.js?v=20250711-fast-glb').catch(function (err) {
+    import('./amulet-detail-scene.js?v=20250711-glb-authority').catch(function (err) {
       console.warn('[amulet-detail] scene boot failed', err);
-      if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('scene');
     });
   </script>
 </body>

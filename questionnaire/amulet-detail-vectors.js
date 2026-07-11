@@ -103,16 +103,13 @@ async function waitForFonts() {
 }
 
 export async function bootDetailVectors() {
-  await waitForDetailContent();
-  await waitForDetailCatalog();
-  await waitForFonts();
+  await Promise.all([waitForDetailContent(), waitForDetailCatalog(), waitForFonts()]);
   if (window.pagmarDetailComposePreload) {
     try {
       await window.pagmarDetailComposePreload;
     } catch (_) {}
   }
-  await waitForPaint();
-  await renderVectors();
+  await renderVectors({ markBootDone: true });
 }
 
 export async function refreshDetailVectors() {
@@ -127,13 +124,13 @@ async function waitForDetailContent() {
   const deadline = Date.now() + 15000;
   while (boot._pending && boot._pending.content && Date.now() < deadline) {
     await new Promise(function (resolve) {
-      window.setTimeout(resolve, 40);
+      window.setTimeout(resolve, 16);
     });
   }
 }
 
 async function waitForDetailCatalog() {
-  const deadline = Date.now() + 10000;
+  const deadline = Date.now() + 8000;
   while (Date.now() < deadline) {
     if (
       typeof window.getAmuletRecord === 'function' &&
@@ -142,7 +139,7 @@ async function waitForDetailCatalog() {
       return;
     }
     await new Promise(function (resolve) {
-      window.setTimeout(resolve, 40);
+      window.setTimeout(resolve, 16);
     });
   }
 }
@@ -298,43 +295,20 @@ function composedSvgHasLayers(svgMarkup) {
 }
 
 export async function preloadDetailCompose(entryId, answers) {
-  if (entryId == null) return null;
-  window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
-  if (
-    window.__pagmarDetailComposedByEntryId[entryId] &&
-    composedSvgHasLayers(window.__pagmarDetailComposedByEntryId[entryId].svg)
-  ) {
-    return window.__pagmarDetailComposedByEntryId[entryId];
-  }
-  try {
-    const fromIdb = await readComposedForEntry(entryId);
-    if (fromIdb?.svg && composedSvgHasLayers(fromIdb.svg)) {
-      window.__pagmarDetailComposedByEntryId[entryId] = fromIdb;
-      return fromIdb;
-    }
-  } catch (_) {}
-  return null;
+  if (entryId == null || !answers || !answers.q1Wish) return null;
+  return getSharedDetailCompose(answers, { entryId: entryId });
 }
 
-/** Per-amulet compose for detail page - preloaded/cache first, then live compose, then IDB. */
+/** Per-amulet compose for detail page — always from this entry's answers. */
 async function resolveDetailPageCompose(record, idx, entryIdOverride) {
   const entryId = entryIdOverride != null ? entryIdOverride : resolveDetailEntryId(idx);
 
-  if (entryId != null && window.__pagmarDetailComposedByEntryId?.[entryId]) {
-    const cached = window.__pagmarDetailComposedByEntryId[entryId];
-    if (cached?.svg && composedSvgHasLayers(cached.svg)) return cached;
-  }
-
-  if (entryId != null) {
-    const perEntry = await readComposedForEntry(entryId);
-    if (perEntry?.svg && composedSvgHasLayers(perEntry.svg)) {
-      window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
-      window.__pagmarDetailComposedByEntryId[entryId] = perEntry;
-      return perEntry;
-    }
-  }
-
-  if (window.pagmarDetailComposePreload) {
+  if (
+    window.pagmarDetailComposePreload &&
+    window.pagmarDetailComposePreloadEntryId != null &&
+    entryId != null &&
+    window.pagmarDetailComposePreloadEntryId == entryId
+  ) {
     try {
       const preloaded = await window.pagmarDetailComposePreload;
       if (preloaded?.svg && composedSvgHasLayers(preloaded.svg)) return preloaded;
@@ -343,22 +317,14 @@ async function resolveDetailPageCompose(record, idx, entryIdOverride) {
 
   if (record && record.q1Wish) {
     try {
-      const compose = await import('./amulet-compose.js');
-      await compose.initAmuletCompose();
       const composed = await getSharedDetailCompose(record, { entryId: entryId });
-      if (composed?.svg && composedSvgHasLayers(composed.svg)) {
-        if (entryId != null) {
-          window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
-          window.__pagmarDetailComposedByEntryId[entryId] = composed;
-        }
-        return composed;
-      }
+      if (composed?.svg && composedSvgHasLayers(composed.svg)) return composed;
     } catch (err) {
       console.warn('[detail-vectors] compose from answers failed', err);
     }
   }
 
-  return getSharedDetailCompose(record, { entryId: entryId });
+  return null;
 }
 
 export async function renderResultOverlayVectors(answers) {
@@ -488,12 +454,31 @@ async function renderVectorsOnce(options) {
     })
     .catch(function () {});
 
+  let entryId = null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const rawEntry = params.get('entry');
+    if (rawEntry != null && rawEntry !== '') {
+      const parsed = parseInt(rawEntry, 10);
+      if (Number.isFinite(parsed)) entryId = parsed;
+    }
+  } catch (_) {}
+
   const idx = parseAmuletIndex();
   const base = (window.AMULET_QUESTIONS || []).length;
   if (idx < base) return false;
 
-  const entryId = resolveDetailEntryId(idx);
-  const record = authoritativeDetailAnswers(entryId, idx);
+  if (entryId == null) entryId = resolveDetailEntryId(idx);
+  let record = authoritativeDetailAnswers(entryId, idx);
+  if ((!record || !record.q1Wish) && entryId != null) {
+    try {
+      const resolveMod = await import('./amulet-entry-resolve.js');
+      const resolved = await resolveMod.resolveEntryRecord(entryId);
+      if (resolved && resolved.answers && resolved.answers.q1Wish) {
+        record = resolved.answers;
+      }
+    } catch (_) {}
+  }
   if (!record || !record.q1Wish) return false;
 
   clearDetailVectorSlots();
@@ -566,7 +551,7 @@ async function renderVectors(options = {}) {
         await waitForFonts();
         await waitForPaint();
         await new Promise(function (resolve) {
-          window.setTimeout(resolve, 140 * attempt);
+          window.setTimeout(resolve, 60 * attempt);
         });
       }
       rendered = await renderVectorsOnce(options);
@@ -610,11 +595,7 @@ function parseAmuletIndex() {
   try {
     const params = new URLSearchParams(window.location.search);
     const base = (window.AMULET_QUESTIONS || []).length;
-    const raw = params.get('id');
-    if (raw != null && raw !== '') {
-      const n = parseInt(raw, 10);
-      if (Number.isFinite(n) && n >= base) return n;
-    }
+
     const entryRaw = params.get('entry');
     if (entryRaw != null && entryRaw !== '') {
       const entryId = parseInt(entryRaw, 10);
@@ -626,6 +607,13 @@ function parseAmuletIndex() {
         if (fromEntry != null) return fromEntry;
       }
     }
+
+    const raw = params.get('id');
+    if (raw != null && raw !== '') {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n >= base) return n;
+    }
+
     return base;
   } catch (_) {
     return 0;
@@ -1827,8 +1815,7 @@ function renderUnifiedStageSvg(contour, container, viewBox) {
   pathEl.setAttribute('shape-rendering', 'geometricPrecision');
   svg.appendChild(pathEl);
 
-  container.innerHTML = '';
-  container.appendChild(svg);
+  container.replaceChildren(svg);
   return svg;
 }
 

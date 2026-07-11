@@ -32,10 +32,14 @@ body.is-result-overlay-open {
   --result-tag-size: 20;
   --result-tag-line-height: 0.9;
   --result-tag-tracking: 0.6;
+  --result-stack-gap: 16;
+  --result-story-gap: 32;
   --result-body-font: "TheBasics", "TheBasics Mono", monospace;
   --result-story-font: "Lava Pro HL", "TheBasics Display Thin", serif;
   --pagmar-w: 1920;
   --pagmar-h: 1080;
+  --result-amulet-size: 850;
+  --result-amulet-y-shift: 48;
 }
 
 .pagmar__result-overlay.is-visible {
@@ -153,8 +157,10 @@ body.is-result-overlay-open {
 }
 
 .pagmar__result-tags .pagmar__result-tag,
-.pagmar__result-components .pagmar__result-tag {
+.pagmar__result-components .pagmar__result-tag,
+.pagmar__result-request > .pagmar__result-tag {
   padding: 0;
+  line-height: 1;
 }
 
 .pagmar__result-field-text {
@@ -224,7 +230,7 @@ body.is-result-overlay-open {
 }
 
 .pagmar__result-criteria-text .pagmar__result-field-text {
-  margin-top: calc(16 * var(--u));
+  margin-top: calc(var(--result-stack-gap) * var(--u));
   align-self: flex-end;
 }
 
@@ -319,6 +325,7 @@ body.is-result-overlay-open {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  gap: calc(var(--result-stack-gap) * var(--u));
   width: calc(410 * var(--u));
   margin: 0;
 }
@@ -383,7 +390,7 @@ body.is-result-overlay-open {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: calc(16 * var(--u));
+  gap: calc(var(--result-story-gap) * var(--u));
   pointer-events: auto;
   overflow: hidden;
 }
@@ -419,7 +426,7 @@ body.is-result-overlay-open {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: calc(16 * var(--u));
+  gap: calc(var(--result-stack-gap) * var(--u));
   width: calc(347.027 * var(--u));
 }
 
@@ -501,13 +508,13 @@ body.is-result-overlay-open {
   white-space: nowrap;
 }
 
-/* Amulet - centered in Frame 405 */
+/* Amulet - centered in Frame 405 (enlarged vs Figma 736 — fills center column) */
 .pagmar__result-amulet {
   position: absolute;
   left: 50%;
-  top: calc(50% - 63.25 * var(--u));
-  width: calc(736.298 * var(--u));
-  height: calc(736.297 * var(--u));
+  top: calc(50% - var(--result-amulet-y-shift) * var(--u));
+  width: calc(var(--result-amulet-size) * var(--u));
+  height: calc(var(--result-amulet-size) * var(--u));
   transform: translate(-50%, -50%);
   margin: 0;
   pointer-events: none;

@@ -21,12 +21,6 @@
   const detailCreateCta = document.getElementById('detailCreateCta');
 
   function parseIndex() {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get('id');
-    if (raw != null && raw !== '') {
-      const n = parseInt(raw, 10);
-      if (Number.isFinite(n) && n >= USER_AMULET_INDEX) return n;
-    }
     const entryId = parseEntryId();
     if (
       entryId != null &&
@@ -35,7 +29,11 @@
       var fromEntry = window.pagmarIndexForEntryId(entryId);
       if (fromEntry != null) return fromEntry;
     }
-    return USER_AMULET_INDEX;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('id');
+    if (raw == null || raw === '') return USER_AMULET_INDEX;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= USER_AMULET_INDEX ? n : USER_AMULET_INDEX;
   }
 
   function indexLabel(index) {
@@ -172,11 +170,15 @@
   }
 
   async function preloadDetailContext(index) {
-    await import('./seed-bootstrap.js')
-      .then(function (mod) {
-        return mod.ensureSeedCollectionLoaded();
-      })
-      .catch(function () {});
+    if (window.pagmarDetailWarmup && window.pagmarDetailWarmup.seed) {
+      await window.pagmarDetailWarmup.seed.catch(function () {});
+    } else {
+      await import('./seed-bootstrap.js')
+        .then(function (mod) {
+          return mod.ensureSeedCollectionLoaded();
+        })
+        .catch(function () {});
+    }
 
     resolvedDetailEntryId = parseEntryId() || readNavEntryId(index);
     if (resolvedDetailEntryId == null && typeof window.pagmarEntryIdForAmuletIndex === 'function') {
@@ -223,20 +225,12 @@
           }
         })
       );
-      idbReads.push(
-        storeMod.loadSnapshot('composed3d-' + entryId).then(function (composedRaw) {
-          if (!composedRaw) return;
-          try {
-            var composedParsed = JSON.parse(composedRaw);
-            if (composedParsed && composedParsed.svg) {
-              window.__pagmarDetailComposedByEntryId = window.__pagmarDetailComposedByEntryId || {};
-              window.__pagmarDetailComposedByEntryId[entryId] = composedParsed;
-            }
-          } catch (_) {}
-        })
-      );
       await Promise.all(idbReads);
     } catch (_) {}
+
+    if (window.pagmarDetailWarmup && window.pagmarDetailWarmup.lock) {
+      await window.pagmarDetailWarmup.lock.catch(function () {});
+    }
 
     var composeAnswers =
       window.__pagmarDetailAnswersByEntryId[entryId] ||
@@ -244,9 +238,32 @@
       (typeof window.pagmarFindCollectionEntryById === 'function'
         ? (window.pagmarFindCollectionEntryById(entryId) || {}).answers
         : null);
-    if (composeAnswers && composeAnswers.q1Wish) {
+    var composeEntry =
+      typeof window.pagmarFindCollectionEntryById === 'function'
+        ? window.pagmarFindCollectionEntryById(entryId)
+        : null;
+    var composeIsBundledSeed = false;
+    if (entryId != null) {
       try {
-        var vectorsMod = await import('./amulet-detail-vectors.js?v=20250711-fast-glb');
+        var resolveMod = await import('./amulet-entry-resolve.js');
+        var seedMap = await resolveMod.ensureSeedEntryMap();
+        composeIsBundledSeed = resolveMod.entryShouldUseBundledSeedGlb(
+          entryId,
+          seedMap,
+          composeEntry
+        );
+      } catch (_) {}
+    }
+    if (
+      composeAnswers &&
+      composeAnswers.q1Wish &&
+      !composeIsBundledSeed &&
+      !window.pagmarDetailComposePreload &&
+      !window.__pagmarDetailBundledGlbEntryId
+    ) {
+      try {
+        var vectorsMod = await import('./amulet-detail-vectors.js?v=20250711-entry-authority');
+        window.pagmarDetailComposePreloadEntryId = entryId;
         window.pagmarDetailComposePreload = vectorsMod.preloadDetailCompose(entryId, composeAnswers);
       } catch (err) {
         console.warn('[amulet-detail] compose preload failed', err);
@@ -256,6 +273,10 @@
 
   function authoritativeAnswersForEntry(entryId) {
     if (entryId == null) return null;
+    if (typeof window.pagmarFindCollectionEntryById === 'function') {
+      var entry = window.pagmarFindCollectionEntryById(entryId);
+      if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
+    }
     if (
       window.__pagmarDetailAnswersByEntryId &&
       window.__pagmarDetailAnswersByEntryId[entryId] &&
@@ -265,10 +286,6 @@
     }
     var nav = readNavPayloadForEntry(entryId);
     if (nav && nav.answers && nav.answers.q1Wish) return nav.answers;
-    if (typeof window.pagmarFindCollectionEntryById === 'function') {
-      var entry = window.pagmarFindCollectionEntryById(entryId);
-      if (entry && entry.answers && entry.answers.q1Wish) return entry.answers;
-    }
     return null;
   }
 
@@ -318,22 +335,18 @@
 
     const spec = window.getAmuletSpec(index, null, recordOverride || undefined);
     var imgSrc = null;
-    if (
-      entryId != null &&
-      window.__pagmarDetailSnapshotByEntryId &&
-      window.__pagmarDetailSnapshotByEntryId[entryId]
-    ) {
-      imgSrc = window.__pagmarDetailSnapshotByEntryId[entryId];
-    } else if (entry && entry.snapshot) {
-      imgSrc = entry.snapshot;
-    } else if (typeof window.getAmuletImageSrc === 'function' && entryId != null) {
-      var entryIndex =
-        typeof window.pagmarIndexForEntryId === 'function'
-          ? window.pagmarIndexForEntryId(entryId)
-          : index;
-      if (entryIndex != null) imgSrc = window.getAmuletImageSrc(entryIndex);
-    } else if (typeof window.getAmuletImageSrc === 'function') {
-      imgSrc = window.getAmuletImageSrc(index);
+    if (entryId != null) {
+      imgSrc = '/questionnaire/seed/snapshots/' + entryId + '.png';
+    }
+    if (entry && entry.id != null && entry.id == entryId && entry.snapshot) {
+      if (
+        String(entry.snapshot).indexOf('/questionnaire/seed/') === 0 &&
+        String(entry.snapshot).indexOf('/' + entryId + '.') !== -1
+      ) {
+        imgSrc = entry.snapshot;
+      } else if (String(entry.snapshot).indexOf('/questionnaire/seed/') !== 0) {
+        imgSrc = entry.snapshot;
+      }
     }
 
     if (detailNumText) detailNumText.textContent = indexLabel(index);
@@ -395,11 +408,15 @@
   }
 
   async function bootContent() {
-    await import('./seed-bootstrap.js')
-      .then(function (mod) {
-        return mod.ensureSeedCollectionLoaded();
-      })
-      .catch(function () {});
+    if (window.pagmarDetailWarmup && window.pagmarDetailWarmup.seed) {
+      await window.pagmarDetailWarmup.seed.catch(function () {});
+    } else {
+      await import('./seed-bootstrap.js')
+        .then(function (mod) {
+          return mod.ensureSeedCollectionLoaded();
+        })
+        .catch(function () {});
+    }
 
     const entryId = parseEntryId();
     if (entryId == null) {
@@ -417,7 +434,18 @@
       }
 
       await preloadDetailContext(index);
-      var displayIndex = index;
+      var navPayload = readNavPayloadForEntry(resolvedDetailEntryId);
+      var displayIndex =
+        typeof window.pagmarIndexForEntryId === 'function' &&
+        resolvedDetailEntryId != null
+          ? window.pagmarIndexForEntryId(resolvedDetailEntryId)
+          : null;
+      if (displayIndex == null) {
+        displayIndex =
+          navPayload && typeof navPayload.labelIndex === 'number'
+            ? USER_AMULET_INDEX + navPayload.labelIndex
+            : resolveDetailIndex(index, resolvedDetailEntryId);
+      }
       var collectionEntry = null;
       if (typeof window.pagmarFindCollectionEntryById === 'function') {
         collectionEntry = window.pagmarFindCollectionEntryById(resolvedDetailEntryId);
@@ -426,18 +454,16 @@
       if (!entry) entry = resolveEntryForDetail(displayIndex);
       if (entry && entry.id != null) resolvedDetailEntryId = entry.id;
       renderDetail(displayIndex, entry);
-      await Promise.all([
+      Promise.all([
         waitForImage(detailAmuletImg),
         waitForImage(document.getElementById('detailAmuletImgBack')),
-      ]);
+      ]).catch(function () {});
     } catch (_) {
       /* fall through - always release loader */
     } finally {
       if (window.pagmarDetailBoot) window.pagmarDetailBoot.done('content');
     }
   }
-
-  /* ── Vector rendering is handled by amulet-detail-vectors.js (module) ── */
 
   /* ── Navigation ── */
   function leaveDetailPage(e) {
@@ -603,23 +629,19 @@
     scheduleDetailContentSpacingFit();
   }
 
+  window.addEventListener('pagmar:detail-vectors-ready', function () {
+    watchDetailContentLayout();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        fitDetailContentSpacing();
+      });
+    });
+  });
+  window.addEventListener('pagmar:detail-boot-complete', bootDetailSpacingFit);
   window.addEventListener('pagmar:detail-rendered', scheduleDetailContentSpacingFit);
-  window.addEventListener('pagmar:detail-vectors-ready', scheduleDetailContentSpacingFit);
   window.addEventListener('resize', scheduleDetailContentSpacingFit);
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(scheduleDetailContentSpacingFit).catch(function () {});
-  }
-
-  if (document.body.classList.contains('is-detail-loading')) {
-    var detailBootObserver = new MutationObserver(function () {
-      if (!document.body.classList.contains('is-detail-loading')) {
-        detailBootObserver.disconnect();
-        bootDetailSpacingFit();
-      }
-    });
-    detailBootObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  } else {
-    bootDetailSpacingFit();
   }
 
   /* ── Drag to rotate the 3D coin ── */

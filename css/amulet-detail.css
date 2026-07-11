@@ -118,6 +118,7 @@ body.pagmar-amulet-detail.is-detail-loading .pagmar-canvas--detail {
 }
 
 body.pagmar-amulet-detail.is-detail-loading .pagmar-viewport {
+  visibility: hidden;
   pointer-events: none;
   background: transparent;
 }
@@ -1120,11 +1121,13 @@ body.pagmar-amulet-detail .pagmar__detail-amulet-hover__surface .glass-lens__tin
 body.pagmar-amulet-detail .pagmar__detail-amulet-hover .pagmar__glass-pill__text {
   position: relative;
   z-index: 3;
-  font-family: var(--detail-tag-font);
-  font-size: 16px;
+  font-family: var(--figma-tag-font);
+  font-size: calc(var(--figma-tag-size) * var(--u));
   font-weight: 400;
+  font-style: normal;
   font-synthesis: none;
-  letter-spacing: 0.02em;
+  line-height: var(--figma-tag-line-height);
+  letter-spacing: calc(var(--figma-tag-tracking) * var(--u));
   -webkit-font-smoothing: antialiased;
 }
 

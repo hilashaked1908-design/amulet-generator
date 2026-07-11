@@ -49,7 +49,8 @@ export async function precomposeForFinalRender(answers) {
   }
 }
 
-export async function renderFinalAmuletLikePrototype(answers, container, onProgress) {
+export async function renderFinalAmuletLikePrototype(answers, container, onProgress, opts) {
+  opts = opts || {};
   if (!container) throw new Error('amulet container missing');
 
   await initAmuletCompose();
@@ -151,8 +152,13 @@ export async function renderFinalAmuletLikePrototype(answers, container, onProgr
       });
 
       const store = await import('./amulet-glb-store.js');
+      const glbBundle = { lighting, rendererSettings, materialOverrides };
       try { await store.copyGlb('user-amulet', 'user-amulet-prev'); } catch (_) {}
-      await store.saveGlb('user-amulet', pbrScene, { lighting, rendererSettings, materialOverrides });
+      await store.saveGlb('user-amulet', pbrScene, glbBundle);
+      if (opts.entryId != null) {
+        await store.saveGlb('collection-' + opts.entryId, pbrScene, glbBundle);
+        console.log('[amulet-final-render] saved GLB for collection-' + opts.entryId);
+      }
     }
   } catch (err) {
     console.warn('[amulet-final-render] GLB save failed (non-fatal)', err);

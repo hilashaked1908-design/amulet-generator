@@ -13,8 +13,8 @@
   <link rel="stylesheet" href="../css/questionnaire.css?v=20250709-full-site">
   <link rel="stylesheet" href="../css/buttons.css?v=20250710-glass-blur-distort">
   <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250709-choice-fix">
-  <link rel="stylesheet" href="../css/result-overlay.css?v=20250710-result-glass-360">
-  <link rel="stylesheet" href="../css/about-overlay.css?v=20250710-about-footer-emblem">
+  <link rel="stylesheet" href="../css/result-overlay.css?v=20250711-result-tag-gap">
+  <link rel="stylesheet" href="../css/about-overlay.css?v=20250711-frame484-down5">
   <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250710-about-refine">
 </head>
 <body class="pagmar-index">
@@ -453,28 +453,36 @@
         <header class="pagmar__about-hero" aria-label="אות אמת">
           <p class="pagmar__about-hero-word pagmar__about-hero-word--left" dir="rtl">אמת</p>
           <div class="pagmar__about-hero-emblem" aria-hidden="true">
-            <svg viewBox="0 0 425 234" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-              <path d="M161.013 69.5249C173.448 55.9793 192.406 44.3236 214.954 44.3236C237.502 44.3236 256.676 55.9793 269.111 69.5249C270.221 70.7343 271.954 71.1713 273.481 70.5699L279.825 68.0723C281.07 67.5823 281.629 66.1429 281.184 64.8815C278.167 56.3295 280.285 46.8317 286.392 40.0262C288.725 37.4269 292.607 35.2275 296.684 33.7016C299.233 32.7472 301.431 30.9813 302.735 28.5918C308.808 17.4682 318.04 6.6819 330.305 3.81277C352.253 -0.372703 367.191 10.8963 371.987 32.4101C374.276 45.1241 369.737 53.3502 362.358 64.1789C361.569 65.337 361.207 66.7296 361.225 68.1308C361.324 75.7651 358.932 81.3206 356.244 84.7222C354.212 87.2925 350.629 91.3004 345.536 93.7945C343.952 94.5704 342.656 96.0162 342.803 97.774C343.006 100.213 343.912 102.475 345.579 104.453C349.46 109.06 356.359 108.47 362.145 106.793C373.07 103.625 378.298 103.464 390.638 105.316C413.606 108.765 429.969 126.324 426.776 150.566C425.916 157.098 420.894 162.937 416.226 168.097C413.715 170.874 413.245 174.881 414.947 178.215C420.705 189.497 423.187 195.648 420.891 203.94C417.299 216.909 403.193 221.362 387.522 220.413C366.336 219.129 356.138 219.291 341.521 216.071C339.125 215.544 336.662 216.635 335.38 218.726C329.568 228.205 323.383 233.327 314.36 235.045C304.937 236.84 284.325 236.874 269.789 236.874C255.957 236.308 252.401 235.55 241.39 230.039C238.411 228.548 236.095 227.046 234.119 225.324C227.403 219.474 227.16 209.415 229.652 200.865C230.305 198.625 229.172 196.222 226.973 195.441C219.279 192.707 210.902 192.687 203.151 195.441C200.952 196.222 199.819 198.625 200.472 200.865C202.964 209.415 202.72 219.474 196.005 225.324C194.029 227.046 191.713 228.548 188.734 230.039C177.723 235.55 174.167 236.308 160.335 236.874C145.799 236.874 125.186 236.84 115.764 235.045C106.741 233.327 100.556 228.205 94.7437 218.726C93.4616 216.635 90.9986 215.544 88.6032 216.071C73.9854 219.291 63.7881 219.129 42.6019 220.413C26.931 221.362 12.8246 216.909 9.23313 203.94C6.93703 195.648 9.41844 189.497 15.1771 178.215C16.8789 174.881 16.4089 170.874 13.8979 168.097C9.23015 162.937 4.20786 157.098 3.34755 150.566C0.154636 126.324 16.5175 108.765 39.4862 105.316C51.8256 103.464 57.0537 103.625 67.979 106.793C73.7646 108.47 80.6636 109.06 84.5447 104.453C86.2115 102.475 87.1174 100.213 87.3208 97.774C87.4674 96.0162 86.1716 94.5704 84.5875 93.7945C79.4953 91.3004 75.9115 87.2925 73.8801 84.7222C71.1917 81.3206 68.8 75.7651 68.8991 68.1308C68.9172 66.7296 68.5547 65.337 67.7656 64.1789C60.3869 53.3502 55.8474 45.1241 58.1366 32.4101C62.9332 10.8963 77.8707 -0.372703 99.8187 3.81277C112.084 6.6819 121.316 17.4682 127.389 28.5918C128.693 30.9813 130.89 32.7472 133.44 33.7016C137.517 35.2275 141.399 37.4269 143.732 40.0262C149.839 46.8317 151.957 56.3295 148.94 64.8815C148.495 66.1429 149.054 67.5823 150.299 68.0723L156.643 70.5699C158.17 71.1713 159.903 70.7343 161.013 69.5249Z" stroke="currentColor" stroke-width="5.9" stroke-linejoin="round"/>
-            </svg>
+            <div class="pagmar__about-hero-emblem__stack">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--1" src="assets/about/component-33/frame-403.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--2" src="assets/about/component-33/frame-396.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--3" src="assets/about/component-33/frame-405.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--4" src="assets/about/component-33/frame-406.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--5" src="assets/about/component-33/frame-408.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--6" src="assets/about/component-33/frame-469.svg" alt="" decoding="async" draggable="false">
+              <img class="pagmar__about-hero-emblem__vector pagmar__about-hero-emblem__vector--7" src="assets/about/component-33/frame-470.svg" alt="" decoding="async" draggable="false">
+            </div>
           </div>
           <p class="pagmar__about-hero-word pagmar__about-hero-word--right" dir="rtl">אות</p>
         </header>
 
         <section class="pagmar__about-section pagmar__about-section--origin" aria-labelledby="aboutOriginTag">
-          <div class="pagmar__about-origin-copy">
-            <p class="pagmar__about-copy" dir="rtl">סיגיל הוא סמל אישי המשמש כקמע, שמקורו במסורות מאגיות שהתפתחו לאורך מאות שנים.</p>
-            <p class="pagmar__about-copy" dir="rtl">
-              בניגוד לסמלים קבועים, כל סיגיל נוצר עבור בקשה מסוימת.<br>
-              במסורת המקובלת הופכים את הבקשה הכתובה לסמל באמצעות פירוק המשפט לאותיות, הסרת אותיות חוזרות וחיבור האותיות הנותרות לצורה חדשה. התוצאה של חיבור האותיות אינה מיועדת להיקרא כמילה, אלא לשמש ייצוג חזותי של הכוונה והרצון.
-            </p>
-          </div>
-          <div class="pagmar__about-section-glyphs pagmar__about-origin-glyphs" aria-hidden="true">
-            <div class="pagmar__about-tag-icons">
-              <img src="assets/about/tag-star.svg" width="11.32" height="11.59" alt="">
-              <span class="pagmar__about-tag-icons-row">
+          <div class="pagmar__about-origin-stack">
+            <div class="pagmar__about-origin-row">
+              <p class="pagmar__about-copy" dir="rtl">סיגיל הוא סמל אישי המשמש כקמע, שמקורו במסורות מאגיות שהתפתחו לאורך מאות שנים.</p>
+              <div class="pagmar__about-origin-row-glyphs" aria-hidden="true">
+                <img src="assets/about/tag-star.svg" width="11.32" height="11.59" alt="">
+              </div>
+            </div>
+            <div class="pagmar__about-origin-row pagmar__about-origin-row--wide">
+              <p class="pagmar__about-copy" dir="rtl">
+                בניגוד לסמלים קבועים, כל סיגיל נוצר עבור בקשה מסוימת.<br>
+                במסורת המקובלת הופכים את הבקשה הכתובה לסמל באמצעות פירוק המשפט לאותיות, הסרת אותיות חוזרות וחיבור האותיות הנותרות לצורה חדשה. התוצאה של חיבור האותיות אינה מיועדת להיקרא כמילה, אלא לשמש ייצוג חזותי של הכוונה והרצון.
+              </p>
+              <div class="pagmar__about-origin-row-glyphs pagmar__about-origin-row-glyphs--pair" aria-hidden="true">
                 <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
                 <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
-              </span>
+              </div>
             </div>
           </div>
           <div class="pagmar__about-origin-tag">
@@ -485,29 +493,33 @@
         <section class="pagmar__about-section pagmar__about-section--system" aria-labelledby="aboutSystemTag">
           <div class="pagmar__about-system-layout">
             <div class="pagmar__about-block pagmar__about-block--system">
-              <div class="pagmar__about-block-copy pagmar__about-copy pagmar__about-copy--system" dir="rtl">
-                <p>המערכת לוקחת את המילים שאתם כותבים והופכת אותן לסיגיל אישי ומותאם עבור כל בקשה.</p>
-                <p>האותיות שמהן מורכבת הבקשה משמשות ליצירת הקמע, בעוד שהרגשות המלווים אותה משפיעים על אופיו החזותי ועל החומריות שלו.</p>
-                <p>
-                  עם יצירתו, הקמע נשמר במרחב דיגיטלי משותף, שבו הוא מתקיים לצד קמעות שנוצרו מבקשות של אנשים אחרים.<br>
-                  כך מציעה המערכת פרשנות עכשווית למסורת הסיגילים, כזו הנשענת על עקרונות מאגיים עתיקים, אך מתקיימת באמצעות טכנולוגיה, זיכרון משותף ואוסף הולך וגדל של רצונות אנושיים.
-                </p>
-              </div>
-              <div class="pagmar__about-section-glyphs pagmar__about-system-glyphs" aria-hidden="true">
-                <div class="pagmar__about-tag-icons">
-                  <img src="assets/about/tag-star.svg" width="12" height="12" alt="">
-                  <span class="pagmar__about-tag-icons-row">
-                    <img src="assets/about/tag-diamond.svg" width="12" height="12" alt="">
-                    <img src="assets/about/tag-diamond.svg" width="12" height="12" alt="">
-                  </span>
-                  <span class="pagmar__about-tag-icons-row">
-                    <img src="assets/about/tag-diamond.svg" width="12" height="12" alt="">
-                    <img src="assets/about/tag-diamond.svg" width="12" height="12" alt="">
-                    <img src="assets/about/tag-diamond.svg" width="12" height="12" alt="">
-                  </span>
+              <div class="pagmar__about-system-stack">
+                <div class="pagmar__about-system-row">
+                  <p class="pagmar__about-copy" dir="rtl">המערכת לוקחת את המילים שאתם כותבים והופכת אותן לסיגיל אישי ומותאם עבור כל בקשה.</p>
+                  <div class="pagmar__about-system-row-glyphs" aria-hidden="true">
+                    <img src="assets/about/tag-star.svg" width="11.32" height="11.59" alt="">
+                  </div>
+                </div>
+                <div class="pagmar__about-system-row pagmar__about-system-row--wide">
+                  <p class="pagmar__about-copy" dir="rtl">האותיות שמהן מורכבת הבקשה משמשות ליצירת הקמע, בעוד שהרגשות המלווים אותה משפיעים על אופיו החזותי ועל החומריות שלו.</p>
+                  <div class="pagmar__about-system-row-glyphs pagmar__about-system-row-glyphs--pair" aria-hidden="true">
+                    <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
+                    <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
+                  </div>
+                </div>
+                <div class="pagmar__about-system-row pagmar__about-system-row--wide">
+                  <p class="pagmar__about-copy" dir="rtl">
+                    עם יצירתו, הקמע נשמר במרחב דיגיטלי משותף, שבו הוא מתקיים לצד קמעות שנוצרו מבקשות של אנשים אחרים.<br>
+                    כך מציעה המערכת פרשנות עכשווית למסורת הסיגילים, כזו הנשענת על עקרונות מאגיים עתיקים, אך מתקיימת באמצעות טכנולוגיה, זיכרון משותף ואוסף הולך וגדל של רצונות אנושיים.
+                  </p>
+                  <div class="pagmar__about-system-row-glyphs pagmar__about-system-row-glyphs--triple" aria-hidden="true">
+                    <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
+                    <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
+                    <img src="assets/about/tag-diamond.svg" width="11.34" height="11.59" alt="">
+                  </div>
                 </div>
               </div>
-              <div class="pagmar__about-block-tag pagmar__about-system-tag">
+              <div class="pagmar__about-system-tag">
                 <p class="pagmar__about-tag" id="aboutSystemTag" dir="rtl">[ המערכת ]</p>
               </div>
             </div>
@@ -523,7 +535,7 @@
               class="pagmar__about-connection-default"
               src="assets/about/connection-default.svg"
               width="880"
-              height="924"
+              height="730"
               alt=""
               decoding="async"
               draggable="false"
@@ -531,7 +543,7 @@
             >
             <svg
               class="pagmar__about-connection-svg"
-              viewBox="0 0 880 924"
+              viewBox="0 0 880 730"
               preserveAspectRatio="xMidYMid meet"
               xmlns="http://www.w3.org/2000/svg"
               aria-hidden="true"
@@ -540,11 +552,15 @@
           </div>
 
           <div class="pagmar__about-letters-side">
-            <h2 class="pagmar__about-letters-title" id="aboutLettersTitle" dir="rtl">האותיות</h2>
-            <div class="pagmar__about-letters-copy" dir="rtl">
-              <p>לכל אות נוצרה ליגטורה ייחודית משלה.</p>
-              <p>האלגוריתם מחבר בין האותיות על פי מערכת חיבורים קבועה, שממנה נבנית הצורה הראשונית של הקמע.</p>
-              <p class="pagmar__about-letters-hint">בחר זוג אותיות כדי לראות את החיבור ביניהן</p>
+            <div class="pagmar__about-letters-intro">
+              <h2 class="pagmar__about-letters-title" id="aboutLettersTitle" dir="rtl">האותיות</h2>
+              <div class="pagmar__about-letters-body" dir="rtl">
+                <p>לכל אות נוצרה ליגטורה ייחודית משלה.</p>
+                <p>האלגוריתם מחבר בין האותיות על פי מערכת חיבורים קבועה, שממנה נבנית הצורה הראשונית של הקמע.</p>
+              </div>
+              <div class="pagmar__about-letters-hint-wrap" dir="rtl">
+                <p class="pagmar__about-letters-hint">בחר זוג אותיות כדי לראות את החיבור ביניהן</p>
+              </div>
             </div>
             <div class="pagmar__about-letter-grid-wrap" id="aboutLetterGridWrap">
               <div class="pagmar__about-letter-grid" id="aboutLetterGrid" role="group" aria-label="בחירת אותיות לחיבור"></div>
@@ -563,17 +579,18 @@
             <p class="pagmar__about-footer-word" dir="rtl">אות</p>
           </div>
 
-          <div class="pagmar__about-credits pagmar__about-credits--thanks" dir="rtl">
-            <p class="pagmar__about-credits-tag">[תודות מיוחדות]</p>
-            <ul class="pagmar__about-credits-list">
-              <li>נועה יחיאל</li>
-              <li>בוב אוראל</li>
-              <li>תמיר שקד</li>
-            </ul>
-          </div>
+          <div class="pagmar__about-footer-credits">
+            <div class="pagmar__about-credits pagmar__about-credits--thanks" dir="rtl">
+              <p class="pagmar__about-credits-tag">[תודות מיוחדות]</p>
+              <ul class="pagmar__about-credits-list">
+                <li>נועה יחיאל</li>
+                <li>בוב אוראל</li>
+                <li>תמיר שקד</li>
+              </ul>
+            </div>
 
-          <div class="pagmar__about-credits pagmar__about-credits--project">
             <img class="pagmar__about-bezalel-logo" src="assets/about/bezalel-logo.svg" width="627" height="95" alt="בצלאל אקדמיה לאמנות ועיצוב ירושלים" decoding="async" draggable="false">
+
             <div class="pagmar__about-project-copy" dir="rtl">
               <p>נעשה במסגרת פרויקט גמר - הילה שקד</p>
               <p>המחלקה לתקשורת חזותית, בצלאל אקדמיה לאמנות ועיצוב ירושלים</p>
@@ -587,22 +604,22 @@
   <script src="../connection-core.js"></script>
   <script src="questions.js?v=20250709-full-site"></script>
   <script src="amulet-catalog.js?v=20250710-detail-entry"></script>
-  <script src="garden-atmosphere.js?v=20250709-full-site"></script>
+  <script src="garden-atmosphere.js?v=20250711-detail-body-guard"></script>
   <script src="garden-stars.js?v=20250709-full-site"></script>
   <script src="glass-lens.js?v=20250710-about-amulet-glass"></script>
   <script src="garden-amulet-hover.js?v=20250709-full-site"></script>
   <script src="questionnaire-q1-vector-tip.js?v=20250709-q1-tip"></script>
   <script type="module">
-    import('./garden-three.js?v=20250711-correct-entry').catch(function (err) {
+    import('./garden-three.js?v=20250711-glb-authority').catch(function (err) {
       console.error('[garden-three] failed to load', err);
     });
   </script>
-  <script src="questionnaire-ui.js?v=20250710-q8-silent"></script>
+  <script src="questionnaire-ui.js?v=20250711-stable-frames"></script>
   <script src="button-roll.js?v=20250709-full-site"></script>
   <script src="index-buttons.js?v=20250709-full-site"></script>
-  <script src="index-filter-view.js?v=20250710-entry-only"></script>
+  <script src="index-filter-view.js?v=20250711-debug-entry"></script>
   <script src="about-close.js?v=20250710-about-refine"></script>
-  <script src="about-letters.js?v=20250710-about-ligature-frame"></script>
+  <script src="about-letters.js?v=20250711-letters-frame730"></script>
   <script src="about-amulet-hover.js?v=20250710-about-amulet-hover"></script>
   <script type="module">
     import('./about-overlay-fog.js?v=20250710-about-fog').catch(function (err) {

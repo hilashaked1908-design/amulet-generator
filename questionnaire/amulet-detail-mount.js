@@ -112,7 +112,9 @@ function startDetailAmuletRenderLoop() {
     if (state.renderer && state.scene && state.camera) {
       applyAmuletRotation();
       state.renderer.render(state.scene, state.camera);
-      if (window.pagmarGlassLens) window.pagmarGlassLens.tick();
+      if (window.pagmarGlassLens && !document.body.classList.contains('pagmar-open')) {
+        window.pagmarGlassLens.tick();
+      }
     }
   }
   frame(state.lastFrameMs);
@@ -150,10 +152,12 @@ export function mountDetailAmulet3D(container, glbScene, options) {
     preserveDrawingBuffer: true,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 0);
+  const clearAlpha =
+    options && options.opaqueBackground ? 1 : 0;
+  renderer.setClearColor(0x000000, clearAlpha);
 
   const scene = new THREE.Scene();
-  scene.background = null;
+  scene.background = clearAlpha > 0 ? new THREE.Color(0x000000) : null;
 
   const roomEnvTex = buildRoomEnvironmentMap(renderer);
   scene.environment = roomEnvTex;
@@ -169,6 +173,15 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   applyPresentMaterialMaps(glbScene, roomEnvTex, studioEnv, materialOverrides, {
     sheshPresentation: useDetailPresentation,
   });
+  if (!(options && options.skipStoneBackCap)) {
+    import('../three-pbr-amulet.js?v=20250711-entry-authority')
+      .then(function (mod) {
+        mod.ensureStoneBackCapForScene(glbScene);
+      })
+      .catch(function (err) {
+        console.warn('[amulet-detail-mount] stone back cap skipped', err);
+      });
+  }
 
   const box = new THREE.Box3().setFromObject(glbScene);
   const center = box.getCenter(new THREE.Vector3());
@@ -176,6 +189,9 @@ export function mountDetailAmulet3D(container, glbScene, options) {
 
   const group = new THREE.Group();
   group.add(glbScene);
+  if (options && typeof options.presentationOffsetY === 'number') {
+    group.position.y = options.presentationOffsetY;
+  }
   scene.add(group);
   if (useDetailPresentation) {
     addCreationLights(scene);
@@ -212,8 +228,10 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   state.scene = scene;
   state.camera = camera;
   state.group = group;
-  state.userRotX = 0.2;
-  state.userRotY = 0;
+  state.userRotX =
+    options && typeof options.initialRotX === 'number' ? options.initialRotX : 0.2;
+  state.userRotY =
+    options && typeof options.initialRotY === 'number' ? options.initialRotY : 0;
   state.autoRotate = Boolean(options && options.autoRotate);
   state.autoRotateSpeed =
     typeof options.autoRotateSpeed === 'number' ? options.autoRotateSpeed : 0.1;

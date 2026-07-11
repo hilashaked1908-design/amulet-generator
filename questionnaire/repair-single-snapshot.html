@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>תיקון snapshot - קמע בודד</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f0f0f;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    .card {
+      max-width: 720px;
+      margin: 0 auto;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 500; }
+    p { color: #aaa; line-height: 1.6; margin: 0 0 12px; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #e8e8e8;
+      color: #111;
+      width: 100%;
+      margin-top: 8px;
+    }
+    button:disabled { opacity: 0.45; cursor: wait; }
+    #log {
+      margin-top: 16px;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      font-family: ui-monospace, monospace;
+    }
+    .ok { color: #9cf; }
+    .err { color: #f88; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .grid img {
+      width: 100%;
+      background: repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 50% / 12px 12px;
+      border-radius: 6px;
+    }
+    .cap { font-size: 0.8rem; color: #888; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="title">תיקון snapshot</h1>
+    <p id="desc">מרנדר מחדש מה-GLB באיכות גבוהה ושומר ל-IndexedDB + localStorage.</p>
+    <button type="button" id="runBtn">התחל</button>
+    <div id="log"></div>
+    <div class="grid" id="grid" hidden></div>
+  </div>
+
+  <script type="module">
+    import { captureGardenSnapshotFromGlb } from './garden-snapshot-from-glb.js';
+    import { saveSnapshot, loadSnapshot, loadGlbRaw } from './amulet-glb-store.js';
+    import { processGardenSnapshotCanvas } from './snapshot-process.js';
+
+    const params = new URLSearchParams(location.search);
+    const labelParam = params.get('label') || '033';
+    const autoRun = params.get('auto') !== '0';
+    const QUESTIONS = 8;
+    const COLLECTION_KEY = 'amuletCollection';
+
+    const labelNum = parseInt(labelParam, 10);
+    const index = labelNum - 1;
+    const collectionIndex = index - QUESTIONS;
+    const label = String(labelNum).padStart(3, '0');
+
+    document.getElementById('title').textContent = 'תיקון snapshot — קמע [' + label + ']';
+
+    function log(html) {
+      document.getElementById('log').innerHTML += html + '\n';
+    }
+
+    function loadCollection() {
+      try {
+        const raw = localStorage.getItem(COLLECTION_KEY) || sessionStorage.getItem(COLLECTION_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveCollection(collection) {
+      const json = JSON.stringify(collection);
+      try {
+        localStorage.setItem(COLLECTION_KEY, json);
+      } catch (_) {}
+      try {
+        sessionStorage.setItem(COLLECTION_KEY, json);
+      } catch (_) {}
+    }
+
+    function panel(title, dataUrl) {
+      const wrap = document.createElement('div');
+      const img = document.createElement('img');
+      img.alt = title;
+      img.src = dataUrl || '';
+      const cap = document.createElement('div');
+      cap.className = 'cap';
+      cap.textContent = title;
+      img.onload = function () {
+        cap.textContent = title + ' — ' + img.naturalWidth + '×' + img.naturalHeight;
+      };
+      wrap.appendChild(img);
+      wrap.appendChild(cap);
+      return wrap;
+    }
+
+    async function repairOne() {
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      document.getElementById('log').textContent = '';
+      document.getElementById('grid').hidden = true;
+      document.getElementById('grid').innerHTML = '';
+
+      if (!Number.isFinite(labelNum) || collectionIndex < 0) {
+        log('<span class="err">label לא תקין: ' + labelParam + '</span>');
+        btn.disabled = false;
+        return;
+      }
+
+      const collection = loadCollection();
+      const entry = collection[collectionIndex];
+      if (!entry || entry.id == null) {
+        log('<span class="err">לא נמצא קמע [' + label + '] (collectionIndex=' + collectionIndex + ', סה״כ ' + collection.length + ')</span>');
+        log('פתחי את העמוד מאותו דפדפן שבו הגן (localhost:8080).');
+        btn.disabled = false;
+        return;
+      }
+
+      const entryId = entry.id;
+      const snapKey = 'collection-' + entryId;
+      const wish = entry.answers && entry.answers.q1Wish ? String(entry.answers.q1Wish).trim() : '';
+
+      log('קמע [' + label + '] · id=' + entryId);
+      if (wish) log(wish);
+
+      let beforeUrl = null;
+      try {
+        beforeUrl = await loadSnapshot(snapKey);
+      } catch (_) {}
+      if (!beforeUrl && entry.snapshot && String(entry.snapshot).startsWith('data:')) {
+        beforeUrl = entry.snapshot;
+      }
+
+      if (beforeUrl) {
+        log('לפני: נטען snapshot קיים');
+      } else {
+        log('לפני: אין snapshot (ייווצר חדש)');
+      }
+
+      const glbRaw = await loadGlbRaw(snapKey);
+      if (!glbRaw || !glbRaw.glb) {
+        log('<span class="err">לא נמצא GLB ב-IndexedDB עבור ' + snapKey + '</span>');
+        btn.disabled = false;
+        return;
+      }
+
+      log('מרנדר GLB… (זה לוקח כמה שניות)');
+      const canvas = await captureGardenSnapshotFromGlb(snapKey, { targetPx: 2048 });
+      if (!canvas || !canvas.width) {
+        log('<span class="err">הרינדור נכשל</span>');
+        btn.disabled = false;
+        return;
+      }
+
+      log('רינדור: ' + canvas.width + '×' + canvas.height);
+      const processed = processGardenSnapshotCanvas(canvas);
+      const hiResUrl = processed.hiResUrl;
+      const thumbUrl = processed.thumbUrl;
+
+      await saveSnapshot(snapKey, hiResUrl);
+      entry.snapshot = thumbUrl;
+      entry.snapshotInIdb = true;
+      collection[collectionIndex] = entry;
+      saveCollection(collection);
+
+      const hiImg = new Image();
+      await new Promise(function (resolve, reject) {
+        hiImg.onload = resolve;
+        hiImg.onerror = reject;
+        hiImg.src = hiResUrl;
+      });
+
+      log('<span class="ok">נשמר! hi-res ' + hiImg.width + '×' + hiImg.height + ' → IndexedDB</span>');
+      log('<span class="ok">thumb עודכן ב-localStorage</span>');
+
+      const grid = document.getElementById('grid');
+      grid.hidden = false;
+      if (beforeUrl) grid.appendChild(panel('לפני', beforeUrl));
+      grid.appendChild(panel('אחרי', hiResUrl));
+
+      window.dispatchEvent(
+        new CustomEvent('pagmar:snapshot-repaired', { detail: { entryId: entryId, label: label } })
+      );
+
+      log('\n<span class="ok">סיום. רענני את הגן (F5) אם הקמע עדיין מטושטש.</span>');
+      btn.disabled = false;
+      btn.textContent = 'הרץ שוב';
+    }
+
+    document.getElementById('runBtn').addEventListener('click', function () {
+      repairOne().catch(function (err) {
+        log('<span class="err">' + (err && err.message ? err.message : err) + '</span>');
+        document.getElementById('runBtn').disabled = false;
+      });
+    });
+
+    if (autoRun) {
+      repairOne().catch(function (err) {
+        log('<span class="err">' + (err && err.message ? err.message : err) + '</span>');
+        document.getElementById('runBtn').disabled = false;
+      });
+    }
+  </script>
+</body>
+</html>
