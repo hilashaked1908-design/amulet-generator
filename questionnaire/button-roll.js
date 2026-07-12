@@ -250,7 +250,7 @@
   function enhanceAll(root) {
     const scope = root && root.querySelectorAll ? root : document;
 
-    scope.querySelectorAll(ROLL_SELECTOR).forEach(enhanceRollTarget);
+    if (ROLL_SELECTOR) scope.querySelectorAll(ROLL_SELECTOR).forEach(enhanceRollTarget);
     scope.querySelectorAll('.figma-q__btn').forEach(enhanceFigmaQButton);
     scope.querySelectorAll('.pagmar__text-save, .pagmar__export-btn').forEach(enhancePlainButton);
     scope
