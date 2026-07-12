@@ -38,9 +38,12 @@ body.pagmar-create {
   --figma-amulet-bottom-y: calc(var(--figma-amulet-y) + var(--figma-amulet-h));
   --figma-q-dock-top-y: calc(var(--figma-frame-h) - var(--figma-q-dock-bottom) - var(--figma-q-dock-h));
   --figma-amulet-caption-line-h: calc(var(--figma-tag-size) * var(--figma-tag-line-height));
-  --figma-amulet-caption-y: calc(
-    (var(--figma-amulet-bottom-y) + var(--figma-q-dock-top-y) - var(--figma-amulet-caption-line-h)) / 2
-  );
+  /* Figma 2774:49194 Frame 412 — fixed position, left of centered amulet @ 1920×1080 */
+  --figma-amulet-caption-abs-x: 241;
+  --figma-amulet-caption-abs-y: 601;
+  --figma-amulet-caption-w: 247.22265625;
+  --figma-amulet-caption-text-w: 217.14453125;
+  --figma-amulet-caption-h: 36;
   --figma-q-field-font: 55;
   --figma-q-dock-bottom: 62;
   --figma-q-dock-lift: 0px;
@@ -675,13 +678,15 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
   pointer-events: auto;
 }
 
-/* Center tag between live vector frame and question dock - Figma 2630:44529 */
-.figma-amulet-stage-caption {
-  position: fixed;
-  left: 50%;
-  top: var(--figma-amulet-caption-top, calc(var(--figma-amulet-caption-y) * var(--fu)));
-  transform: translateX(-50%);
-  width: calc(var(--figma-q-desc-w) * var(--fu));
+/* Figma 2774:49194 Frame 412 — fixed artboard position X 241 Y 601 */
+body.pagmar-index.is-create-mode .pagmar__request-artboard #amuletStageCaption,
+body.pagmar-create .pagmar__request-artboard #amuletStageCaption,
+#amuletStageCaption.figma-amulet-stage-caption {
+  position: fixed !important;
+  left: calc(var(--figma-amulet-caption-abs-x) * var(--fu)) !important;
+  top: calc(var(--figma-amulet-caption-abs-y) * var(--fu)) !important;
+  transform: none !important;
+  width: calc(var(--figma-amulet-caption-w) * var(--fu)) !important;
   max-width: calc(100vw - 80px);
   margin: 0;
   padding: 0;
