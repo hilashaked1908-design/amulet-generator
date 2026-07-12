@@ -231,6 +231,29 @@ export function mountDetailAmulet3D(container, glbScene, options) {
     preserveDrawingBuffer: true,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // Surface WebGL context loss (and allow the browser to restore it). A lost
+  // context renders black; preventDefault is required for a restore event.
+  renderer.domElement.addEventListener(
+    'webglcontextlost',
+    function (ev) {
+      ev.preventDefault();
+      console.error('[detail-mount] WebGL context lost — result amulet may go black');
+    },
+    false
+  );
+  renderer.domElement.addEventListener(
+    'webglcontextrestored',
+    function () {
+      console.warn('[detail-mount] WebGL context restored — redrawing');
+      try {
+        const st = getDetailAmuletRenderState();
+        if (st && st.renderer && st.scene && st.camera) {
+          st.renderer.render(st.scene, st.camera);
+        }
+      } catch (_) {}
+    },
+    false
+  );
   const clearAlpha =
     options && options.opaqueBackground ? 1 : 0;
   renderer.setClearColor(0x000000, clearAlpha);

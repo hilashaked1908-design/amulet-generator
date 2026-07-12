@@ -37,6 +37,12 @@ export async function mountDetailStyleAmulet(container, glbKey, options) {
 
   await waitForContainerLayout(container);
 
+  // Free the heavy live-render (three-pbr) WebGL context BEFORE creating the
+  // result renderer, so we never hold two large GL contexts at once. On slower
+  // hosts (e.g. the cloud) the browser can drop the newest context when too
+  // many are alive, which showed up as a black amulet in the result view.
+  disposeThreePbr();
+
   const mounted = mountDetailAmulet3D(container, loaded.scene, {
     materialOverrides: loaded.materialOverrides || [],
     useDetailPresentation: Boolean(options && options.useDetailPresentation),
@@ -45,6 +51,5 @@ export async function mountDetailStyleAmulet(container, glbKey, options) {
     fitMargin: options && options.fitMargin,
   });
 
-  disposeThreePbr();
   return mounted;
 }
