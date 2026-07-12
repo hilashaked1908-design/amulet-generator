@@ -568,12 +568,24 @@ async function showResultOverlay(container, answers) {
   const workspace = document.getElementById('indexCreateWorkspace');
   if (!overlay || !slot) return false;
 
+  // Keep the result overlay OUT of the questionnaire wrapper: that wrapper gets
+  // opacity:0 / visibility:hidden when the result opens, which was hiding the
+  // whole result view (it showed for a moment then went black). Promote it to a
+  // direct child of <body>, like the About overlay.
+  if (overlay.parentElement !== document.body) {
+    document.body.appendChild(overlay);
+  }
+
   populateResultOverlay(answers);
 
   overlay.hidden = false;
   overlay.classList.remove('is-visible');
   document.body.classList.add('is-result-overlay-open');
   await waitForOverlayLayout();
+  // Reveal the populated shell immediately (texts + structure); the amulet and
+  // effects mount right after in the background. Avoids a black gap where the
+  // loader is gone but the overlay isn't visible yet.
+  overlay.classList.add('is-visible');
 
   slot.innerHTML = '';
 
