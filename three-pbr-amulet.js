@@ -10005,6 +10005,16 @@ export function getActivePbrCamera() {
   return active.camera ?? null;
 }
 
+/** Render one frame of the active PBR scene (used to keep the result view
+ * painted every frame — some hosts only repaint the canvas on interaction). */
+export function renderActivePbrFrame() {
+  if (active.renderer && active.scene && active.camera) {
+    active.renderer.render(active.scene, active.camera);
+    return true;
+  }
+  return false;
+}
+
 /** Tighten orthographic framing after moving the live canvas to the result overlay. */
 export function zoomActivePbrPresentation(factor) {
   const zoom = Number(factor);

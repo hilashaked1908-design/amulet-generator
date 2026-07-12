@@ -8,7 +8,7 @@ import {
   setAmuletLoaderProgress,
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
-import { captureGardenSnapshotFromActivePbr, captureLiveAmuletSnapshot, zoomActivePbrPresentation } from '../three-pbr-amulet.js';
+import { captureGardenSnapshotFromActivePbr, captureLiveAmuletSnapshot, zoomActivePbrPresentation, renderActivePbrFrame } from '../three-pbr-amulet.js';
 import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-vector-raster-fix';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
@@ -458,6 +458,29 @@ const RESULT_OVERLAY_FADE_MS = 400;
 const RESULT_AMULET_FIT_MARGIN = 1.08;
 const RESULT_LIVE_CANVAS_ZOOM = 1.24;
 
+let resultKeepAliveRaf = 0;
+function stopResultAmuletKeepAlive() {
+  if (resultKeepAliveRaf) {
+    cancelAnimationFrame(resultKeepAliveRaf);
+    resultKeepAliveRaf = 0;
+  }
+}
+/* Some hosts only repaint the live WebGL canvas on interaction, leaving the
+   result view black when idle. Keep rendering it every frame while the result
+   overlay is open. */
+function startResultAmuletKeepAlive() {
+  stopResultAmuletKeepAlive();
+  function tick() {
+    if (!document.body.classList.contains('is-result-overlay-open')) {
+      resultKeepAliveRaf = 0;
+      return;
+    }
+    renderActivePbrFrame();
+    resultKeepAliveRaf = requestAnimationFrame(tick);
+  }
+  resultKeepAliveRaf = requestAnimationFrame(tick);
+}
+
 function mountLiveCreateCanvasInSlot(slot, sourceCanvas) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) {
     throw new Error('create canvas missing');
@@ -470,6 +493,7 @@ function mountLiveCreateCanvasInSlot(slot, sourceCanvas) {
   };
   disposePresentedAmulet = null;
   zoomActivePbrPresentation(RESULT_LIVE_CANVAS_ZOOM);
+  startResultAmuletKeepAlive();
 }
 
 async function mountResultAmuletLikeDetail(slot, glbKey, options) {
