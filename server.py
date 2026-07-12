@@ -7,6 +7,7 @@ import re
 import secrets
 import base64
 import binascii
+import gzip
 import shutil
 import signal
 import socket
@@ -297,10 +298,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         path = urlparse(self.path).path
-        if path.endswith((".js", ".html", ".css")):
-            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-            self.send_header("Pragma", "no-cache")
-            self.send_header("Expires", "0")
+        if path.endswith((".js", ".mjs", ".html", ".css")):
+            # Allow caching WITH revalidation: the browser keeps the file and
+            # gets a tiny 304 when unchanged, instead of re-downloading every
+            # load. Content is versioned via ?v= query strings for busting.
+            self.send_header("Cache-Control", "no-cache")
         elif "/questionnaire/exports/" in path:
             self.send_header("Cache-Control", "no-cache")
         elif (
@@ -339,6 +341,43 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[:2] == ["questionnaire", "exports"]:
                 return os.path.join(EXPORTS_DIR, *parts[2:])
         return os.path.join(self.directory, *parts)
+
+    _GZIP_EXTS = (".js", ".mjs", ".css", ".html", ".svg", ".json")
+
+    def _maybe_serve_gzip(self):
+        """Serve compressible static files gzip-compressed, with 304 support."""
+        if "gzip" not in (self.headers.get("Accept-Encoding") or "").lower():
+            return False
+        parsed = urlparse(self.path).path
+        if not parsed.endswith(self._GZIP_EXTS):
+            return False
+        fs_path = self.translate_path(self.path)
+        if not fs_path or not os.path.isfile(fs_path):
+            return False
+        try:
+            st = os.stat(fs_path)
+        except OSError:
+            return False
+        last_modified = self.date_time_string(st.st_mtime)
+        if self.headers.get("If-Modified-Since") == last_modified:
+            self.send_response(304)
+            self.end_headers()
+            return True
+        try:
+            with open(fs_path, "rb") as f:
+                payload = gzip.compress(f.read(), 6)
+        except OSError:
+            return False
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(fs_path))
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Last-Modified", last_modified)
+        self.send_header("Vary", "Accept-Encoding")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(payload)
+        return True
 
     def do_GET(self):
         self._set_decoded_path()
@@ -429,6 +468,8 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 print(f"[serve] MISSING {parsed_path} (fs={fs_path})")
 
+        if self._maybe_serve_gzip():
+            return
         return super().do_GET()
 
     def _read_json_body(self):
