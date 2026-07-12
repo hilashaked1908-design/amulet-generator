@@ -65,6 +65,16 @@ body.is-result-overlay-open {
   --u: var(--pagmar-margin-u);
 }
 
+/* Force the result amulet WebGL canvas onto its own GPU compositor layer so it
+   keeps painting when idle. Without this it only repainted on mouse movement in
+   the cloud, showing the dark backdrop through the (transparent) canvas. */
+#resultAmulet3D canvas,
+.pagmar__result-overlay .pagmar-canvas--result canvas {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
 .pagmar__result-fog {
   position: fixed;
   inset: 0;
