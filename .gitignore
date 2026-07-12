@@ -9,3 +9,5 @@ __pycache__/
 .cursor-revert-originals/
 .server.pid
 logs/
+questionnaire/exports/
+questionnaire/exports/*.png

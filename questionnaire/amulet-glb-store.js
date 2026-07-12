@@ -321,6 +321,17 @@ export async function collectUsedEntryIds() {
       if (Number.isFinite(n)) ids.add(n);
     });
   } catch (_) {}
+  try {
+    const seedRes = await fetch('/questionnaire/seed/collection.json', { cache: 'force-cache' });
+    if (seedRes.ok) {
+      const seedArr = await seedRes.json();
+      if (Array.isArray(seedArr)) {
+        seedArr.forEach(function (entry) {
+          if (entry && entry.id != null) ids.add(Number(entry.id));
+        });
+      }
+    }
+  } catch (_) {}
   return ids;
 }
 

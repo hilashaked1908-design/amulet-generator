@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>קמע</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: #000000;
+      color: #f4f4e8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    img {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100dvh - 32px);
+      object-fit: contain;
+    }
+    .err {
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      line-height: 1.5;
+      max-width: 28rem;
+    }
+  </style>
+</head>
+<body>
+  <img id="shareImg" alt="קמע" hidden>
+  <p class="err" id="shareErr" hidden>התמונה לא זמינה. ודאי שהשרת פועל ושהדף נפתח מאותה כתובת שבברקוד.</p>
+  <script type="module">
+    import { loadExportSharePng } from './export-share-store.js?v=20250712-export-barcode';
+
+    const id = new URLSearchParams(window.location.search).get('id');
+    const img = document.getElementById('shareImg');
+    const err = document.getElementById('shareErr');
+
+    function showBlob(blob) {
+      const url = URL.createObjectURL(blob);
+      img.src = url;
+      img.hidden = false;
+      img.addEventListener(
+        'load',
+        function () {
+          URL.revokeObjectURL(url);
+        },
+        { once: true }
+      );
+    }
+
+    function showError() {
+      err.hidden = false;
+    }
+
+    if (!id || !/^[a-f0-9]{16}$/.test(id)) {
+      showError();
+    } else {
+      const serverUrl = '/questionnaire/exports/' + id + '.png';
+      img.addEventListener('load', function () {
+        img.hidden = false;
+      }, { once: true });
+      img.addEventListener('error', async function () {
+        try {
+          const blob = await loadExportSharePng(id);
+          if (blob) showBlob(blob);
+          else showError();
+        } catch (_) {
+          showError();
+        }
+      }, { once: true });
+      img.src = serverUrl;
+    }
+  </script>
+</body>
+</html>

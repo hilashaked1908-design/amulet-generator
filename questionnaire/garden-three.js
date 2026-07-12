@@ -1,7 +1,7 @@
 /**
  * Amulet garden - Cyber Garden style (ground-plane pan + low camera + sprites).
  */
-console.log('%c[garden-three] v20250711-glb-url-authority loaded', 'color:lime;font-size:14px');
+console.log('%c[garden-three] v20250712-entry-id-authority loaded', 'color:lime;font-size:14px');
 import * as THREE from './vendor/three.module.js';
 import { createLucaFog } from './garden-fog.js';
 import {
@@ -11,7 +11,7 @@ import {
   compressSnapshotDataUrl,
   compressSnapshotForLocalStorage,
 } from './snapshot-process.js';
-import { PERMANENTLY_REMOVED_LABELS } from './permanently-removed-labels.js';
+import { isPermanentlyRemovedEntryId } from './permanently-removed-labels.js';
 import {
   canonicalSeedGlbUrl,
   glbUrlMatchesEntryId,
@@ -496,7 +496,7 @@ function collectionWriteVerified(collection) {
     if (parsed.length !== expectedLength) continue;
     if (expectedLastId != null) {
       const last = parsed[parsed.length - 1];
-      if (!last || last.id !== expectedLastId) continue;
+      if (!last || last.id != expectedLastId) continue;
     }
     return true;
   }
@@ -544,7 +544,28 @@ function mergeCollectionEntries(a, b) {
       (entry.createdAt || 0) > (existing.createdAt || 0)
         ? entry
         : existing;
-    byKey.set(key, prefer);
+    const other = prefer === entry ? existing : entry;
+    const merged = Object.assign({}, prefer);
+    if (
+      other.glbUrl &&
+      prefer.id != null &&
+      glbUrlMatchesEntryId(other.glbUrl, prefer.id) &&
+      String(other.glbUrl).indexOf('/seed/glbs/') !== -1 &&
+      (!merged.glbUrl || !glbUrlMatchesEntryId(merged.glbUrl, prefer.id))
+    ) {
+      merged.glbUrl = other.glbUrl;
+    }
+    if (
+      other.snapshot &&
+      String(other.snapshot).indexOf('/seed/snapshots/') !== -1 &&
+      (!merged.snapshot ||
+        String(merged.snapshot).indexOf('data:') === 0 ||
+        !merged.snapshot)
+    ) {
+      merged.snapshot = other.snapshot;
+      if (other.snapshotInIdb === false) merged.snapshotInIdb = false;
+    }
+    byKey.set(key, merged);
   }
   return [...byKey.values()].sort(function (x, y) {
     return (x.createdAt || 0) - (y.createdAt || 0);
@@ -569,6 +590,8 @@ function stripHeavyCollectionFields(collection) {
 }
 
 const SEED_COLLECTION_URL = '/questionnaire/seed/collection.json';
+/** Entry ids from bundled seed/collection.json — always have GLB on disk. */
+let runtimeSeedEntryIds = null;
 
 /** Load bundled amulets for Netlify (static seed folder). Merges with local storage. */
 async function loadSeedCollectionFromFile() {
@@ -577,6 +600,15 @@ async function loadSeedCollectionFromFile() {
     if (!res.ok) return;
     const seed = await res.json();
     if (!Array.isArray(seed) || !seed.length) return;
+    runtimeSeedEntryIds = new Set(
+      seed
+        .map(function (entry) {
+          return entry && entry.id;
+        })
+        .filter(function (id) {
+          return id != null;
+        })
+    );
     const local = runtimeCollection || readCollectionFromStorage();
     runtimeCollection = local.length ? mergeCollectionEntries(local, seed) : seed.slice();
     saveCollection(runtimeCollection);
@@ -584,6 +616,10 @@ async function loadSeedCollectionFromFile() {
   } catch (err) {
     console.warn('[garden-three] seed collection unavailable', err);
   }
+}
+
+function isRuntimeSeedEntryId(entryId) {
+  return entryId != null && runtimeSeedEntryIds != null && runtimeSeedEntryIds.has(entryId);
 }
 
 function initCollectionFromStorage() {
@@ -627,6 +663,14 @@ function slimCollectionEntry(entry, stripHeavy) {
     if (snap.length <= COLLECTION_LS_SNAPSHOT_MAX_CHARS) {
       slim.snapshot = snap;
     }
+  }
+  if (
+    entry.glbUrl &&
+    entry.id != null &&
+    glbUrlMatchesEntryId(entry.glbUrl, entry.id) &&
+    String(entry.glbUrl).indexOf('/seed/glbs/') !== -1
+  ) {
+    slim.glbUrl = entry.glbUrl;
   }
   return slim;
 }
@@ -701,8 +745,12 @@ function persistLiveAmuletPositions() {
   if (!collection.length) return;
   let dirty = false;
   for (const sprite of collectionSprites) {
-    const idx = sprite.userData.collectionIndex;
-    if (typeof idx !== 'number' || idx < 0 || idx >= collection.length) continue;
+    const entryId = ensureSpriteEntryId(sprite);
+    if (entryId == null) continue;
+    const idx = collection.findIndex(function (entry) {
+      return entry && entry.id == entryId;
+    });
+    if (idx < 0) continue;
     const next = spritePositionPayload(sprite);
     const prev = normalizeSavedPosition(collection[idx].position);
     if (!prev || prev.x !== next.x || prev.z !== next.z || prev.yWorld !== next.yWorld) {
@@ -987,34 +1035,43 @@ function applyRemoveLabelFromUrl() {
   });
 }
 
+/** Disabled — label-based purge deleted user amulets at slots [021][022][023]. */
 function purgeAmulets021022023Once() {
-  try {
-    if (localStorage.getItem(PURGE_LABELS_021_KEY) === 'done') return Promise.resolve();
-  } catch (_) {}
-
-  const targets = [21, 22, 23];
-  const hasAny = targets.some(function (label) {
-    return collectionIndexForLabel(label) >= 0;
-  });
-  if (!hasAny) {
-    try {
-      localStorage.setItem(PURGE_LABELS_021_KEY, 'done');
-    } catch (_) {}
-    return Promise.resolve([]);
-  }
-
-  return removeCollectionEntriesByLabels(targets).then(function (removed) {
-    if (removed.length) {
-      try {
-        localStorage.setItem(PURGE_LABELS_021_KEY, 'done');
-      } catch (_) {}
-    }
-    return removed;
-  });
+  return Promise.resolve([]);
 }
 
 function purgePermanentlyRemovedLabels() {
-  return removeCollectionEntriesByLabels(PERMANENTLY_REMOVED_LABELS);
+  const collection = loadCollection();
+  const removed = collection.filter(function (entry) {
+    return entry && isPermanentlyRemovedEntryId(entry.id);
+  });
+  if (!removed.length) return Promise.resolve([]);
+  const removedIds = new Set(
+    removed.map(function (entry) { return entry.id; }).filter(function (id) { return id != null; })
+  );
+  const kept = collection.filter(function (entry) {
+    return !entry || !isPermanentlyRemovedEntryId(entry.id);
+  });
+  return glbStore().then(function (store) {
+    return Promise.all(removed.map(function (entry) {
+      return deleteIdbKeysForEntry(store, entry && entry.id);
+    }));
+  }).then(function () {
+    runtimeCollection = kept;
+    saveCollection(kept);
+    purgeSpritesForRemoveLabels(new Set(), removedIds);
+    for (const sprite of collectionSprites) {
+      const entryId = sprite.userData.collectionEntryId;
+      const newIdx = kept.findIndex(function (entry) { return entry && entry.id === entryId; });
+      if (newIdx >= 0) {
+        sprite.userData.collectionIndex = newIdx;
+        sprite.userData.questionIndex = USER_AMULET_INDEX + newIdx;
+      }
+    }
+    updateCameraScrollLimits();
+    notifyCollectionChanged();
+    return removed;
+  });
 }
 
 function afterPxForChainSlot(slotIndex) {
@@ -1407,6 +1464,8 @@ function fillMissingCollectionPositionsInStorage() {
   if (!collection.length) return;
   const pose = openingCameraPose();
   const selfRadius = SPRITE_SIZE * 0.42;
+  const occupied = collectOccupiedPositions(null);
+  let placementOrdinal = placementOrdinalForNewAmulet(collection);
   let dirty = false;
   for (let index = 0; index < collection.length; index += 1) {
     const entry = collection[index];
@@ -1414,18 +1473,24 @@ function fillMissingCollectionPositionsInStorage() {
     if (hasSavedPosition(entry.position)) continue;
     const label = collectionDisplayLabel(index);
     if (label >= NEW_AMULET_FIRST_LABEL) {
-      const occupied = collectOccupiedPositions(null);
-      const spot = resolveLiveNewAmuletSpot(label, pose, selfRadius, occupied);
+      const placementSeed = hashPlacementSeed(entry.id, placementOrdinal);
+      const spot = resolveLiveNewAmuletSpot(placementSeed, pose, selfRadius, occupied);
       if (spot) {
-        entry.position = { x: spot.x, z: spot.z };
+        const cleared = findClearPosition(spot.x, spot.z, selfRadius, occupied);
+        entry.position = { x: cleared.x, z: cleared.z };
         entry.layoutNudge = LIVE_FORWARD_ROW_TAG;
+        occupied.push({ x: cleared.x, z: cleared.z, radius: selfRadius });
+        placementOrdinal += 1;
         dirty = true;
         continue;
       }
     }
     const slot = collectionSlotPosition(index);
-    entry.position = { x: slot.x, z: slot.z };
+    const cleared = findClearPosition(slot.x, slot.z, selfRadius, occupied);
+    entry.position = { x: cleared.x, z: cleared.z };
     if (slot.yWorld != null) entry.position.yWorld = slot.yWorld;
+    occupied.push({ x: cleared.x, z: cleared.z, radius: selfRadius });
+    placementOrdinal += 1;
     dirty = true;
   }
   if (dirty) saveCollection(collection);
@@ -1663,6 +1728,10 @@ function snapshotKeyForSprite(sprite) {
 }
 
 function upgradeSpriteFromIndexedDb(sprite) {
+  const entryId = ensureSpriteEntryId(sprite);
+  if (entryId != null && isRuntimeSeedEntryId(entryId)) {
+    return Promise.resolve(false);
+  }
   const key = snapshotKeyForSprite(sprite);
   if (!key) return Promise.resolve(false);
   return glbStore()
@@ -1862,7 +1931,7 @@ function capturePlacementAnchor() {
 }
 
 function userAmuletSlotPosition(selfRadius) {
-  return findClearPosition(USER_AMULET_SLOT.x, USER_AMULET_SLOT.z, selfRadius);
+  return resolveNewAmuletPlacement(selfRadius);
 }
 
 function nudgeNewAmuletPlacementForward(x, z, pose) {
@@ -1917,18 +1986,39 @@ function referenceDepthRows() {
   return rows;
 }
 
-function lateralSideStepsForLabel(label) {
-  return seededShuffle(NEW_AMULET_DEPTH_ROW_SIDE_STEPS_PX, label * 7919 + 17);
+function lateralSideStepsForPlacementSeed(placementSeed) {
+  return seededShuffle(NEW_AMULET_DEPTH_ROW_SIDE_STEPS_PX, placementSeed * 7919 + 17);
+}
+
+/** Unique saved positions — spread index for the next brand-new amulet. */
+function placementOrdinalForNewAmulet(collection) {
+  const seen = new Set();
+  let ordinal = 0;
+  for (const entry of collection || []) {
+    const pos = normalizeSavedPosition(entry?.position);
+    if (!pos) continue;
+    const key = pos.x.toFixed(2) + ',' + pos.z.toFixed(2);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordinal += 1;
+  }
+  return ordinal;
+}
+
+function hashPlacementSeed(entryId, ordinal) {
+  const n = Number(entryId);
+  const base = Number.isFinite(n) ? Math.abs(Math.floor(n)) : 0;
+  return base + ordinal * 97 + 13;
 }
 
 /** Brand-new amulet only — on [009]/[014]/[017] depth rows, spread left/right. */
-function resolveLiveNewAmuletSpot(label, pose, selfRadius, occupied) {
+function resolveLiveNewAmuletSpot(placementSeed, pose, selfRadius, occupied) {
   const rows = referenceDepthRows();
   const rowOrder = seededShuffle(
     rows.map(function (_, idx) { return idx; }),
-    label * 13 + 7
+    placementSeed * 13 + 7
   );
-  const sideSteps = lateralSideStepsForLabel(label);
+  const sideSteps = lateralSideStepsForPlacementSeed(placementSeed);
 
   for (let r = 0; r < rowOrder.length; r += 1) {
     const row = rows[rowOrder[r]];
@@ -1947,33 +2037,99 @@ function resolveLiveNewAmuletSpot(label, pose, selfRadius, occupied) {
   return null;
 }
 
-function depthRowPlacementSeed(slotIndex, pose) {
+function depthRowPlacementSeed(placementOrdinal, pose) {
   const rows = referenceDepthRows();
-  const row = rows[slotIndex % rows.length];
-  const sidePx = (slotIndex % 2 === 0 ? 1 : -1) * (220 + (slotIndex % 10) * 130);
+  const row = rows[placementOrdinal % rows.length];
+  const sidePx =
+    (placementOrdinal % 2 === 0 ? 1 : -1) * (220 + (placementOrdinal % 10) * 130);
   return nudgeScreenRightPx(row.x, row.z, sidePx, pose);
 }
 
+function positionForNewAmuletAtOrdinal(placementOrdinal, pose) {
+  const spreadLabel = NEW_AMULET_FIRST_LABEL + placementOrdinal;
+  const anchorIdx = chainWideAnchorIndex();
+  if (anchorIdx < 0) return null;
+
+  const collection = loadCollection();
+  const anchorPos = normalizeSavedPosition(collection[anchorIdx]?.position);
+  if (!anchorPos) return null;
+
+  const { sidePx, depthPx } = newAmuletSpreadOffset(spreadLabel);
+
+  let x = anchorPos.x;
+  let z = anchorPos.z;
+  const depth = nudgeAlongOpeningViewPx(x, z, depthPx, pose);
+  const side = nudgeScreenRightPx(depth.x, depth.z, sidePx, pose);
+  return { x: side.x, z: side.z, yWorld: anchorPos.yWorld };
+}
+
 /** Place new amulet — forward depth rows, sideways fill; never re-layout saved amulets. */
-function resolveNewAmuletPlacement(selfRadius) {
+function resolveNewAmuletPlacement(selfRadius, options) {
   const occupied = collectOccupiedPositions(null);
   const collection = loadCollection();
   const slotIndex = collection.length;
   const pose = openingCameraPose();
+  const placementOrdinal = placementOrdinalForNewAmulet(collection);
+  const placementSeed =
+    options && options.entryId != null
+      ? hashPlacementSeed(options.entryId, placementOrdinal)
+      : placementOrdinal + slotIndex;
   const newLabel = collectionDisplayLabel(slotIndex);
 
-  if (slotIndex === 0 && occupied.length === 0) {
+  if (placementOrdinal === 0 && occupied.length === 0) {
     const anchor = loadPlacementAnchor();
     const base = anchor || { x: USER_AMULET_SLOT.x, z: USER_AMULET_SLOT.z };
     return findClearPosition(base.x, base.z, selfRadius, occupied);
   }
 
-  const liveSpot = resolveLiveNewAmuletSpot(newLabel, pose, selfRadius, occupied);
-  if (liveSpot) return liveSpot;
+  const liveSpot = resolveLiveNewAmuletSpot(placementSeed, pose, selfRadius, occupied);
+  if (liveSpot) {
+    return findClearPosition(liveSpot.x, liveSpot.z, selfRadius, occupied);
+  }
 
-  const seed = depthRowPlacementSeed(slotIndex, pose);
-  if (isPositionClear(seed.x, seed.z, selfRadius, occupied)) {
-    return { x: seed.x, z: seed.z };
+  if (newLabel >= NEW_AMULET_FIRST_LABEL) {
+    const target = positionForNewAmuletAtOrdinal(placementOrdinal, pose);
+    if (target) {
+      if (isPositionClear(target.x, target.z, selfRadius, occupied)) {
+        return { x: target.x, z: target.z };
+      }
+      const { sidePx } = newAmuletSpreadOffset(NEW_AMULET_FIRST_LABEL + placementOrdinal);
+      const gapFills = [
+        { side: sidePx > 0 ? NEW_AMULET_WING_ROW_GROW_PX : -NEW_AMULET_WING_ROW_GROW_PX, depth: 0 },
+        { side: -sidePx * 0.3, depth: 0 },
+        { side: NEW_AMULET_WING_BASE_PX * 0.45, depth: NEW_AMULET_DEPTH_ROW_PX * 0.35 },
+        { side: -NEW_AMULET_WING_BASE_PX * 0.45, depth: NEW_AMULET_DEPTH_ROW_PX * 0.35 },
+        { side: 0, depth: NEW_AMULET_DEPTH_ROW_PX },
+        { side: 0, depth: -NEW_AMULET_DEPTH_ROW_PX * 0.55 },
+        { side: sidePx * 0.5, depth: NEW_AMULET_DEPTH_ROW_PX * 0.6 },
+        { side: -sidePx * 0.5, depth: -NEW_AMULET_DEPTH_ROW_PX * 0.4 },
+      ];
+      for (const fill of gapFills) {
+        let x = target.x;
+        let z = target.z;
+        if (fill.depth) {
+          const depth = nudgeAlongOpeningViewPx(x, z, fill.depth, pose);
+          x = depth.x;
+          z = depth.z;
+        }
+        if (fill.side) {
+          const side = nudgeScreenRightPx(x, z, fill.side, pose);
+          x = side.x;
+          z = side.z;
+        }
+        if (isPositionClear(x, z, selfRadius, occupied)) {
+          return { x, z };
+        }
+      }
+      return findClearPosition(target.x, target.z, selfRadius, occupied);
+    }
+  }
+
+  if (slotIndex > 0) {
+    const target = positionRelativeToPrevIndex(slotIndex - 1, slotIndex, pose);
+    if (target) {
+      return findClearPosition(target.x, target.z, selfRadius, occupied);
+    }
   }
 
   const rows = referenceDepthRows();
@@ -1988,7 +2144,8 @@ function resolveNewAmuletPlacement(selfRadius) {
     }
   }
 
-  return { x: seed.x, z: seed.z };
+  const seed = depthRowPlacementSeed(placementOrdinal, pose);
+  return findClearPosition(seed.x, seed.z, selfRadius, occupied);
 }
 
 function resolveUserAmuletLayout(selfRadius, restore, options) {
@@ -2000,7 +2157,7 @@ function resolveUserAmuletLayout(selfRadius, restore, options) {
     const center = getViewCenterOnGround();
     return findClearPosition(center.x, center.z, selfRadius);
   }
-  return resolveNewAmuletPlacement(selfRadius);
+  return resolveNewAmuletPlacement(selfRadius, options);
 }
 
 function applyUserAmuletSlotPosition() {
@@ -2178,7 +2335,26 @@ function snapshotUrlsFromSprite(sprite) {
 
 function buildQuickCollectionEntry(sprite, entryId) {
   const answers = sprite.userData.answers || loadUserAmuletAnswers() || loadAnswers();
-  const archivedPosition = spritePositionPayload(sprite);
+  let archivedPosition = spritePositionPayload(sprite);
+  const occupied = collectOccupiedPositions(sprite);
+  const selfRadius = spriteFootprintRadius(sprite);
+  if (
+    !isPositionClear(archivedPosition.x, archivedPosition.z, selfRadius, occupied)
+  ) {
+    const cleared = findClearPosition(
+      archivedPosition.x,
+      archivedPosition.z,
+      selfRadius,
+      occupied
+    );
+    archivedPosition = {
+      x: cleared.x,
+      z: cleared.z,
+      yWorld: archivedPosition.yWorld,
+    };
+    setSpriteAnchor(sprite, cleared.x, cleared.z);
+    applySpriteFloat(sprite);
+  }
   const snapUrls = snapshotUrlsFromSprite(sprite);
   if (snapUrls.hiRes && entryId != null) {
     void glbStore().then(function (store) {
@@ -2703,8 +2879,14 @@ function attachGalleryAnswers(_sprite) {
 
 function spriteGardenIndex(sprite) {
   if (sprite.userData.isUserAmulet) return USER_AMULET_INDEX;
+  if (
+    sprite.userData.isCollectionAmulet &&
+    typeof sprite.userData.questionIndex === 'number'
+  ) {
+    return sprite.userData.questionIndex;
+  }
   const tex = sprite.userData.tex;
-  if (typeof tex === 'number') return tex;
+  if (typeof tex === 'number' && !sprite.userData.isCollectionAmulet) return tex;
   return sprite.userData.questionIndex;
 }
 
@@ -2806,8 +2988,16 @@ function snapshotUserGlbToCollectionEntry(entryId) {
     .then(function (store) {
       return store.loadGlbRaw(snapKey).then(function (existing) {
         if (existing && existing.glb) return true;
-        console.warn('[garden-three] no GLB for', snapKey, '— detail page will use composed3d fallback');
-        return false;
+        return store.loadGlbRaw('user-amulet').then(function (userRaw) {
+          if (!userRaw || !userRaw.glb) {
+            console.warn('[garden-three] no GLB for', snapKey, '— detail page will use composed3d fallback');
+            return false;
+          }
+          return store.copyGlb('user-amulet', snapKey).then(function () {
+            console.log('[garden-three] copied user-amulet GLB to', snapKey);
+            return true;
+          });
+        });
       });
     })
     .catch(function (err) {
@@ -2857,7 +3047,10 @@ function describeSpriteNavState(sprite) {
   const collection = loadCollection();
   const collIdx =
     typeof sprite.userData.collectionIndex === 'number' ? sprite.userData.collectionIndex : null;
-  const entryAtIdx = collIdx != null ? collection[collIdx] : null;
+  const entryAtIdx =
+    collIdx != null && collIdx >= 0 && collIdx < collection.length
+      ? collection[collIdx]
+      : null;
   const spriteEntryId = sprite.userData.collectionEntryId ?? null;
   const entryIdAtIdx = entryAtIdx && entryAtIdx.id != null ? entryAtIdx.id : null;
   const labelAtIdx =
@@ -2891,27 +3084,43 @@ function ensureSpriteEntryId(sprite) {
   const collection = loadCollection();
   const collIdx =
     typeof sprite.userData.collectionIndex === 'number' ? sprite.userData.collectionIndex : null;
-  const entryAtIdx = collIdx != null ? collection[collIdx] : null;
+  const storedId = sprite.userData.collectionEntryId ?? null;
 
-  // Collection sprites: snapshot texture always came from collection[collectionIndex].
-  if (sprite.userData.isCollectionAmulet && entryAtIdx && entryAtIdx.id != null) {
-    const storedId = sprite.userData.collectionEntryId ?? null;
-    if (storedId != null && String(storedId) !== String(entryAtIdx.id)) {
-      console.warn(
-        '[garden-three] sprite entryId corrected from collection index',
-        describeSpriteNavState(sprite)
-      );
+  // Entry id is authoritative — collection index shifts when entries are added/removed/reordered.
+  if (storedId != null) {
+    const entryById = collectionEntryById(storedId);
+    if (entryById) {
+      const newIdx = collection.findIndex(function (entry) {
+        return entry && entry.id == storedId;
+      });
+      if (newIdx >= 0) {
+        if (collIdx != null && newIdx !== collIdx) {
+          console.warn(
+            '[garden-three] sprite collectionIndex corrected from entry id',
+            describeSpriteNavState(sprite),
+            { correctedIndex: newIdx }
+          );
+        }
+        sprite.userData.collectionIndex = newIdx;
+        sprite.userData.questionIndex = USER_AMULET_INDEX + newIdx;
+        sprite.userData.isCollectionAmulet = true;
+      }
+      if (!sprite.userData.answers && entryById.answers) {
+        sprite.userData.answers = entryById.answers;
+      }
+      return storedId;
     }
-    sprite.userData.collectionEntryId = entryAtIdx.id;
-    if (!sprite.userData.answers && entryAtIdx.answers) {
-      sprite.userData.answers = entryAtIdx.answers;
-    }
-    return entryAtIdx.id;
+    console.warn(
+      '[garden-three] clearing stale sprite collectionEntryId',
+      describeSpriteNavState(sprite)
+    );
+    sprite.userData.collectionEntryId = null;
   }
 
-  const storedId = sprite.userData.collectionEntryId ?? null;
-  if (storedId != null) return storedId;
-
+  const entryAtIdx =
+    collIdx != null && collIdx >= 0 && collIdx < collection.length
+      ? collection[collIdx]
+      : null;
   if (entryAtIdx && entryAtIdx.id != null) {
     sprite.userData.collectionEntryId = entryAtIdx.id;
     if (!sprite.userData.answers && entryAtIdx.answers) {
@@ -3134,7 +3343,22 @@ function disposeGardenSpinGroup(group) {
 
 /* Garden sprites use the snapshot captured during creation - no re-render needed. */
 
-async function ensureUserAmuletMeshTemplate() {
+async function ensureUserAmuletMeshTemplate(sprite) {
+  const entryId = sprite && sprite.userData.collectionEntryId;
+  if (entryId != null) {
+    try {
+      const store = await import('./amulet-glb-store.js');
+      const glb = await store.loadUserEntryGlb(entryId);
+      if (glb && glb.scene) {
+        const wrapped = wrapPbrSceneForGarden(glb.scene.clone(true));
+        if (sprite.userData.isUserAmulet) userAmuletMeshTemplate = wrapped;
+        return wrapped;
+      }
+    } catch (err) {
+      console.warn('[garden-three] per-entry GLB spin template failed', entryId, err);
+    }
+  }
+
   if (userAmuletMeshTemplate) return userAmuletMeshTemplate;
   if (userAmuletMeshTemplatePromise) return userAmuletMeshTemplatePromise;
 
@@ -3144,10 +3368,13 @@ async function ensureUserAmuletMeshTemplate() {
     if (!sceneClone) {
       const compose = await import('./amulet-compose.js');
       await compose.initAmuletCompose();
-      const answers = loadUserAmuletAnswers() || loadAnswers();
+      const answers =
+        (sprite && sprite.userData.answers) ||
+        loadUserAmuletAnswers() ||
+        loadAnswers();
       const composed = await compose.composeFullAmuletForPbr(answers);
       if (!composed) throw new Error('user amulet compose failed');
-      const meshOpts = {
+      sceneClone = await pbr.buildPbrSceneCloneForGarden({
         svg: composed.svg,
         style2: composed.style2,
         style3: { ...composed.style3, l3MassScale: compose.L3_MASS_SCALE },
@@ -3155,9 +3382,7 @@ async function ensureUserAmuletMeshTemplate() {
         domainHex: composed.domainHex,
         ageNum: composed.ageNum,
         l3MaterialMode: 'stone',
-      };
-      // Vector tubes only on reload - full PBR would freeze the tab for many seconds.
-      sceneClone = await pbr.buildVectorSceneCloneForGarden(meshOpts);
+      });
     }
     userAmuletMeshTemplate = wrapPbrSceneForGarden(sceneClone);
     return userAmuletMeshTemplate;
@@ -3210,7 +3435,7 @@ async function startUserAmulet3DSpin(sprite) {
 
   try {
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const template = await ensureUserAmuletMeshTemplate();
+    const template = await ensureUserAmuletMeshTemplate(sprite);
     if (!sprite.userData.spinActive && !sprite.userData.spin3dPending) return;
 
     sprite.userData.spinActive = false;
@@ -3558,7 +3783,10 @@ function resolveNavigationIndexForEntry(entryId, sprite) {
 }
 
 function spriteCollectionEntry(sprite) {
-  if (!sprite || typeof sprite.userData.collectionIndex !== 'number') return null;
+  if (!sprite) return null;
+  const entryId = ensureSpriteEntryId(sprite);
+  if (entryId != null) return collectionEntryById(entryId);
+  if (typeof sprite.userData.collectionIndex !== 'number') return null;
   const collection = loadCollection();
   const entry = collection[sprite.userData.collectionIndex];
   return entry && entry.id != null ? entry : null;
@@ -3568,6 +3796,9 @@ function glbUrlForCollectionEntry(entry) {
   if (!entry || entry.id == null) return null;
   if (entry.glbUrl && glbUrlMatchesEntryId(entry.glbUrl, entry.id)) {
     return entry.glbUrl;
+  }
+  if (isRuntimeSeedEntryId(entry.id)) {
+    return canonicalSeedGlbUrl(entry.id);
   }
   if (
     entry.snapshot &&
@@ -3583,12 +3814,57 @@ function navigateToAmuletDetailFromSprite(sprite) {
   syncSpriteCollectionIndicesFromCollection();
   ensureSpriteEntryId(sprite);
 
-  const entry =
-    spriteCollectionEntry(sprite) ||
-    collectionEntryById(resolveSpriteEntryId(sprite));
+  let entry = spriteCollectionEntry(sprite);
   if (!entry || entry.id == null) {
+    const resolvedId = resolveSpriteEntryId(sprite);
+    if (resolvedId != null) entry = collectionEntryById(resolvedId);
+  }
+  if (!entry || entry.id == null) {
+    const target = resolveSpriteNavigationTarget(sprite);
+    if (target.entryId != null) {
+      entry = collectionEntryById(target.entryId);
+    } else if (
+      target.index != null &&
+      typeof window.pagmarEntryIdForAmuletIndex === 'function'
+    ) {
+      const fromIndex = window.pagmarEntryIdForAmuletIndex(target.index);
+      if (fromIndex != null) entry = collectionEntryById(fromIndex);
+    }
+  }
+  if (!entry || entry.id == null) {
+    const target = resolveSpriteNavigationTarget(sprite);
+    const fallbackId =
+      sprite.userData.collectionEntryId != null
+        ? sprite.userData.collectionEntryId
+        : target.entryId;
+    if (fallbackId != null) {
+      const fallbackEntry = collectionEntryById(fallbackId);
+      const answers =
+        (fallbackEntry && fallbackEntry.answers) ||
+        sprite.userData.answers ||
+        target.answers;
+      const navIndex =
+        typeof window.pagmarIndexForEntryId === 'function'
+          ? window.pagmarIndexForEntryId(fallbackId)
+          : target.index;
+      console.warn(
+        '[garden-three] opening detail via sprite entry id fallback',
+        describeSpriteNavState(sprite),
+        { fallbackId: fallbackId, navIndex: navIndex }
+      );
+      navigateToAmuletDetail(
+        navIndex != null ? navIndex : target.index,
+        fallbackId,
+        answers,
+        null,
+        glbUrlForCollectionEntry(fallbackEntry)
+      );
+      return;
+    }
     console.warn('[garden-three] cannot open detail — no collection entry for sprite', {
       collectionIndex: sprite.userData.collectionIndex,
+      label: spriteDisplayLabel(sprite),
+      nav: describeSpriteNavState(sprite),
     });
     return;
   }
@@ -3698,6 +3974,7 @@ window.pagmarNavigateToAmuletDetail = navigateToAmuletDetail;
 canvas.addEventListener('pointerup', (e) => {
   if (!pointerDown) return;
   const moved = pointerDown.moved;
+  const pressedAmulet = pointerDown.amulet;
   pointerDown = null;
 
   if (moved) {
@@ -3708,8 +3985,10 @@ canvas.addEventListener('pointerup', (e) => {
   if (document.body.classList.contains('is-create-mode')) return;
 
   const hit =
+    (pressedAmulet && isSpriteHoverable(pressedAmulet) ? pressedAmulet : null) ||
     pickAmulet(e.clientX, e.clientY, true) ||
-    pickAmuletAtPointer(e.clientX, e.clientY, null);
+    pickAmulet(e.clientX, e.clientY, false) ||
+    pickAmuletAtPointer(e.clientX, e.clientY, pressedAmulet);
   if (!hit) {
     updateCursorFromPointer(e.clientX, e.clientY);
     return;
@@ -3717,9 +3996,6 @@ canvas.addEventListener('pointerup', (e) => {
 
   syncSpriteCollectionIndicesFromCollection();
   ensureSpriteEntryId(hit);
-  startAmuletSpin(hit);
-
-  e.preventDefault();
   navigateToAmuletDetailFromSprite(hit);
 });
 
@@ -3795,7 +4071,18 @@ function applyGardenViewState(state) {
   return true;
 }
 
+function resetAllAmuletSpinState() {
+  if (activeUserAmulet3DSpin) finishUserAmulet3DSpin();
+  for (const sprite of sprites) {
+    sprite.userData.spinActive = false;
+    sprite.userData.spin3dPending = false;
+    sprite.userData.spin3dHidden = false;
+    sprite.visible = (sprite.userData.focusMul ?? 1) > 0.02;
+  }
+}
+
 function stashGardenStateForReturn() {
+  resetAllAmuletSpinState();
   const state = captureGardenViewState();
   writeGardenViewStateToStorage(state);
   try {
@@ -3811,6 +4098,7 @@ function restoreGardenReturnStateOnLoad() {
   } catch (_) {
     return false;
   }
+  resetAllAmuletSpinState();
   const state = readGardenViewStateFromStorage();
   if (!state) return false;
   return applyGardenViewState(state);
@@ -3932,12 +4220,6 @@ Promise.resolve()
     restoreUserAmuletAnswersIfNeeded();
     initCollectionFromStorage();
     return loadSeedCollectionFromFile();
-  })
-  .then(() => {
-    return purgeAmulets021022023Once();
-  })
-  .then(() => {
-    return purgePermanentlyRemovedLabels();
   })
   .then(() => {
     revertOpeningGlobalDownOnce();

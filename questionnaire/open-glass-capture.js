@@ -1,58 +1,57 @@
 /**
- * Open page - full-viewport capture for glass-lens (black + amulet only).
- * Same sampling model as garden: one canvas behind the bubble, clone + CSS filter.
+ * Open page - garden mirror canvas; glass-clone samples + blurs this layer.
  */
 (function () {
   'use strict';
 
   if (!document.body.classList.contains('pagmar-open')) return;
 
+  var garden = document.getElementById('openGlassGarden');
+  if (!garden) return;
+
   var canvas = document.createElement('canvas');
-  canvas.id = 'openGlassCapture';
-  canvas.className = 'pagmar-open__glass-capture';
   canvas.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(canvas);
+  garden.appendChild(canvas);
 
-  function paintAmulet3D(ctx) {
-    var amuletCanvas = document.querySelector('.pagmar-open__amulet-3d canvas');
-    if (amuletCanvas && amuletCanvas.width > 0 && amuletCanvas.height > 0) {
-      var rect = amuletCanvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        ctx.save();
-        try {
-          ctx.drawImage(
-            amuletCanvas,
-            0,
-            0,
-            amuletCanvas.width,
-            amuletCanvas.height,
-            rect.left,
-            rect.top,
-            rect.width,
-            rect.height
-          );
-        } catch (_) {}
-        ctx.restore();
-        return;
-      }
-    }
-
-    var placeholder = document.querySelector('.pagmar-open__amulet-placeholder');
-    if (!placeholder || !placeholder.complete || !placeholder.naturalWidth) return;
-    var phRect = placeholder.getBoundingClientRect();
-    if (phRect.width < 1 || phRect.height < 1) return;
+  function paintFog(ctx) {
+    var fogCanvas = document.querySelector('#openFogHost .pagmar__detail-fog-canvas');
+    if (!fogCanvas || fogCanvas.width <= 0 || fogCanvas.height <= 0) return;
+    var rect = fogCanvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     ctx.save();
     try {
       ctx.drawImage(
-        placeholder,
+        fogCanvas,
         0,
         0,
-        placeholder.naturalWidth,
-        placeholder.naturalHeight,
-        phRect.left,
-        phRect.top,
-        phRect.width,
-        phRect.height
+        fogCanvas.width,
+        fogCanvas.height,
+        rect.left,
+        rect.top,
+        rect.width,
+        rect.height
+      );
+    } catch (_) {}
+    ctx.restore();
+  }
+
+  function paintAmulet3D(ctx) {
+    var amuletCanvas = document.querySelector('.pagmar-open__amulet-3d canvas');
+    if (!amuletCanvas || amuletCanvas.width <= 0 || amuletCanvas.height <= 0) return;
+    var rect = amuletCanvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    ctx.save();
+    try {
+      ctx.drawImage(
+        amuletCanvas,
+        0,
+        0,
+        amuletCanvas.width,
+        amuletCanvas.height,
+        rect.left,
+        rect.top,
+        rect.width,
+        rect.height
       );
     } catch (_) {}
     ctx.restore();
@@ -68,8 +67,6 @@
     if (canvas.width !== pxW || canvas.height !== pxH) {
       canvas.width = pxW;
       canvas.height = pxH;
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
     }
 
     var ctx = canvas.getContext('2d');
@@ -78,7 +75,12 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
+    paintFog(ctx);
     paintAmulet3D(ctx);
+
+    if (window.pagmarGlassLens) {
+      window.pagmarGlassLens.tick();
+    }
   }
 
   function tick() {
@@ -88,12 +90,6 @@
 
   window.addEventListener('resize', paintOpenCapture, { passive: true });
   window.addEventListener('pagmar-open:amulet-ready', paintOpenCapture, { passive: true });
-
-  var placeholder = document.querySelector('.pagmar-open__amulet-placeholder');
-  if (placeholder) {
-    if (placeholder.complete) paintOpenCapture();
-    else placeholder.addEventListener('load', paintOpenCapture, { once: true, passive: true });
-  }
 
   requestAnimationFrame(tick);
 })();

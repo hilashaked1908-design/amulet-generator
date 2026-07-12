@@ -382,8 +382,91 @@ body.pagmar-index .pagmar__index-about:hover .pagmar__index-chrome-corner {
   bottom: auto !important;
 }
 
-/* ── Index chrome - about icon + filter text (Figma 2601:40649) ── */
-body.pagmar-index .pagmar__index-about,
+/* ── Site chrome about text button (Figma 2601:40649) ── */
+.pagmar__index-about {
+  z-index: 110;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: auto;
+  height: var(--pagmar-chrome-hit);
+  min-width: 0;
+  min-height: var(--pagmar-chrome-hit);
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pagmar-yellow-white, #f4f4e8);
+  font-family: "TheBasics", "DavidLibre", serif;
+  direction: rtl;
+  cursor: pointer;
+  pointer-events: auto;
+  isolation: isolate;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  transition: opacity 0.25s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.pagmar-index .pagmar__index-about {
+  color: var(--index-chrome-accent);
+  transition: opacity var(--index-transition-duration) var(--index-transition-ease);
+}
+
+.pagmar__index-about__label {
+  position: relative;
+  display: block;
+  font-family: "TheBasics", "DavidLibre", serif;
+  font-size: calc(24 * var(--pagmar-margin-u));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.1;
+  letter-spacing: calc(-0.24 * var(--pagmar-margin-u));
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pagmar__index-about__label::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: calc(-3 * var(--pagmar-margin-u));
+  left: 0;
+  height: var(--pagmar-line-weight);
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--pagmar-btn-roll-duration) var(--pagmar-btn-roll-ease);
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pagmar__index-about:hover .pagmar__index-about__label::after {
+    transform: scaleX(1);
+  }
+}
+
+.pagmar__index-about__label.pagmar-btn__roll--chars {
+  display: inline-block;
+}
+
+.pagmar__index-about:active {
+  opacity: 0.68;
+}
+
+.pagmar__index-about:focus-visible {
+  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.55);
+  outline-offset: calc(3 * var(--pagmar-margin-u));
+}
+
 body.pagmar-index .pagmar__index-filter-trigger {
   display: inline-flex;
   align-items: center;
@@ -396,13 +479,6 @@ body.pagmar-index .pagmar__index-filter-trigger {
   backdrop-filter: none;
   box-shadow: none;
   transition: opacity var(--index-transition-duration) var(--index-transition-ease);
-}
-
-body.pagmar-index .pagmar__index-about {
-  min-width: 0;
-}
-
-body.pagmar-index .pagmar__index-filter-trigger {
   width: auto;
   height: var(--pagmar-chrome-hit);
   min-width: 0;
@@ -410,16 +486,7 @@ body.pagmar-index .pagmar__index-filter-trigger {
   justify-content: flex-end;
 }
 
-body.pagmar-index .pagmar__index-about__icon {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  user-select: none;
-}
-
-body.pagmar-index .pagmar__index-about.is-over-content,
+.pagmar__index-about.is-over-content,
 body.pagmar-index .pagmar__index-filter-trigger.is-over-content {
   background: transparent;
   -webkit-backdrop-filter: none;

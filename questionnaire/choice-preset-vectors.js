@@ -2,11 +2,11 @@
  * Figma preset outlines for choice questions (Q4 belief / Q5 feeling).
  * Shown in thumb slots instead of letter-derived vector layers.
  */
+import { questionnaireThumbFitLayout } from './thumb-vector-layout.js?v=20250712-vector-grid-3col';
+
 const ASSET_BASE = 'assets/create/choice-vectors/';
 const VECTOR_COLOR = '#F4F4E8';
 const VECTOR_STROKE = 1.5;
-const THUMB_BOX_W = 90.3;
-const THUMB_BOX_H = 89.813;
 
 /** Q4 [אמונה] → stone silhouette (Figma bottom row). */
 export const Q4_BELIEF_VECTOR = {
@@ -81,37 +81,16 @@ function measurePathBounds(pathD) {
   };
 }
 
-function thumbLayout(bounds) {
-  const minX = bounds.minX;
-  const minY = bounds.minY;
-  const maxX = bounds.maxX;
-  const maxY = bounds.maxY;
-  const cw = Math.max(maxX - minX, 1);
-  const ch = Math.max(maxY - minY, 1);
-  const pad = 8;
-  const innerW = THUMB_BOX_W - pad * 2;
-  const innerH = THUMB_BOX_H - pad * 2;
-  const scale = Math.min(innerW / cw, innerH / ch);
-  const scaledW = cw * scale;
-  const scaledH = ch * scale;
-  const tx = pad + (innerW - scaledW) * 0.5 - minX * scale;
-  const ty = pad + (innerH - scaledH) * 0.5 - minY * scale;
-  return {
-    viewBox: '0 0 ' + THUMB_BOX_W + ' ' + THUMB_BOX_H,
-    transform: 'translate(' + tx + ',' + ty + ') scale(' + scale + ')',
-  };
-}
-
 function mountThumbSvg(pathD, container) {
   const ns = 'http://www.w3.org/2000/svg';
   const bounds = measurePathBounds(pathD);
-  const layout = thumbLayout(bounds);
+  const layout = questionnaireThumbFitLayout(bounds);
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('xmlns', ns);
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
   svg.setAttribute('viewBox', layout.viewBox);
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('preserveAspectRatio', layout.preserveAspectRatio || 'xMaxYMax meet');
   svg.setAttribute('fill', 'none');
   svg.setAttribute('overflow', 'visible');
   svg.classList.add('pagmar__choice-preset-vector');

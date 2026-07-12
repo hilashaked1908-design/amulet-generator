@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>שחזור קמעות שנמחקו</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f0f0f;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    .card {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 500; }
+    p { color: #aaa; line-height: 1.6; margin: 0 0 12px; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #e8e8e8;
+      color: #111;
+      width: 100%;
+      margin-top: 8px;
+    }
+    button.secondary { background: #333; color: #eee; }
+    button:disabled { opacity: 0.45; cursor: wait; }
+    #log {
+      margin-top: 16px;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      font-family: ui-monospace, monospace;
+    }
+    .ok { color: #9cf; }
+    .warn { color: #fc9; }
+    .err { color: #f88; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .stat {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .stat strong { display: block; font-size: 1.4rem; color: #fff; }
+    .stat span { font-size: 0.85rem; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>שחזור קמעות שנמחקו</h1>
+    <p>
+      באג בקוד הישן מחק בכל רענון קמעות במיקומים <strong>[021] [022] [023] [030] [033] [034]</strong>
+      — לפי מספר סידורי, לא לפי זהות הקמע. הדף הזה מנסה לשחזר מ-localStorage, sessionStorage ו-IndexedDB.
+    </p>
+    <div class="stats" id="stats"></div>
+    <button type="button" id="scanBtn">סרוק ושחזר</button>
+    <button type="button" id="indexBtn" class="secondary">חזרה לאינדקס</button>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import {
+      listGlbKeys,
+      loadGlbRaw,
+      loadSnapshot,
+    } from './amulet-glb-store.js';
+    import { captureGardenSnapshotFromGlb } from './garden-snapshot-from-glb.js';
+    import { processGardenSnapshotCanvas } from './snapshot-process.js';
+
+    const COLLECTION_KEY = 'amuletCollection';
+
+    function log(html) {
+      document.getElementById('log').innerHTML += html + '\n';
+    }
+
+    function parseCollectionRaw(raw) {
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function entryMergeKey(entry) {
+      if (!entry || typeof entry !== 'object') return null;
+      if (entry.id != null) return 'id:' + entry.id;
+      return 'fp:' + (entry.createdAt || 0);
+    }
+
+    function mergeCollectionEntries(a, b) {
+      const byKey = new Map();
+      for (const entry of [...a, ...b]) {
+        const key = entryMergeKey(entry);
+        if (!key) continue;
+        const existing = byKey.get(key);
+        if (!existing) {
+          byKey.set(key, entry);
+          continue;
+        }
+        const prefer =
+          (entry.snapshot && !existing.snapshot) ||
+          (entry.glbUrl && !existing.glbUrl) ||
+          (entry.answers && !existing.answers) ||
+          (entry.createdAt || 0) > (existing.createdAt || 0)
+            ? entry
+            : existing;
+        const other = prefer === entry ? existing : entry;
+        const merged = Object.assign({}, prefer);
+        if (other.answers && !merged.answers) merged.answers = other.answers;
+        if (other.position && !merged.position) merged.position = other.position;
+        if (other.snapshot && !merged.snapshot) merged.snapshot = other.snapshot;
+        byKey.set(key, merged);
+      }
+      return [...byKey.values()].sort(function (x, y) {
+        return (x.createdAt || 0) - (y.createdAt || 0);
+      });
+    }
+
+    function readStorage(name) {
+      try {
+        return parseCollectionRaw(window[name].getItem(COLLECTION_KEY));
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveCollection(collection) {
+      const json = JSON.stringify(collection);
+      let ok = false;
+      try {
+        localStorage.setItem(COLLECTION_KEY, json);
+        ok = true;
+      } catch (err) {
+        log('<span class="warn">localStorage: ' + err.message + '</span>');
+      }
+      try {
+        sessionStorage.setItem(COLLECTION_KEY, json);
+        ok = true;
+      } catch (err) {
+        log('<span class="warn">sessionStorage: ' + err.message + '</span>');
+      }
+      return ok;
+    }
+
+    function entryIdFromCollectionKey(key) {
+      const m = String(key || '').match(/^collection-(\d+)$/);
+      return m ? Number(m[1]) : null;
+    }
+
+    async function parseAnswersRaw(raw) {
+      if (!raw) return null;
+      if (typeof raw === 'object') return raw;
+      try {
+        return JSON.parse(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function buildEntryFromIdb(entryId) {
+      const glbKey = 'collection-' + entryId;
+      const glbRaw = await loadGlbRaw(glbKey);
+      const hasGlb = Boolean(glbRaw && glbRaw.glb);
+
+      let answers = null;
+      try {
+        answers = await parseAnswersRaw(await loadSnapshot('answers-collection-' + entryId));
+      } catch (_) {}
+
+      let snapshot = '';
+      let snapshotInIdb = false;
+      try {
+        const snapRaw = await loadSnapshot(glbKey);
+        if (snapRaw && String(snapRaw).indexOf('data:') === 0) {
+          snapshot = snapRaw;
+          snapshotInIdb = true;
+        }
+      } catch (_) {}
+
+      if (!hasGlb && !answers && !snapshot) return null;
+
+      const createdAt =
+        Number.isFinite(entryId) && entryId > 1e12 ? entryId : Date.now();
+
+      return {
+        id: entryId,
+        answers: answers || {},
+        createdAt: answers && answers.completedAt ? answers.completedAt : createdAt,
+        snapshot: snapshot,
+        snapshotInIdb: snapshotInIdb,
+        isLive: false,
+      };
+    }
+
+    async function ensureThumbSnapshot(entry) {
+      if (!entry || entry.id == null) return entry;
+      if (entry.snapshot && String(entry.snapshot).indexOf('data:') === 0) return entry;
+      const glbKey = 'collection-' + entry.id;
+      const glbRaw = await loadGlbRaw(glbKey);
+      if (!glbRaw || !glbRaw.glb) return entry;
+      try {
+        log('מרנדר snapshot ל-id ' + entry.id + '…');
+        const canvas = await captureGardenSnapshotFromGlb(glbKey, { targetPx: 1024 });
+        const processed = processGardenSnapshotCanvas(canvas);
+        entry.snapshot = processed.thumbUrl;
+        entry.snapshotInIdb = true;
+        const { saveSnapshot } = await import('./amulet-glb-store.js');
+        await saveSnapshot(glbKey, processed.hiResUrl);
+      } catch (err) {
+        log('<span class="warn">snapshot ל-' + entry.id + ': ' + err.message + '</span>');
+      }
+      return entry;
+    }
+
+    function renderStats(local, session, merged, idbOrphans) {
+      const el = document.getElementById('stats');
+      el.innerHTML =
+        '<div class="stat"><strong>' + local.length + '</strong><span>localStorage</span></div>' +
+        '<div class="stat"><strong>' + session.length + '</strong><span>sessionStorage</span></div>' +
+        '<div class="stat"><strong>' + merged.length + '</strong><span>אחרי מיזוג</span></div>' +
+        '<div class="stat"><strong>' + idbOrphans.length + '</strong><span>GLB יתומים ב-IDB</span></div>';
+    }
+
+    async function scanAndRecover() {
+      const btn = document.getElementById('scanBtn');
+      btn.disabled = true;
+      document.getElementById('log').textContent = '';
+
+      const local = readStorage('localStorage');
+      const session = readStorage('sessionStorage');
+      const merged = mergeCollectionEntries(local, session);
+      const knownIds = new Set(
+        merged.map(function (e) { return e && e.id; }).filter(function (id) { return id != null; })
+      );
+
+      let idbKeys = [];
+      try {
+        idbKeys = await listGlbKeys();
+      } catch (err) {
+        log('<span class="err">לא ניתן לקרוא IndexedDB: ' + err.message + '</span>');
+        btn.disabled = false;
+        return;
+      }
+
+      const orphanIds = [];
+      for (const key of idbKeys) {
+        const entryId = entryIdFromCollectionKey(key);
+        if (entryId == null || knownIds.has(entryId)) continue;
+        orphanIds.push(entryId);
+      }
+
+      renderStats(local, session, merged, orphanIds);
+
+      log('localStorage: ' + local.length + ' · sessionStorage: ' + session.length);
+      if (local.length !== session.length) {
+        log('<span class="warn">יש הבדל בין localStorage ל-sessionStorage — המיזוג אמור לשחזר את כולם.</span>');
+      }
+
+      const recovered = [];
+      for (const entryId of orphanIds) {
+        const built = await buildEntryFromIdb(entryId);
+        if (!built) continue;
+        const withSnap = await ensureThumbSnapshot(built);
+        recovered.push(withSnap);
+        const wish = withSnap.answers && withSnap.answers.q1Wish
+          ? String(withSnap.answers.q1Wish).slice(0, 50)
+          : '(ללא תשובות)';
+        log('<span class="ok">שוחזר מ-IDB: id=' + entryId + ' — ' + wish + '</span>');
+      }
+
+      const final = mergeCollectionEntries(merged, recovered);
+      const added = final.length - merged.length;
+
+      if (added > 0 || local.length !== final.length || session.length !== final.length) {
+        if (saveCollection(final)) {
+          log('<span class="ok">נשמרו ' + final.length + ' קמעות (' + added + ' נוספו מ-IDB).</span>');
+          log('רענני את האינדקס — הקמעות אמורות לחזור.');
+        } else {
+          log('<span class="err">השמירה נכשלה — אולי localStorage מלא.</span>');
+        }
+      } else if (final.length === merged.length && orphanIds.length === 0) {
+        log('<span class="warn">לא נמצאו קמעות לשחזור ב-IndexedDB או באחסון מפוצל.</span>');
+        log('אם הקמעות נמחקו לפני התיקון, ייתכן שה-GLB נמחק יחד איתן ולא ניתן לשחזר.');
+      } else {
+        log('<span class="ok">האוסף כבר מלא (' + final.length + ' קמעות).</span>');
+      }
+
+      btn.disabled = false;
+    }
+
+    document.getElementById('scanBtn').addEventListener('click', function () {
+      scanAndRecover().catch(function (err) {
+        log('<span class="err">' + err.message + '</span>');
+        document.getElementById('scanBtn').disabled = false;
+      });
+    });
+
+    document.getElementById('indexBtn').addEventListener('click', function () {
+      location.href = 'index.html';
+    });
+
+    scanAndRecover().catch(function (err) {
+      document.getElementById('log').innerHTML =
+        '<span class="err">שגיאה: ' + err.message + '</span>';
+    });
+  </script>
+</body>
+</html>

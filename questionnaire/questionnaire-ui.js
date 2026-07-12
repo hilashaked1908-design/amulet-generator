@@ -123,11 +123,8 @@
   const tagEl = document.getElementById('questionTag');
   const tagStepEl = document.getElementById('questionTagStep');
   const tagCategoryEl = document.getElementById('questionTagCategory');
-  const vectorCopyEl = document.getElementById('questionVectorCopy');
-  const vectorCopyTextEl = vectorCopyEl
-    ? vectorCopyEl.querySelector('.figma-q__vector-copy-text')
-    : null;
   const amuletStageCaptionEl = document.getElementById('amuletStageCaption');
+  const questionTransitionLoader = document.getElementById('questionTransitionLoader');
 
   let activeIndex = null;
   let activeSpecIndex = null;
@@ -139,6 +136,26 @@
   let createHistoryPushed = false;
   let createPopstateIgnore = 0;
   const REQUEST_TRANSITION_MS = 220;
+  /** Q1–Q4 — vectors may still be building. */
+  const QUESTION_TRANSITION_LOADER_MS = 650;
+  /** Q5+ — brief vessel loader, then question is interactive. */
+  const SEMANTIC_TRANSITION_LOADER_MS = 380;
+
+  function isFastSemanticQuestionIndex(index) {
+    return typeof index === 'number' && index >= 4;
+  }
+
+  /** Q7–Q8 (indexes 6–7): free-text dock — show field immediately, no vessel loader. */
+  function isInstantDockTextQuestionIndex(index) {
+    return typeof index === 'number' && index >= 6 && index <= 7;
+  }
+
+  function getQuestionTransitionLoaderMs(nextIndex) {
+    if (isInstantDockTextQuestionIndex(nextIndex)) return 0;
+    return isFastSemanticQuestionIndex(nextIndex)
+      ? SEMANTIC_TRANSITION_LOADER_MS
+      : QUESTION_TRANSITION_LOADER_MS;
+  }
 
   const CHOICE_TITLES = {
     q4Belief: 'אמונה',
@@ -149,18 +166,18 @@
   const CREATE_SAVE_LABEL_NEXT = 'לשאלה הבאה';
   const CREATE_SAVE_LABEL_FINAL = 'צור קמע';
 
-  /** Q8 (index 7) — last glass-bubble explanation in the questionnaire. */
+  /** Q8 (index 7) — last stage-tag explanation in the questionnaire. */
   const LAST_EXPLAINED_QUESTION_INDEX = 7;
 
-  /** Past tense — what changed after the previous answer (glass bubble on next frame). */
+  /** Past tense — what changed after the previous answer (tag between amulet and dock). */
   const PAST_STAGE_CAPTION_BY_QUESTION = {
-    1: 'האותיות מהבקשה התחברו ויצרו את קווי המתאר הראשונים של הקמע.',
+    1: 'מבנה הקמע נבנה מתוך האותיות שבבקשה.',
     2: 'שכבת השם התווספה למתאר, האותיות של שמכם יוצרות בסיס לקמע.',
     3: 'האותיות מהתשובה שלכם הוטבעו על האבן.',
     4: 'חומריות האבן נקבעה מהאמונה שלכם.',
-    5: 'חומריות המתכת או הפולימר נקבעה מהתחושה שלכם.',
-    6: 'מידת הקוצניות נקבעה לפי מה שחסר לכם.',
-    7: 'אותיות מהשינוי הוטבעו במעגל על האבן.',
+    5: 'חומריות הקמע נקבעה לפי התחושה שבחרתם.',
+    6: 'מידת הקוצניות של הקמע נקבעה לפי מה שחסר לכם.',
+    7: 'מילות השינוי נוספו כחריטה על הקמע.',
   };
 
   function getPastStageCaptionText(questionIndex) {
@@ -450,7 +467,7 @@
   function ensureAmuletModules() {
     if (amuletModulesReady) return amuletModulesReady;
     amuletModulesReady = Promise.all([
-      import('./amulet-build.js?v=20250709-full-site'),
+      import('./amulet-build.js?v=20250712-q5-loader-instant'),
       import('./amulet-show.js?v=20250711-result-amulet-scale'),
     ]).catch(function (err) {
       amuletModulesReady = null;
@@ -899,6 +916,71 @@
     void showFinishedAmuletNow();
   }
 
+  async function showEarlyAmuletLoader() {
+    try {
+      const loaderMod = await import('./amulet-loader.js');
+      window.amuletShowLoader = loaderMod.showAmuletLoader;
+      window.amuletHideLoader = loaderMod.hideAmuletLoader;
+      window.amuletSetLoaderProgress = loaderMod.setAmuletLoaderProgress;
+      await loaderMod.showAmuletLoader('טוען קמע', { fullscreen: true, gallery: true });
+      return true;
+    } catch (err) {
+      console.warn('[questionnaire] early amulet loader failed', err);
+      return false;
+    }
+  }
+
+  function recoverStuckAmuletRender(message) {
+    document.body.classList.remove(
+      'is-amulet-rendering',
+      'is-building',
+      'is-question-transition-loading',
+      'is-vector-frame-loading'
+    );
+    hideQuestionTransitionLoader();
+    if (typeof window.amuletHideLoader === 'function') {
+      window.amuletHideLoader({ force: true });
+    }
+    const createStatus = document.getElementById('createAmuletStatus');
+    if (createStatus) {
+      createStatus.textContent = message || 'לא הצלחנו ליצור את הקמע. נסי שוב.';
+      createStatus.hidden = false;
+    }
+    if (indexCreateWorkspace) {
+      indexCreateWorkspace.hidden = false;
+      indexCreateWorkspace.classList.add('is-open');
+    }
+    const garden = document.getElementById('questionGarden');
+    if (garden) garden.hidden = false;
+  }
+
+  async function beginCompletedAmuletRender(answers) {
+    closePanel();
+    hideFinalBuildQuestionChrome();
+    mountAmuletInCreateSlot();
+
+    if (typeof window.amuletBuildCancel === 'function') {
+      window.amuletBuildCancel();
+    }
+    document.body.classList.remove(
+      'is-building',
+      'is-question-transition-loading',
+      'is-vector-frame-loading'
+    );
+    hideQuestionTransitionLoader();
+    document.body.classList.add('is-amulet-rendering');
+
+    /* Garden hides while is-amulet-rendering — show loader before any heavy work. */
+    await showEarlyAmuletLoader();
+
+    try {
+      await showFinishedAmuletNow(answers);
+    } catch (err) {
+      console.error('[questionnaire] final amulet render failed', err);
+      recoverStuckAmuletRender('לא הצלחנו ליצור את הקמע. נסי שוב.');
+    }
+  }
+
   async function showFinishedAmuletNow(answers) {
     if (typeof window.amuletBuildCancel === 'function') {
       window.amuletBuildCancel();
@@ -909,11 +991,7 @@
       await ensureAmuletModules();
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
-      document.body.classList.remove('is-amulet-rendering');
-      if (typeof window.amuletHideLoader === 'function') {
-        window.amuletHideLoader({ force: true });
-      }
-      alert('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
+      recoverStuckAmuletRender('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
       return;
     }
 
@@ -927,11 +1005,7 @@
       await mod.showFinishedAmulet(answers);
     } catch (err) {
       console.error('[questionnaire] failed to load amulet renderer', err);
-      document.body.classList.remove('is-amulet-rendering');
-      if (typeof window.amuletHideLoader === 'function') {
-        window.amuletHideLoader({ force: true });
-      }
-      alert('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
+      recoverStuckAmuletRender('לא הצלחנו לטעון את מערכת הקמע. בדקי חיבור לאינטרנט ורענני.');
     }
   }
 
@@ -1105,6 +1179,7 @@
       await window.amuletBuildUpdate(answers, {
         uiBlocking: uiBlocking,
         showLoader: showLoader,
+        keepPreview: opts.keepPreview,
       });
     } finally {
       if (uiBlocking) setBuilding(false);
@@ -1117,22 +1192,59 @@
 
   window.amuletUnlockSemanticQuestionUi = unlockSemanticQuestionUi;
 
-  /** Q4-Q7: vectors already visible - only warm PBR compose when browser is idle. */
+  /** Q6–Q7 answers — warm PBR in the background while the user keeps answering. */
   function schedulePostVectorPrecompose(answers, answeredIndex) {
-    if (answeredIndex < 3 || answeredIndex > 6) return;
-    if (typeof window.amuletSchedulePrecompose === 'function') {
-      window.amuletSchedulePrecompose(answers);
+    if (answeredIndex < 5 || answeredIndex > 6) return;
+    const urgent = answeredIndex === 6;
+    const runner =
+      urgent && typeof window.amuletWarmRenderPipeline === 'function'
+        ? window.amuletWarmRenderPipeline
+        : typeof window.amuletSchedulePrecompose === 'function'
+          ? window.amuletSchedulePrecompose
+          : null;
+    if (runner) {
+      runner(answers, urgent ? { urgent: true } : undefined);
       return;
     }
     void ensureAmuletModules()
       .then(function () {
-        if (typeof window.amuletSchedulePrecompose === 'function') {
-          window.amuletSchedulePrecompose(answers);
+        const retry =
+          urgent && typeof window.amuletWarmRenderPipeline === 'function'
+            ? window.amuletWarmRenderPipeline
+            : window.amuletSchedulePrecompose;
+        if (typeof retry === 'function') {
+          retry(answers, urgent ? { urgent: true } : undefined);
         }
       })
       .catch(function (err) {
         console.error('[questionnaire] failed to schedule precompose', err);
       });
+  }
+
+  /** Q7/Q8 on screen — start warming the full 3D pipeline before the last answer. */
+  function warmLateQuestionPipeline(answers, questionIndex) {
+    if (!isCreateFlow() || questionIndex < 6) return;
+    const runner =
+      typeof window.amuletWarmRenderPipeline === 'function'
+        ? window.amuletWarmRenderPipeline
+        : typeof window.amuletSchedulePrecompose === 'function'
+          ? window.amuletSchedulePrecompose
+          : null;
+    if (runner) {
+      runner(answers, { urgent: questionIndex === 7 });
+      return;
+    }
+    void ensureAmuletModules()
+      .then(function () {
+        const retry =
+          typeof window.amuletWarmRenderPipeline === 'function'
+            ? window.amuletWarmRenderPipeline
+            : window.amuletSchedulePrecompose;
+        if (typeof retry === 'function') {
+          retry(answers, { urgent: questionIndex === 7 });
+        }
+      })
+      .catch(function () {});
   }
 
   function keepIndexCreateOpen() {
@@ -1151,8 +1263,67 @@
     return el && 'value' in el ? el.value.trim() : '';
   }
 
+  function getActiveDockTextInput() {
+    if (!fieldWrap) return null;
+    const el = fieldWrap.querySelector('.intro__question-input');
+    return el && 'value' in el ? el : null;
+  }
+
+  function focusDockTextInput(input) {
+    if (!input || typeof input.focus !== 'function') return;
+    input.focus({ preventScroll: true });
+  }
+
+  function shouldCaptureDockTyping(e) {
+    if (!isRequestFlowActive() || activeIndex === null) return false;
+    if (document.body.classList.contains('is-question-transition-loading')) return false;
+    const question = questions[activeIndex];
+    if (!question || (question.type !== 'text' && question.type !== 'textarea')) return false;
+    if (!getActiveDockTextInput()) return false;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return false;
+    const active = document.activeElement;
+    if (active === getActiveDockTextInput()) return false;
+    if (
+      active &&
+      (active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable)
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function insertIntoDockTextInput(input, text) {
+    if (!input || !text) return;
+    const start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+    const end = typeof input.selectionEnd === 'number' ? input.selectionEnd : input.value.length;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    const pos = start + text.length;
+    if (typeof input.setSelectionRange === 'function') {
+      input.setSelectionRange(pos, pos);
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function setDockChoicePending(value) {
+    if (!fieldWrap) return;
+    if (value) {
+      fieldWrap.dataset.choiceValue = value;
+    } else {
+      delete fieldWrap.dataset.choiceValue;
+    }
+    fieldWrap.querySelectorAll('.intro__choice-btn--figma').forEach(function (btn) {
+      btn.classList.toggle('is-selected', Boolean(value && btn.dataset.value === value));
+    });
+    if (submitBtn) {
+      submitBtn.disabled = !validate(null, value);
+    }
+  }
+
 
   function ensureQuestionInteractive() {
+    hideQuestionTransitionLoader();
     document.body.classList.remove('is-question-transition-loading', 'is-vector-frame-loading');
     if (requestArtboard) requestArtboard.classList.remove('is-advancing');
     setBuilding(false);
@@ -1162,11 +1333,40 @@
     }
   }
 
+  function showQuestionTransitionLoader() {
+    if (!questionTransitionLoader) return;
+    questionTransitionLoader.hidden = false;
+    questionTransitionLoader.setAttribute('aria-hidden', 'false');
+    questionTransitionLoader.setAttribute('aria-busy', 'true');
+  }
+
+  function hideQuestionTransitionLoader() {
+    if (!questionTransitionLoader) return;
+    questionTransitionLoader.hidden = true;
+    questionTransitionLoader.setAttribute('aria-hidden', 'true');
+    questionTransitionLoader.removeAttribute('aria-busy');
+  }
+
   function hideQuestionForAdvance() {
-    document.body.classList.add('is-question-transition-loading');
+    document.body.classList.add('is-question-transition-loading', 'is-vector-frame-loading');
     if (requestArtboard) requestArtboard.classList.add('is-advancing');
-    hideVectorTip();
     hideAmuletStageCaption();
+    showQuestionTransitionLoader();
+  }
+
+  async function beginQuestionAdvanceTransition() {
+    if (!isRequestFlowActive()) return;
+    hideQuestionForAdvance();
+    try {
+      await ensureAmuletModules();
+    } catch (err) {
+      console.error('[questionnaire] failed to load amulet build for transition', err);
+    }
+  }
+
+  async function endQuestionAdvanceTransition(startedAt, nextIndex) {
+    if (!isRequestFlowActive()) return;
+    await waitQuestionTransitionLoaderMin(startedAt, nextIndex);
   }
 
   function waitForNextVectorReady(timeoutMs) {
@@ -1191,6 +1391,13 @@
   function waitQuestionTransitionMin(startedAt) {
     const elapsed = performance.now() - startedAt;
     const remaining = REQUEST_TRANSITION_MS - elapsed;
+    if (remaining <= 0) return Promise.resolve();
+    return placeholderSleep(remaining);
+  }
+
+  function waitQuestionTransitionLoaderMin(startedAt, nextIndex) {
+    const elapsed = performance.now() - startedAt;
+    const remaining = getQuestionTransitionLoaderMs(nextIndex) - elapsed;
     if (remaining <= 0) return Promise.resolve();
     return placeholderSleep(remaining);
   }
@@ -1221,7 +1428,6 @@
     const tag = document.getElementById('questionTag');
     const dock = document.querySelector('.figma-q__dock');
     const about = document.getElementById('requestAboutBtn');
-    const vectorCopy = document.getElementById('questionVectorCopy');
 
     if (title) title.textContent = '';
     if (desc) {
@@ -1232,7 +1438,6 @@
     if (copy) copy.hidden = true;
     if (dock) dock.hidden = true;
     if (about) about.hidden = true;
-    if (vectorCopy) vectorCopy.hidden = true;
     if (amuletStageCaptionEl) {
       amuletStageCaptionEl.textContent = '';
       amuletStageCaptionEl.hidden = true;
@@ -1241,6 +1446,7 @@
       requestArtboard.classList.remove('is-advancing');
       requestArtboard.style.removeProperty('--figma-amulet-caption-top');
     }
+    hideQuestionTransitionLoader();
     document.body.classList.remove('is-question-transition-loading');
   }
 
@@ -1270,15 +1476,11 @@
         if (allAnswered(answers)) {
           answers.completedAt = Date.now();
           saveAnswers(answers);
-          closePanel();
-          hideFinalBuildQuestionChrome();
-          mountAmuletInCreateSlot();
-          document.body.classList.add('is-amulet-rendering');
-          await runAmuletBuild(answers, { showLoader: false, uiBlocking: false });
-          await showFinishedAmuletNow(answers);
+          await beginCompletedAmuletRender(answers);
           return;
         }
         const nextIndex = nextUnansweredIndex(answers);
+        const transitionStartedAt = performance.now();
 
         mountAmuletInCreateSlot();
 
@@ -1286,7 +1488,7 @@
           document.body.classList.add('is-semantic-questions');
         }
 
-        async function buildVectorIfNeeded(allowUiBlock) {
+        async function buildVectorIfNeeded() {
           try {
             await ensureAmuletModules();
           } catch (err) {
@@ -1304,16 +1506,18 @@
           if (!willShowNewLayer) {
             if (needsCatchup) {
               await runAmuletBuild(answers, {
-                uiBlocking: allowUiBlock !== false,
+                uiBlocking: false,
                 showLoader: false,
+                keepPreview: false,
               });
             }
             return;
           }
 
           await runAmuletBuild(answers, {
-            uiBlocking: allowUiBlock !== false,
-            showLoader: allowUiBlock !== false,
+            uiBlocking: false,
+            showLoader: false,
+            keepPreview: false,
           });
         }
 
@@ -1341,10 +1545,10 @@
 
         async function prepareNextQuestionScreen(answeredIndex, data) {
           const needsVectorBuild = await transitionNeedsVectorBuild(data);
+
           if (needsVectorBuild) {
-            if (isRequestFlowActive()) hideQuestionForAdvance();
             const vectorDone = waitForNextVectorReady();
-            await buildVectorIfNeeded(false);
+            await buildVectorIfNeeded();
             await vectorDone;
             await waitNextPaint();
           }
@@ -1354,14 +1558,37 @@
           }
         }
 
-        try {
-          await prepareNextQuestionScreen(index, answers);
-        } catch (err) {
-          console.error('[questionnaire] question transition prepare failed', err);
-        }
-        revealQuestionAfterAdvance(nextIndex);
+        const prepPromise = prepareNextQuestionScreen(index, answers);
 
-        if (index >= 3 && index <= 6) {
+        if (isRequestFlowActive() && isInstantDockTextQuestionIndex(nextIndex)) {
+          void prepPromise.catch(function (err) {
+            console.error('[questionnaire] question transition prepare failed', err);
+          });
+          revealQuestionAfterAdvance(nextIndex);
+        } else {
+          try {
+            if (isRequestFlowActive()) {
+              await beginQuestionAdvanceTransition();
+            }
+
+            if (isFastSemanticQuestionIndex(nextIndex)) {
+              void prepPromise.catch(function (err) {
+                console.error('[questionnaire] question transition prepare failed', err);
+              });
+              await endQuestionAdvanceTransition(transitionStartedAt, nextIndex);
+            } else {
+              await Promise.all([
+                prepPromise,
+                endQuestionAdvanceTransition(transitionStartedAt, nextIndex),
+              ]);
+            }
+          } catch (err) {
+            console.error('[questionnaire] question transition prepare failed', err);
+          }
+          revealQuestionAfterAdvance(nextIndex);
+        }
+
+        if (index >= 5 && index <= 6) {
           schedulePostVectorPrecompose(answers, index);
         }
       })();
@@ -1457,6 +1684,10 @@
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
           if (document.body.classList.contains('is-question-transition-loading')) return;
+          if (useDockChoiceGrid) {
+            setDockChoicePending(opt.value);
+            return;
+          }
           saveAnswer(index, opt.value);
         });
       }
@@ -1499,6 +1730,9 @@
       el.placeholder = '';
       el.value = value;
       fieldWrap.appendChild(el);
+      if (isRequestFlowActive()) {
+        focusDockTextInput(el);
+      }
       return el;
     }
   }
@@ -1531,12 +1765,8 @@
   async function syncChoicePresetVectorsFromAnswers(answers) {
     if (!isRequestFlowActive()) return;
     const data = answers || loadAnswers();
-    const mod = await import('./choice-preset-vectors.js?v=20250709-choice-vectors');
+    const mod = await import('./choice-preset-vectors.js?v=20250712-thumb-unify');
     await mod.syncChoicePresetThumbVectors(data);
-  }
-
-  function hideVectorTip() {
-    if (vectorCopyEl) vectorCopyEl.hidden = true;
   }
 
   function hideAmuletStageCaption() {
@@ -1552,10 +1782,6 @@
     if (!isRequestFlowActive()) return;
     const qIndex = typeof questionIndex === 'number' ? questionIndex : activeIndex;
 
-    hideAmuletStageCaption();
-
-    if (!vectorCopyEl) return;
-
     const live = requestArtboard && requestArtboard.classList.contains('is-amulet-live');
     const caption =
       live &&
@@ -1566,19 +1792,17 @@
         : '';
 
     if (!caption) {
-      hideVectorTip();
+      hideAmuletStageCaption();
       return;
     }
 
-    if (vectorCopyTextEl) {
-      vectorCopyTextEl.textContent = caption;
-    }
-    vectorCopyEl.hidden = false;
+    if (!amuletStageCaptionEl) return;
 
-    const surface = vectorCopyEl.querySelector('.pagmar__garden-amulet-hover__surface');
-    if (window.pagmarGlassLens && surface) {
-      window.pagmarGlassLens.register(surface);
-    }
+    amuletStageCaptionEl.textContent = caption;
+    amuletStageCaptionEl.hidden = false;
+    requestAnimationFrame(function () {
+      syncAmuletStageCaptionPosition();
+    });
   }
 
   function syncAmuletStageCaption() {
@@ -1691,8 +1915,6 @@
 
     const fieldEl = renderCreateField(question, answers, index);
     setCreateSaveLabel(index);
-    syncVectorCopy(getAnsweredVectorStage(), index);
-    syncChoicePresetVectorsFromAnswers(answers);
 
     if (fieldEl) {
       startPlaceholderCycle(fieldEl, question);
@@ -1714,9 +1936,12 @@
     document.body.classList.add('is-panel-open');
     window.dispatchEvent(new CustomEvent('questionnaire:panel-open'));
     bindFigmaSubmitButtonHover();
+    warmLateQuestionPipeline(answers, index);
 
     ensureDockLiftObserver();
     requestAnimationFrame(function () {
+      syncVectorCopy(getAnsweredVectorStage(), index);
+      void syncChoicePresetVectorsFromAnswers(answers);
       syncDockAmuletLift();
       syncRequestQuestionTextLayout();
       ensureQuestionInteractive();
@@ -1746,9 +1971,16 @@
       isRequestFlowActive() && activeIndex !== null && activeIndex !== index;
 
     if (isTransition) {
-      animateRequestQuestionChange(function () {
+      if (isInstantDockTextQuestionIndex(index)) {
         populateCreateQuestion(index);
-      });
+        return;
+      }
+      const transitionStartedAt = performance.now();
+      hideQuestionForAdvance();
+      void (async function () {
+        await waitQuestionTransitionLoaderMin(transitionStartedAt, index);
+        populateCreateQuestion(index);
+      })();
       return;
     }
 
@@ -2177,7 +2409,7 @@
     stopRequestFlowFogIfNeeded();
     stopCreateAmuletMorph();
     stopDockLiftObserver();
-    hideVectorTip();
+    hideAmuletStageCaption();
     restoreAmuletToStage();
 
     const status = document.getElementById('amuletStatus');
@@ -2502,6 +2734,15 @@
   }
 
   document.addEventListener('keydown', function (e) {
+    if (shouldCaptureDockTyping(e) && e.key.length === 1) {
+      const input = getActiveDockTextInput();
+      if (input) {
+        e.preventDefault();
+        focusDockTextInput(input);
+        insertIntoDockTextInput(input, e.key);
+      }
+      return;
+    }
     if (e.key !== 'Escape') return;
     if (isRequestFlowActive()) {
       handleRequestClose();
@@ -2758,12 +2999,14 @@
   });
 
   window.addEventListener('questionnaire:vector-ready', function (evt) {
+    if (document.body.classList.contains('is-question-transition-loading')) return;
     const stage = evt.detail && evt.detail.stage;
     syncVectorCopy(stage, activeIndex);
   });
 
   function resetStuckIndexFlowState() {
     if (!isIndexPage) return;
+    hideQuestionTransitionLoader();
     document.body.classList.remove('is-vector-frame-loading', 'is-question-transition-loading');
     if (!document.body.classList.contains('is-create-mode')) {
       document.body.classList.remove(
@@ -2808,20 +3051,14 @@
 
   if (isIndexPage) {
     window.setTimeout(function () {
-      const loader = document.getElementById('pagmarGalleryFullpageLoader');
       if (
-        loader &&
-        !loader.hidden &&
-        document.body.classList.contains('is-amulet-rendering') &&
-        !document.body.classList.contains('is-result-overlay-open')
+        !document.body.classList.contains('is-amulet-rendering') ||
+        document.body.classList.contains('is-result-overlay-open')
       ) {
-        console.warn('[questionnaire] clearing stuck gallery loader');
-        document.body.classList.remove('is-amulet-rendering', 'is-create-mode');
-        if (indexCreateWorkspace) indexCreateWorkspace.hidden = true;
-        if (typeof window.amuletHideLoader === 'function') {
-          window.amuletHideLoader({ force: true });
-        }
+        return;
       }
+      console.warn('[questionnaire] clearing stuck amulet render');
+      recoverStuckAmuletRender('הטעינה נתקעה. נסי שוב.');
     }, 20000);
   }
 

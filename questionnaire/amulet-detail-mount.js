@@ -11,6 +11,85 @@ import {
   buildStudioEnvMap,
   PRESENT_TONE_MAPPING_EXPOSURE,
 } from './amulet-present-lighting.js';
+import { ensureStoneBackCapForScene } from '../three-pbr-amulet.js?v=20250712-stone-back-vendor';
+
+const STONE_PRESENTATION_RENDER_ORDER = 12;
+const METAL_PRESENTATION_RENDER_ORDER = 24;
+
+function meshMaterialRef(obj) {
+  if (!obj?.material) return null;
+  return Array.isArray(obj.material) ? obj.material[0] : obj.material;
+}
+
+function prepareLoadedGlbForPresentation(glbScene, THREE, options) {
+  if (!glbScene) return;
+
+  glbScene.updateMatrixWorld(true);
+
+  let stoneMesh = null;
+  let stoneScore = -1;
+
+  glbScene.traverse(function (obj) {
+    if (!obj.isMesh || !obj.material) return;
+    const mat = meshMaterialRef(obj);
+    const metalness = mat?.metalness ?? 0;
+    if (metalness > 0.45) {
+      obj.renderOrder = METAL_PRESENTATION_RENDER_ORDER;
+      return;
+    }
+
+    const count = obj.geometry?.attributes?.position?.count || 0;
+    if (count < 3) return;
+    const hasVertexColors = Boolean(obj.geometry?.attributes?.color);
+    let score = count;
+    if (hasVertexColors) score += count * 2;
+    if (metalness < 0.15) score += count * 0.5;
+    if (score > stoneScore) {
+      stoneScore = score;
+      stoneMesh = obj;
+    }
+  });
+
+  if (stoneMesh) {
+    stoneMesh.renderOrder = STONE_PRESENTATION_RENDER_ORDER;
+    const mats = Array.isArray(stoneMesh.material)
+      ? stoneMesh.material
+      : [stoneMesh.material];
+    mats.forEach(function (m) {
+      if (!m) return;
+      m.side = THREE.DoubleSide;
+      m.depthWrite = true;
+      m.transparent = false;
+      m.opacity = 1;
+      m.needsUpdate = true;
+    });
+  }
+
+  if (!(options && options.skipStoneBackCap)) {
+    try {
+      if (!ensureStoneBackCapForScene(glbScene, THREE)) {
+        console.warn('[amulet-detail-mount] stone back cap — no stone mesh found');
+      }
+    } catch (err) {
+      console.warn('[amulet-detail-mount] stone back cap skipped', err);
+    }
+  }
+
+  glbScene.traverse(function (obj) {
+    if (obj.name !== 'stoneBackCap' || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(function (m) {
+      if (!m) return;
+      m.side = THREE.DoubleSide;
+      m.depthWrite = true;
+      m.transparent = false;
+      m.opacity = 1;
+      m.needsUpdate = true;
+    });
+  });
+
+  glbScene.updateMatrixWorld(true);
+}
 
 const state = {
   container: null,
@@ -173,15 +252,7 @@ export function mountDetailAmulet3D(container, glbScene, options) {
   applyPresentMaterialMaps(glbScene, roomEnvTex, studioEnv, materialOverrides, {
     sheshPresentation: useDetailPresentation,
   });
-  if (!(options && options.skipStoneBackCap)) {
-    import('../three-pbr-amulet.js?v=20250711-entry-authority')
-      .then(function (mod) {
-        mod.ensureStoneBackCapForScene(glbScene);
-      })
-      .catch(function (err) {
-        console.warn('[amulet-detail-mount] stone back cap skipped', err);
-      });
-  }
+  prepareLoadedGlbForPresentation(glbScene, THREE, options);
 
   const box = new THREE.Box3().setFromObject(glbScene);
   const center = box.getCenter(new THREE.Vector3());
@@ -285,35 +356,53 @@ export function captureDetailAmuletSnapshot(options) {
   const { renderer, scene, camera } = state;
   if (!renderer || !scene || !camera) return null;
 
+  const savedRotX = state.userRotX;
+  const savedRotY = state.userRotY;
+  const savedSpinAnim = state.spinAnim;
+  state.userRotX = 0;
+  state.userRotY = 0;
+  state.spinAnim = null;
   applyAmuletRotation();
-  resizeDetailAmuletRenderer();
 
-  const dom = renderer.domElement;
-  const origDPR = renderer.getPixelRatio();
-  const cssW = dom.clientWidth || dom.width / Math.max(origDPR, 1);
-  const cssH = dom.clientHeight || dom.height / Math.max(origDPR, 1);
-  const aspect = cssW / Math.max(cssH, 1);
-  const snapW = aspect >= 1 ? targetPx : Math.round(targetPx * aspect);
-  const snapH = aspect >= 1 ? Math.round(targetPx / aspect) : targetPx;
+  try {
+    resizeDetailAmuletRenderer();
 
-  renderer.setPixelRatio(1);
-  renderer.setSize(snapW, snapH, false);
-  renderer.setClearColor(0x000000, 0);
-  renderer.toneMappingExposure =
-    typeof renderer.toneMappingExposure === 'number' ? renderer.toneMappingExposure : PRESENT_TONE_MAPPING_EXPOSURE;
-  renderer.render(scene, camera);
+    const dom = renderer.domElement;
+    const origDPR = renderer.getPixelRatio();
+    const cssW = Math.max(1, dom.clientWidth || dom.width / Math.max(origDPR, 1));
+    const cssH = Math.max(1, dom.clientHeight || dom.height / Math.max(origDPR, 1));
+    const aspect = cssW / cssH;
+    const snapW = Math.max(1, aspect >= 1 ? targetPx : Math.round(targetPx * aspect));
+    const snapH = Math.max(1, aspect >= 1 ? Math.round(targetPx / aspect) : targetPx);
 
-  const snap = document.createElement('canvas');
-  snap.width = snapW;
-  snap.height = snapH;
-  snap.getContext('2d', { alpha: true }).drawImage(dom, 0, 0);
+    renderer.setPixelRatio(1);
+    renderer.setSize(snapW, snapH, false);
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMappingExposure =
+      typeof renderer.toneMappingExposure === 'number' ? renderer.toneMappingExposure : PRESENT_TONE_MAPPING_EXPOSURE;
+    renderer.render(scene, camera);
 
-  renderer.setPixelRatio(origDPR);
-  renderer.setSize(cssW, cssH, false);
-  renderer.setClearColor(0x000000, 0);
-  renderer.render(scene, camera);
+    const snap = document.createElement('canvas');
+    snap.width = snapW;
+    snap.height = snapH;
+    snap.getContext('2d', { alpha: true }).drawImage(dom, 0, 0);
 
-  return snap;
+    renderer.setPixelRatio(origDPR);
+    renderer.setSize(cssW, cssH, false);
+    renderer.setClearColor(0x000000, 0);
+    return snap;
+  } catch (err) {
+    console.warn('[amulet-detail-mount] snapshot capture failed', err);
+    return null;
+  } finally {
+    state.userRotX = savedRotX;
+    state.userRotY = savedRotY;
+    state.spinAnim = savedSpinAnim;
+    applyAmuletRotation();
+    if (renderer && scene && camera) {
+      renderer.render(scene, camera);
+    }
+  }
 }
 
 if (typeof window !== 'undefined') {

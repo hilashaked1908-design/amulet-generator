@@ -118,7 +118,14 @@
   function enhanceRollTarget(el) {
     if (!el || el.classList.contains('is-typing')) return;
 
-    if (el.classList.contains('pagmar__index-filter-trigger__label')) {
+    if (
+      el.classList.contains('pagmar__index-filter-trigger__label') ||
+      el.classList.contains('pagmar__index-about__label')
+    ) {
+      if (el.classList.contains('pagmar__index-about__label')) {
+        delete el.dataset.rollEnhanced;
+        el.classList.remove('pagmar-btn__roll', 'pagmar-btn__roll--chars');
+      }
       return;
     }
 

@@ -37,7 +37,7 @@ body.pagmar-create {
   --figma-request-about-size: 60;
   --figma-amulet-bottom-y: calc(var(--figma-amulet-y) + var(--figma-amulet-h));
   --figma-q-dock-top-y: calc(var(--figma-frame-h) - var(--figma-q-dock-bottom) - var(--figma-q-dock-h));
-  --figma-amulet-caption-line-h: calc(27 * 1.1);
+  --figma-amulet-caption-line-h: calc(var(--figma-tag-size) * var(--figma-tag-line-height));
   --figma-amulet-caption-y: calc(
     (var(--figma-amulet-bottom-y) + var(--figma-q-dock-top-y) - var(--figma-amulet-caption-line-h)) / 2
   );
@@ -75,9 +75,17 @@ body.pagmar-create {
   --figma-amulet-w: 566;
   --figma-amulet-h: 611;
   --figma-amulet-y: 133.62890625;
-  --figma-q-vector-thumb-w: 90.3;
-  --figma-q-vector-thumb-h: 89.813;
-  --figma-q-vector-grid-h: 211.62;
+  --figma-q-vector-cols: 3;
+  --figma-q-vector-rows: 3;
+  --figma-q-vector-thumb-w: calc(
+    (var(--figma-q-copy-w) - (var(--figma-q-vector-cols) - 1) * var(--figma-q-block-gap))
+    / var(--figma-q-vector-cols)
+  );
+  --figma-q-vector-thumb-h: calc(var(--figma-q-vector-thumb-w) * 89.813 / 90.3);
+  --figma-q-vector-grid-h: calc(
+    var(--figma-q-vector-rows) * var(--figma-q-vector-thumb-h)
+    + (var(--figma-q-vector-rows) - 1) * var(--figma-q-block-gap)
+  );
   --figma-close-x: 1852.0703125;
   --figma-close-y: 63.88212585449219;
   --figma-amulet-lift: 0px;
@@ -101,7 +109,7 @@ body.pagmar-create {
   --request-btn-bg: #181610;
   --request-btn-ink: var(--pagmar-yellow-white);
   --request-btn-border: transparent;
-  background: #000000 !important;
+  background: transparent !important;
 }
 
 body.pagmar-create .pagmar__atmosphere {
@@ -136,20 +144,11 @@ body.pagmar-index.is-create-mode .pagmar-viewport {
 }
 
 /* Hide index chrome only - keep home-page garden / grid visible behind questionnaire */
-body.pagmar-index.is-create-mode .pagmar__index-about,
+body.pagmar-index.is-create-mode #indexAboutBtn,
 body.pagmar-index.is-create-mode .pagmar__index-filter-trigger,
 body.pagmar-index.is-create-mode .pagmar__index-filter-sidebar,
 body.pagmar-index.is-create-mode .pagmar__index-cta-pill {
   display: none !important;
-}
-
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__garden,
-body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__atmosphere--back,
-body.pagmar-index.is-create-mode:not(.is-create-exiting):not(.is-amulet-rendering) .pagmar__atmosphere--fantik {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
 }
 
 body.pagmar-index.is-create-mode.is-create-exiting .pagmar__garden {
@@ -260,12 +259,7 @@ body.pagmar-create .pagmar__request-flow {
 }
 
 .pagmar__request-artboard::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background: #000000;
-  pointer-events: none;
+  display: none;
 }
 
 .pagmar__request-fog {
@@ -274,7 +268,7 @@ body.pagmar-create .pagmar__request-flow {
   z-index: 1;
   pointer-events: none !important;
   overflow: hidden;
-  background: #000000;
+  background: transparent;
 }
 
 .pagmar__request-fog.pagmar__detail-fog--live {
@@ -337,6 +331,9 @@ body.pagmar-create .pagmar__request-flow {
   pointer-events: none;
   visibility: hidden;
   opacity: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
   transition:
     opacity var(--figma-transition, 220ms cubic-bezier(0.33, 0, 0.2, 1)),
     visibility var(--figma-transition, 220ms cubic-bezier(0.33, 0, 0.2, 1));
@@ -392,6 +389,13 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard > .figma-
   z-index: 1;
   pointer-events: auto;
   overflow: visible;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.figma-amulet .pagmar__vector-fog-veil {
+  display: none !important;
 }
 
 .figma-amulet__ellipse {
@@ -472,6 +476,9 @@ body.pagmar-index.is-create-mode .figma-amulet.pagmar__request-amulet-build {
   height: 100% !important;
   min-width: 0;
   min-height: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Live amulet canvas inside transparent frame */
@@ -486,6 +493,9 @@ body.pagmar-create .figma-amulet .pagmar__create-amulet-view,
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .figma-amulet .figma-amulet-stage__morph {
@@ -582,8 +592,8 @@ body.pagmar-index.is-create-mode .figma-amulet.is-vector-preview .pagmar__index-
   height: calc(var(--figma-q-vector-grid-h) * var(--fu));
   overflow: visible;
   display: grid;
-  grid-template-columns: repeat(4, calc(var(--figma-q-vector-thumb-w) * var(--fu)));
-  grid-template-rows: repeat(2, calc(var(--figma-q-vector-thumb-h) * var(--fu)));
+  grid-template-columns: repeat(var(--figma-q-vector-cols), calc(var(--figma-q-vector-thumb-w) * var(--fu)));
+  grid-template-rows: repeat(var(--figma-q-vector-rows), calc(var(--figma-q-vector-thumb-h) * var(--fu)));
   gap: calc(var(--figma-q-block-gap) * var(--fu));
   pointer-events: none !important;
   visibility: hidden;
@@ -617,14 +627,24 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
   pointer-events: none !important;
 }
 
-.figma-q-vector-thumb--q1 { grid-column: 4; grid-row: 1; }
-.figma-q-vector-thumb--q2 { grid-column: 3; grid-row: 1; }
-.figma-q-vector-thumb--q3 { grid-column: 2; grid-row: 1; }
-.figma-q-vector-thumb--q4 { grid-column: 1; grid-row: 1; }
-.figma-q-vector-thumb--q5 { grid-column: 4; grid-row: 2; }
-.figma-q-vector-thumb--q6 { grid-column: 3; grid-row: 2; }
-.figma-q-vector-thumb--q7 { grid-column: 2; grid-row: 2; }
-.figma-q-vector-thumb--q8 { grid-column: 1; grid-row: 2; }
+.figma-q-vector-thumb--hoverable:not([hidden]) {
+  pointer-events: auto !important;
+  cursor: default;
+}
+
+.figma-q-vector-thumb--hoverable:not([hidden]) svg,
+.figma-q-vector-thumb--hoverable:not([hidden]) path {
+  pointer-events: none;
+}
+
+.figma-q-vector-thumb--q1 { grid-column: 3; grid-row: 1; }
+.figma-q-vector-thumb--q2 { grid-column: 2; grid-row: 1; }
+.figma-q-vector-thumb--q3 { grid-column: 1; grid-row: 1; }
+.figma-q-vector-thumb--q4 { grid-column: 3; grid-row: 2; }
+.figma-q-vector-thumb--q5 { grid-column: 2; grid-row: 2; }
+.figma-q-vector-thumb--q6 { grid-column: 1; grid-row: 2; }
+.figma-q-vector-thumb--q7 { grid-column: 3; grid-row: 3; }
+.figma-q-vector-thumb--q8 { grid-column: 2; grid-row: 3; }
 
 .figma-q-vector-thumb[hidden] {
   display: none;
@@ -650,38 +670,12 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
 }
 
 /* Pagmar about - position from pagmar-chrome.css */
-.figma-request-about {
+#requestAboutBtn {
   z-index: 36;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  cursor: pointer;
   pointer-events: auto;
-  text-decoration: none;
-  -webkit-appearance: none;
-  appearance: none;
 }
 
-.figma-request-about img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  user-select: none;
-}
-
-.figma-request-about:focus-visible {
-  outline: var(--pagmar-line-weight) solid rgba(var(--pagmar-yellow-white-rgb), 0.45);
-  outline-offset: calc(2 * var(--fu));
-}
-
-/* Center caption between live vector frame and question dock - Figma 2630:44529 */
+/* Center tag between live vector frame and question dock - Figma 2630:44529 */
 .figma-amulet-stage-caption {
   position: fixed;
   left: 50%;
@@ -691,15 +685,6 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
   max-width: calc(100vw - 80px);
   margin: 0;
   padding: 0;
-  color: var(--request-ink, var(--pagmar-yellow-white));
-  direction: rtl;
-  text-align: center;
-  font-family: "TheBasics", "DavidLibre", serif;
-  font-size: calc(27 * var(--fu));
-  font-weight: 400;
-  font-style: normal;
-  line-height: 1.1;
-  letter-spacing: 0;
   pointer-events: none;
   z-index: 34;
 }
@@ -710,6 +695,11 @@ body.pagmar-index.is-create-mode.is-building .pagmar__request-artboard .figma-q-
 
 .pagmar__request-artboard.is-amulet-live .figma-amulet-stage-caption:not([hidden]) {
   opacity: 1;
+}
+
+body.is-question-transition-loading .figma-amulet-stage-caption {
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 /* Close - position from pagmar-chrome.css */
@@ -798,10 +788,114 @@ body.pagmar-create .pagmar__request-artboard .figma-q__panel {
 /* Between questions - hide question + dock while the next vector prepares */
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__copy,
 body.is-question-transition-loading .pagmar__request-artboard .figma-q__dock {
+  display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
-  filter: blur(calc(5 * var(--fu)));
+  filter: none !important;
   pointer-events: none !important;
+}
+
+/* Between questions - single centered vessel loader on the frame */
+.figma-q__transition-zone {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.figma-q__transition-zone:not([hidden]) {
+  display: flex;
+}
+
+.figma-q__transition-loader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(28vw, calc(220 * var(--fu)));
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.figma-q__transition-loader__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.figma-q__transition-loader__vessels {
+  position: relative;
+  width: min(88%, calc(280 * var(--fu)));
+  height: min(88%, calc(280 * var(--fu)));
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  overflow: clip;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.figma-q__transition-loader__vessel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  will-change: opacity;
+  animation-name: pagmar-detail-vessel-slot;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: running;
+  backface-visibility: hidden;
+  filter: brightness(0) invert(1);
+}
+
+.figma-q__transition-loader__vessel--1 {
+  width: 56%;
+  height: auto;
+  aspect-ratio: 162.765 / 281.371;
+  animation-delay: 0s;
+}
+
+.figma-q__transition-loader__vessel--2 {
+  width: 96%;
+  height: auto;
+  aspect-ratio: 278.478 / 284.742;
+  animation-delay: -1s;
+}
+
+.figma-q__transition-loader__vessel--3 {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 291.758 / 162.674;
+  animation-delay: -2s;
+}
+
+.figma-q__transition-loader__vessel--4 {
+  width: 94%;
+  height: auto;
+  aspect-ratio: 272.426 / 277.41;
+  animation-delay: -3s;
+}
+
+body.is-question-transition-loading .figma-amulet .pagmar__amulet-frame-loader,
+body.is-question-transition-loading .figma-amulet-stage__morph:not(.is-hidden) {
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 body.is-question-transition-loading .pagmar__request-artboard .figma-q-vector-grid {
@@ -809,16 +903,22 @@ body.is-question-transition-loading .pagmar__request-artboard .figma-q-vector-gr
   opacity: 0 !important;
 }
 
+/* Between questions - keep stage for loader, hide vector until next question reveals */
 body.is-question-transition-loading .pagmar__request-artboard > .figma-amulet-stage {
   visibility: visible !important;
   opacity: 1 !important;
 }
 
-body.is-question-transition-loading.pagmar-create.is-building .pagmar__request-artboard > .figma-amulet-stage,
-body.is-question-transition-loading.pagmar-index.is-create-mode.is-building .pagmar__request-artboard > .figma-amulet-stage,
-body.is-question-transition-loading.is-vector-frame-loading .pagmar__request-artboard > .figma-amulet-stage {
-  visibility: visible !important;
-  opacity: 1 !important;
+body.is-question-transition-loading .pagmar__request-artboard .pagmar__index-create-amulet-view,
+body.is-question-transition-loading .pagmar__request-artboard .pagmar__create-amulet-view {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.is-question-transition-loading .figma-amulet:not(.is-amulet-loading) .figma-amulet-stage__morph:not(.is-hidden) {
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 /* Question dock - interactive only when question is visible (not between questions) */
@@ -1045,6 +1145,15 @@ body.is-choice-question .figma-q__dock .figma-q__field {
   opacity: 1;
 }
 
+.figma-amulet-stage-caption.figma-q__tag {
+  justify-content: center;
+  align-self: center;
+  white-space: normal;
+  text-align: center;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
 /* Figma Frame 395 - title 75px Lava Pro HL */
 .figma-q__title {
   margin: 0;
@@ -1079,26 +1188,23 @@ body.is-choice-question .figma-q__dock .figma-q__field {
   letter-spacing: 0;
 }
 
-.figma-q__vector-copy-text {
-  white-space: pre-line;
-}
-
-/* Vector explanation - garden-style glass bubble, fixed Figma position */
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip,
-body.pagmar-create .pagmar__request-vector-tip {
+/* Answer tooltip above vector thumbnails in the question copy grid */
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover,
+body.pagmar-create .pagmar__request-thumb-hover {
   position: fixed;
-  left: calc(var(--figma-q-vector-copy-x) * var(--fu));
-  top: calc(var(--figma-q-vector-copy-y) * var(--fu));
-  z-index: 36;
+  left: 0;
+  top: 0;
+  z-index: 40;
   width: auto;
   max-width: calc(317 * var(--fu));
   pointer-events: none;
-  opacity: 1;
-  transform: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, opacity;
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .pagmar__garden-amulet-hover__surface,
-body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__surface {
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__surface,
+body.pagmar-create .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__surface {
   box-sizing: border-box;
   display: inline-flex !important;
   flex-direction: column;
@@ -1119,28 +1225,38 @@ body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__sur
   border: var(--pagmar-line-weight) solid transparent !important;
   position: relative !important;
   box-shadow: none !important;
-  gap: 0;
+  gap: calc(10 * var(--fu));
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .glass-lens__backdrop,
-body.pagmar-create .pagmar__request-vector-tip .glass-lens__backdrop,
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .glass-clone,
-body.pagmar-create .pagmar__request-vector-tip .glass-clone {
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .glass-lens__backdrop,
+body.pagmar-create .pagmar__request-thumb-hover .glass-lens__backdrop,
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .glass-clone,
+body.pagmar-create .pagmar__request-thumb-hover .glass-clone,
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .glass-chrome,
+body.pagmar-create .pagmar__request-thumb-hover .glass-chrome {
   border-radius: 40px;
 }
 
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .glass-chrome,
-body.pagmar-create .pagmar__request-vector-tip .glass-chrome {
-  border-radius: 40px;
-}
-
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .pagmar__garden-amulet-hover__request,
-body.pagmar-create .pagmar__request-vector-tip .pagmar__garden-amulet-hover__request,
-body.pagmar-index.is-create-mode .pagmar__request-vector-tip .figma-q__vector-copy-text,
-body.pagmar-create .pagmar__request-vector-tip .figma-q__vector-copy-text {
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__head,
+body.pagmar-create .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__head {
   position: relative;
   z-index: 3;
-  display: block;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(10 * var(--fu));
+  direction: ltr;
+  margin: 0;
+  max-width: 100%;
+}
+
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__index,
+body.pagmar-create .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__index,
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__request,
+body.pagmar-create .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__request {
+  position: relative;
+  z-index: 3;
   margin: 0;
   width: auto !important;
   max-width: calc(317 * var(--fu)) !important;
@@ -1148,7 +1264,7 @@ body.pagmar-create .pagmar__request-vector-tip .figma-q__vector-copy-text {
   text-align: right;
   direction: rtl;
   unicode-bidi: plaintext;
-  white-space: pre-line !important;
+  white-space: normal !important;
   overflow-wrap: break-word;
   word-break: normal;
   text-wrap: pretty;
@@ -1163,20 +1279,17 @@ body.pagmar-create .pagmar__request-vector-tip .figma-q__vector-copy-text {
   -webkit-font-smoothing: antialiased;
 }
 
-body.is-question-transition-loading .pagmar__request-vector-tip {
+body.pagmar-index.is-create-mode .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__index,
+body.pagmar-create .pagmar__request-thumb-hover .pagmar__garden-amulet-hover__index {
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.is-question-transition-loading .pagmar__request-thumb-hover {
   visibility: hidden !important;
   opacity: 0 !important;
 }
 
-.pagmar__request-vector-tip[hidden] {
-  display: none !important;
-}
-
-.pagmar__request-artboard.is-amulet-live .figma-q__vector-copy:not([hidden]) {
-  opacity: 1;
-}
-
-.figma-q__desc[hidden] { display: none; }
 
 .figma-q__field-box {
   box-sizing: border-box;
@@ -1863,19 +1976,25 @@ body.pagmar-create .pagmar__request-artboard .figma-q__btn:focus-visible:not(:di
 }
 
 /* Q4–Q8: dock + answers clickable the moment the question is shown */
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__dock,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__dock,
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__field,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__field,
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__field-box,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__field-box,
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .intro__choice-btn--figma,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .intro__choice-btn--figma,
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .intro__question-input,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .intro__question-input,
-body.pagmar-index.is-create-mode.is-panel-open .pagmar__request-artboard .figma-q__btn-outer,
-body.pagmar-create.is-panel-open .pagmar__request-artboard .figma-q__btn-outer {
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__dock,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__dock,
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field,
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field-box,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__field-box,
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .intro__choice-btn--figma,
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .intro__question-input,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .intro__question-input,
+body.pagmar-index.is-create-mode.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__btn-outer,
+body.pagmar-create.is-panel-open:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__btn-outer {
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+/* Q5+ — no dock fade-in delay once the question is shown */
+body.is-semantic-questions:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__dock,
+body.is-semantic-questions:not(.is-question-transition-loading) .pagmar__request-artboard .figma-q__copy {
+  transition: none !important;
 }

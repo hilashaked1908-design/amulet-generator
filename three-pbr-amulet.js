@@ -2,8 +2,8 @@
  * SVG stroke paths → Three.js PBR (metal tubes L2, SDF sculptural stone / inflated opal L3).
  * RoomEnvironment IBL + dramatic directional lights.
  */
-import * as THREE from 'https://esm.sh/three@0.170.0';
-import { RoomEnvironment } from 'https://esm.sh/three@0.170.0/examples/jsm/environments/RoomEnvironment.js';
+import * as THREE from './questionnaire/vendor/three.module.js';
+import { RoomEnvironment } from './questionnaire/vendor/RoomEnvironment.js';
 import { buildStoneSculptureMeshFromMaskAsync, prepareTextOverlayFromGrid } from './stone-sdf-mesh.js';
 import { yieldToMainThread } from './render-yield.js';
 import {
@@ -16,6 +16,10 @@ import {
 } from './amulet-material-presets.js';
 import { deriveAmuletShapeParams, METAL_ELLIPSE_BY_BELIEF } from './amulet-shape-from-text.js';
 import { REPOUSSE_FIELD_DEFAULTS } from './metal-repousse-mesh.js';
+
+function resolveThree(threeLib) {
+  return threeLib || THREE;
+}
 const W = 680;
 const H = 680;
 const CX = 340;
@@ -35,9 +39,9 @@ const FRAME_PAD = 40;
 const SUMMONING_FRAME_PAD = 30;
 const PATH_MAIN_W = L3_STROKE_WIDTH;
 const MASK_SCALE = 2;
-/** Coarser raster for back-cap hole detection — keeps GLB mount responsive. */
-const BACK_CAP_MASK_SCALE = 1;
-const BACK_CAP_MASK_MAX_PX = 240;
+/** Raster for back-cap hole detection — match MASK_SCALE so small pierce holes survive. */
+const BACK_CAP_MASK_SCALE = MASK_SCALE;
+const BACK_CAP_MASK_MAX_PX = 320;
 const MASK_MESH_STEP = 2;
 /** z — L2 מלפנים; אבן L3 מאחור; מסגרת שכבה תחתונה (מאחורי הכל). */
 const L2_SURFACE_Z = 8;
@@ -1036,6 +1040,15 @@ function createOrbitControls(canvas, { scene, camera, renderer, baseRotY, autoRo
   }
 
   return {
+    getRotation() {
+      return { x: userRotX, y: userRotY };
+    },
+    setRotation(x, y) {
+      userRotX = x;
+      userRotY = y;
+      applyRotation();
+      renderFrame();
+    },
     reset() {
       userRotX = autoRotating ? 0.24 : 0;
       userRotY = 0;
@@ -4268,6 +4281,13 @@ function extractFilledHolesMask(beforeFill, afterFill, w, h) {
   return any ? { grid: holes, w, h } : null;
 }
 
+/** Enclosed voids captured right after the first interior fill on a slab mask. */
+function capturePierceHolesFromFill(beforeFill, afterFill, w, h, maskOrigin) {
+  const pierceHoleMask = extractFilledHolesMask(beforeFill, afterFill, w, h);
+  if (pierceHoleMask) pierceHoleMask.maskOrigin = maskOrigin;
+  return pierceHoleMask;
+}
+
 function keepLargestMaskComponent(grid, w, h) {
   const { labels, componentCount } = labelConnectedComponents(grid, w, h);
   if (componentCount <= 1) return grid;
@@ -4539,7 +4559,9 @@ function rasterizeProceduralStoneMask(stoneShapeParams, style3, style2 = null) {
       morphKeep
   );
   let slabGrid = dilateMaskGrid(unionGrid, w, h, dilatePx);
+  const beforeHoleFill = new Uint8Array(slabGrid);
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
+  const pierceHoleMask = capturePierceHolesFromFill(beforeHoleFill, slabGrid, w, h, maskOrigin);
   const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * morphKeep);
   slabGrid = closeStrokeMaskGrid(slabGrid, w, h, bridgePx, Math.max(1, bridgePx - 4));
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
@@ -4547,7 +4569,7 @@ function rasterizeProceduralStoneMask(stoneShapeParams, style3, style2 = null) {
   slabGrid = dilateMaskGrid(slabGrid, w, h, Math.max(1, Math.round(5 * MASK_SCALE * morphKeep)));
   const spurCut = stoneShapeParams.baseRadius * 0.42 * (0.55 + morphKeep * 0.45);
   slabGrid = pruneThinMaskSpurs(slabGrid, w, h, spurCut);
-  return { grid: slabGrid, w, h, maskOrigin };
+  return { grid: slabGrid, w, h, maskOrigin, pierceHoleMask };
 }
 
 /** Less bridging → more visible gaps / lobes between name letters. */
@@ -5055,7 +5077,9 @@ function rasterizeSlabWrapMask(rootSvg, style2, style3, stoneShapeParams = null)
       morphKeep
   );
   let slabGrid = dilateMaskGrid(unionGrid, w, h, dilatePx);
+  const beforeHoleFill = new Uint8Array(slabGrid);
   slabGrid = fillMaskInteriorHoles(slabGrid, w, h);
+  const pierceHoleMask = capturePierceHolesFromFill(beforeHoleFill, slabGrid, w, h, maskOrigin);
 
   const bridgePx = Math.round(SLAB_PLATE_BRIDGE_SCENE * MASK_SCALE * morphKeep);
   slabGrid = closeStrokeMaskGrid(slabGrid, w, h, bridgePx, Math.max(1, bridgePx - 4));
@@ -5063,7 +5087,7 @@ function rasterizeSlabWrapMask(rootSvg, style2, style3, stoneShapeParams = null)
   slabGrid = solidifyInsideOuterBoundary(slabGrid, w, h);
   slabGrid = dilateMaskGrid(slabGrid, w, h, Math.max(1, Math.round(5 * MASK_SCALE * morphKeep)));
 
-  return { grid: slabGrid, w, h, maskOrigin };
+  return { grid: slabGrid, w, h, maskOrigin, pierceHoleMask };
 }
 
 function mountSvg(svgString) {
@@ -6844,13 +6868,14 @@ function pointInTriangle(px, py, ax, ay, bx, by, cx, cy) {
 }
 
 /** Rasterize rendered stone mesh XY silhouette (world space, follows every curve). */
-function rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale = MASK_SCALE, maxPx = 0) {
+function rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale = MASK_SCALE, maxPx = 0, threeLib = null) {
   if (!stoneMesh?.geometry?.attributes?.position) return null;
+  const T = resolveThree(threeLib);
   stoneMesh.updateMatrixWorld(true);
   const geom = stoneMesh.geometry;
   const pos = geom.attributes.position;
   const index = geom.index;
-  const v = new THREE.Vector3();
+  const v = new T.Vector3();
   let ms = maskScale || MASK_SCALE;
 
   let minX = Infinity;
@@ -6923,8 +6948,8 @@ function rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale = MASK_SCALE, ma
   return { grid, w, h, maskOrigin, maskScale: ms };
 }
 
-function rasterizeStoneMeshSilhouette(stoneMesh, maskScale = MASK_SCALE, maxPx = 0) {
-  const stamp = rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale, maxPx);
+function rasterizeStoneMeshSilhouette(stoneMesh, maskScale = MASK_SCALE, maxPx = 0, threeLib = null) {
+  const stamp = rasterizeStoneMeshSilhouetteStamp(stoneMesh, maskScale, maxPx, threeLib);
   if (!stamp) return null;
   const filled = stamp.grid.slice();
   fillMaskInteriorHoles(filled, stamp.w, stamp.h);
@@ -6993,15 +7018,158 @@ function buildSlabEqualGapFrameContour(rootSvg, slabMask, style3, style2, questi
 
 /** Flat stone slab back thickness (scene units along -Z). */
 const STONE_BACK_CAP_DEPTH = 6.5;
+/** Lower band of stone mesh skinned for the conforming back cap. */
+const STONE_BACK_SHELL_BAND = 0.34;
+/** Nudge cap under stone back to avoid z-fighting at the seam. */
+const STONE_BACK_CAP_SEAM = 0.05;
 
-function worldPointsToMeshLocal(points, mesh) {
+function quantizedVertKey(x, y, z) {
+  return Math.round(x * 800) + ',' + Math.round(y * 800) + ',' + Math.round(z * 800);
+}
+
+/** Back cap geometry sampled from the stone mesh back shell — matches silhouette, holes, and relief. */
+function buildConformingStoneBackCapGeometry(stoneMesh, depth, threeLib = null) {
+  const T = resolveThree(threeLib);
+  const src = stoneMesh.geometry;
+  const posAttr = src.attributes.position;
+  if (!posAttr || posAttr.count < 3) return null;
+
+  src.computeBoundingBox();
+  const minZ = src.boundingBox.min.z;
+  const maxZ = src.boundingBox.max.z;
+  const zSpan = Math.max(1e-4, maxZ - minZ);
+  const shellTop = minZ + zSpan * STONE_BACK_SHELL_BAND;
+
+  const colAttr = src.attributes.color;
+  const index = src.index;
+  const hasColor = Boolean(colAttr);
+
+  const topVerts = [];
+  const topMap = new Map();
+  const topIndices = [];
+  const edgeCount = new Map();
+
+  function readColor(i) {
+    if (!colAttr) return [0.76, 0.74, 0.71];
+    return [colAttr.getX(i), colAttr.getY(i), colAttr.getZ(i)];
+  }
+
+  function addTop(x, y, z, cr, cg, cb) {
+    const seamZ = z - STONE_BACK_CAP_SEAM;
+    const key = quantizedVertKey(x, y, seamZ);
+    if (topMap.has(key)) return topMap.get(key);
+    const idx = topVerts.length / 6;
+    topVerts.push(x, y, seamZ, cr, cg, cb);
+    topMap.set(key, idx);
+    return idx;
+  }
+
+  function noteEdge(a, b) {
+    const k = a < b ? a + '|' + b : b + '|' + a;
+    edgeCount.set(k, (edgeCount.get(k) || 0) + 1);
+  }
+
+  const triCount = index ? index.count / 3 : posAttr.count / 3;
+  let keptTris = 0;
+
+  for (let t = 0; t < triCount; t += 1) {
+    const ia = index ? index.getX(t * 3) : t * 3;
+    const ib = index ? index.getX(t * 3 + 1) : t * 3 + 1;
+    const ic = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+
+    const ax = posAttr.getX(ia);
+    const ay = posAttr.getY(ia);
+    const az = posAttr.getZ(ia);
+    const bx = posAttr.getX(ib);
+    const by = posAttr.getY(ib);
+    const bz = posAttr.getZ(ib);
+    const cx = posAttr.getX(ic);
+    const cy = posAttr.getY(ic);
+    const cz = posAttr.getZ(ic);
+
+    if (Math.min(az, bz, cz) > shellTop) continue;
+
+    const [car, cag, cab] = readColor(ia);
+    const [cbr, cbg, cbb] = readColor(ib);
+    const [ccr, ccg, ccb] = readColor(ic);
+
+    const i0 = addTop(ax, ay, az, car, cag, cab);
+    const i1 = addTop(bx, by, bz, cbr, cbg, cbb);
+    const i2 = addTop(cx, cy, cz, ccr, ccg, ccb);
+    topIndices.push(i0, i1, i2);
+    noteEdge(i0, i1);
+    noteEdge(i1, i2);
+    noteEdge(i2, i0);
+    keptTris += 1;
+  }
+
+  if (keptTris < 8 || topVerts.length < 36) return null;
+
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  const topCount = topVerts.length / 6;
+
+  for (let i = 0; i < topVerts.length; i += 6) {
+    positions.push(topVerts[i], topVerts[i + 1], topVerts[i + 2]);
+    if (hasColor) colors.push(topVerts[i + 3], topVerts[i + 4], topVerts[i + 5]);
+  }
+
+  const bottomMap = new Map();
+  function bottomIdx(topIdx) {
+    if (bottomMap.has(topIdx)) return bottomMap.get(topIdx);
+    const base = topIdx * 6;
+    const x = topVerts[base];
+    const y = topVerts[base + 1];
+    const z = topVerts[base + 2] - depth;
+    const bidx = topCount + bottomMap.size;
+    bottomMap.set(topIdx, bidx);
+    positions.push(x, y, z);
+    if (hasColor) {
+      colors.push(topVerts[base + 3] * 0.965, topVerts[base + 4] * 0.965, topVerts[base + 5] * 0.965);
+    }
+    return bidx;
+  }
+
+  for (let i = 0; i < topIndices.length; i += 3) {
+    indices.push(topIndices[i], topIndices[i + 1], topIndices[i + 2]);
+  }
+  for (let i = 0; i < topIndices.length; i += 3) {
+    const a = topIndices[i];
+    const b = topIndices[i + 1];
+    const c = topIndices[i + 2];
+    indices.push(bottomIdx(c), bottomIdx(b), bottomIdx(a));
+  }
+  for (const [ek, count] of edgeCount.entries()) {
+    if (count !== 1) continue;
+    const parts = ek.split('|').map(Number);
+    const a = parts[0];
+    const b = parts[1];
+    const ja = bottomIdx(a);
+    const jb = bottomIdx(b);
+    indices.push(a, b, jb);
+    indices.push(a, jb, ja);
+  }
+
+  const geom = new T.BufferGeometry();
+  geom.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+  if (hasColor && colors.length === positions.length) {
+    geom.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+  }
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function worldPointsToMeshLocal(points, mesh, threeLib = null) {
   if (!mesh || !points?.length) return points;
+  const T = resolveThree(threeLib);
   mesh.updateMatrixWorld(true);
   const inv = mesh.matrixWorld.clone().invert();
-  const v = new THREE.Vector3();
+  const v = new T.Vector3();
   return points.map(function (p) {
     v.set(p.x, p.y, 0).applyMatrix4(inv);
-    return new THREE.Vector3(v.x, v.y, 0);
+    return new T.Vector3(v.x, v.y, 0);
   });
 }
 
@@ -7023,11 +7191,12 @@ function traceAllHoleBoundaries(holeMask) {
   return contours;
 }
 
-function maskContourToScenePoints(contour, maskOrigin, pixelScale, rasterScale) {
+function maskContourToScenePoints(contour, maskOrigin, pixelScale, rasterScale, threeLib = null) {
+  const T = resolveThree(threeLib);
   const rs = rasterScale || MASK_SCALE;
   const ps = pixelScale || 1;
   return contour.map(function (p) {
-    return new THREE.Vector3(
+    return new T.Vector3(
       maskOrigin.minX + (p.x * ps) / rs,
       maskOrigin.maxY - (p.y * ps) / rs,
       0
@@ -7114,7 +7283,16 @@ function mergeHoleMasks(a, b) {
   return any ? { grid: out, w: a.w, h: a.h, maskOrigin: a.maskOrigin } : null;
 }
 
-function silhouettePackFromSlabMask(slabMask, stoneMesh) {
+function silhouettePackFromSlabMask(slabMask, stoneMesh, threeLib = null) {
+  if (stoneMesh) {
+    const meshSil = rasterizeStoneMeshSilhouette(
+      stoneMesh,
+      BACK_CAP_MASK_SCALE,
+      BACK_CAP_MASK_MAX_PX,
+      threeLib
+    );
+    if (meshSil) return meshSil;
+  }
   if (slabMask?.grid) {
     return {
       grid: slabMask.grid,
@@ -7124,7 +7302,7 @@ function silhouettePackFromSlabMask(slabMask, stoneMesh) {
       maskScale: MASK_SCALE,
     };
   }
-  return rasterizeStoneMeshSilhouette(stoneMesh, BACK_CAP_MASK_SCALE, BACK_CAP_MASK_MAX_PX);
+  return null;
 }
 
 function contourSignedArea(pts) {
@@ -7148,8 +7326,65 @@ function normalizeHoleWinding(holePts, outerPts) {
   return holePts;
 }
 
-function buildStoneBackCapShape(slabMask, stoneMesh) {
-  const silPack = silhouettePackFromSlabMask(slabMask, stoneMesh);
+function collectBackCapHoleSources(silPack, slabMask, stoneMesh) {
+  const maskOrigin = silPack.maskOrigin;
+  const rasterScale = silPack.maskScale || MASK_SCALE;
+  const holeSources = [];
+
+  function pushHoleMask(holeMask, origin, scale) {
+    if (!holeMask?.grid) return;
+    holeSources.push({
+      mask: holeMask,
+      origin: origin || maskOrigin,
+      rasterScale: scale || rasterScale,
+    });
+  }
+
+  // Rendered stone mesh — authoritative XY cutouts (through-holes in the actual geometry).
+  if (stoneMesh) {
+    const meshSil = rasterizeStoneMeshSilhouette(
+      stoneMesh,
+      BACK_CAP_MASK_SCALE,
+      BACK_CAP_MASK_MAX_PX
+    );
+    if (meshSil) {
+      pushHoleMask(
+        buildHoleMaskFromSilhouetteGap(meshSil),
+        meshSil.maskOrigin,
+        meshSil.maskScale || rasterScale
+      );
+    }
+  }
+
+  if (silPack.rawGrid) {
+    pushHoleMask(buildHoleMaskFromSilhouetteGap(silPack), maskOrigin, rasterScale);
+  }
+
+  const maskPack = resolveSlabBackMask(slabMask, stoneMesh);
+  if (maskPack?.pierceHoleMask?.grid) {
+    const pierce = maskPack.pierceHoleMask;
+    const pierceOrigin = pierce.maskOrigin || maskOrigin;
+    const pierceScale = MASK_SCALE;
+    const meshHole = holeSources[0]?.mask;
+    if (
+      meshHole?.grid &&
+      meshHole.w === pierce.w &&
+      meshHole.h === pierce.h &&
+      holeSources[0]?.origin?.minX === pierceOrigin.minX &&
+      holeSources[0]?.origin?.minY === pierceOrigin.minY
+    ) {
+      holeSources[0].mask = mergeHoleMasks(meshHole, pierce);
+    } else {
+      pushHoleMask(pierce, pierceOrigin, pierceScale);
+    }
+  }
+
+  return holeSources;
+}
+
+function buildStoneBackCapShape(slabMask, stoneMesh, threeLib = null) {
+  const T = resolveThree(threeLib);
+  const silPack = silhouettePackFromSlabMask(slabMask, stoneMesh, threeLib);
   if (!silPack?.grid) return null;
 
   const boundaries = traceAllSilhouetteBoundaries(silPack.grid, silPack.w, silPack.h);
@@ -7158,38 +7393,11 @@ function buildStoneBackCapShape(slabMask, stoneMesh) {
   const maskOrigin = silPack.maskOrigin;
   const rasterScale = silPack.maskScale || MASK_SCALE;
   const outerContour = subsampleContourPtsPreserveCorners(
-    maskContourToScenePoints(boundaries[0], maskOrigin, 1, rasterScale),
+    maskContourToScenePoints(boundaries[0], maskOrigin, 1, rasterScale, threeLib),
     2.6
   );
 
-  let holeMask = buildHoleMaskFromSilhouetteGap(silPack);
-  const maskPack = resolveSlabBackMask(slabMask, stoneMesh);
-
-  const holeSources = [];
-  if (holeMask?.grid) {
-    holeSources.push({ mask: holeMask, origin: maskOrigin, rasterScale: rasterScale });
-  }
-  if (maskPack?.pierceHoleMask?.grid) {
-    const pierce = maskPack.pierceHoleMask;
-    const sameGrid =
-      holeMask?.grid && holeMask.w === pierce.w && holeMask.h === pierce.h;
-    if (!sameGrid) {
-      holeSources.push({
-        mask: pierce,
-        origin: pierce.maskOrigin || maskOrigin,
-        rasterScale: MASK_SCALE,
-      });
-    } else {
-      const merged = mergeHoleMasks(holeMask, pierce);
-      if (merged) {
-        holeSources[0] = {
-          mask: merged,
-          origin: pierce.maskOrigin || maskOrigin,
-          rasterScale: rasterScale,
-        };
-      }
-    }
-  }
+  const holeSources = collectBackCapHoleSources(silPack, slabMask, stoneMesh);
 
   let holeContours = [];
   for (const src of holeSources) {
@@ -7207,18 +7415,18 @@ function buildStoneBackCapShape(slabMask, stoneMesh) {
     });
   }
 
-  const shape = new THREE.Shape();
+  const shape = new T.Shape();
   appendShapePath(shape, outerContour);
 
   for (const holeEntry of holeContours) {
     const holeRaster = holeEntry.rasterScale || rasterScale;
     let holePts = subsampleContourPtsPreserveCorners(
-      maskContourToScenePoints(holeEntry.contour, holeEntry.origin, 1, holeRaster),
+      maskContourToScenePoints(holeEntry.contour, holeEntry.origin, 1, holeRaster, threeLib),
       2.0
     );
     if (holePts.length < 3) continue;
     holePts = normalizeHoleWinding(holePts, outerContour);
-    const holePath = new THREE.Path();
+    const holePath = new T.Path();
     appendShapePath(holePath, holePts);
     shape.holes.push(holePath);
   }
@@ -7308,23 +7516,38 @@ function buildStoneSilhouetteContour(slabMask, stoneMesh) {
   return worldPointsToMeshLocal(worldPts, stoneMesh);
 }
 
+function meshMaterial(obj) {
+  if (!obj?.material) return null;
+  return Array.isArray(obj.material) ? obj.material[0] : obj.material;
+}
+
 function findPrimaryStoneMesh(root) {
   if (!root) return null;
   let best = null;
-  let bestCount = 0;
+  let bestScore = -1;
+  let colorBest = null;
+  let colorBestCount = 0;
   root.traverse(function (obj) {
     if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
     if (obj.name === 'stoneBackCap') return;
-    const mat = obj.material;
+    const mat = meshMaterial(obj);
     const metalness = mat?.metalness ?? 0;
-    if (metalness > 0.35) return;
     const count = obj.geometry.attributes.position.count;
-    if (count > bestCount) {
-      bestCount = count;
+    const hasVertexColors = Boolean(obj.geometry.attributes.color);
+    if (hasVertexColors && count > colorBestCount) {
+      colorBestCount = count;
+      colorBest = obj;
+    }
+    if (metalness > 0.45) return;
+    let score = count;
+    if (hasVertexColors) score += count * 2;
+    if (metalness < 0.15) score += count * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
       best = obj;
     }
   });
-  return best;
+  return best || colorBest;
 }
 
 function sceneHasStoneBackCap(root) {
@@ -7336,33 +7559,39 @@ function sceneHasStoneBackCap(root) {
   return found;
 }
 
-/** Thin flat back cap — same stone material + pierce holes as the slab. */
-function buildStoneSlabBackCapMesh(stoneMesh, slabMask, material) {
+/** Conforming stone back shell — sampled from stone mesh; flat extrude is fallback only. */
+function buildStoneSlabBackCapMesh(stoneMesh, slabMask, material, threeLib = null) {
+  const T = resolveThree(threeLib);
   if (!stoneMesh?.geometry || !material) return null;
-  const shape = buildStoneBackCapShape(slabMask, stoneMesh);
-  if (!shape) return null;
+  const matForColors = Array.isArray(material) ? material[0] : material;
 
-  stoneMesh.geometry.computeBoundingBox();
-  const backZ = stoneMesh.geometry.boundingBox.min.z;
+  let capGeom = buildConformingStoneBackCapGeometry(stoneMesh, STONE_BACK_CAP_DEPTH, threeLib);
+  if (!capGeom) {
+    const shape = buildStoneBackCapShape(slabMask, stoneMesh, threeLib);
+    if (!shape) return null;
 
-  const capGeom = new THREE.ExtrudeGeometry(shape, {
-    depth: STONE_BACK_CAP_DEPTH,
-    bevelEnabled: false,
-    curveSegments: 8,
-    steps: 1,
-  });
-  capGeom.translate(0, 0, backZ - STONE_BACK_CAP_DEPTH);
-  capGeom.computeVertexNormals();
-  applyBackCapVertexColors(capGeom, stoneMesh, material);
+    stoneMesh.geometry.computeBoundingBox();
+    const backZ = stoneMesh.geometry.boundingBox.min.z;
 
-  const capMesh = new THREE.Mesh(capGeom, material);
+    capGeom = new T.ExtrudeGeometry(shape, {
+      depth: STONE_BACK_CAP_DEPTH,
+      bevelEnabled: false,
+      curveSegments: 12,
+      steps: 1,
+    });
+    capGeom.translate(0, 0, backZ - STONE_BACK_CAP_DEPTH);
+    applyBackCapVertexColors(capGeom, stoneMesh, matForColors);
+    capGeom.computeVertexNormals();
+  }
+
+  const capMesh = new T.Mesh(capGeom, material);
   capMesh.name = 'stoneBackCap';
   capMesh.renderOrder = (stoneMesh.renderOrder || STONE_RENDER_ORDER) - 1;
   capMesh.layers.mask = stoneMesh.layers.mask;
   return capMesh;
 }
 
-function attachStoneSlabBackCap(stoneMesh, slabMask, material) {
+function attachStoneSlabBackCap(stoneMesh, slabMask, material, threeLib = null) {
   if (!stoneMesh) return null;
   removeStoneBackCapFromMesh(stoneMesh);
   if (slabMask) {
@@ -7374,28 +7603,55 @@ function attachStoneSlabBackCap(stoneMesh, slabMask, material) {
       grid: slabMask.grid || null,
     };
   }
-  const backCap = buildStoneSlabBackCapMesh(stoneMesh, slabMask, material);
-  if (!backCap) return null;
+  let capMaterial = material;
+  if (threeLib && material) {
+    const T = resolveThree(threeLib);
+    if (Array.isArray(material)) {
+      capMaterial = material.map(function (m) {
+        const clone = m.clone();
+        clone.side = T.DoubleSide;
+        clone.needsUpdate = true;
+        return clone;
+      });
+    } else if (material.clone) {
+      capMaterial = material.clone();
+      capMaterial.side = T.DoubleSide;
+      capMaterial.needsUpdate = true;
+    }
+  }
+  const backCap = buildStoneSlabBackCapMesh(stoneMesh, slabMask, capMaterial, threeLib);
+  if (!backCap) {
+    console.warn('[stoneBackCap] build failed', {
+      mesh: stoneMesh.name,
+      verts: stoneMesh.geometry?.attributes?.position?.count,
+    });
+    return null;
+  }
   stoneMesh.add(backCap);
   stoneMesh.userData.stoneBackCap = backCap;
   return backCap;
 }
 
 /** Add a flat stone back to loaded GLB scenes that were saved before this feature. */
-export function ensureStoneBackCapForScene(root) {
+export function ensureStoneBackCapForScene(root, threeLib = null) {
   if (!root) return false;
-  if (sceneHasStoneBackCap(root)) return true;
   const stoneMesh = findPrimaryStoneMesh(root);
-  if (!stoneMesh?.material) return false;
-  const material = stoneMesh.material;
-  requestAnimationFrame(function () {
+  const rawMaterial = stoneMesh?.material;
+  if (!rawMaterial) return false;
+  removeStoneBackCapFromMesh(stoneMesh);
+  const attach = function () {
     try {
-      if (sceneHasStoneBackCap(root)) return;
-      attachStoneSlabBackCap(stoneMesh, null, material);
+      if (sceneHasStoneBackCap(root)) return true;
+      return Boolean(attachStoneSlabBackCap(stoneMesh, null, rawMaterial, threeLib));
     } catch (err) {
       console.warn('[stoneBackCap] deferred build failed', err);
+      return false;
     }
-  });
+  };
+  if (threeLib) {
+    return attach();
+  }
+  requestAnimationFrame(attach);
   return true;
 }
 
@@ -9478,6 +9734,30 @@ async function renderPbrCore(svg, opts) {
   };
 }
 
+/** Warm WebGL + env + stone/ceramic caches while the user is still on late questionnaire steps. */
+export async function warmPbrRenderAssets(opts = {}) {
+  await yieldToMainThread();
+  const renderer = getOrCreateRenderer();
+  const tempScene = new THREE.Scene();
+  const envMap = setupEnvironment(renderer, tempScene);
+  disposeScene(tempScene);
+
+  const belief = opts.q4Belief || 'signs';
+  const preset = q4StonePreset(belief);
+  buildProceduralStoneTextures(preset);
+
+  if (belief === 'support') {
+    buildBasaltStoneTextures();
+  }
+
+  const q5 = opts.q5Feeling || 'hope';
+  if (envMap) {
+    buildCeramicQ1MaterialFromQ5(q5, envMap);
+  }
+
+  await yieldToMainThread();
+}
+
 /**
  * @param {{ svg: string, style2: object|null, style3: object, container: HTMLElement }} opts
  */
@@ -9744,57 +10024,96 @@ export function zoomActivePbrPresentation(factor) {
   return true;
 }
 
-export function captureLiveAmuletSnapshot() {
-  const renderer = active.renderer;
+/**
+ * Garden snapshot — frontal view, live buffer size (no resize — avoids breaking the active canvas).
+ */
+export function captureGardenSnapshotFromActivePbr() {
+  return captureLiveAmuletSnapshot();
+}
+
+function withFrontalAmuletView(callback) {
   const scene = active.scene;
-  const camera = active.camera;
-  if (!renderer || !scene || !camera) return null;
+  const interactive = active.interactive;
+  if (interactive?.getRotation && interactive?.setRotation) {
+    const saved = interactive.getRotation();
+    interactive.setRotation(0, 0);
+    try {
+      return callback();
+    } finally {
+      interactive.setRotation(saved.x, saved.y);
+    }
+  }
+  if (scene) {
+    const savedX = scene.rotation.x;
+    const savedY = scene.rotation.y;
+    scene.rotation.x = 0;
+    scene.updateMatrixWorld(true);
+    try {
+      return callback();
+    } finally {
+      scene.rotation.x = savedX;
+      scene.rotation.y = savedY;
+      scene.updateMatrixWorld(true);
+    }
+  }
+  return callback();
+}
 
-  renderer.render(scene, camera);
+export function captureLiveAmuletSnapshot() {
+  return withFrontalAmuletView(function () {
+    const renderer = active.renderer;
+    const scene = active.scene;
+    const camera = active.camera;
+    if (!renderer || !scene || !camera) return null;
 
-  const dom = renderer.domElement;
-  const w = dom.width;
-  const h = dom.height;
-  if (!w || !h) return null;
+    renderer.render(scene, camera);
 
-  const snap = document.createElement('canvas');
-  snap.width = w;
-  snap.height = h;
-  const ctx = snap.getContext('2d', { alpha: true });
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(dom, 0, 0);
-  return snap;
+    const dom = renderer.domElement;
+    const w = dom.width;
+    const h = dom.height;
+    if (!w || !h) return null;
+
+    const snap = document.createElement('canvas');
+    snap.width = w;
+    snap.height = h;
+    const ctx = snap.getContext('2d', { alpha: true });
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(dom, 0, 0);
+    return snap;
+  });
 }
 
 export function captureHighResSnapshot(targetPx) {
-  const renderer = active.renderer;
-  const scene = active.scene;
-  const camera = active.camera;
-  if (!renderer || !scene || !camera) return captureLiveAmuletSnapshot();
-  targetPx = targetPx || 4096;
+  return withFrontalAmuletView(function () {
+    const renderer = active.renderer;
+    const scene = active.scene;
+    const camera = active.camera;
+    if (!renderer || !scene || !camera) return captureLiveAmuletSnapshot();
+    targetPx = targetPx || 4096;
 
-  const dom = renderer.domElement;
-  const origDPR = renderer.getPixelRatio();
-  const origBufferW = dom.width;
-  const origBufferH = dom.height;
-  const cssW = dom.clientWidth || origBufferW / Math.max(origDPR, 1);
-  const cssH = dom.clientHeight || origBufferH / Math.max(origDPR, 1);
+    const dom = renderer.domElement;
+    const origDPR = renderer.getPixelRatio();
+    const origBufferW = dom.width;
+    const origBufferH = dom.height;
+    const cssW = Math.max(1, dom.clientWidth || origBufferW / Math.max(origDPR, 1));
+    const cssH = Math.max(1, dom.clientHeight || origBufferH / Math.max(origDPR, 1));
 
-  renderer.setPixelRatio(1);
-  renderer.setSize(targetPx, targetPx, false);
-  renderer.setClearColor(0x000000, 0);
-  renderer.render(scene, camera);
+    renderer.setPixelRatio(1);
+    renderer.setSize(targetPx, targetPx, false);
+    renderer.setClearColor(0x000000, 0);
+    renderer.render(scene, camera);
 
-  const snap = document.createElement('canvas');
-  snap.width = targetPx;
-  snap.height = targetPx;
-  snap.getContext('2d', { alpha: true }).drawImage(dom, 0, 0);
+    const snap = document.createElement('canvas');
+    snap.width = targetPx;
+    snap.height = targetPx;
+    snap.getContext('2d', { alpha: true }).drawImage(dom, 0, 0);
 
-  renderer.setPixelRatio(origDPR);
-  renderer.setSize(cssW, cssH, false);
-  renderer.setClearColor(0x000000, 0);
-  renderer.render(scene, camera);
-  return snap;
+    renderer.setPixelRatio(origDPR);
+    renderer.setSize(cssW, cssH, false);
+    renderer.setClearColor(0x000000, 0);
+    renderer.render(scene, camera);
+    return snap;
+  });
 }
 
 /**

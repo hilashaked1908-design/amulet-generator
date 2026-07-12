@@ -141,30 +141,34 @@ export function needsVectorFrameLoad(answers) {
   return willShowNewVectorLayer(answers) || needsVectorCatchup(answers);
 }
 
-function scheduleBackgroundPrecompose(answers) {
+function scheduleBackgroundPrecompose(answers, options = {}) {
   const token = ++precomposeToken;
+  const urgent = options.urgent === true;
+  const delayMs = urgent ? 0 : 280;
+  const idleTimeout = urgent ? 600 : 2800;
 
-  function runPrecompose() {
+  function run() {
     if (token !== precomposeToken) return;
     void import('./amulet-final-render.js')
       .then(function (finalMod) {
         if (token !== precomposeToken) return;
-        return finalMod.precomposeForFinalRender(answers);
+        return finalMod.warmFinalRenderPipeline(answers, {
+          precompose: Boolean(answers.q7Change?.trim()),
+        });
       })
       .catch(function (err) {
-        console.warn('[create] precompose failed', err);
+        console.warn('[create] warm/precompose failed', err);
       });
   }
 
-  /* Let the next-question transition paint before heavy SVG compose. */
   window.setTimeout(function () {
     if (token !== precomposeToken) return;
     if (typeof requestIdleCallback === 'function') {
-      requestIdleCallback(runPrecompose, { timeout: 4000 });
+      requestIdleCallback(run, { timeout: idleTimeout });
     } else {
-      runPrecompose();
+      window.setTimeout(run, urgent ? 0 : 400);
     }
-  }, 400);
+  }, delayMs);
 }
 
 function scheduleDeferredPreviewUpdate(answers, options) {
@@ -186,9 +190,15 @@ function scheduleDeferredPreviewUpdate(answers, options) {
   });
 }
 
-export function scheduleAmuletPrecompose(answers) {
+export function scheduleAmuletPrecompose(answers, options = {}) {
   if (!answers?.q1Wish?.trim()) return;
-  scheduleBackgroundPrecompose(answers);
+  scheduleBackgroundPrecompose(answers, options);
+}
+
+/** Warm PBR assets while user is on Q7/Q8 — no visible change, faster final render. */
+export function warmAmuletRenderPipeline(answers, options = {}) {
+  if (!answers?.q1Wish?.trim()) return;
+  scheduleBackgroundPrecompose(answers, Object.assign({ urgent: true }, options));
 }
 
 async function ensureVectorStage(answers, container, stage, signal, token) {
@@ -296,7 +306,9 @@ export async function updateAmuletPreview(answers, options = {}) {
   const shouldShowLoader = showLoader && newLayerVisible;
 
   if (shouldShowLoader) {
-    await showAmuletLoader('טוען קמע', { keepPreview: true });
+    await showAmuletLoader('טוען קמע', {
+      keepPreview: options.keepPreview !== false,
+    });
   }
 
   if (newLayerVisible && typeof window.pagmarHideCreateAmuletMorph === 'function') {
@@ -376,6 +388,7 @@ window.amuletBuildCancel = cancelAmuletBuild;
 window.amuletClearBuildUi = clearAmuletBuildUi;
 window.amuletShowTextureLoading = showTextureLoadingState;
 window.amuletSchedulePrecompose = scheduleAmuletPrecompose;
+window.amuletWarmRenderPipeline = warmAmuletRenderPipeline;
 window.amuletPreloadCompose = initAmuletCompose;
 
 void preloadLoaderGallerySpin();

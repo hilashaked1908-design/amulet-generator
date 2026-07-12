@@ -41,9 +41,21 @@ function drawWrappedText(ctx, text, x, boxBottom, maxWidth, maxHeight, specKey) 
   drawFittedTextBlock(ctx, fit, x, boxBottom, true);
 }
 
-function getUnitScale(cardEl) {
+function getUnitScale(cardEl, options) {
+  options = options || {};
+  if (options.composeUnit > 0) return options.composeUnit;
+
   const rect = cardEl.getBoundingClientRect();
-  return rect.width / 800;
+  if (rect.width > 0) return rect.width / 800;
+
+  const main = document.querySelector('.pagmar__export-main');
+  if (main) {
+    const mr = main.getBoundingClientRect();
+    const u = Math.min(mr.width / 1920, mr.height / 1080);
+    if (u > 0) return u;
+  }
+
+  return Math.min(window.innerWidth / 1920, window.innerHeight / 1080) || 1;
 }
 
 export async function composeExportCardPng(options) {
@@ -51,7 +63,7 @@ export async function composeExportCardPng(options) {
   const card = document.getElementById('exportCard');
   if (!card) throw new Error('export card missing');
 
-  const u = getUnitScale(card);
+  const u = getUnitScale(card, options);
   const outW = Math.round(800 * u * (options.scale || 2));
   const outH = Math.round(800 * u * (options.scale || 2));
   const canvas = document.createElement('canvas');
@@ -64,12 +76,14 @@ export async function composeExportCardPng(options) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, 800, 800);
 
-  const fogCanvas = document.querySelector('#exportFogHost .pagmar__detail-fog-canvas');
-  if (fogCanvas?.width) {
-    ctx.save();
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(fogCanvas, -80, -80, 960, 960);
-    ctx.restore();
+  if (!options.skipFog) {
+    const fogCanvas = document.querySelector('#exportFogHost .pagmar__detail-fog-canvas');
+    if (fogCanvas?.width) {
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(fogCanvas, -80, -80, 960, 960);
+      ctx.restore();
+    }
   }
 
   ctx.strokeStyle = '#f4f4e8';
@@ -147,6 +161,8 @@ export async function composeExportCardPng(options) {
     );
   }
 
-  exportCanvasAsTransparentPng(canvas, { filename: options.filename || 'amulet-card' });
+  if (options.download !== false) {
+    exportCanvasAsTransparentPng(canvas, { filename: options.filename || 'amulet-card' });
+  }
   return canvas;
 }

@@ -679,7 +679,7 @@ body.is-result-overlay-open {
 body.is-result-overlay-open .pagmar__index-create,
 body.is-result-overlay-open .pagmar__stage,
 body.is-result-overlay-open .pagmar__index-cta-pill,
-body.is-result-overlay-open .pagmar__index-about,
+body.is-result-overlay-open #indexAboutBtn,
 body.is-result-overlay-open .pagmar__index-filter-sidebar,
 body.is-result-overlay-open .pagmar__create-flow,
 body.is-result-overlay-open .pagmar__export-btn {

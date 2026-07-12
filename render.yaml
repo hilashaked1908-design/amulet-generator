@@ -2,10 +2,21 @@ services:
   - type: web
     name: amulet-generator
     runtime: python
-    plan: free
+    # Persistent disks require a paid instance type (free has ephemeral storage).
+    plan: starter
     buildCommand: echo "no build"
     startCommand: python server.py
     healthCheckPath: /api/server-info
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
+      # Generator output (exports/glyphs/connections.json) is written here so it
+      # survives redeploys/restarts. Must match the disk mountPath below.
+      - key: DATA_DIR
+        value: /var/data
+    # RENDER_EXTERNAL_URL is injected automatically by Render and is used by
+    # server.py (get_public_origin) to build correct QR/share links.
+    disk:
+      name: amulet-data
+      mountPath: /var/data
+      sizeGB: 1

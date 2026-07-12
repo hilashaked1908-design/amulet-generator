@@ -2,7 +2,7 @@
  * Signed-distance sculptural mesh extraction (marching cubes + Laplacian smooth).
  * Marching cubes tables: Paul Bourke / Mikola Lysenko (isosurface).
  */
-import * as THREE from 'https://esm.sh/three@0.170.0';
+import * as THREE from './questionnaire/vendor/three.module.js';
 import { yieldToMainThread } from './render-yield.js';
 import {
   PREMIUM_MATERIAL_IDS,
@@ -13,7 +13,7 @@ import {
   normalizePremiumMaterialId,
   getPremiumMaterialSpec,
 } from './amulet-material-presets.js';
-import { mergeVertices } from 'https://esm.sh/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeVertices } from './questionnaire/vendor/BufferGeometryUtils.js';
 
 function isMeteoriteStonePreset(params) {
   return (

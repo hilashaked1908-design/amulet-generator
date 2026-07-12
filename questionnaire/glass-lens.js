@@ -93,15 +93,6 @@
       return fogHost ? fogHost.querySelector('.pagmar__detail-fog-canvas') : null;
     }
 
-    if (mode === 'open-amulet') {
-      const captureCanvas = document.getElementById('openGlassCapture');
-      if (captureCanvas && captureCanvas.width > 0) return captureCanvas;
-
-      const amuletCanvas = document.querySelector('.pagmar-open__amulet-3d canvas');
-      if (amuletCanvas && amuletCanvas.width > 0) return amuletCanvas;
-      return null;
-    }
-
     if (mode === 'export-fog') {
       const fogHost = document.getElementById('exportFogHost');
       return fogHost ? fogHost.querySelector('.pagmar__detail-fog-canvas') : null;
@@ -152,7 +143,7 @@
     const lensRect = lensEl.getBoundingClientRect();
     if (lensRect.width < 1 || lensRect.height < 1) return;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(1, Math.round(lensRect.width * dpr));
     const h = Math.max(1, Math.round(lensRect.height * dpr));
 

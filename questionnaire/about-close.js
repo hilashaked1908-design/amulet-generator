@@ -42,10 +42,25 @@
     });
   }
 
+  var aboutChromeBtn = document.getElementById('aboutChromeAboutBtn');
+  if (aboutChromeBtn) {
+    aboutChromeBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAbout();
+    });
+  }
+
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !document.getElementById('aboutOverlay')?.hidden) {
       e.preventDefault();
       closeAbout();
     }
   });
+
+  if (new URLSearchParams(window.location.search).get('about') === '1') {
+    window.requestAnimationFrame(function () {
+      openAbout();
+    });
+  }
 })();

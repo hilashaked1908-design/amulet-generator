@@ -15,6 +15,7 @@ import {
 
 let cachedCompose = null;
 let cachedComposeKey = '';
+let warmPipelineToken = 0;
 
 function composeCacheKey(answers) {
   return [
@@ -35,14 +36,45 @@ export function invalidateComposeCache() {
 
 window.amuletInvalidateComposeCache = invalidateComposeCache;
 
+/** Background warm-up: connections, SVG compose, PBR textures — same output, less wait at Q8. */
+export async function warmFinalRenderPipeline(answers, options = {}) {
+  if (!answers?.q1Wish?.trim()) return;
+  const token = ++warmPipelineToken;
+  const precompose = options.precompose !== false;
+
+  try {
+    await initAmuletCompose();
+    if (token !== warmPipelineToken) return;
+
+    const pbrMod = await import('../three-pbr-amulet.js');
+    if (token !== warmPipelineToken) return;
+
+    await pbrMod.warmPbrRenderAssets({
+      q4Belief: answers.q4Belief,
+      q5Feeling: answers.q5Feeling,
+      q6Difficulty: answers.q6Difficulty,
+    });
+    if (token !== warmPipelineToken) return;
+
+    if (precompose && answers.q7Change?.trim()) {
+      await precomposeForFinalRender(answers);
+    }
+  } catch (err) {
+    console.warn('[amulet] warm pipeline failed', err);
+  }
+}
+
 /** Background SVG compose while user answers Q4-Q6 (no textures yet). */
 export async function precomposeForFinalRender(answers) {
   if (!answers?.q1Wish?.trim()) return;
   try {
     await initAmuletCompose();
+    await yieldToMainThread();
     const key = composeCacheKey(answers);
     if (cachedComposeKey === key && cachedCompose) return;
-    cachedCompose = await composeFullAmuletForPbr(answers);
+    cachedCompose = await deferToNextTask(function () {
+      return composeFullAmuletForPbr(answers);
+    });
     cachedComposeKey = key;
   } catch (err) {
     console.warn('[amulet] precompose failed', err);

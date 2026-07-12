@@ -314,7 +314,7 @@
     return '\u05F4' + t + '\u05F4';
   }
 
-  function renderDetail(index, entry) {
+  function renderDetail(index, entry, imgSrcOverride) {
     if (typeof window.getAmuletSpec !== 'function') return;
 
     var entryId =
@@ -334,19 +334,23 @@
     }
 
     const spec = window.getAmuletSpec(index, null, recordOverride || undefined);
-    var imgSrc = null;
-    if (entryId != null) {
-      imgSrc = '/questionnaire/seed/snapshots/' + entryId + '.png';
-    }
-    if (entry && entry.id != null && entry.id == entryId && entry.snapshot) {
-      if (
-        String(entry.snapshot).indexOf('/questionnaire/seed/') === 0 &&
-        String(entry.snapshot).indexOf('/' + entryId + '.') !== -1
-      ) {
+    var imgSrc = imgSrcOverride || null;
+    if (!imgSrc && entry && entry.id != null && entry.id == entryId && entry.snapshot) {
+      if (String(entry.snapshot).indexOf('data:') === 0) {
         imgSrc = entry.snapshot;
       } else if (String(entry.snapshot).indexOf('/questionnaire/seed/') !== 0) {
         imgSrc = entry.snapshot;
+      } else if (String(entry.snapshot).indexOf('/' + entryId + '.') !== -1) {
+        imgSrc = entry.snapshot;
       }
+    }
+    if (
+      !imgSrc &&
+      entryId != null &&
+      window.__pagmarDetailSnapshotByEntryId &&
+      window.__pagmarDetailSnapshotByEntryId[entryId]
+    ) {
+      imgSrc = window.__pagmarDetailSnapshotByEntryId[entryId];
     }
 
     if (detailNumText) detailNumText.textContent = indexLabel(index);
@@ -428,11 +432,6 @@
     const index = parseIndex();
 
     try {
-      if (index < USER_AMULET_INDEX) {
-        window.location.replace('index.html');
-        return;
-      }
-
       await preloadDetailContext(index);
       var navPayload = readNavPayloadForEntry(resolvedDetailEntryId);
       var displayIndex =
@@ -453,7 +452,19 @@
       var entry = buildDetailEntry(resolvedDetailEntryId, collectionEntry);
       if (!entry) entry = resolveEntryForDetail(displayIndex);
       if (entry && entry.id != null) resolvedDetailEntryId = entry.id;
-      renderDetail(displayIndex, entry);
+
+      var snapshotUrl = null;
+      try {
+        var resolveMod = await import('./amulet-entry-resolve.js');
+        var seedMap = await resolveMod.ensureSeedEntryMap();
+        snapshotUrl = await resolveMod.resolveDetailSnapshotUrlAsync(
+          resolvedDetailEntryId,
+          entry,
+          seedMap
+        );
+      } catch (_) {}
+
+      renderDetail(displayIndex, entry, snapshotUrl);
       Promise.all([
         waitForImage(detailAmuletImg),
         waitForImage(document.getElementById('detailAmuletImgBack')),

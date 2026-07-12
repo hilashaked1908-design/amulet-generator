@@ -201,7 +201,8 @@
       var entryMatch = location.search.match(/[?&]entry=(\d+)/);
       var entryId = entryMatch ? parseInt(entryMatch[1], 10) : null;
       if (entryId != null && Number.isFinite(entryId)) {
-        var preloadGlbUrl = '/questionnaire/seed/glbs/' + entryId + '.glb';
+        var preloadGlbUrl = null;
+        var preloadSnapUrl = null;
         try {
           var glbMatch = location.search.match(/[?&]glb=([^&]+)/);
           if (glbMatch && glbMatch[1]) {
@@ -223,16 +224,19 @@
             }
           }
         } catch (_) {}
-        [
-          { as: 'fetch', href: preloadGlbUrl },
-          { as: 'image', href: '/questionnaire/seed/snapshots/' + entryId + '.png' },
-        ].forEach(function (item) {
-          var link = document.createElement('link');
-          link.rel = 'preload';
-          link.as = item.as;
-          link.href = item.href;
-          document.head.appendChild(link);
-        });
+        if (preloadGlbUrl && preloadGlbUrl.indexOf('/seed/glbs/') !== -1) {
+          preloadSnapUrl = '/questionnaire/seed/snapshots/' + entryId + '.png';
+          [
+            { as: 'fetch', href: preloadGlbUrl },
+            { as: 'image', href: preloadSnapUrl },
+          ].forEach(function (item) {
+            var link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = item.as;
+            link.href = item.href;
+            document.head.appendChild(link);
+          });
+        }
       } else {
         var idMatch = location.search.match(/[?&]id=(\d+)/);
         var detailId = idMatch ? parseInt(idMatch[1], 10) : -1;
@@ -512,11 +516,11 @@
   <script defer src="amulet-catalog.js?v=20250710-detail-entry"></script>
   <script defer src="../connection-core.js"></script>
   <script defer src="glass-lens.js?v=20250710-glass-blur-distort"></script>
-  <script defer src="amulet-detail.js?v=20250711-entry-authority"></script>
+  <script defer src="amulet-detail.js?v=20250712-user-snapshot"></script>
   <script defer src="amulet-detail-hover.js?v=20250709-clone-all"></script>
   <script defer src="amulet-detail-question-hover.js?v=20250709-glass-question-tip"></script>
   <script type="module">
-    import('./amulet-detail-scene.js?v=20250711-glb-url-authority').catch(function (err) {
+    import('./amulet-detail-scene.js?v=20250712-user-glb-first').catch(function (err) {
       console.warn('[amulet-detail] scene boot failed', err);
     });
   </script>

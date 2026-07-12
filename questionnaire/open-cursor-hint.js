@@ -14,7 +14,7 @@
   tip.className = 'pagmar-open__cursor-hint pagmar__garden-amulet-hover';
   tip.setAttribute('aria-hidden', 'true');
   tip.innerHTML =
-    '<div class="pagmar__garden-amulet-hover__surface glass-tooltip glass-lens" data-glass-source="open-amulet">' +
+    '<div class="pagmar__garden-amulet-hover__surface glass-tooltip glass-lens" data-glass-source="garden">' +
     '<div class="glass-lens__backdrop" aria-hidden="true">' +
     '<div class="glass-clone" aria-hidden="true">' +
     '<canvas class="glass-clone__capture" aria-hidden="true"></canvas>' +
@@ -30,8 +30,24 @@
   document.body.appendChild(tip);
 
   var surface = tip.querySelector('.pagmar__garden-amulet-hover__surface');
-  if (window.pagmarGlassLens && surface) {
+
+  function registerOpenGlass() {
+    if (!window.pagmarGlassLens || !surface) return false;
     window.pagmarGlassLens.register(surface);
+    return true;
+  }
+
+  function waitForGardenCanvas() {
+    var gardenCanvas = document.querySelector('#openGlassGarden canvas');
+    if (gardenCanvas && gardenCanvas.width > 0) {
+      registerOpenGlass();
+      return;
+    }
+    requestAnimationFrame(waitForGardenCanvas);
+  }
+
+  if (!registerOpenGlass()) {
+    waitForGardenCanvas();
   }
 
   var targetX = -9999;

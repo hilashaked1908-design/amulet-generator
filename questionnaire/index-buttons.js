@@ -1,6 +1,6 @@
 /**
  * Index chrome buttons - Figma 2601:40649.
- * Terminal-style typewriter on load for CTA + filter labels; about is icon-only.
+ * Terminal-style typewriter on load for CTA + filter labels; about is text + underline hover.
  */
 (function () {
   'use strict';
@@ -598,6 +598,9 @@
   if (shouldRunInitialChromeTyping()) {
     if (filterTrigger) {
       restoreStaticTypeText(filterTrigger.querySelector('.pagmar__index-filter-trigger__label'));
+    }
+    if (aboutBtn) {
+      restoreStaticTypeText(aboutBtn.querySelector('.pagmar__index-about__label'));
     }
     if (ctaLabel) {
       resetTypeTargetForTyping(ctaLabel);

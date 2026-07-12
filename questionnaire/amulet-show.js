@@ -8,7 +8,7 @@ import {
   setAmuletLoaderProgress,
 } from './amulet-loader.js';
 import { exportAmuletCanvasPng, exportCanvasAsTransparentPng } from './amulet-export.js';
-import { captureLiveAmuletSnapshot, zoomActivePbrPresentation } from '../three-pbr-amulet.js';
+import { captureGardenSnapshotFromActivePbr, captureLiveAmuletSnapshot, zoomActivePbrPresentation } from '../three-pbr-amulet.js';
 import { renderResultOverlayVectors } from './amulet-detail-vectors.js?v=20250708-vector-raster-fix';
 
 const STORAGE_KEY = 'amuletQuestionnaire';
@@ -464,6 +464,8 @@ function mountLiveCreateCanvasInSlot(slot, sourceCanvas) {
   }
   slot.appendChild(sourceCanvas);
   capturePresentedSnapshot = function () {
+    const snap = captureGardenSnapshotFromActivePbr();
+    if (snap?.width && snap?.height) return snap;
     return cloneCanvasSnapshot(sourceCanvas);
   };
   disposePresentedAmulet = null;
@@ -493,8 +495,13 @@ async function mountResultAmuletLikeDetail(slot, glbKey, options) {
     window.setTimeout(resolve, 80);
   });
 
-  await present.mountDetailStyleAmulet(slot, glbKey, mountOpts);
-  return true;
+  try {
+    await present.mountDetailStyleAmulet(slot, glbKey, mountOpts);
+    return true;
+  } catch (retryErr) {
+    console.warn('[amulet-show] detail mount retry failed', retryErr);
+    return false;
+  }
 }
 
 function yieldToMainThread() {
@@ -572,6 +579,8 @@ async function showResultOverlay(container, answers) {
       try {
         slot.appendChild(liveCanvas);
         capturePresentedSnapshot = function () {
+          const snap = captureGardenSnapshotFromActivePbr();
+          if (snap?.width && snap?.height) return snap;
           return cloneCanvasSnapshot(liveCanvas);
         };
         disposePresentedAmulet = null;
@@ -843,10 +852,14 @@ async function saveAmuletAndReturnHome(container, answers, options) {
   }
 
   try {
-    const sprite = await window.gardenAddUserAmulet(canvasForGarden, Object.assign(await gardenSaveOptions(finalAnswers), {
-      focusAfterPlace: true,
-      finalize: true,
-    }));
+    const saveEntryId = peekPendingEntryId();
+    const sprite = await window.gardenAddUserAmulet(
+      canvasForGarden,
+      Object.assign(await gardenSaveOptions(finalAnswers, saveEntryId), {
+        focusAfterPlace: true,
+        finalize: true,
+      })
+    );
     if (!sprite) {
       setStatus('לא הצלחנו לשמור את הקמע', true);
       return false;
@@ -1050,13 +1063,23 @@ export async function showFinishedAmulet(answersOverride) {
     }
     console.log('[amulet] starting prototype PBR render');
 
-    const saveEntryId = await allocateSaveEntryId();
+    const saveEntryIdPromise = allocateSaveEntryId();
+    const resultOverlayPrefetch = Promise.all([
+      import('./result-overlay-fog.js?v=20250709-result-layout'),
+      import('./amulet-detail-present.js?v=20250705-save-fix5'),
+      import('./result-overlay-hover.js?v=20250710-result-glass-360'),
+      import('./result-overlay-question-hover.js?v=20250710-result-tag-hover'),
+    ]);
+
+    const saveEntryId = await saveEntryIdPromise;
     await renderFinalAmuletLikePrototype(answers, container, function (frac) {
       if (token !== renderToken) return;
       setAmuletLoaderProgress(frac);
     }, { entryId: saveEntryId });
 
     if (token !== renderToken) return;
+
+    await resultOverlayPrefetch.catch(function () {});
 
     if (zone) zone.classList.remove('is-textures-loading');
 
@@ -1365,11 +1388,15 @@ export async function finishPendingSaveOnIndex() {
   const gardenReady = await waitForGardenAdd(8000);
   if (!gardenReady) return false;
 
+  const saveEntryId = peekPendingEntryId();
   try {
-    const sprite = await window.gardenAddUserAmulet(canvas, Object.assign(await gardenSaveOptions(answers), {
-      focusAfterPlace: true,
-      finalize: true,
-    }));
+    const sprite = await window.gardenAddUserAmulet(
+      canvas,
+      Object.assign(await gardenSaveOptions(answers, saveEntryId), {
+        focusAfterPlace: true,
+        finalize: true,
+      })
+    );
     if (!sprite) return false;
     document.body.classList.add('has-user-amulet');
     persistCompletedQuestionnaire(answers);

@@ -91,6 +91,58 @@ export function canonicalSeedSnapshotUrl(entryId) {
   return '/questionnaire/seed/snapshots/' + entryId + '.png';
 }
 
+/** Snapshot URL from a collection entry record (data URL, IDB-backed preview, or seed path). */
+export function snapshotUrlFromEntryRecord(entryId, entryRecord) {
+  if (!entryRecord || !entryRecord.snapshot) return null;
+  const snap = String(entryRecord.snapshot);
+  if (!snap) return null;
+  if (snap.indexOf('data:') === 0 || snap.indexOf('blob:') === 0) return snap;
+  if (snap.indexOf('/seed/snapshots/') !== -1) {
+    return entryId != null && snap.indexOf('/' + entryId + '.') !== -1 ? snap : null;
+  }
+  if (entryId != null && snap.indexOf('/' + entryId + '.') !== -1) return snap;
+  if (snap.indexOf('/questionnaire/seed/') !== 0) return snap;
+  return null;
+}
+
+/** Sync snapshot URL for detail page — checks entry record and preloaded IDB cache. */
+export function resolveDetailSnapshotUrlSync(entryId, entryRecord, seedMap) {
+  const fromEntry = snapshotUrlFromEntryRecord(entryId, entryRecord);
+  if (fromEntry) return fromEntry;
+
+  if (
+    typeof window !== 'undefined' &&
+    window.__pagmarDetailSnapshotByEntryId &&
+    window.__pagmarDetailSnapshotByEntryId[entryId]
+  ) {
+    return window.__pagmarDetailSnapshotByEntryId[entryId];
+  }
+
+  if (entryShouldUseBundledSeedGlb(entryId, seedMap, entryRecord)) {
+    return canonicalSeedSnapshotUrl(entryId);
+  }
+  return null;
+}
+
+/** Async snapshot URL — also reads hi-res preview from IndexedDB. */
+export async function resolveDetailSnapshotUrlAsync(entryId, entryRecord, seedMap) {
+  const sync = resolveDetailSnapshotUrlSync(entryId, entryRecord, seedMap);
+  if (sync) return sync;
+  if (entryId == null) return null;
+  try {
+    const store = await import('./amulet-glb-store.js');
+    const raw = await store.loadSnapshot('collection-' + entryId);
+    if (raw) {
+      if (typeof window !== 'undefined') {
+        window.__pagmarDetailSnapshotByEntryId = window.__pagmarDetailSnapshotByEntryId || {};
+        window.__pagmarDetailSnapshotByEntryId[entryId] = raw;
+      }
+      return raw;
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function glbUrlMatchesEntryId(glbUrl, entryId) {
   if (!glbUrl || entryId == null) return false;
   const id = String(entryId);
@@ -190,7 +242,12 @@ export function collectAuthoritativeGlbUrls(entryId, seedMap, entryRecord, navGl
   if (entryRecord && entryRecord.glbUrl) push(entryRecord.glbUrl);
   push(authoritativeGlbUrlForEntry(entryId, seedMap, entryRecord));
   push(bundledGlbUrlForEntry(entryRecord, entryId, seedMap));
-  push(canonicalSeedGlbUrl(entryId));
+  if (
+    isSeedCatalogEntry(entryId, seedMap) ||
+    entryShouldUseBundledSeedGlb(entryId, seedMap, entryRecord)
+  ) {
+    push(canonicalSeedGlbUrl(entryId));
+  }
   return urls;
 }
 

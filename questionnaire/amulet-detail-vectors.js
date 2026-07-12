@@ -5,7 +5,8 @@
 import {
   clearChoicePresetThumbVectors,
   syncChoicePresetThumbVectors,
-} from './choice-preset-vectors.js?v=20250709-choice-vectors';
+} from './choice-preset-vectors.js?v=20250712-thumb-unify';
+import { questionnaireThumbFitLayout } from './thumb-vector-layout.js?v=20250712-vector-grid-3col';
 
 const DETAIL_VECTOR_COLOR = '#F4F4E8'; /* צהוב לבן - --pagmar-yellow-white */
 /** Internal mask raster only (never shown). Must stay pure white - lum threshold is 248. */
@@ -1481,6 +1482,8 @@ function renderContourSvg(contour, container, options) {
       maxX: bounds.maxX + DETAIL_VECTOR_VIEW_BLEED,
       maxY: bounds.maxY + DETAIL_VECTOR_VIEW_BLEED,
     });
+  } else if (options && options.thumb) {
+    layout = questionnaireThumbFitLayout(bounds);
   } else {
     const preliminaryScale = estimateDetailVectorScale(bounds, options);
     const bleed = strokeBleedInUserUnits(preliminaryScale);

@@ -1,24 +1,22 @@
 /**
- * Open page - seed amulet [021] in Figma layout slot.
- * Static PNG shows immediately; 3D upgrades after idle.
+ * Open page - seed amulet [014] in Figma layout slot.
+ * Loads 3D immediately (no static snapshot flash).
  */
-import { loadGlbFromUrl } from './amulet-glb-store.js';
+import { loadGlb } from './amulet-glb-store.js';
 import {
   mountDetailAmulet3D,
   disposeDetailAmuletMount,
   waitForContainerLayout,
-} from './amulet-detail-mount.js';
+} from './amulet-detail-mount.js?v=20250712-open-stone';
 
-const AMULET_021_ENTRY_ID = '1783268062084';
-const AMULET_021_GLB_URL = '/questionnaire/seed/glbs/' + AMULET_021_ENTRY_ID + '.glb';
+const AMULET_014_ENTRY_ID = '1783187972558';
+const AMULET_014_GLB_KEY = 'collection-' + AMULET_014_ENTRY_ID;
 
 let bootToken = 0;
 
-function hidePlaceholder(container) {
+function markAmuletReady(container) {
   if (!container) return;
   container.classList.add('is-3d-ready');
-  const placeholder = container.querySelector('.pagmar-open__amulet-placeholder');
-  if (placeholder) placeholder.setAttribute('aria-hidden', 'true');
 }
 
 async function bootOpenAmulet3D() {
@@ -26,12 +24,12 @@ async function bootOpenAmulet3D() {
   if (!container) return;
 
   const token = ++bootToken;
-  container.dataset.amuletLabel = '021';
-  container.dataset.amuletId = AMULET_021_ENTRY_ID;
+  container.dataset.amuletLabel = '014';
+  container.dataset.amuletId = AMULET_014_ENTRY_ID;
 
   try {
-    const loaded = await loadGlbFromUrl(AMULET_021_GLB_URL);
-    if (!loaded?.scene) throw new Error('seed GLB [021] missing');
+    const loaded = await loadGlb(AMULET_014_GLB_KEY, { preferBundledSeed: true });
+    if (!loaded?.scene) throw new Error('seed GLB [014] missing');
     if (token !== bootToken) return;
 
     disposeDetailAmuletMount();
@@ -43,8 +41,8 @@ async function bootOpenAmulet3D() {
       useDetailPresentation: true,
       autoRotate: true,
       autoRotateSpeed: 0.11,
-      fitMargin: 1.02,
-      skipStoneBackCap: true,
+      fitMargin: 1.08,
+      initialRotX: 0.2,
     });
 
     if (token !== bootToken) {
@@ -52,11 +50,11 @@ async function bootOpenAmulet3D() {
       return;
     }
 
-    hidePlaceholder(container);
+    markAmuletReady(container);
     window.dispatchEvent(new CustomEvent('pagmar-open:amulet-ready'));
   } catch (err) {
     if (token === bootToken) {
-      console.warn('[open-amulet-3d] mount failed — keeping static snapshot', err);
+      console.warn('[open-amulet-3d] mount failed', err);
     }
   }
 }

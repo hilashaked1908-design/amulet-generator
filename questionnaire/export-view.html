@@ -10,11 +10,28 @@
   <script src="pagmar-boot.js?v=20250710-export-view"></script>
   <link rel="stylesheet" href="../css/fonts.css?v=20250710-export-view">
   <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-export-view">
-  <link rel="stylesheet" href="../css/buttons.css?v=20250710-export-view">
-  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250710-export-view">
-  <link rel="stylesheet" href="../css/export-view.css?v=20250711-export-amulet-scale">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250712-about-unified">
+  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250712-about-unified">
+  <link rel="stylesheet" href="../css/export-view.css?v=20250712-export-loader-fog">
 </head>
-<body class="pagmar-export-view">
+<body class="pagmar-export-view is-export-loading">
+
+  <div
+    class="pagmar__export-page-loader"
+    id="exportPageLoader"
+    hidden
+    role="status"
+    aria-live="polite"
+    aria-busy="false"
+  >
+    <div class="pagmar__export-page-loader__vessels" aria-hidden="true">
+      <img class="pagmar__export-page-loader__vessel pagmar__export-page-loader__vessel--1" src="assets/detail/loader-vessel-1.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__export-page-loader__vessel pagmar__export-page-loader__vessel--2" src="assets/detail/loader-vessel-2.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__export-page-loader__vessel pagmar__export-page-loader__vessel--3" src="assets/detail/loader-vessel-3.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+      <img class="pagmar__export-page-loader__vessel pagmar__export-page-loader__vessel--4" src="assets/detail/loader-vessel-4.svg" alt="" decoding="sync" draggable="false" fetchpriority="high">
+    </div>
+    <span class="pagmar__export-page-loader__sr">טוען</span>
+  </div>
 
   <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
     <defs>
@@ -36,16 +53,9 @@
 
   <div class="pagmar__export-page">
     <header class="pagmar__export-chrome">
-      <a class="pagmar-chrome__about" href="index.html?result=1" aria-label="דף הבית">
-        <img
-          src="assets/index-figma-2127/about-icon-2601.svg"
-          width="60"
-          height="60"
-          alt=""
-          decoding="async"
-          draggable="false"
-        >
-      </a>
+      <button type="button" class="pagmar__index-about pagmar-chrome__about" id="exportAboutBtn" aria-label="אודות">
+        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
+      </button>
       <button type="button" class="pagmar-chrome__close" id="exportCloseBtn" aria-label="סגור">
         <img src="assets/detail/close-icon.svg" width="16.119" height="21.235" alt="">
       </button>
@@ -76,20 +86,39 @@
           <div class="pagmar__export-amulet-slot" id="exportAmulet3D"></div>
         </div>
         </div>
+
+        <div class="pagmar__export-barcode-block">
+          <span class="pagmar__export-tag pagmar__export-barcode-tag">[לייצוא קמע]</span>
+          <div class="pagmar__export-barcode-glass glass-lens" data-glass-source="export-fog">
+            <div class="glass-lens__backdrop" aria-hidden="true">
+              <div class="glass-clone" aria-hidden="true">
+                <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
+              </div>
+              <div class="glass-lens__tint" aria-hidden="true"></div>
+              <div class="glass-chrome" aria-hidden="true"></div>
+            </div>
+            <div
+              class="pagmar__export-barcode-slot"
+              id="exportBarcodeSlot"
+              aria-label="ברקוד לפתיחת התמונה בטלפון"
+            ></div>
+          </div>
+        </div>
       </div>
 
       <div class="pagmar__export-actions">
-        <button type="button" class="pagmar__export-action-btn" id="exportImageBtn">
-          <span class="pagmar__export-image-btn__label">ייצא קמע</span>
-        </button>
         <button type="button" class="pagmar__export-action-btn" id="exportSaveBtn">שמור קמע</button>
-        <button type="button" class="pagmar__export-action-btn pagmar__export-action-btn--filled" id="exportCreateAnotherBtn">צור קמע נוסף</button>
+        <button type="button" class="pagmar__export-action-btn pagmar__export-action-btn--filled" id="exportCreateAnotherBtn">ליצירת קמע נוסף</button>
       </div>
     </main>
   </div>
 
+  <script src="vendor/qrcode-generator.js?v=20250712-export-barcode"></script>
+  <script>
+    if (typeof qrcode === 'function') window.qrcode = qrcode;
+  </script>
   <script src="glass-lens.js?v=20250710-export-view"></script>
   <script src="questions.js?v=20250710-export-view"></script>
-  <script type="module" src="export-view.js?v=20250711-export-figma3"></script>
+  <script type="module" src="export-view.js?v=20250712-export-loader-fog"></script>
 </body>
 </html>

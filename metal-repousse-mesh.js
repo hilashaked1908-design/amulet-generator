@@ -2,7 +2,7 @@
  * Unified repoussé metal sheet — positive-only relief from wish glyph paths.
  * One continuous displaced surface (not wireframe tubes).
  */
-import * as THREE from 'https://esm.sh/three@0.160.0';
+import * as THREE from './questionnaire/vendor/three.module.js';
 import { yieldToMainThread } from './render-yield.js';
 
 const MASK_SCALE = 2;

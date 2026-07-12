@@ -10,12 +10,12 @@
   <script src="pagmar-boot.js?v=20250709-full-site"></script>
   <link rel="stylesheet" href="../css/fonts.css?v=20250710-about-letters">
   <link rel="stylesheet" href="../css/glass-lens.css?v=20250710-glass-blur-distort">
-  <link rel="stylesheet" href="../css/questionnaire.css?v=20250709-full-site">
-  <link rel="stylesheet" href="../css/buttons.css?v=20250710-glass-blur-distort">
-  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250709-choice-fix">
+  <link rel="stylesheet" href="../css/questionnaire.css?v=20250712-amulet-frame-clear">
+  <link rel="stylesheet" href="../css/buttons.css?v=20250712-about-unified">
+  <link rel="stylesheet" href="../css/request-flow-figma.css?v=20250712-amulet-frame-clear">
   <link rel="stylesheet" href="../css/result-overlay.css?v=20250711-result-tag-gap">
-  <link rel="stylesheet" href="../css/about-overlay.css?v=20250711-frame484-down5">
-  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250710-about-refine">
+  <link rel="stylesheet" href="../css/about-overlay.css?v=20250712-about-unified">
+  <link rel="stylesheet" href="../css/pagmar-chrome.css?v=20250712-about-unified">
 </head>
 <body class="pagmar-index">
 
@@ -51,18 +51,8 @@
   <div class="pagmar-viewport">
     <div class="pagmar-canvas" id="pagmarCanvas" aria-label="פתיחת שאלון קמע">
 
-      <!-- Figma 2601:40649 - Frame 397 about icon -->
       <button type="button" class="pagmar__index-about pagmar-chrome__about" id="indexAboutBtn" aria-label="אודות">
-        <img
-          class="pagmar__index-about__icon"
-          src="assets/index-figma-2127/about-icon-2601.svg"
-          width="60"
-          height="60"
-          alt=""
-          decoding="async"
-          draggable="false"
-          aria-hidden="true"
-        >
+        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
       </button>
 
       <aside class="pagmar__index-filter-sidebar" id="indexFilterSidebar" aria-label="סינון">
@@ -180,39 +170,11 @@
                   </button>
                 </div>
             </div>
-            <p class="figma-amulet-stage-caption" id="amuletStageCaption" hidden aria-live="polite"></p>
+            <p class="figma-amulet-stage-caption figma-q__tag" id="amuletStageCaption" hidden aria-live="polite"></p>
           </div>
 
-          <div
-            class="pagmar__garden-amulet-hover pagmar__request-vector-tip"
-            id="questionVectorCopy"
-            hidden
-            aria-live="polite"
-          >
-            <div
-              class="pagmar__garden-amulet-hover__surface glass-tooltip glass-lens"
-              data-glass-source="request-fog"
-            >
-              <div class="glass-lens__backdrop" aria-hidden="true">
-                <div class="glass-clone" aria-hidden="true">
-                  <canvas class="glass-clone__capture" aria-hidden="true"></canvas>
-                </div>
-                <div class="glass-lens__tint" aria-hidden="true"></div>
-                <div class="glass-chrome" aria-hidden="true"></div>
-              </div>
-              <p class="pagmar__garden-amulet-hover__request figma-q__vector-copy-text"></p>
-            </div>
-          </div>
-
-          <button type="button" class="figma-layer figma-request-about pagmar-chrome__about" id="requestAboutBtn" aria-label="אודות">
-            <img
-              src="assets/index-figma-2127/about-icon-2601.svg"
-              width="60"
-              height="60"
-              alt=""
-              decoding="async"
-              draggable="false"
-            >
+          <button type="button" class="pagmar__index-about pagmar-chrome__about" id="requestAboutBtn" aria-label="אודות">
+            <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
           </button>
 
           <button type="button" class="figma-layer figma-close pagmar-chrome__close" id="requestCloseBtn" aria-label="סגור">
@@ -252,6 +214,23 @@
               <div class="figma-q__field-box">
                 <div class="figma-q__field" id="questionField"></div>
               </div>
+            </div>
+            <div
+              class="figma-q__transition-zone"
+              id="questionTransitionLoader"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <div class="figma-q__transition-loader" aria-hidden="true">
+                <div class="figma-q__transition-loader__vessels">
+                  <img class="figma-q__transition-loader__vessel figma-q__transition-loader__vessel--1" src="assets/detail/loader-vessel-1.svg" alt="" decoding="sync" draggable="false">
+                  <img class="figma-q__transition-loader__vessel figma-q__transition-loader__vessel--2" src="assets/detail/loader-vessel-2.svg" alt="" decoding="sync" draggable="false">
+                  <img class="figma-q__transition-loader__vessel figma-q__transition-loader__vessel--3" src="assets/detail/loader-vessel-3.svg" alt="" decoding="sync" draggable="false">
+                  <img class="figma-q__transition-loader__vessel figma-q__transition-loader__vessel--4" src="assets/detail/loader-vessel-4.svg" alt="" decoding="sync" draggable="false">
+                </div>
+              </div>
+              <span class="figma-q__transition-loader__sr">טוען</span>
             </div>
           </div>
 
@@ -426,16 +405,14 @@
     <div class="pagmar__about-fog" id="aboutFogHost" aria-hidden="true"></div>
 
     <header class="pagmar__about-chrome" aria-label="כלי ניווט">
-      <span class="pagmar__about-chrome-logo pagmar-chrome__about" aria-hidden="true">
-        <img
-          src="assets/index-figma-2127/about-icon-2601.svg"
-          width="60"
-          height="60"
-          alt=""
-          decoding="async"
-          draggable="false"
-        >
-      </span>
+      <button
+        type="button"
+        class="pagmar__index-about pagmar-chrome__about pagmar__about-chrome-logo"
+        id="aboutChromeAboutBtn"
+        aria-label="אודות"
+      >
+        <span class="pagmar__index-about__label pagmar__index-type-target" data-type-text="אודות">אודות</span>
+      </button>
       <button
         type="button"
         class="pagmar__about-chrome-close pagmar-chrome__close"
@@ -608,17 +585,17 @@
   <script src="garden-stars.js?v=20250709-full-site"></script>
   <script src="glass-lens.js?v=20250710-about-amulet-glass"></script>
   <script src="garden-amulet-hover.js?v=20250709-full-site"></script>
-  <script src="questionnaire-q1-vector-tip.js?v=20250709-q1-tip"></script>
+  <script src="questionnaire-vector-thumb-hover.js?v=20250712-vector-thumb-hover"></script>
   <script type="module">
-    import('./garden-three.js?v=20250711-glb-url-authority').catch(function (err) {
+    import('./garden-three.js?v=20250712-no-index-purge').catch(function (err) {
       console.error('[garden-three] failed to load', err);
     });
   </script>
-  <script src="questionnaire-ui.js?v=20250711-stable-frames"></script>
-  <script src="button-roll.js?v=20250709-full-site"></script>
-  <script src="index-buttons.js?v=20250709-full-site"></script>
+  <script src="questionnaire-ui.js?v=20250712-q78-instant-type"></script>
+  <script src="button-roll.js?v=20250712-about-text-btn"></script>
+  <script src="index-buttons.js?v=20250712-about-text-btn"></script>
   <script src="index-filter-view.js?v=20250711-debug-entry"></script>
-  <script src="about-close.js?v=20250710-about-refine"></script>
+  <script src="about-close.js?v=20250712-about-toggle"></script>
   <script src="about-letters.js?v=20250711-letters-frame730"></script>
   <script src="about-amulet-hover.js?v=20250710-about-amulet-hover"></script>
   <script type="module">
