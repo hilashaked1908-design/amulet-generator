@@ -138,7 +138,7 @@ body.pagmar-open {
 .pagmar-open__enter-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(20 * var(--open-u));
+  bottom: calc(20 * var(--open-u) + 30px);
   top: auto;
   width: calc(362.535 * var(--open-u));
   margin: 0;
