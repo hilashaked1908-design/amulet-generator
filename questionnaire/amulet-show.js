@@ -562,14 +562,22 @@ async function showResultOverlay(container, answers) {
 
   try {
     const liveCanvas = container?.querySelector('canvas');
-    let mounted = false;
-    try {
-      mounted = await mountResultAmuletLikeDetail(slot, 'user-amulet');
-    } catch (detailErr) {
-      console.warn('[amulet-show] result detail mount failed, using live canvas', detailErr);
-    }
-    if (!mounted) {
+    // Prefer the already-rendered live canvas: it is framed and lit correctly
+    // (it's what the user briefly sees). The GLB re-mount can mis-frame/under-
+    // light the amulet on slower hosts, which showed as a black result view in
+    // the cloud. Fall back to the detail re-mount only if no live canvas exists.
+    if (liveCanvas?.width && liveCanvas?.height) {
       mountLiveCreateCanvasInSlot(slot, liveCanvas);
+    } else {
+      let mounted = false;
+      try {
+        mounted = await mountResultAmuletLikeDetail(slot, 'user-amulet');
+      } catch (detailErr) {
+        console.warn('[amulet-show] result detail mount failed', detailErr);
+      }
+      if (!mounted) {
+        throw new Error('no live canvas available and detail mount failed');
+      }
     }
   } catch (err) {
     console.error('[amulet-show] could not mount result amulet', err);
