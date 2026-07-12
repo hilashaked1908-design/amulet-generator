@@ -141,6 +141,12 @@ export function needsVectorFrameLoad(answers) {
   return willShowNewVectorLayer(answers) || needsVectorCatchup(answers);
 }
 
+function isCreateDockInputFocused() {
+  const active = document.activeElement;
+  if (!active || (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA')) return false;
+  return Boolean(active.closest('.pagmar__request-artboard'));
+}
+
 function scheduleBackgroundPrecompose(answers, options = {}) {
   const token = ++precomposeToken;
   const urgent = options.urgent === true;
@@ -149,6 +155,13 @@ function scheduleBackgroundPrecompose(answers, options = {}) {
 
   function run() {
     if (token !== precomposeToken) return;
+    // Never run the heavy (synchronous) compose while the user is typing in the
+    // questionnaire dock (Q7/Q8) — it blocks input and makes typed text appear
+    // only after a stutter. Defer and re-check until the field is not focused.
+    if (!urgent && isCreateDockInputFocused()) {
+      window.setTimeout(run, 500);
+      return;
+    }
     void import('./amulet-final-render.js')
       .then(function (finalMod) {
         if (token !== precomposeToken) return;
