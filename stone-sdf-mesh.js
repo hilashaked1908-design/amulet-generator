@@ -3156,7 +3156,7 @@ export function buildStoneSculptureMeshFromMask(
   const spanZ = maxZ - minZ;
   const maxSpan = Math.max(spanX, spanY, spanZ);
   const res = Math.min(
-    erodedArtifact ? 52 : 46,
+    erodedArtifact ? 48 : 44,
     Math.max(
       44,
       Math.round(
@@ -3174,7 +3174,7 @@ export function buildStoneSculptureMeshFromMask(
   if (meteoriteGeom) {
     nz = Math.max(36, Math.round(nz * 1.58));
   }
-  const maxVoxels = meteoriteGeom ? 60000 : erodedArtifact ? 54000 : 40000;
+  const maxVoxels = meteoriteGeom ? 52000 : erodedArtifact ? 46000 : 32000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -3385,7 +3385,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   const spanZ = maxZ - minZ;
   const maxSpan = Math.max(spanX, spanY, spanZ);
   const res = Math.min(
-    erodedArtifact ? 52 : 46,
+    erodedArtifact ? 48 : 44,
     Math.max(
       44,
       Math.round(
@@ -3403,7 +3403,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   if (meteoriteGeom) {
     nz = Math.max(36, Math.round(nz * 1.58));
   }
-  const maxVoxels = meteoriteGeom ? 60000 : erodedArtifact ? 54000 : 40000;
+  const maxVoxels = meteoriteGeom ? 52000 : erodedArtifact ? 46000 : 32000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
