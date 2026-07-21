@@ -3174,7 +3174,7 @@ export function buildStoneSculptureMeshFromMask(
   if (meteoriteGeom) {
     nz = Math.max(36, Math.round(nz * 1.58));
   }
-  const maxVoxels = meteoriteGeom ? 52000 : erodedArtifact ? 46000 : 32000;
+  const maxVoxels = meteoriteGeom ? 44000 : erodedArtifact ? 38000 : 26000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
@@ -3403,7 +3403,7 @@ export async function buildStoneSculptureMeshFromMaskAsync(
   if (meteoriteGeom) {
     nz = Math.max(36, Math.round(nz * 1.58));
   }
-  const maxVoxels = meteoriteGeom ? 52000 : erodedArtifact ? 46000 : 32000;
+  const maxVoxels = meteoriteGeom ? 44000 : erodedArtifact ? 38000 : 26000;
   const voxels = nx * ny * nz;
   if (voxels > maxVoxels) {
     const s = Math.cbrt(maxVoxels / voxels);
